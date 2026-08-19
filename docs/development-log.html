@@ -39,7 +39,7 @@
       <tr><td>12Q Float16 practical precision</td><td class="pass">PASS (APPROXIMATE)</td><td>All 24 Gate 09 cases retain top-20 membership; minimum graded nDCG 0.9999925. One rank-16/17 swap proves it is not the native authority. Candidate stores remain float16; exhaustive reference remains native streaming.</td></tr>
       <tr><td>12D Two-pass exhaustive frontier</td><td class="pass">PASS (BOUNDED SMOKE)</td><td>Atomic/resumable NSE and NASDAQ frontier smokes return deterministic native top-20 with strict stopping certificates, ≤4.44e-16 reconstructed-bound delta and 421–436 MB RSS. Full-market scale remains T12-04.</td></tr>
       <tr><td>12E Deterministic scale ladder</td><td class="pass">PASS — BOTH MARKETS</td><td>Full NSE and NASDAQ 1%/10% aggregate gates pass. NASDAQ 10% covers 1,159 symbols/363,633 candidates, prunes 99.78%, repeats its digest, searches in 6.82/6.59 minutes and projects a 68.2-minute full search at 547 MB.</td></tr>
-      <tr><td>12F Blind authority matrix</td><td class="open">RUNNER READY — 0/24 CASES</td><td>Versioned exact-reference artifacts, provenance validation, atomic resume, readable case reports and 12-case aggregation gates are implemented. No production ranking or forward outcome is read during authority generation.</td></tr>
+      <tr><td>12F Blind authority matrix</td><td class="open">IN PROGRESS — 1/24 CASES</td><td>The full NSE homefirst-current authority passes over 1,040,116 candidates with a repeated exact digest and strict stopping proof. The NSE aggregate correctly remains incomplete at 1/12. No production ranking or forward outcome has been read.</td></tr>
       <tr><td>12 Full-universe production matrix</td><td class="open">OPEN</td><td>A bounded exact-safe reference now exists, while full-exchange scale and the independent 24-case recall matrix remain unverified.</td></tr>
     </tbody>
   </table>
@@ -332,6 +332,15 @@
   <p><b>Reuse:</b> A matching scale-ladder frontier may seed a case through hard links or copies, but every shard is revalidated by the normal frontier builder against the current source, benchmark, quality, request, schema and content digest. Other queries build independent query-specific shards.</p>
   <p><b>Verification:</b> Round-trip, candidate-universe and registry provenance drift, tamper detection, full-exhaustion certificate, scale-frontier seeding, completed-checkpoint resume, HTML output and existing exhaustive/brute-force differentials pass. The complete repository suite passes 111 tests. Authority generation is now ready; no case authority or recall result is claimed by this implementation checkpoint.</p>
   <p><b>Next:</b> Generate and freeze all 12 NSE and 12 NASDAQ authorities, checkpointing case by case. Aggregate both matrices only after all artifacts validate, and only then run the preregistered production pool recall comparison.</p>
+</section>
+
+<section class="entry" id="log-028">
+  <h2>L-028 — First frozen full-universe authority: NSE homefirst current</h2>
+  <p><b>Scope:</b> Generated the first T12-05 reference for <code>nse-homefirst-current-252</code> / episode <code>99fe49f51285b398361b7b13</code>. The run read neither production retrieval output nor forward outcomes.</p>
+  <p><b>Frontier:</b> Seeded all 1,843 shards from the certified 100% NSE scale root, then revalidated every shard against the current frozen query, source universe, benchmark, quality, request, schema and content digests. The complete frontier accounts for 1,040,116 eligible stride-five episodes with zero failures; no shard required rebuilding.</p>
+  <p><b>Exact certificate:</b> Native completion evaluates 1,278 candidates and safely prunes 1,038,838. The two independent searches take 915.48 and 955.23 seconds, return the same complete match payload digest <code>71320df3…c4c</code>, use the same frontier manifest, and establish strict <code>next lower bound &gt; stop threshold</code>. Peak RSS is 641.99 MB, below the 1 GiB gate. The sealed authority digest is <code>371e9c5c…c13</code>.</p>
+  <p><b>Independent reload:</b> The public loader rechecked the artifact content/result digests, both certificates, accounting, manifest bindings and 20-match count. The dataset aggregator then validated current universe provenance and reported exactly 1/12 NSE cases complete; all 11 missing artifacts remain explicit failures in the progress gate and HTML report.</p>
+  <p><b>Decision:</b> This one case passes, but T12-05 remains open at 1/24. Continue case-by-case authority generation. Do not run production-pool recall or inspect forward outcomes until both 12-case authority matrices pass.</p>
 </section>
 </main>
 
