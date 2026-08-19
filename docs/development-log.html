@@ -286,6 +286,15 @@
   <p><b>Projection:</b> Scaling the measured 50% work by the exact eligible-symbol ratio projects 1,654.43 seconds (27.6 minutes) for a fresh full build and 1,141.99 seconds (19.0 minutes) for a full exact search. Both are below the two-hour NSE offline limit. Projections remain planning evidence; only the actual 100% rung can establish complete NSE authority.</p>
   <p><b>Decision:</b> The 100% NSE rung is authorized by time, RSS and disk evidence. T12-04 is still open until that rung and the NASDAQ 1%/10% rungs pass.</p>
 </section>
+
+<section class="entry" id="log-023">
+  <h2>L-023 — Nested frontier reuse before the NSE 100% rung</h2>
+  <p><b>Why:</b> Building the 100% scale root independently would recompute the already certified 922-symbol half-universe and add roughly 14 minutes without increasing correctness evidence.</p>
+  <p><b>How:</b> Before a larger rung, the ladder locates the largest completed lower-scale root for the same query and hard-links its per-symbol NPZ shards into the new root. The normal exhaustive builder then validates every seeded shard against the new explicit instrument scope, current source and benchmark fingerprints, quality/request provenance, schema and content digest. Invalid shards are not accepted; atomic replacement in the larger root cannot alter the lower-rung directory entry.</p>
+  <p><b>Reporting:</b> Each rung now records seeded, newly built and reused instrument counts. A mixed seeded build deliberately omits a fresh-full-build projection because its elapsed time measures only incremental work. Frontier byte projections remain logical and therefore conservative even where hard links avoid physical duplication.</p>
+  <p><b>Tests:</b> A nested 50%/100% fixture proves the full rung seeds two verified shards, reuses both, builds the remaining eligible shard, repeats the same exact digest and reconciles candidate accounting. All 108 repository tests pass.</p>
+  <p><b>Decision:</b> Proceed to the actual 100% NSE rung using the locked two-shard completion cache and the existing 50% certificate as the validated seed.</p>
+</section>
 </main>
 
 <section id="reproduce">

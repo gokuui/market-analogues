@@ -61,14 +61,16 @@ def test_scale_ladder_runs_resume_repeat_and_report(
     source, query, request, quality = _inputs(directory_dataset, bars)
     result = run_scale_ladder(
         query, source, request, quality, tmp_path / "ladder",
-        fractions=(1.0,), seed="locked", batch_size=11,
+        fractions=(0.5, 1.0), seed="locked", batch_size=11,
         frontier_batch_rows=1, representation_cache_shards=2,
         maximum_rss_mb=4096, disk_reserve_bytes=0,
         maximum_projected_hours=1,
     )
     assert result.passed
-    rung = result.rungs[0]
+    rung = result.rungs[-1]
     assert rung.selected_instruments == result.total_eligible_instruments == 3
+    assert rung.seeded_shards == 2
+    assert rung.instruments_reused == 2 and rung.instruments_built == 1
     assert rung.result_digest == rung.repeated_digest
     assert rung.eligible_candidates == rung.exact_evaluated + rung.safely_pruned
     assert rung.projected_full_search_seconds == rung.search_seconds

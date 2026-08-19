@@ -5,6 +5,7 @@ from hashlib import sha256
 from html import escape
 import json
 import math
+import os
 from pathlib import Path
 import resource
 import shutil
@@ -27,6 +28,9 @@ class ScaleRung:
     result_digest: str
     repeated_digest: str
     previous_top_k_overlap: float | None
+    seeded_shards: int
+    instruments_built: int
+    instruments_reused: int
     build_seconds: float
     resume_seconds: float
     search_seconds: float
@@ -91,6 +95,36 @@ def _matches_digest(matches) -> str:
     ])
 
 
+def _seed_from_largest_lower_scale(
+    root: Path, rung_root: Path, query_episode_id: str, fraction: float,
+) -> int:
+    candidates: list[tuple[float, Path]] = []
+    for path in root.glob("scale-*"):
+        try:
+            candidate_fraction = int(path.name.removeprefix("scale-")) / 1_000_000
+        except ValueError:
+            continue
+        if candidate_fraction < fraction:
+            candidates.append((candidate_fraction, path))
+    if not candidates:
+        return 0
+    source = max(candidates)[1] / query_episode_id / "shards"
+    if not source.exists():
+        return 0
+    seeded = 0
+    for path in source.rglob("*.npz"):
+        destination = rung_root / query_episode_id / "shards" / path.relative_to(source)
+        if destination.exists():
+            continue
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            os.link(path, destination)
+        except OSError:
+            shutil.copy2(path, destination)
+        seeded += 1
+    return seeded
+
+
 def run_scale_ladder(
     query: Episode,
     source: OHLCVSource,
@@ -124,6 +158,9 @@ def run_scale_ladder(
     for fraction, keys in zip(fractions, prefixes):
         tag = f"scale-{round(fraction * 1_000_000):07d}"
         rung_root = root / tag
+        seeded = _seed_from_largest_lower_scale(
+            root, rung_root, query.key.id, fraction,
+        )
         build = build_exact_frontier(
             query, source, request, quality, rung_root, stride=stride,
             batch_size=batch_size, instrument_keys=keys,
@@ -177,7 +214,8 @@ def run_scale_ladder(
         if free + frontier_bytes - projected_frontier < disk_reserve_bytes:
             rung_failures.append("projected full frontier violates the disk reserve")
         projected_build = (
-            build.seconds * projection_factor if build.instruments_built else None
+            build.seconds * projection_factor
+            if build.instruments_built and not build.instruments_reused else None
         )
         projected_search = certificate.elapsed_seconds * projection_factor
         if projected_search > maximum_projected_hours * 3600:
@@ -188,7 +226,9 @@ def run_scale_ladder(
         rung = ScaleRung(
             fraction, len(keys), total, certificate.eligible_candidates,
             certificate.exact_evaluated, certificate.safely_pruned,
-            digest, repeated_digest, overlap, build.seconds, resume.seconds,
+            digest, repeated_digest, overlap, seeded,
+            build.instruments_built, build.instruments_reused,
+            build.seconds, resume.seconds,
             certificate.elapsed_seconds, repeated.certificate.elapsed_seconds,
             frontier_bytes, projected_build, projected_search, rss, free,
             not rung_failures, tuple(rung_failures),
