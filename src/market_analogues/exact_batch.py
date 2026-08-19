@@ -406,6 +406,7 @@ def batch_representation_lower_bounds(
     }
     for group, names in GROUPS.items():
         channel_distances = []
+        channel_included = []
         for name in names:
             query_values = query.samples_48.get(name)
             candidate_values = [candidate.samples_48.get(name) for candidate in candidates]
@@ -413,6 +414,7 @@ def batch_representation_lower_bounds(
             if query_values is None:
                 distances = np.where(present, 2.0, 0.0)
                 channel_distances.append(distances)
+                channel_included.append(present)
                 continue
             matrix = np.stack([
                 values if values is not None else np.zeros(48)
@@ -431,7 +433,12 @@ def batch_representation_lower_bounds(
             ))
             distances[~present] = 2.0
             channel_distances.append(distances)
-        components[group] = np.mean(channel_distances, axis=0)
+            channel_included.append(np.ones(len(candidates), dtype=bool))
+        included = np.sum(channel_included, axis=0)
+        components[group] = np.divide(
+            np.sum(channel_distances, axis=0), included,
+            out=np.zeros(len(candidates), dtype=float), where=included > 0,
+        )
     rigid_price = components["price"].copy()
     components["price"] = .55 * rigid_price
     components["structural"] = np.sqrt(np.mean(

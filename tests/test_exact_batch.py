@@ -50,9 +50,13 @@ def _assert_representation_equal(
                 np.testing.assert_allclose(left[name], right[name], rtol=0, atol=1e-12)
 
 
-@pytest.mark.parametrize("benchmark_mode", ["full", "partial", "missing"])
+@pytest.mark.parametrize(
+    ("benchmark_mode", "lookback"),
+    [("full", 126), ("partial", 126), ("missing", 126), ("missing", 63)],
+)
 def test_sliding_exact_representations_and_bounds_match_scalar(
     benchmark_mode: str,
+    lookback: int,
 ) -> None:
     case = generate_case("volatile_reversal", 7, n=300)
     benchmark = case.episode.benchmark if benchmark_mode != "missing" else None
@@ -60,10 +64,10 @@ def test_sliding_exact_representations_and_bounds_match_scalar(
         benchmark = benchmark.copy()
         benchmark.loc[benchmark.index[::7], "close"] = np.nan
     batch = sliding_exact_representations(
-        case.episode.bars, benchmark, lookback=126, stride=29,
+        case.episode.bars, benchmark, lookback=lookback, stride=29,
     )
     references = tuple(
-        _reference(case.episode.bars, benchmark, int(position), 126)
+        _reference(case.episode.bars, benchmark, int(position), lookback)
         for position in batch.positions
     )
     for actual, expected in zip(batch.representations, references):

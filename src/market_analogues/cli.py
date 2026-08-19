@@ -5,6 +5,7 @@ from hashlib import sha256
 import importlib.util
 import json
 from pathlib import Path
+import resource
 from time import perf_counter
 
 import numpy as np
@@ -20,6 +21,9 @@ from .config import AppConfig, load_config
 from .episodes import build_episode, build_manifest
 from .exact_storage_feasibility import (
     verify_exact_storage_feasibility, write_exact_storage_report,
+)
+from .exhaustive import (
+    build_exact_frontier, exhaustive_frontier_search, write_exhaustive_report,
 )
 from .exact_batch_verification import verify_exact_batch_kernel, write_exact_batch_report
 from .gates import GateReport, require_passed
@@ -558,6 +562,134 @@ def cmd_verify_exact_batch(args: argparse.Namespace) -> int:
     return 0 if result.passed else 2
 
 
+def cmd_verify_exhaustive_frontier(args: argparse.Namespace) -> int:
+    config, source = _load(args)
+    require_passed(_gates(config), "12c_exact_batch_kernel")
+    require_passed(_gates(config), f"12a_query_registry_{args.dataset}")
+    quality_path = config.artifact_dir / "quality" / f"{args.dataset}.parquet"
+    quality = pd.read_parquet(quality_path)
+    registry_directory = config.artifact_dir / "gate12" / args.dataset
+    registry_yaml = registry_directory / "query-registry.yaml"
+    registry_failures = validate_gate12_registry(source, registry_yaml, quality)
+    if registry_failures:
+        raise SystemExit("; ".join(registry_failures))
+    yaml_registry = pd.DataFrame(
+        (yaml.safe_load(registry_yaml.read_text()) or {})["cases_data"]
+    )
+    registry = pd.read_parquet(registry_directory / "query-registry.parquet")
+    try:
+        pd.testing.assert_frame_equal(
+            yaml_registry.reset_index(drop=True),
+            registry.reset_index(drop=True), check_dtype=False,
+        )
+    except AssertionError as exc:
+        raise SystemExit(f"Gate 12 registry copies disagree: {exc}") from exc
+    query = build_episode(
+        source, InstrumentKey(args.dataset, args.symbol), args.cutoff,
+        args.lookback, config.representation_version,
+    )
+    if query.key.id not in set(registry.episode_id.astype(str)):
+        raise SystemExit("exhaustive verification query is not in the frozen Gate 12 registry")
+    request = SearchQuery(
+        query.key, (args.dataset,), ("A", "B"), args.top_k,
+        max_per_instrument=args.max_per_instrument,
+        minimum_history_gap_bars=args.minimum_history_gap,
+    )
+    root = Path(args.frontier_root) if args.frontier_root else (
+        config.artifact_dir / "gate12" / "frontiers"
+    )
+    build = build_exact_frontier(
+        query, source, request, quality, root, stride=args.stride,
+        batch_size=args.batch_size, instrument_limit=args.instrument_limit,
+        rebuild_invalid=args.rebuild_invalid,
+    )
+    resume = build_exact_frontier(
+        query, source, request, quality, root, stride=args.stride,
+        batch_size=args.batch_size, instrument_limit=args.instrument_limit,
+    )
+    failures = list(build.failures) + list(resume.failures)
+    result = exhaustive_frontier_search(
+        query, source, request, root, quality=quality, tolerance=args.tolerance,
+        frontier_batch_rows=args.frontier_batch_rows,
+        representation_cache_shards=args.representation_cache_shards,
+    )
+    repeated = exhaustive_frontier_search(
+        query, source, request, root, quality=quality, tolerance=args.tolerance,
+        frontier_batch_rows=args.frontier_batch_rows,
+        representation_cache_shards=args.representation_cache_shards,
+    )
+    ids = [match.episode_key.id for match in result.matches]
+    repeated_ids = [match.episode_key.id for match in repeated.matches]
+    totals = [match.total_distance for match in result.matches]
+    repeated_totals = [match.total_distance for match in repeated.matches]
+    if ids != repeated_ids:
+        failures.append("repeated exhaustive result IDs differ")
+    maximum_repeat_delta = max(
+        (abs(left - right) for left, right in zip(totals, repeated_totals)),
+        default=0.0,
+    )
+    if maximum_repeat_delta > args.tolerance:
+        failures.append(f"repeated total delta {maximum_repeat_delta:.3e} exceeds tolerance")
+    if len(ids) != args.top_k:
+        failures.append(f"returned {len(ids)} matches; require {args.top_k}")
+    certificate = result.certificate
+    if certificate.exact_evaluated + certificate.safely_pruned != certificate.eligible_candidates:
+        failures.append("certificate accounting does not reconcile")
+    if not certificate.stopped_early:
+        failures.append("bounded smoke did not establish an early stopping frontier")
+    rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024
+    if rss > args.maximum_rss_mb:
+        failures.append(f"peak RSS {rss:.2f} MB exceeds {args.maximum_rss_mb:.2f} MB")
+    metrics = {
+        "dataset": args.dataset, "symbol": args.symbol,
+        "cutoff": query.key.cutoff.isoformat(), "lookback": args.lookback,
+        "instrument_limit": args.instrument_limit,
+        "frontier_batch_rows": args.frontier_batch_rows,
+        "representation_cache_shards": args.representation_cache_shards,
+        "manifest_digest": build.manifest_digest,
+        "instruments_considered": build.instruments_considered,
+        "instruments_built": build.instruments_built,
+        "instruments_reused": build.instruments_reused,
+        "quality_skipped": build.quality_skipped,
+        "resume_instruments_reused": resume.instruments_reused,
+        "eligible_candidates": certificate.eligible_candidates,
+        "exact_evaluated": certificate.exact_evaluated,
+        "safely_pruned": certificate.safely_pruned,
+        "prune_fraction": (
+            certificate.safely_pruned / certificate.eligible_candidates
+            if certificate.eligible_candidates else 0.0
+        ),
+        "matches": len(ids), "stopped_early": certificate.stopped_early,
+        "stop_threshold": (
+            certificate.stop_threshold if np.isfinite(certificate.stop_threshold) else None
+        ),
+        "next_lower_bound": certificate.next_lower_bound,
+        "maximum_recomputed_bound_delta": certificate.maximum_recomputed_bound_delta,
+        "maximum_repeat_delta": maximum_repeat_delta,
+        "build_seconds": build.seconds, "resume_seconds": resume.seconds,
+        "search_seconds": certificate.elapsed_seconds,
+        "repeat_search_seconds": repeated.certificate.elapsed_seconds,
+        "peak_rss_mb": rss,
+    }
+    passed = not failures
+    output = Path(args.output) if args.output else (
+        config.artifact_dir / "reports"
+        / f"exhaustive-frontier-{args.dataset}-{args.symbol}-{args.lookback}.html"
+    )
+    write_exhaustive_report(
+        build, resume, result, output, passed=passed,
+        failures=failures, metrics=metrics,
+    )
+    scope = "smoke" if args.instrument_limit is not None else "full"
+    GateReport(
+        f"12d_exhaustive_frontier_{scope}_{args.dataset}", passed,
+        metrics, failures,
+    ).write(_gates(config))
+    print(json.dumps({"passed": passed, **metrics, "failures": failures}, indent=2))
+    print(output)
+    return 0 if passed else 2
+
+
 def cmd_build_view_store(args: argparse.Namespace) -> int:
     config, source = _load(args)
     require_passed(_gates(config), f"01_ingestion_audit_{args.dataset}")
@@ -936,6 +1068,26 @@ def build_parser() -> argparse.ArgumentParser:
     exact_batch.add_argument("--maximum-rss-mb", type=float, default=512.0)
     exact_batch.add_argument("--output")
     exact_batch.set_defaults(func=cmd_verify_exact_batch)
+    exhaustive = sub.add_parser("verify-exhaustive-frontier")
+    exhaustive.add_argument("--config", required=True)
+    exhaustive.add_argument("--dataset", required=True)
+    exhaustive.add_argument("--symbol", required=True)
+    exhaustive.add_argument("--cutoff", required=True)
+    exhaustive.add_argument("--lookback", type=int, default=252)
+    exhaustive.add_argument("--top-k", type=int, default=20)
+    exhaustive.add_argument("--max-per-instrument", type=int, default=3)
+    exhaustive.add_argument("--minimum-history-gap", type=int, default=60)
+    exhaustive.add_argument("--stride", type=int, default=5)
+    exhaustive.add_argument("--batch-size", type=int, default=128)
+    exhaustive.add_argument("--frontier-batch-rows", type=int, default=256)
+    exhaustive.add_argument("--representation-cache-shards", type=int, default=32)
+    exhaustive.add_argument("--instrument-limit", type=int)
+    exhaustive.add_argument("--rebuild-invalid", action="store_true")
+    exhaustive.add_argument("--tolerance", type=float, default=1e-12)
+    exhaustive.add_argument("--maximum-rss-mb", type=float, default=1024.0)
+    exhaustive.add_argument("--frontier-root")
+    exhaustive.add_argument("--output")
+    exhaustive.set_defaults(func=cmd_verify_exhaustive_frontier)
     view_store = sub.add_parser("build-view-store")
     view_store.add_argument("--config", required=True)
     view_store.add_argument("--dataset", required=True)
