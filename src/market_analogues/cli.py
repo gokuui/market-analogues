@@ -29,6 +29,7 @@ from .scan import streaming_search
 from .types import InstrumentKey, SearchQuery
 from .universe import verify_universe, write_universe_report
 from .verification import run_synthetic_verifier, write_verification_gate
+from .view_store import build_view_store
 
 
 def _load(args: argparse.Namespace) -> tuple[AppConfig, object]:
@@ -211,6 +212,51 @@ def cmd_verify_fusion(args: argparse.Namespace) -> int:
     print(json.dumps({"passed": result.passed, **result.metrics,
                       "failures": result.failures}, indent=2))
     print(output)
+    return 0 if result.passed else 2
+
+
+def cmd_build_view_store(args: argparse.Namespace) -> int:
+    config, source = _load(args)
+    require_passed(_gates(config), f"01_ingestion_audit_{args.dataset}")
+    require_passed(_gates(config), "03_synthetic_retrieval")
+    quality_path = config.artifact_dir / "quality" / f"{args.dataset}.parquet"
+    if not quality_path.exists():
+        raise SystemExit(f"missing quality audit: {quality_path}")
+    quality = pd.read_parquet(quality_path)
+    output_root = Path(args.output_root) if args.output_root else (
+        config.artifact_dir / "view-store"
+    )
+    result = build_view_store(
+        source, quality, output_root, lookbacks=tuple(args.lookbacks),
+        stride=args.stride, representation_version=config.representation_version,
+        workers=args.workers, instrument_limit=args.instrument_limit,
+        rebuild_invalid=args.rebuild_invalid,
+        storage_dtype=args.storage_dtype,
+    )
+    metrics = {
+        "dataset": result.dataset_id,
+        "instruments_considered": result.instruments_considered,
+        "shards_built": result.instruments_built,
+        "shards_reused": result.instruments_reused,
+        "quality_skipped": result.quality_skipped,
+        "rows": result.rows,
+        "storage_dtype": args.storage_dtype,
+        "lookbacks": sorted(set(args.lookbacks)),
+        "stride": args.stride,
+        "manifest": str(result.manifest_path),
+        "manifest_digest": result.manifest_digest,
+        "seconds": result.seconds,
+    }
+    scope = "-".join(str(value) for value in sorted(set(args.lookbacks)))
+    gate_name = f"11a_view_shards_{args.dataset}_{scope}"
+    if args.instrument_limit is not None:
+        gate_name = f"11a_view_shards_smoke_{args.dataset}_{scope}"
+    GateReport(
+        gate_name, result.passed,
+        metrics, list(result.failures),
+    ).write(_gates(config))
+    print(json.dumps({"passed": result.passed, **metrics,
+                      "failures": result.failures}, indent=2))
     return 0 if result.passed else 2
 
 
@@ -419,6 +465,17 @@ def build_parser() -> argparse.ArgumentParser:
     fusion.add_argument("--per-instrument-view", type=int, default=5)
     fusion.add_argument("--output")
     fusion.set_defaults(func=cmd_verify_fusion)
+    view_store = sub.add_parser("build-view-store")
+    view_store.add_argument("--config", required=True)
+    view_store.add_argument("--dataset", required=True)
+    view_store.add_argument("--lookbacks", type=int, nargs="+", default=[63, 126, 252])
+    view_store.add_argument("--stride", type=int, default=5)
+    view_store.add_argument("--workers", type=int, default=4)
+    view_store.add_argument("--instrument-limit", type=int)
+    view_store.add_argument("--rebuild-invalid", action="store_true")
+    view_store.add_argument("--storage-dtype", choices=["float16", "float32"], default="float16")
+    view_store.add_argument("--output-root")
+    view_store.set_defaults(func=cmd_build_view_store)
     return parser
 
 

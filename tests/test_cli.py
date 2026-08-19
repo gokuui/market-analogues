@@ -8,10 +8,10 @@ from market_analogues.cli import build_parser, main
 
 def test_cli_exposes_gated_workflow() -> None:
     parser = build_parser()
-    commands = ["audit", "build-episodes", "build-index", "verify", "search", "compare-methods", "verify-universe", "verify-oracle", "verify-fusion"]
+    commands = ["audit", "build-episodes", "build-index", "verify", "search", "compare-methods", "verify-universe", "verify-oracle", "verify-fusion", "build-view-store"]
     for command in commands:
         argv = [command, "--config", "config.yaml"]
-        if command in {"audit", "build-episodes", "build-index", "search", "verify-universe", "verify-oracle", "verify-fusion"}:
+        if command in {"audit", "build-episodes", "build-index", "search", "verify-universe", "verify-oracle", "verify-fusion", "build-view-store"}:
             argv += ["--dataset", "test"]
         if command in {"search", "verify-universe"}:
             argv += ["--symbol", "AAA", "--cutoff", "2020-01-01"]

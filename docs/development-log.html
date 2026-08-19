@@ -30,6 +30,7 @@
       <tr><td>08 Complete-universe baseline</td><td class="fail">FAIL</td><td>Coverage, causality and memory pass. Price-only candidate fidelity fails: pool-500 versus pool-1,000 top-20 recall is 0.75 NSE and 0.65 NASDAQ.</td></tr>
       <tr><td>09 Stratified exact oracle</td><td class="pass">PASS</td><td>24/24 cases; 5,850 exactly scored episodes; NSE/NASDAQ, 63/126/252 bars, historical/current cutoffs, quality and liquidity strata.</td></tr>
       <tr><td>10 Sampled multiview fusion</td><td class="pass">PASS</td><td>Pool 175 reaches a 0.95 worst-case top-20 recall floor in all 24 sampled oracle cases. Earlier pool-125 failures remain in gate history.</td></tr>
+      <tr><td>11A Persisted view shards</td><td class="open">IN PROGRESS</td><td>Schema, resume, corruption detection and warm search are implemented. Full NSE 252-bar layer passes; NASDAQ and other lookbacks remain.</td></tr>
       <tr><td>12 Full-universe production matrix</td><td class="open">OPEN</td><td>Multiview smoke queries cover every eligible instrument but fail saturation and latency. Exact-safe reference retrieval does not yet exist.</td></tr>
     </tbody>
   </table>
@@ -119,6 +120,17 @@
   <p><b>What:</b> Added this running log and prepared the complete source, tests, configuration examples and readable plans for the repository’s first commit.</p>
   <p><b>Why:</b> Future work needs both code-level rollback and the reasoning needed to understand why a previous approach passed, failed or was rejected.</p>
   <p><b>Scope:</b> Generated market data, large oracle Parquets, reports, gates, virtual environments and caches remain ignored. Their compact metrics and decisions are recorded here; they are reproducible from source and local datasets.</p>
+</section>
+
+<section class="entry" id="log-009">
+  <h2>L-009 — Gate 11A persisted-view foundation and NSE 252 layer</h2>
+  <p><b>What:</b> Added a fixed 240-value, query-independent signature contract; atomic per-symbol compressed NPZ shards; schema/signature/storage versions; source fingerprints; content and manifest digests; deterministic layered manifests; stale-input invalidation; corruption errors and opt-in rebuild; resumable serial/parallel builds; and warm persisted candidate search.</p>
+  <p><b>Why:</b> The full-universe multiview smoke recomputed seven views from raw OHLCV for every query. It was memory-safe but took 130.56 seconds on NSE and 791.27 seconds on NASDAQ before exact reranking.</p>
+  <p><b>How:</b> Extracted close path, range/body, robust volume/shock, market/relative path, 12-stage development and structural features into fixed-size vectors. Vectorized all sliding-window construction per symbol. Stores use stable episode IDs and cutoff nanoseconds; queries load only matching lookback/quality shards, enforce observed-session and same-symbol overlap limits, take local per-view candidates, then apply deterministic reciprocal-rank fusion.</p>
+  <p><b>Correctness:</b> Vectorized signatures match the episode reference within 2e-5. Batch and single distances agree. Float16 storage preserves every tested per-view top-10 set and stays within 0.5% / 0.005 tolerance. Tests cover round-trip, serial/parallel digest identity, incremental lookback merge, unchanged resume, corruption detection, explicit repair, safe manifest paths and deterministic temporal search.</p>
+  <p><b>Optimization evidence:</b> The same 1,264-row smoke store fell from 10.56 seconds to 0.31 seconds after vectorization and kept the exact same pre-quantization content digest. Float16 reduced a 125,907-row scale sample from 95 MB to 52 MB.</p>
+  <p><b>Full NSE 252 evidence:</b> 1,843/1,843 eligible shards, 1,061,384 rows, 262 quality exclusions, zero failures, 106.64-second initial build, 442 MB disk. An unchanged run reused all 1,843 shards in 5.21 seconds with manifest digest <code>52672c6baf48323e045e45c0dd68641ce18acd06b45001a9c7294cec9c9b2b8e</code>. Warm query candidate generation over 1,040,117 eligible rows took 13.63–15.54 seconds and returned pool 1,000, versus 130.56 seconds raw-on-query.</p>
+  <p><b>Limits:</b> This checkpoint covers only NSE lookback 252. Persisted candidate generation does not solve the 1,000-candidate exact-rerank cost or prove exhaustive recall. NASDAQ 252, other lookbacks and exact-safe pruning remain open.</p>
 </section>
 </main>
 

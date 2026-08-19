@@ -12,6 +12,8 @@ market-analogues audit --config config/datasets.example.yaml --dataset nse
 market-analogues build-episodes --config config/datasets.example.yaml --dataset nse
 market-analogues verify --config config/datasets.example.yaml
 market-analogues compare-methods --config config/datasets.example.yaml
+market-analogues build-view-store --config config/datasets.example.yaml \
+  --dataset nse --lookbacks 252 --stride 5
 market-analogues search --config config/datasets.example.yaml --dataset nse \
   --symbol reliance --cutoff 2025-12-31 --streaming
 ```
