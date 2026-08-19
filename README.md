@@ -43,6 +43,7 @@ the ranking. Results are descriptive historical evidence, not forecasts.
 - [Repository comparison and adopted ideas](docs/repository-comparison.html)
 - [Complete-universe verification and next-step plan](docs/universe-verification-plan.html)
 - [Current verification status and next implementation plan](docs/verification-status-and-next-plan.html)
+- [Gate 12 exhaustive reference and independent validation plan](docs/gate12-exhaustive-reference-plan.html)
 - [Running development and decision log](docs/development-log.html)
 
 ## Verification

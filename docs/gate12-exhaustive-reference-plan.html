@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Gate 12 — exhaustive reference and independent validation plan</title>
+  <style>
+    :root{--ink:#17202a;--muted:#566573;--paper:#fff;--bg:#f4f6f7;--line:#d5d8dc;--green:#117864;--red:#b03a2e;--amber:#9a6700;--blue:#2471a3}
+    *{box-sizing:border-box}body{font-family:system-ui,sans-serif;max-width:1240px;margin:0 auto;padding:2rem;background:var(--bg);color:var(--ink);line-height:1.55}
+    header,section{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:1.4rem;margin:0 0 1rem}
+    table{border-collapse:collapse;width:100%}th,td{text-align:left;vertical-align:top;padding:.65rem;border-bottom:1px solid var(--line)}
+    .pass{color:var(--green)}.fail{color:var(--red)}.open{color:var(--amber)}.task{border-left:5px solid var(--blue)}
+    code{background:#eef2f3;padding:.1rem .3rem;overflow-wrap:anywhere}li{margin:.4rem 0}.muted{color:var(--muted)}
+  </style>
+</head>
+<body>
+<header>
+  <h1>Gate 12 — exhaustive reference and independent validation</h1>
+  <p><b>Locked 19 August 2026, before measuring any Gate 12 recall.</b> This plan answers the remaining correctness question: “Does the fast persisted pool contain the true constrained top-20 from every eligible historical window?” It does not treat pool 1,000, a signature ranking, or another approximation as truth.</p>
+  <p><b>Current boundary:</b> Gate 11 proves sampled-oracle fidelity and a deterministic, fresh-data-validated 252-bar production path. It does not prove complete-exchange nearest neighbours. Gate 12 remains synthetic and machine-verifiable; no human chart judgement is an acceptance input.</p>
+</header>
+
+<section>
+  <h2>Why another reference engine is required</h2>
+  <p>The persisted 240-value signature is intentionally a candidate representation. Its view distances are not mathematical lower bounds on the exact composite, so an omitted window cannot be dismissed safely from signature rank alone. Gate 08 already showed that larger approximate pools continue to change results.</p>
+  <p>The exact representation contains 1,353 numeric values per episode: 128 coarse values, 19×48 channel samples, 4×64 DTW samples, 48 stage values and 9 structural values, plus missing-channel state. Across the current 4,884,685 stored 252-bar rows this is approximately 26.4 GB at float32 or 13.2 GB at float16 before metadata. Only 9.7 GB is free, and float16 is not an exact authority. Therefore a blind full exact-feature store is prohibited unless the feasibility gate proves a safe smaller layout and preserves a 5 GB disk reserve.</p>
+  <p>The planned authority is instead a two-pass, memory-bounded search: compute the exact non-DTW lower bound for every eligible episode, persist only a compact sortable frontier, then reconstruct and finish DTW in global lower-bound order until the corrected constrained stopping proof is satisfied.</p>
+</section>
+
+<section>
+  <h2>Independent query registry rule</h2>
+  <p>Selection seed is <code>gate12-query-v1</code>. Exclude all Gate 09 query symbols and every symbol sampled as a Gate 09 candidate. Require at least 1,000 rows. Within each market and each A/B × low/middle/high liquidity cell, choose the smallest SHA-256 order of <code>seed:market:tier:stratum:symbol</code>. This rule was executed before any Gate 12 result.</p>
+  <table>
+    <thead><tr><th>Market</th><th>Tier / liquidity</th><th>Locked symbol</th><th>Rows at lock</th><th>Median 252-bar dollar volume</th></tr></thead>
+    <tbody>
+      <tr><td>NSE</td><td>A / high</td><td>homefirst</td><td>1,247</td><td>₹288.3m</td></tr>
+      <tr><td>NSE</td><td>A / low</td><td>vinylindia</td><td>4,178</td><td>₹2.70m</td></tr>
+      <tr><td>NSE</td><td>A / middle</td><td>shrirampps</td><td>1,031</td><td>₹66.3m</td></tr>
+      <tr><td>NSE</td><td>B / high</td><td>indiaglyco</td><td>6,961</td><td>₹157.2m</td></tr>
+      <tr><td>NSE</td><td>B / low</td><td>aceinteg</td><td>2,123</td><td>₹0.120m</td></tr>
+      <tr><td>NSE</td><td>B / middle</td><td>onwardtec</td><td>6,876</td><td>₹11.5m</td></tr>
+      <tr><td>NASDAQ</td><td>A / high</td><td>CAKE</td><td>6,599</td><td>$69.4m</td></tr>
+      <tr><td>NASDAQ</td><td>A / low</td><td>ZICA</td><td>2,331</td><td>$0.015m</td></tr>
+      <tr><td>NASDAQ</td><td>A / middle</td><td>SLE</td><td>1,783</td><td>$0.234m</td></tr>
+      <tr><td>NASDAQ</td><td>B / high</td><td>TVTX</td><td>4,063</td><td>$38.7m</td></tr>
+      <tr><td>NASDAQ</td><td>B / low</td><td>ABEOW</td><td>1,135</td><td>$0</td></tr>
+      <tr><td>NASDAQ</td><td>B / middle</td><td>THRD_old</td><td>3,727</td><td>$0.042m</td></tr>
+    </tbody>
+  </table>
+  <p>Each symbol contributes two 252-bar queries: the latest observed cutoff and the cutoff at position <code>251 + round(0.70 × (rows − 1 − 251))</code>. The registry will persist explicit cutoffs and stock/benchmark fingerprints. No symbol or cutoff may be replaced after seeing recall; an unavailable or invalid locked query is a visible failure.</p>
+</section>
+
+<section class="task">
+  <h2>T12-00 — Persist the frozen registry and baseline evidence</h2>
+  <p><b>Build:</b> Add a deterministic registry generator and a reviewed YAML/Parquet registry containing the 24 cases, exclusion-set digest, selection seed/rule, explicit cutoffs, tier/liquidity labels, lookback, source fingerprint and benchmark fingerprint.</p>
+  <p><b>Tests:</b> shuffled liquidity rows yield the same registry; every case is absent from Gate 09 query/candidate symbols; every query has 252 prior bars and the historical cutoff has at least 60 later observed sessions; source mutation invalidates the registry.</p>
+  <p><b>Pass before proceeding:</b> 24/24 cases valid, unique and reproducible; registry digest written to the log.</p>
+</section>
+
+<section class="task">
+  <h2>T12-01 — Exact-feature storage and compression feasibility spike</h2>
+  <p><b>Build:</b> On deterministic A/B and liquidity-stratified shards, serialize only the arrays required by <code>representation_distance_lower_bound</code> and DTW completion. Compare float32, lossless compressed float32 and any proposed derived/minimal layout. Float16 may be measured but cannot become the authority unless every oracle total/component remains within 1e-12 and ordering/ties remain identical.</p>
+  <p><b>Tests:</b> deserialize-to-online parity for every representation field; lower bound and completed distance parity; missing benchmark, constant price, zero volume and extreme finite-value fixtures; corruption and version mismatch fail.</p>
+  <p><b>Pass before proceeding:</b> projected full footprint plus temporary frontier leaves ≥5 GB free. If it fails—as the 26.4/13.2 GB raw estimates suggest—record the failure and select the streaming two-pass design without building the full artifact.</p>
+</section>
+
+<section class="task">
+  <h2>T12-02 — Vectorized exact lower-bound kernel</h2>
+  <p><b>Build:</b> Compute, for every stride-five window of one symbol, exactly the same coarse, 48-sample groups, stage, structural and rigid-price values used by the scalar representation. Compare them with one query in batches and emit exact non-DTW lower bounds plus episode metadata. Do not reuse candidate-signature distances as bounds.</p>
+  <p><b>Tests:</b> scalar-versus-batch field, component and lower-bound agreement ≤1e-12 on random windows and all edge fixtures; every bound ≤ completed exact distance; serial/parallel and batch-size changes produce identical sorted rows/digest; future benchmark mutations have zero effect before a cutoff.</p>
+  <p><b>Performance gate:</b> ≥20× scalar throughput on a stratified sample, ≤512 MB per worker, and no non-finite or silently skipped eligible window.</p>
+</section>
+
+<section class="task">
+  <h2>T12-03 — Two-pass exhaustive constrained authority</h2>
+  <p><b>Pass 1:</b> Stream every eligible symbol through T12-02 and atomically write a compact frontier containing episode ID, instrument, cutoff, lower bound, tier and source/benchmark provenance. Reconcile expected versus emitted windows and globally sort by lower bound then ID.</p>
+  <p><b>Pass 2:</b> Reconstruct candidates in frontier order, complete exact DTW and maintain the overlap/per-instrument constrained top-k. A finite stop is allowed only while the selected result is full; if a cheaper candidate displaces multiple matches, reopen the threshold to infinity as established in L-014.</p>
+  <p><b>Tests:</b> identical IDs/order/totals/components versus brute force on small complete universes and all Gate 09 cases; adversarial ties, multi-overlap displacement and per-instrument displacement; interrupted Pass 1 resume; frontier corruption; shuffled symbols/batches/workers; exact accounting identity <code>eligible = evaluated + safely pruned</code>.</p>
+  <p><b>Certificate:</b> Each reference result must include query/manifest/frontier digests, exact representation version, eligible count, per-bound work, reconstructed count, stop threshold, next lower bound, latency and RSS. Without this certificate the result is not an oracle.</p>
+</section>
+
+<section class="task">
+  <h2>T12-04 — Scale ladder before a complete NASDAQ run</h2>
+  <p><b>Run:</b> One locked current query through 1%, 10%, 50% and 100% of NSE using a deterministic symbol hash partition. Compare result prefixes at every scale and measure Pass 1/2 separately. Then run 1% and 10% NASDAQ and extrapolate conservatively.</p>
+  <p><b>Pass before proceeding:</b> zero accounting/provenance failures, RSS ≤1 GiB, temporary disk leaves ≥5 GB free, and projected offline reference time ≤2 hours NSE / ≤6 hours NASDAQ per query. If not, optimize the exact batch kernel; do not reduce universe coverage or call a larger approximate pool exhaustive.</p>
+</section>
+
+<section class="task">
+  <h2>T12-05 — Independent 252-bar validation matrix</h2>
+  <p><b>Run:</b> Produce the exhaustive authority for all 24 frozen cases. Against each authority, evaluate the unchanged production signature pools 175, 250, 500 and 1,000. Pool 175 remains the pre-registered primary result; larger pools diagnose misses but cannot retroactively turn the same matrix into calibration evidence.</p>
+  <p><b>Pass:</b> primary pool-175 top-20 recall ≥0.95 in every case, nDCG@20 ≥0.95 in every case, exact reranking identical for shared members, zero temporal/overlap/tier/source failures, repeated digest stability, fast path ≤120 s NSE / ≤300 s NASDAQ and RSS ≤1 GiB.</p>
+  <p><b>If failed:</b> preserve the failed gate. Move any candidate-method changes to a new development set and reserve a new untouched validation registry; never tune on these 24 cases and report them again as independent.</p>
+</section>
+
+<section class="task">
+  <h2>T12-06 — Lookback and disk expansion decision</h2>
+  <p>Only after T12-05, project schema-v3 63/126 stores, temporary frontier space and the 5 GB reserve. Remove or archive generated smoke artifacts only through an explicit logged maintenance task. Build one lookback/market at a time, verify unchanged resume, persisted-oracle recall and Gate 11C before starting the next. Repeat the independent-registry protocol with new untouched cases.</p>
+</section>
+
+<section class="task">
+  <h2>T12-07 — Promotion and operational report index</h2>
+  <p>Create one HTML index linking registry, exact certificates, fast-path reports, failed attempts, gate histories and resource measurements. Promote <code>--view-store</code> to the default only if every primary Gate 12 case passes. Otherwise keep it opt-in and state the measured failure modes in the user report.</p>
+</section>
+
+<section>
+  <h2>Execution discipline</h2>
+  <ol>
+    <li>Implement one task only.</li>
+    <li>Run its unit, adversarial, differential, determinism and resource checks.</li>
+    <li>Write a machine gate and readable HTML evidence.</li>
+    <li>Append what/why/how/failures/metrics to the development log.</li>
+    <li>Commit a clean rollback point.</li>
+    <li>Proceed only when the task’s explicit pass condition holds; a failure creates a recorded redesign task, not a threshold waiver.</li>
+  </ol>
+  <p class="muted">Forward outcomes remain outside every retrieval and acceptance computation. Gate 12 validates historical similarity retrieval, not profitability or a trading forecast.</p>
+</section>
+</body>
+</html>

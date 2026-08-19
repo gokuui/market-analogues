@@ -194,6 +194,16 @@
   <p><b>Gate 11C rerun:</b> Schema-v3 RELIANCE digest remains <code>0badb2446edfcdaec2da97f6551324b8959c8583ad845511d3ca22aa3928ed4a</code>; worst repeated time 29.05 s and peak 476.02 MB. AAPL remains <code>371e51e49ae7934bc8ae580b8439787fc67169c6dc344a143136bf053681e26c</code>; worst 76.23 s and 772.26 MB. Both have zero repeat delta and the same 97/175 and 88/175 prune counts.</p>
   <p><b>Decision:</b> Supersede the incomplete threshold rule described in L-011 with the reopen-on-incomplete invariant above. Keep the broader Gate 12 claim open: passing known cases did not substitute for adversarial reasoning here.</p>
 </section>
+
+<section class="entry" id="log-015">
+  <h2>L-015 — Gate 12 exhaustive-reference plan and independent registry rule</h2>
+  <p><b>What:</b> Added a task-by-task Gate 12 HTML plan covering registry freeze, exact-feature feasibility, vectorized exact lower bounds, a two-pass exhaustive constrained authority, scale ladder, independent validation, lookback/disk expansion and promotion.</p>
+  <p><b>Why:</b> Pool 175 passes sampled Gate 09 recall and Gate 11C integration, but the complete exchange still has no exact authority. Pool 1,000 and persisted signatures are approximations, not proof that no omitted episode is closer.</p>
+  <p><b>Feasibility finding:</b> The exact representation needs approximately 1,353 numeric values per episode. For 4,884,685 current 252-bar rows, raw storage projects to 26.4 GB float32 or 13.2 GB float16 before metadata, while only 9.7 GB is free. Float16 is not accepted as an exact authority. The plan therefore gates any storage attempt and prefers a two-pass compact lower-bound frontier.</p>
+  <p><b>Independent selection:</b> Seed <code>gate12-query-v1</code>; exclude all Gate 09 query and candidate symbols; require ≥1,000 rows; select one SHA-256 winner from every A/B × low/middle/high liquidity cell per market before recall. Locked NSE symbols: homefirst, vinylindia, shrirampps, indiaglyco, aceinteg, onwardtec. Locked NASDAQ: CAKE, ZICA, SLE, TVTX, ABEOW, THRD_old. Current and deterministic 70%-history cutoffs produce 24 planned 252-bar cases.</p>
+  <p><b>Decision:</b> Implement T12-00 registry persistence next. Do not build 63/126 stores or promote persisted search by default until the exact-reference feasibility and independent 252-bar matrix pass.</p>
+  <p>Readable plan: <a href="gate12-exhaustive-reference-plan.html">Gate 12 exhaustive reference and independent validation</a>.</p>
+</section>
 </main>
 
 <section id="reproduce">

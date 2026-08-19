@@ -75,6 +75,7 @@
     <h3>12 — Independent full-universe validation matrix</h3>
     <p>Lock new queries not used to choose pool 175: both markets, at least four symbols per market, 63/126/252 bars, historical and current cutoffs, different liquidity/stage regimes, and difficult missing-context cases. Use the exact-safe engine as the reference rather than a larger approximate pool.</p>
     <p><b>Pass:</b> ≥95% top-20 recall in every query for the fast path versus the exact-safe reference; zero future/overlap/quality failures; deterministic repeated and serial/parallel digests; NSE ≤120 s and NASDAQ ≤300 s for 252 bars; RSS ≤1 GiB.</p>
+    <p><b>Detailed locked plan:</b> <a href="gate12-exhaustive-reference-plan.html">exhaustive reference and independent validation plan</a>. It freezes 24 untouched cases before recall measurement and uses a two-pass exact lower-bound frontier rather than treating a larger approximate pool as truth.</p>
   </div>
 
   <div class="gate">
