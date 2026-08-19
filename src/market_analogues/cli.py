@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+from hashlib import sha256
 import importlib.util
 import json
 from pathlib import Path
@@ -8,6 +9,7 @@ from time import perf_counter
 
 import numpy as np
 import pandas as pd
+import yaml
 
 from .adapters import source_from_spec
 from .benchmark import (
@@ -16,9 +18,14 @@ from .benchmark import (
 )
 from .config import AppConfig, load_config
 from .episodes import build_episode, build_manifest
+from .exact_storage_feasibility import (
+    verify_exact_storage_feasibility, write_exact_storage_report,
+)
 from .gates import GateReport, require_passed
 from .fusion_verification import verify_candidate_fusion, write_fusion_report
-from .gate12_registry import build_gate12_registry, write_gate12_registry
+from .gate12_registry import (
+    build_gate12_registry, validate_gate12_registry, write_gate12_registry,
+)
 from .index import CoarseIndex
 from .outcomes import compute_outcomes, summarize_match_outcomes
 from .oracle import run_oracle_suite, write_oracle_artifacts
@@ -348,6 +355,124 @@ def cmd_build_gate12_registry(args: argparse.Namespace) -> int:
         "passed": result.passed, **result.metrics, "failures": result.failures,
     }, indent=2))
     print(html_path)
+    return 0 if result.passed else 2
+
+
+def _validated_view_manifest_rows(
+    config: AppConfig,
+    dataset_id: str,
+    lookbacks: set[int],
+    benchmark_fingerprint: str | None,
+) -> int:
+    view_gate_names = [
+        f"11a_view_shards_{dataset_id}_{lookback}" for lookback in sorted(lookbacks)
+    ]
+    for gate_name in view_gate_names:
+        require_passed(_gates(config), gate_name)
+    path = config.artifact_dir / "view-store" / dataset_id / "manifest.json"
+    if not path.exists():
+        raise SystemExit(f"missing view-store manifest: {path}")
+    payload = json.loads(path.read_text())
+    if payload.get("failures"):
+        raise SystemExit(f"view-store manifest contains failures: {path}")
+    if payload.get("dataset_id") != dataset_id:
+        raise SystemExit(f"view-store manifest dataset mismatch: {path}")
+    if payload.get("representation_version") != config.representation_version:
+        raise SystemExit(f"view-store representation version is stale: {path}")
+    if payload.get("benchmark_fingerprint") != benchmark_fingerprint:
+        raise SystemExit(f"view-store benchmark fingerprint is stale: {path}")
+    shards = payload.get("shards")
+    if not isinstance(shards, list):
+        raise SystemExit(f"view-store manifest has no shard records: {path}")
+    digest_payload = json.dumps(shards, sort_keys=True, separators=(",", ":"))
+    digest = sha256(digest_payload.encode()).hexdigest()
+    if digest != payload.get("manifest_digest"):
+        raise SystemExit(f"view-store manifest digest mismatch: {path}")
+    for gate_name in view_gate_names:
+        gate = json.loads((_gates(config) / f"{gate_name}.json").read_text())
+        if gate.get("metrics", {}).get("manifest_digest") != digest:
+            raise SystemExit(f"view-store manifest changed after gate {gate_name}")
+    eligible = [record for record in shards if int(record["lookback"]) in lookbacks]
+    if {int(record["lookback"]) for record in eligible} != lookbacks:
+        raise SystemExit(
+            f"view-store manifest does not cover lookbacks {sorted(lookbacks)}: {path}"
+        )
+    if any(record.get("dataset_id") != dataset_id for record in eligible):
+        raise SystemExit(f"view-store shard dataset mismatch: {path}")
+    return sum(int(record["rows"]) for record in eligible)
+
+
+def cmd_verify_exact_storage(args: argparse.Namespace) -> int:
+    config = load_config(args.config)
+    unknown = set(args.datasets).difference(config.datasets)
+    if unknown:
+        raise SystemExit(
+            f"unknown datasets {sorted(unknown)}; choose from {sorted(config.datasets)}"
+        )
+    sources = {}
+    registries = {}
+    total_rows = 0
+    for dataset_id in args.datasets:
+        require_passed(_gates(config), f"12a_query_registry_{dataset_id}")
+        source = source_from_spec(config.datasets[dataset_id])
+        registry_directory = config.artifact_dir / "gate12" / dataset_id
+        yaml_path = registry_directory / "query-registry.yaml"
+        parquet_path = registry_directory / "query-registry.parquet"
+        quality_path = config.artifact_dir / "quality" / f"{dataset_id}.parquet"
+        for required in (yaml_path, parquet_path, quality_path):
+            if not required.exists():
+                raise SystemExit(f"missing required Gate 12 input: {required}")
+        quality = pd.read_parquet(quality_path)
+        registry_failures = validate_gate12_registry(source, yaml_path, quality)
+        if registry_failures:
+            raise SystemExit(
+                f"Gate 12 registry validation failed for {dataset_id}: "
+                + "; ".join(registry_failures)
+            )
+        yaml_registry = pd.DataFrame((yaml.safe_load(yaml_path.read_text()) or {})["cases_data"])
+        parquet_registry = pd.read_parquet(parquet_path)
+        try:
+            pd.testing.assert_frame_equal(
+                yaml_registry.reset_index(drop=True),
+                parquet_registry.reset_index(drop=True),
+                check_dtype=False,
+            )
+        except AssertionError as exc:
+            raise SystemExit(
+                f"Gate 12 YAML/Parquet registry mismatch for {dataset_id}: {exc}"
+            ) from exc
+        lookbacks = {int(value) for value in parquet_registry.lookback.unique()}
+        total_rows += _validated_view_manifest_rows(
+            config, dataset_id, lookbacks, source.benchmark_fingerprint(),
+        )
+        sources[dataset_id] = source
+        registries[dataset_id] = parquet_registry
+    result = verify_exact_storage_feasibility(
+        sources, registries, total_universe_rows=total_rows,
+        sample_windows_per_symbol=args.sample_windows_per_symbol,
+        comparison_queries=args.comparison_queries,
+        comparison_candidates=args.comparison_candidates,
+        tolerance=args.tolerance,
+        disk_path=config.artifact_dir,
+        disk_reserve_bytes=int(args.disk_reserve_gb * 1024 ** 3),
+        frontier_bytes_per_row=args.frontier_bytes_per_row,
+        compression_safety_factor=args.compression_safety_factor,
+    )
+    output = Path(args.output) if args.output else (
+        config.artifact_dir / "reports" / "exact-storage-feasibility.html"
+    )
+    write_exact_storage_report(result, output)
+    GateReport(
+        "12b_exact_storage_feasibility", result.passed,
+        {**result.metrics, "layouts": result.layouts.to_dict(orient="records")},
+        list(result.failures),
+    ).write(_gates(config))
+    print(json.dumps({
+        "passed": result.passed, **result.metrics,
+        "layouts": result.layouts.to_dict(orient="records"),
+        "failures": result.failures,
+    }, indent=2))
+    print(output)
     return 0 if result.passed else 2
 
 
@@ -698,6 +823,18 @@ def build_parser() -> argparse.ArgumentParser:
     registry.add_argument("--maximum-staleness-days", type=int, default=120)
     registry.add_argument("--output-dir")
     registry.set_defaults(func=cmd_build_gate12_registry)
+    storage = sub.add_parser("verify-exact-storage")
+    storage.add_argument("--config", required=True)
+    storage.add_argument("--datasets", nargs="+", default=["nse", "nasdaq"])
+    storage.add_argument("--sample-windows-per-symbol", type=int, default=4)
+    storage.add_argument("--comparison-queries", type=int, default=4)
+    storage.add_argument("--comparison-candidates", type=int, default=8)
+    storage.add_argument("--tolerance", type=float, default=1e-12)
+    storage.add_argument("--disk-reserve-gb", type=float, default=5.0)
+    storage.add_argument("--frontier-bytes-per-row", type=int, default=64)
+    storage.add_argument("--compression-safety-factor", type=float, default=1.25)
+    storage.add_argument("--output")
+    storage.set_defaults(func=cmd_verify_exact_storage)
     view_store = sub.add_parser("build-view-store")
     view_store.add_argument("--config", required=True)
     view_store.add_argument("--dataset", required=True)

@@ -23,7 +23,7 @@
 <section>
   <h2>Why another reference engine is required</h2>
   <p>The persisted 240-value signature is intentionally a candidate representation. Its view distances are not mathematical lower bounds on the exact composite, so an omitted window cannot be dismissed safely from signature rank alone. Gate 08 already showed that larger approximate pools continue to change results.</p>
-  <p>The exact representation contains 1,353 numeric values per episode: 128 coarse values, 19×48 channel samples, 4×64 DTW samples, 48 stage values and 9 structural values, plus missing-channel state. Across the current 4,884,685 stored 252-bar rows this is approximately 26.4 GB at float32 or 13.2 GB at float16 before metadata. Only 9.7 GB is free, and float16 is not an exact authority. Therefore a blind full exact-feature store is prohibited unless the feasibility gate proves a safe smaller layout and preserves a 5 GB disk reserve.</p>
+  <p>The exact representation contains 1,353 numeric values per episode: 128 coarse values, 19×48 channel samples, 4×64 DTW samples, 48 stage values and 9 structural values, plus missing-channel state. The original 26.4 GB float32 and 13.2 GB float16 figures were lower-precision planning estimates, not lossless projections. T12-01 measured the actual mixed-precision contract and found that only the 128 coarse values are float32; the remaining 1,225 exact values are float64. Therefore a blind full exact-feature store is prohibited, and the measured decision below supersedes those preliminary estimates.</p>
   <p>The planned authority is instead a two-pass, memory-bounded search: compute the exact non-DTW lower bound for every eligible episode, persist only a compact sortable frontier, then reconstruct and finish DTW in global lower-bound order until the corrected constrained stopping proof is satisfied.</p>
 </section>
 
@@ -59,10 +59,11 @@
 </section>
 
 <section class="task">
-  <h2>T12-01 — Exact-feature storage and compression feasibility spike</h2>
+  <h2 class="pass">T12-01 — Exact-feature storage and compression feasibility spike — PASS</h2>
   <p><b>Build:</b> On deterministic A/B and liquidity-stratified shards, serialize only the arrays required by <code>representation_distance_lower_bound</code> and DTW completion. Compare float32, lossless compressed float32 and any proposed derived/minimal layout. Float16 may be measured but cannot become the authority unless every oracle total/component remains within 1e-12 and ordering/ties remain identical.</p>
   <p><b>Tests:</b> deserialize-to-online parity for every representation field; lower bound and completed distance parity; missing benchmark, constant price, zero volume and extreme finite-value fixtures; corruption and version mismatch fail.</p>
   <p><b>Pass before proceeding:</b> projected full footprint plus temporary frontier leaves ≥5 GB free. If it fails—as the 26.4/13.2 GB raw estimates suggest—record the failure and select the streaming two-pass design without building the full artifact.</p>
+  <p class="pass"><b>Evidence and decision:</b> A 48-representation stratified probe measured all 1,353 values, optional-presence masks, serialized round trips, exact lower bounds, rigid-price terms, completed components/totals and rankings. Native float32/float64 has zero field or distance delta but projects to 52.81 GiB after the 1.25 compression safety factor; the frontier adds 0.29 GiB. Float32 projects to 27.12 GiB but changes totals by up to 6.81e-8; float16 projects to 13.95 GiB but changes totals by up to 4.06e-4. Both violate 1e-12. With 9.48 GiB free and a 5 GiB reserve, the selected authority is <code>two_pass_streaming</code>. Payload corruption/version mismatch and missing/constant/extreme fixtures pass their guards. Gate 12B passed; no full store was built.</p>
 </section>
 
 <section class="task">

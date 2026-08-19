@@ -9,7 +9,7 @@ from market_analogues.gates import GateReport
 
 def test_cli_exposes_gated_workflow() -> None:
     parser = build_parser()
-    commands = ["audit", "build-episodes", "build-index", "verify", "search", "compare-methods", "verify-universe", "verify-oracle", "verify-fusion", "verify-pruning", "verify-production-search", "build-gate12-registry", "build-view-store"]
+    commands = ["audit", "build-episodes", "build-index", "verify", "search", "compare-methods", "verify-universe", "verify-oracle", "verify-fusion", "verify-pruning", "verify-production-search", "build-gate12-registry", "verify-exact-storage", "build-view-store"]
     for command in commands:
         argv = [command, "--config", "config.yaml"]
         if command in {"audit", "build-episodes", "build-index", "search", "verify-universe", "verify-oracle", "verify-fusion", "verify-pruning", "verify-production-search", "build-gate12-registry", "build-view-store"}:
