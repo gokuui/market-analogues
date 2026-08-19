@@ -30,6 +30,15 @@ class ExactStorageFeasibility:
     layouts: pd.DataFrame
 
 
+def quantize_representation(
+    representation: Representation,
+    layout: str,
+) -> Representation:
+    """Round-trip one representation through a measured storage layout."""
+    coarse, values, masks, names_48, names_64 = _pack([representation], layout)
+    return _unpack(coarse, values, masks, names_48, names_64)[0]
+
+
 def _canonical_names(representations: list[Representation]) -> tuple[tuple[str, ...], tuple[str, ...]]:
     names_48 = tuple(sorted(representations[0].samples_48))
     names_64 = tuple(sorted(representations[0].samples_64))

@@ -34,6 +34,9 @@ from .pruning_verification import verify_exact_safe_pruning, write_pruning_repor
 from .production_verification import (
     verify_production_search, write_production_search_report,
 )
+from .precision_verification import (
+    verify_float16_oracle_precision, write_precision_report,
+)
 from .quality import audit_source
 from .report import write_search_report
 from .representation import represent
@@ -267,6 +270,33 @@ def cmd_verify_pruning(args: argparse.Namespace) -> int:
     print(json.dumps({
         "passed": result.passed, **result.metrics, "failures": result.failures,
     }, indent=2))
+    print(output)
+    return 0 if result.passed else 2
+
+
+def cmd_verify_float16_precision(args: argparse.Namespace) -> int:
+    config, source = _load(args)
+    require_passed(_gates(config), f"09_exhaustive_oracle_{args.dataset}")
+    oracle_directory = Path(args.oracle_dir) if args.oracle_dir else (
+        config.artifact_dir / "oracles" / args.dataset
+    )
+    result = verify_float16_oracle_precision(
+        source, oracle_directory,
+        representation_version=config.representation_version,
+        minimum_recall=args.minimum_recall,
+        minimum_ndcg=args.minimum_ndcg,
+    )
+    output = Path(args.output) if args.output else (
+        config.artifact_dir / "reports" / f"float16-precision-{args.dataset}.html"
+    )
+    write_precision_report(result, output)
+    GateReport(
+        f"12q_float16_precision_{args.dataset}", result.passed,
+        {**result.metrics, "case_metrics": result.cases.to_dict(orient="records")},
+        list(result.failures),
+    ).write(_gates(config))
+    print(json.dumps({"passed": result.passed, **result.metrics,
+                      "failures": result.failures}, indent=2))
     print(output)
     return 0 if result.passed else 2
 
@@ -844,6 +874,14 @@ def build_parser() -> argparse.ArgumentParser:
     pruning.add_argument("--tolerance", type=float, default=1e-12)
     pruning.add_argument("--output")
     pruning.set_defaults(func=cmd_verify_pruning)
+    precision = sub.add_parser("verify-float16-precision")
+    precision.add_argument("--config", required=True)
+    precision.add_argument("--dataset", required=True)
+    precision.add_argument("--oracle-dir")
+    precision.add_argument("--minimum-recall", type=float, default=1.0)
+    precision.add_argument("--minimum-ndcg", type=float, default=.999)
+    precision.add_argument("--output")
+    precision.set_defaults(func=cmd_verify_float16_precision)
     production = sub.add_parser("verify-production-search")
     production.add_argument("--config", required=True)
     production.add_argument("--dataset", required=True)

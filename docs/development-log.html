@@ -36,6 +36,7 @@
       <tr><td>12A Independent query registry</td><td class="pass">PASS</td><td>24 fingerprint-locked cases across markets, A/B tiers, three liquidity strata and historical/latest cutoffs; excludes all Gate 09 query/candidate symbols. No Gate 12 recall measured yet.</td></tr>
       <tr><td>12B Exact-storage feasibility</td><td class="pass">PASS — STREAMING SELECTED</td><td>Native mixed precision is exact but projects to 52.81 GiB plus a 0.29 GiB frontier. Float32/float16 violate the 1e-12 authority contract. Two-pass streaming is locked for the exhaustive reference.</td></tr>
       <tr><td>12C Exact batch kernel</td><td class="pass">PASS</td><td>All 12 frozen symbols and 1,200 windows: minimum 20.55× scalar speedup, aggregate 25.07×, ≤3.56e-15 component delta and 374 MB RSS. The first unstable-timing attempt remains failed in gate history.</td></tr>
+      <tr><td>12Q Float16 practical precision</td><td class="pass">PASS (APPROXIMATE)</td><td>All 24 Gate 09 cases retain top-20 membership; minimum graded nDCG 0.9999925. One rank-16/17 swap proves it is not the native authority. Candidate stores remain float16; exhaustive reference remains native streaming.</td></tr>
       <tr><td>12 Full-universe production matrix</td><td class="open">OPEN</td><td>Multiview smoke queries cover every eligible instrument but fail saturation and latency. Exact-safe reference retrieval does not yet exist.</td></tr>
     </tbody>
   </table>
@@ -57,6 +58,7 @@
       <tr><td>D-008</td><td>Keep LB_Keogh optional; use the non-DTW partial sum by default.</td><td>Across all Gate 09 cases LB_Keogh avoids more exact work, but aggregate scoring time is slightly better on NSE and slightly worse on NASDAQ. Extra bound work is not a universal latency win.</td><td>After a calibrated cost policy can predict when the stronger bound repays its overhead.</td></tr>
       <tr><td>D-009</td><td>Expose persisted exact-safe search as an opt-in production backend.</td><td>Repeated complete 252-bar store searches pass determinism, latency and memory budgets, but only one current query per exchange has been locked outside Gate 09.</td><td>Make it the default only after the independent Gate 12 matrix passes.</td></tr>
       <tr><td>D-010</td><td>Build the exhaustive authority as two-pass streaming, not a full exact-feature store.</td><td>The lossless native layout needs float32 coarse plus float64 exact fields and projects to 52.81 GiB; reduced precision changes authoritative values, while only 9.47 GiB is free and 5 GiB is reserved.</td><td>Only revisit after the exact representation contract or available storage changes and the feasibility gate is rerun.</td></tr>
+      <tr><td>D-011</td><td>Use behavioral precision contracts: float16 candidates, native reference.</td><td>Float16 preserved all 24 top-20 sets and ≥0.9999925 nDCG, so twelve-decimal equality is unnecessary for approximate retrieval. It changed one order, is not a safe native lower bound, and still cannot fit as a full store.</td><td>Revisit if a formal quantization-error bound is proven or storage/resources materially change.</td></tr>
     </tbody>
   </table>
 </section>
@@ -239,6 +241,16 @@
   <p><b>Final benchmark protocol and evidence:</b> Warm a ten-window batch, then use the median of three complete batch timings to reduce cold-start/noise bias; the scalar reference remains a full online representation plus lower bound for every window. All 12 frozen symbols and 1,200 windows pass individually: minimum speedup <code>20.5536×</code>, aggregate <code>25.0741×</code>, peak RSS <code>373.99 MB</code> against the 512 MB limit. Final wall time was 61.46 seconds.</p>
   <p><b>Decision:</b> T12-02 passes. Proceed to T12-03’s resumable frontier and constrained two-pass exhaustive authority. No independent Gate 12 recall has yet been measured.</p>
 </section>
+
+<section class="entry" id="log-019">
+  <h2>L-019 — Float16 behavioral audit and two-tier precision policy</h2>
+  <p><b>Prompt and correction:</b> The user challenged whether <code>1e-12</code> accuracy was necessary and asked to use float16 if it was sufficient. That challenge is correct for practical retrieval: twelve decimal places are not a meaningful product requirement. They remain valuable only for internal scalar-versus-optimized parity and safe-reference proofs.</p>
+  <p><b>What was tested:</b> Added a reusable float16 precision verifier, CLI command, machine gates and HTML reports. For every Gate 09 case, keep the query native, quantize all candidate representation fields to float16, run the complete composite distance and constrained top-20 selection, then compare membership, order, graded nDCG and numeric drift against the persisted native oracle.</p>
+  <p><b>Evidence:</b> NSE passes 12/12 cases and 3,192 candidates: minimum recall 1.0, minimum graded nDCG <code>0.9999924999</code>, 11/12 exact orders, maximum total delta <code>0.0035484</code>, component delta <code>0.0246707</code>. NASDAQ passes 12/12 and 2,658 candidates: recall/nDCG 1.0, 12/12 exact orders, total delta <code>0.0043553</code>, component delta <code>0.0190371</code>. The sole difference swapped ranks 16/17 in TCS current 126; top-20 membership did not change.</p>
+  <p><b>Resource check:</b> Float16’s safety-adjusted full-store projection remains 14,976,266,122 bytes. Adding the 312,619,840-byte frontier and 5 GiB reserve requires about 20.66 GB versus about 10.18 GB free. It does not fit even without the reserve. Thus lowering precision would not alter T12-01’s streaming decision.</p>
+  <p><b>Decision:</b> Keep and explicitly endorse float16 for approximate candidate signatures—the existing view store already defaults to float16 and promotes only overflow shards to float32. Permit float16 for a future approximate cache if it passes recall 1.0 and graded nDCG ≥0.999 on untouched cases, followed by native reranking. Keep native precision for the streaming exhaustive authority because float16 changes ordering and its rounded lower bounds are not proven safe for the native metric. No user-visible report should imply that twelve-decimal distance precision is financially significant.</p>
+  <p>Readable policy: <a href="precision-policy.html">precision policy — float16 versus native</a>.</p>
+</section>
 </main>
 
 <section id="reproduce">
@@ -257,7 +269,9 @@
 .venv/bin/market-analogues build-gate12-registry --config config/datasets.example.yaml --dataset nse
 .venv/bin/market-analogues build-gate12-registry --config config/datasets.example.yaml --dataset nasdaq
 .venv/bin/market-analogues verify-exact-storage --config config/datasets.example.yaml --datasets nse nasdaq
-.venv/bin/market-analogues verify-exact-batch --config config/datasets.example.yaml --datasets nse nasdaq</code></pre>
+.venv/bin/market-analogues verify-exact-batch --config config/datasets.example.yaml --datasets nse nasdaq
+.venv/bin/market-analogues verify-float16-precision --config config/datasets.example.yaml --dataset nse
+.venv/bin/market-analogues verify-float16-precision --config config/datasets.example.yaml --dataset nasdaq</code></pre>
   <p class="muted">Source datasets are read-only. Generated artifacts live under the configured artifact directory and are intentionally excluded from Git.</p>
 </section>
 </body>

@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Precision policy — float16 versus native</title>
+  <style>
+    :root{--ink:#17202a;--bg:#f4f6f7;--paper:#fff;--line:#d5d8dc;--green:#117864;--amber:#9a6700}
+    *{box-sizing:border-box}body{font-family:system-ui,sans-serif;max-width:1180px;margin:0 auto;padding:2rem;background:var(--bg);color:var(--ink);line-height:1.55}
+    header,section{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:1.4rem;margin-bottom:1rem}table{border-collapse:collapse;width:100%}th,td{text-align:left;vertical-align:top;padding:.65rem;border-bottom:1px solid var(--line)}.pass{color:var(--green)}.note{color:var(--amber)}code{background:#eef2f3;padding:.1rem .3rem}
+  </style>
+</head>
+<body>
+<header>
+  <h1>Precision policy: use float16 where behavior passes, native precision for the reference proof</h1>
+  <p><b>Decision recorded 19 August 2026 after user review.</b> A twelve-decimal numerical match is not itself financially meaningful. It remains useful as an internal differential-test tolerance because it catches implementation errors. Storage and product behavior are judged separately by retrieval membership, ranking quality, finite-value safety, resource cost and whether pruning remains mathematically safe.</p>
+</header>
+
+<section>
+  <h2 class="pass">Practical float16 retrieval audit — PASS</h2>
+  <p>Candidate representations were quantized to float16 while each query remained native. Every quantized candidate was then rescored through the complete composite distance and overlap/per-instrument constrained top-20 selection. The comparison covers all 24 Gate 09 cases and all 5,850 stored candidates across NSE/NASDAQ, three lookbacks, historical/current cutoffs, A/B quality and low/middle/high liquidity.</p>
+  <table>
+    <thead><tr><th>Market</th><th>Cases / candidates</th><th>Worst top-20 recall</th><th>Worst graded nDCG</th><th>Exact order</th><th>Max total Δ</th><th>Max component Δ</th></tr></thead>
+    <tbody>
+      <tr><td>NSE</td><td>12 / 3,192</td><td class="pass">1.0</td><td class="pass">0.9999925</td><td>11/12</td><td>0.0035484</td><td>0.0246707</td></tr>
+      <tr><td>NASDAQ</td><td>12 / 2,658</td><td class="pass">1.0</td><td class="pass">1.0</td><td>12/12</td><td>0.0043553</td><td>0.0190371</td></tr>
+    </tbody>
+  </table>
+  <p>The only ordering change swapped native ranks 16 and 17 in the current NSE TCS 126-bar case. Their native distances were 1.0240261 and 1.0240413; after quantization they became 1.0240526 and 1.0240415. Membership was unchanged and graded nDCG was 0.9999925. No sampled candidate overflowed or became non-finite.</p>
+</section>
+
+<section>
+  <h2>Why the exhaustive authority remains native streaming</h2>
+  <ol>
+    <li><b>Float16 changes the metric.</b> It is an excellent approximate retrieval format on this evidence, but it is not identical: one ranking changed and component drift reached 0.0247.</li>
+    <li><b>Quantized lower bounds are not proven bounds on the native metric.</b> Rounding may increase a value. Using that value to stop native search could incorrectly prune a true neighbour unless a formal error envelope is subtracted.</li>
+    <li><b>The full float16 store still does not fit.</b> Its safety-adjusted projection is 14.98 GB; frontier plus the required 5 GiB reserve raises the requirement to about 20.66 GB, while only about 10.18 GB was free. Even discarding the reserve would still be short.</li>
+    <li><b>Streaming removes the incentive.</b> The native T12-02 kernel is already 20.55–29× faster than scalar and uses 374 MB at the full stratified gate, so native reference precision no longer requires a 52.81 GiB store.</li>
+  </ol>
+</section>
+
+<section>
+  <h2>Policy used by the project</h2>
+  <table>
+    <thead><tr><th>Layer</th><th>Precision</th><th>Acceptance contract</th></tr></thead>
+    <tbody>
+      <tr><td>Persisted candidate signatures</td><td><b>float16 by default</b>, adaptive float32 only on overflow</td><td>Candidate recall, distance tolerance, finite values and top-set stability. This was already the production-store policy.</td></tr>
+      <tr><td>Optional future approximate exact-feature cache</td><td>float16 permitted</td><td>Must be labelled approximate and retain top-20 recall 1.0 plus graded nDCG ≥0.999 on its untouched validation set. Final matches must be reconstructed and reranked natively.</td></tr>
+      <tr><td>Two-pass exhaustive reference</td><td>Native float32 coarse + float64 exact fields</td><td>Safe lower bound, native reconstruction and deterministic constrained selection. The 1e-12 differential is an engineering parity check, not a trading-significance claim.</td></tr>
+      <tr><td>User-visible similarity</td><td>Precision-independent behavior</td><td>Membership/recall, rank quality, stability and explanation; do not present meaningless twelve-decimal scores.</td></tr>
+    </tbody>
+  </table>
+  <p class="note"><b>Revisit:</b> A formal conservative quantization-error bound could allow float16-assisted native pruning later. Empirical max error alone is not a safe bound and will not be used to prune.</p>
+</section>
+</body>
+</html>
