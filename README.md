@@ -14,6 +14,8 @@ market-analogues verify --config config/datasets.example.yaml
 market-analogues compare-methods --config config/datasets.example.yaml
 market-analogues build-view-store --config config/datasets.example.yaml \
   --dataset nse --lookbacks 252 --stride 5
+market-analogues verify-pruning --config config/datasets.example.yaml \
+  --dataset nse
 market-analogues search --config config/datasets.example.yaml --dataset nse \
   --symbol reliance --cutoff 2025-12-31 --streaming
 ```
@@ -56,11 +58,11 @@ positives must beat reversed/context-contradictory negatives, future mutation mu
 have zero effect, and persisted coarse-index serialization must preserve neighbors.
 Gate JSON keeps an immutable history beneath `artifact_dir/gates/history`.
 
-The current regression record is 71 passing tests. This establishes a verified retrieval baseline, not trading
+The current regression record is 72 passing tests. This establishes a verified retrieval baseline, not trading
 profitability or production-scale completeness.
 
 The stratified exact oracle and sampled multi-view recall gate pass at candidate
 pool 175. Complete-universe coverage remains sound, but the richer on-demand
 scanner is too slow and its shortlist still changes materially between pools 175
 and 1,000. The universe gate therefore remains failed until persisted view shards,
-exact-safe pruning, and independent full-universe validation are complete.
+production integration of exact-safe pruning, and independent full-universe validation are complete.

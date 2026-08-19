@@ -31,7 +31,7 @@
       <tr><td>09 Stratified exact oracle</td><td class="pass">PASS</td><td>24/24 cases; 5,850 exactly scored episodes; NSE/NASDAQ, 63/126/252 bars, historical/current cutoffs, quality and liquidity strata.</td></tr>
       <tr><td>10 Sampled multiview fusion</td><td class="pass">PASS</td><td>Pool 175 reaches a 0.95 worst-case top-20 recall floor in all 24 sampled oracle cases. Earlier pool-125 failures remain in gate history.</td></tr>
       <tr><td>11A Persisted view shards</td><td class="open">PARTIAL PASS</td><td>Full NSE and NASDAQ 252-bar layers, persisted-signature oracle recall, resume, corruption detection and warm search pass. Other lookbacks remain.</td></tr>
-      <tr><td>11B Exact-safe pruning</td><td class="open">IN PROGRESS</td><td>Zero-DTW lower bound and optional multivariate LB_Keogh return identical tested rankings. Full Gate 09 differential and production integration remain.</td></tr>
+      <tr><td>11B Exact-safe pruning</td><td class="pass">PASS (SAMPLED ORACLE)</td><td>Both bounds reproduce all 24 Gate 09 rankings and components. Default avoids 65.6% of exact evaluations across 5,850 candidates; production search integration remains.</td></tr>
       <tr><td>12 Full-universe production matrix</td><td class="open">OPEN</td><td>Multiview smoke queries cover every eligible instrument but fail saturation and latency. Exact-safe reference retrieval does not yet exist.</td></tr>
     </tbody>
   </table>
@@ -50,6 +50,7 @@
       <tr><td>D-005</td><td>Use observed trading sessions for the history gap.</td><td>Business-day estimates can disagree with exchange sessions and admit temporally invalid candidates.</td><td>Never; this is a correctness invariant.</td></tr>
       <tr><td>D-006</td><td>Do not promote multiview to the default yet.</td><td>Sampled Gate 10 passes, but full-universe pool saturation and raw-on-query latency fail.</td><td>After persisted shards, exact-safe pruning, and independent Gate 12 pass.</td></tr>
       <tr><td>D-007</td><td>Next build persisted view shards, then exact-safe pruning.</td><td>Full-universe runs show bounded memory but repeated raw feature computation and approximate shortlist instability. More hand-tuned weights cannot prove completeness.</td><td>Re-evaluate after Gate 11 differential and performance evidence.</td></tr>
+      <tr><td>D-008</td><td>Keep LB_Keogh optional; use the non-DTW partial sum by default.</td><td>Across all Gate 09 cases LB_Keogh avoids more exact work, but aggregate scoring time is slightly better on NSE and slightly worse on NASDAQ. Extra bound work is not a universal latency win.</td><td>After a calibrated cost policy can predict when the stronger bound repays its overhead.</td></tr>
     </tbody>
   </table>
 </section>
@@ -154,6 +155,18 @@
   <p><b>Rejected default:</b> Eager/automatic LB_Keogh was not consistently faster. In a later concurrent run it improved NSE 3.35→2.07 seconds but slowed NASDAQ 2.47→2.92 seconds. It remains opt-in; the zero-DTW bound is the default until a measured policy justifies LB overhead.</p>
   <p><b>Limits:</b> This is a correctness-first implementation over an already materialized candidate list. It has not yet run differential checks over all 24 Gate 09 cases, does not avoid raw candidate representation construction, and is not yet wired into the user-facing search command.</p>
 </section>
+
+<section class="entry" id="log-012">
+  <h2>L-012 — Gate 11B full sampled-oracle differential</h2>
+  <p><b>What:</b> Added a reusable <code>verify-pruning</code> command, immutable gate record and readable HTML report. It reconstructs every candidate in each persisted Gate 09 case, runs the default non-DTW partial bound and the optional symmetric multivariate LB_Keogh bound, and compares both outputs with the stored exhaustive authority.</p>
+  <p><b>Why:</b> Two real examples and synthetic tests were insufficient to call pruning exact-safe. The optimization must preserve ordered episode IDs, total distance and every explainable component across markets, lookbacks, historical/current cutoffs, quality tiers and liquidity strata.</p>
+  <p><b>How:</b> Candidate episode IDs and windows are reconstructed from the locked oracle Parquets and source data. The verifier uses the same 60-session gap, overlap deduplication, per-instrument cap and top-k as the oracle. A case passes only when ordered IDs are identical and totals/components agree within <code>1e-12</code>. It separately records eligible count, exact evaluations, safe prunes, bound evaluations and scoring time.</p>
+  <p><b>Correctness evidence:</b> NSE passed 12/12 cases over 3,192 candidates; NASDAQ passed 12/12 over 2,658. Both modes reproduced all 24 oracle rankings. Maximum total-distance delta was <code>4.440892098500626e-16</code>; maximum component delta was zero.</p>
+  <p><b>Work avoided:</b> Default pruning evaluated 1,045/3,192 NSE candidates and 966/2,658 NASDAQ candidates, safely avoiding 67.26% and 63.66% of exact evaluations. LB_Keogh evaluated 781 and 841, avoiding 75.53% and 68.36%.</p>
+  <p><b>Performance decision:</b> Default aggregate scoring took 23.39 s NSE and 22.11 s NASDAQ. LB_Keogh took 22.73 s and 22.46 s. The stronger bound reduces exact DTW work but is not consistently faster, so D-008 keeps it opt-in.</p>
+  <p><b>Regression evidence:</b> The complete suite passes 72/72 tests in 25.39 seconds; measured source coverage is 88%. Both generated Gate 11B JSON records parse successfully, both HTML reports were written, documentation HTML parses, and <code>git diff --check</code> is clean.</p>
+  <p><b>Limits:</b> The verifier measures the scorer after candidate representations are materialized. User-facing search still uses the older exact reranker, and the complete exchange is not an exhaustive exact candidate set. Next integrate persisted view retrieval with the verified pruned reranker, then build an independent Gate 12 matrix.</p>
+</section>
 </main>
 
 <section id="reproduce">
@@ -164,7 +177,9 @@
 .venv/bin/market-analogues verify-oracle --config config/datasets.example.yaml --dataset nse --symbols reliance tcs --instruments-per-stratum 4
 .venv/bin/market-analogues verify-oracle --config config/datasets.example.yaml --dataset nasdaq --symbols AAPL MSFT --instruments-per-stratum 3
 .venv/bin/market-analogues verify-fusion --config config/datasets.example.yaml --dataset nse --acceptance-pool 175
-.venv/bin/market-analogues verify-fusion --config config/datasets.example.yaml --dataset nasdaq --acceptance-pool 175</code></pre>
+.venv/bin/market-analogues verify-fusion --config config/datasets.example.yaml --dataset nasdaq --acceptance-pool 175
+.venv/bin/market-analogues verify-pruning --config config/datasets.example.yaml --dataset nse
+.venv/bin/market-analogues verify-pruning --config config/datasets.example.yaml --dataset nasdaq</code></pre>
   <p class="muted">Source datasets are read-only. Generated artifacts live under the configured artifact directory and are intentionally excluded from Git.</p>
 </section>
 </body>

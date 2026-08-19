@@ -21,6 +21,7 @@ from .fusion_verification import verify_candidate_fusion, write_fusion_report
 from .index import CoarseIndex
 from .outcomes import compute_outcomes, summarize_match_outcomes
 from .oracle import run_oracle_suite, write_oracle_artifacts
+from .pruning_verification import verify_exact_safe_pruning, write_pruning_report
 from .quality import audit_source
 from .report import write_search_report
 from .representation import represent
@@ -213,6 +214,46 @@ def cmd_verify_fusion(args: argparse.Namespace) -> int:
     ).write(_gates(config))
     print(json.dumps({"passed": result.passed, **result.metrics,
                       "failures": result.failures}, indent=2))
+    print(output)
+    return 0 if result.passed else 2
+
+
+def cmd_verify_pruning(args: argparse.Namespace) -> int:
+    config, source = _load(args)
+    require_passed(_gates(config), f"09_exhaustive_oracle_{args.dataset}")
+    oracle_directory = Path(args.oracle_dir) if args.oracle_dir else (
+        config.artifact_dir / "oracles" / args.dataset
+    )
+    result = verify_exact_safe_pruning(
+        source, oracle_directory,
+        representation_version=config.representation_version,
+        tolerance=args.tolerance,
+    )
+    output = Path(args.output) if args.output else (
+        config.artifact_dir / "reports" / f"exact-safe-pruning-{args.dataset}.html"
+    )
+    write_pruning_report(result, output)
+    GateReport(
+        f"11b_exact_safe_pruning_{args.dataset}", result.passed,
+        {**result.metrics, "case_metrics": {
+            row.case_id: {
+                "eligible_candidates": int(row.eligible_candidates),
+                "oracle_matches": int(row.oracle_matches),
+                "default_exact_evaluated": int(row.default_exact_evaluated),
+                "default_safely_pruned": int(row.default_safely_pruned),
+                "default_seconds": float(row.default_seconds),
+                "bound_exact_evaluated": int(row.bound_exact_evaluated),
+                "bound_safely_pruned": int(row.bound_safely_pruned),
+                "bound_seconds": float(row.bound_seconds),
+                "maximum_distance_delta": float(row.maximum_distance_delta),
+                "maximum_component_delta": float(row.maximum_component_delta),
+            } for row in result.cases.itertuples(index=False)
+        }},
+        list(result.failures),
+    ).write(_gates(config))
+    print(json.dumps({
+        "passed": result.passed, **result.metrics, "failures": result.failures,
+    }, indent=2))
     print(output)
     return 0 if result.passed else 2
 
@@ -468,6 +509,13 @@ def build_parser() -> argparse.ArgumentParser:
     fusion.add_argument("--view-mode", choices=["cheap", "signature"], default="cheap")
     fusion.add_argument("--output")
     fusion.set_defaults(func=cmd_verify_fusion)
+    pruning = sub.add_parser("verify-pruning")
+    pruning.add_argument("--config", required=True)
+    pruning.add_argument("--dataset", required=True)
+    pruning.add_argument("--oracle-dir")
+    pruning.add_argument("--tolerance", type=float, default=1e-12)
+    pruning.add_argument("--output")
+    pruning.set_defaults(func=cmd_verify_pruning)
     view_store = sub.add_parser("build-view-store")
     view_store.add_argument("--config", required=True)
     view_store.add_argument("--dataset", required=True)
