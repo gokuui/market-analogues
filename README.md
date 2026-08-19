@@ -38,6 +38,8 @@ market-analogues aggregate-gate12-authorities --config config/datasets.example.y
   --dataset nse
 market-analogues run-gate12-authority-matrix --config config/datasets.example.yaml \
   --datasets nse nasdaq
+market-analogues analyze-kullamagi-examples --config config/datasets.example.yaml \
+  --dataset nasdaq
 market-analogues search --config config/datasets.example.yaml --dataset nse \
   --symbol reliance --cutoff 2026-02-11 --lookback 252 \
   --candidate-pool 175 --view-store
@@ -67,6 +69,8 @@ the ranking. Results are descriptive historical evidence, not forecasts.
 - [Current verification status and next implementation plan](docs/verification-status-and-next-plan.html)
 - [Gate 12 exhaustive reference and independent validation plan](docs/gate12-exhaustive-reference-plan.html)
 - [Precision policy: float16 versus native](docs/precision-policy.html)
+- External labelled-example audit: generated at
+  `config/data/analogues/external-examples/kullamagi-positions-2021/report.html`
 - [Running development and decision log](docs/development-log.html)
 
 ## Verification
@@ -83,7 +87,7 @@ positives must beat reversed/context-contradictory negatives, future mutation mu
 have zero effect, and persisted coarse-index serialization must preserve neighbors.
 Gate JSON keeps an immutable history beneath `artifact_dir/gates/history`.
 
-The current regression record is 113 passing tests. This establishes a verified retrieval baseline, not trading
+The current regression record is 116 passing tests. This establishes a verified retrieval baseline, not trading
 profitability or production-scale completeness.
 
 The stratified exact oracle and sampled multi-view recall gate pass at candidate

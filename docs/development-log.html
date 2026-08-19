@@ -39,8 +39,9 @@
       <tr><td>12Q Float16 practical precision</td><td class="pass">PASS (APPROXIMATE)</td><td>All 24 Gate 09 cases retain top-20 membership; minimum graded nDCG 0.9999925. One rank-16/17 swap proves it is not the native authority. Candidate stores remain float16; exhaustive reference remains native streaming.</td></tr>
       <tr><td>12D Two-pass exhaustive frontier</td><td class="pass">PASS (BOUNDED SMOKE)</td><td>Atomic/resumable NSE and NASDAQ frontier smokes return deterministic native top-20 with strict stopping certificates, ≤4.44e-16 reconstructed-bound delta and 421–436 MB RSS. Full-market scale remains T12-04.</td></tr>
       <tr><td>12E Deterministic scale ladder</td><td class="pass">PASS — BOTH MARKETS</td><td>Full NSE and NASDAQ 1%/10% aggregate gates pass. NASDAQ 10% covers 1,159 symbols/363,633 candidates, prunes 99.78%, repeats its digest, searches in 6.82/6.59 minutes and projects a 68.2-minute full search at 547 MB.</td></tr>
-      <tr><td>12F Blind authority matrix</td><td class="open">RUNNING — 3/24 SEALED; CASE 4 ACTIVE</td><td>The unattended sequential supervisor revalidated the first three authorities and is building vinylindia historical. It will continue through NSE 12/12 and then NASDAQ 12/12, stopping only on a visible failure or disk guard. No production ranking or forward outcome is read.</td></tr>
+      <tr><td>12F Blind authority matrix</td><td class="open">RUNNING — 4/24 SEALED; CASE 5 ACTIVE</td><td>The unattended sequential supervisor sealed both vinylindia cases and is building shrirampps current. It will continue through NSE 12/12 and then NASDAQ 12/12, stopping only on a visible failure or disk guard. No production ranking or forward outcome is read.</td></tr>
       <tr><td>12 Full-universe production matrix</td><td class="open">OPEN</td><td>A bounded exact-safe reference now exists, while full-exchange scale and the independent 24-case recall matrix remain unverified.</td></tr>
+      <tr><td>External Kullamagi examples</td><td class="pass">AUDIT COMPLETE — PARTIAL COVERAGE</td><td>132 unique 252-session episodes across 56 NASDAQ-source symbols. Causal top-5 label purity is 51.5% versus a 41.4% frequency baseline (within-query random-candidate p=0.001); causal minority-setup recovery remains weak.</td></tr>
     </tbody>
   </table>
   <p>The software is a verified research baseline, not a complete exchange-scale nearest-neighbour engine and not a trading-profit claim.</p>
@@ -62,6 +63,7 @@
       <tr><td>D-009</td><td>Expose persisted exact-safe search as an opt-in production backend.</td><td>Repeated complete 252-bar store searches pass determinism, latency and memory budgets, but only one current query per exchange has been locked outside Gate 09.</td><td>Make it the default only after the independent Gate 12 matrix passes.</td></tr>
       <tr><td>D-010</td><td>Build the exhaustive authority as two-pass streaming, not a full exact-feature store.</td><td>The lossless native layout needs float32 coarse plus float64 exact fields and projects to 52.81 GiB; reduced precision changes authoritative values, while only 9.47 GiB is free and 5 GiB is reserved.</td><td>Only revisit after the exact representation contract or available storage changes and the feasibility gate is rerun.</td></tr>
       <tr><td>D-011</td><td>Use behavioral precision contracts: float16 candidates, native reference.</td><td>Float16 preserved all 24 top-20 sets and ≥0.9999925 nDCG, so twelve-decimal equality is unnecessary for approximate retrieval. It changed one order, is not a safe native lower bound, and still cannot fit as a full store.</td><td>Revisit if a formal quantization-error bound is proven or storage/resources materially change.</td></tr>
+      <tr><td>D-012</td><td>Use trader-labelled examples as a diagnostic benchmark, not ground truth.</td><td>The sheet is valuable independent evidence, but labels are imbalanced, symbol coverage is partial, and daily bars cannot reproduce the intraday trigger. Outcomes must stay outside retrieval.</td><td>Revisit label-specific conclusions after broader venue/delisted coverage and a preregistered full-universe walk-forward audit.</td></tr>
     </tbody>
   </table>
 </section>
@@ -376,6 +378,23 @@
   <p><b>Initial behavior:</b> The supervisor independently revalidated the three sealed authorities against current universe provenance and marked them PASS without repeating exact searches. It then automatically started case 4/24, <code>nse-vinylindia-historical-252</code>. At the first operational checkpoint its child process was live, 148 query-specific shards were durable, approximately 8.75 GiB remained free and no failure was recorded.</p>
   <p><b>Continuation policy:</b> No user message is required between cases. After each successful artifact, progress is atomically advanced and the next registry case starts in a fresh process. A failing case, failed 12-case aggregate, or free disk below 5 GiB stops the sequence visibly; it does not skip ahead or reduce scope.</p>
 </section>
+
+<section class="entry" id="log-033">
+  <h2>L-033 — External Kullamagi labelled-example morphology audit</h2>
+  <p><b>What:</b> Added a reproducible command that downloads the published Kullamagi positions sheet, normalizes only explicit setup aliases, constructs 252-session episodes ending at the previous completed session, and compares each example with exact composite distance. It writes the immutable source snapshot, coverage table, neighbour table, machine metrics and a readable HTML report.</p>
+  <p><b>Why:</b> These third-party tracker labels can test whether the representation groups trader-recognized chart morphologies without pretending the labels are inputs to the matcher, official Kullamagi ground truth, or subjective human verification.</p>
+  <p><b>Causal controls:</b> Spreadsheet result and chart-after-exit fields never enter similarity. The entry-day daily bar is excluded because its close and final volume were not available at an intraday entry. Same-symbol candidates are excluded. The primary mode permits only labelled episodes whose cutoff is at least 60 observed query sessions earlier; the all-date retrospective mode is diagnostic because same-date sector peers inflate it.</p>
+  <p><b>Coverage:</b> The downloaded snapshot contains 486 parsed rows and 180 unique symbols. The present NASDAQ source provides 132 deduplicated episodes across 56 symbols; 319 rows have no source symbol, 30 lack 252 pre-entry sessions and five duplicate an existing symbol/cutoff. This is venue-, delisting- and survivorship-limited coverage, not a complete audit of the sheet.</p>
+  <p><b>Measured result:</b> The primary causal set has 73 queries. Top-1 setup agreement is 52.05% versus a 41.41% within-query random-candidate expectation and is significant under 1,000 random candidate draws (<code>p=0.0190</code>), but remains below a naive 67.12% always-breakout classifier. Top-5 purity is 51.51% versus the same 41.41% expectation (<code>p=0.0010</code>). Breakouts score 71.43% top-1 and parabolics 50%; all six breakdowns, eight episodic pivots and three mean-reversion examples miss at top-1. The honest conclusion is measurable neighborhood structure dominated by common setups, not reliable named-pattern recovery.</p>
+  <p><b>Verification:</b> A synthetic in-memory regression asserts previous-session cutoffs, dynamic observed-session gap naming, cross-symbol-only candidates, outcome blindness and generic top-k reporting. The random-candidate null samples from each query's own eligible set, preserving its temporal restriction and available setup mix. Parser alias tests and CLI registration pass. The complete repository suite passes 116/116 tests; exact real-data reruns complete 2,179 pairs in 50.93–64.56 seconds under concurrent Gate 12 load with no operational failure. The sheet's live-price cells change its raw byte hash, while the canonical entry-date/symbol/side/setup digest remains stable.</p>
+  <p><b>Next:</b> Preserve this as a baseline. Add historical NYSE/ETF/delisted coverage before drawing broader label conclusions, then test each labelled query against the frozen full historical universe rather than only other sheet examples. Any metric/channel adjustment must use a training split and be judged on a locked later split to avoid fitting these 2021 labels.</p>
+</section>
+
+<section class="entry" id="log-034">
+  <h2>L-034 — Fourth blind authority sealed; unattended case 5 started</h2>
+  <p><b>Checkpoint:</b> While the external audit ran independently, the existing supervisor completed <code>nse-vinylindia-historical-252</code>. The authority covers 693,650 eligible episodes, evaluates 894 exactly, safely prunes 692,756 and repeats its full result digest. Searches take 703.58 and 722.66 seconds, peak RSS is 556.68 MB, and all certificate/accounting checks pass.</p>
+  <p><b>Continuation:</b> Progress is now 4/24 sealed. The supervisor automatically started <code>nse-shrirampps-current-252</code> as case 5; no production ranking or outcome has been read.</p>
+</section>
 </main>
 
 <section id="reproduce">
@@ -405,7 +424,8 @@
 .venv/bin/market-analogues aggregate-exhaustive-scale --config config/datasets.example.yaml --dataset nasdaq --query-episode-id cb2bdccd1386790ef8a16bd0
 .venv/bin/market-analogues build-gate12-authority --config config/datasets.example.yaml --dataset nse --case-id nse-homefirst-current-252
 .venv/bin/market-analogues aggregate-gate12-authorities --config config/datasets.example.yaml --dataset nse
-.venv/bin/market-analogues run-gate12-authority-matrix --config config/datasets.example.yaml --datasets nse nasdaq</code></pre>
+.venv/bin/market-analogues run-gate12-authority-matrix --config config/datasets.example.yaml --datasets nse nasdaq
+.venv/bin/market-analogues analyze-kullamagi-examples --config config/datasets.example.yaml --dataset nasdaq</code></pre>
   <p class="muted">Source datasets are read-only. Generated artifacts live under the configured artifact directory and are intentionally excluded from Git.</p>
 </section>
 </body>

@@ -27,6 +27,10 @@ from .episodes import build_episode, build_manifest
 from .exact_storage_feasibility import (
     verify_exact_storage_feasibility, write_exact_storage_report,
 )
+from .external_examples import (
+    KULLAMAGI_POSITIONS_URL, analyze_kullamagi_examples,
+    download_kullamagi_positions, write_external_example_artifacts,
+)
 from .exhaustive import (
     build_exact_frontier, exhaustive_frontier_search, write_exhaustive_report,
 )
@@ -1030,6 +1034,27 @@ def cmd_run_gate12_authority_matrix(args: argparse.Namespace) -> int:
     return 0 if result.passed else 2
 
 
+def cmd_analyze_kullamagi_examples(args: argparse.Namespace) -> int:
+    config, source = _load(args)
+    csv_bytes = download_kullamagi_positions(args.url)
+    result = analyze_kullamagi_examples(
+        source, csv_bytes, config.representation_version,
+        source_url=args.url,
+        lookback=args.lookback, top_k=args.top_k,
+        minimum_history_gap_bars=args.minimum_history_gap,
+        permutations=args.permutations, seed=args.seed,
+    )
+    directory = Path(args.output_dir) if args.output_dir else (
+        config.artifact_dir / "external-examples" / "kullamagi-positions-2021"
+    )
+    paths = write_external_example_artifacts(result, csv_bytes, directory)
+    print(json.dumps({
+        "passed": result.passed, **result.metrics,
+        "failures": result.failures, "artifacts": [str(path) for path in paths],
+    }, indent=2, default=str))
+    return 0 if result.passed else 2
+
+
 def cmd_build_view_store(args: argparse.Namespace) -> int:
     config, source = _load(args)
     require_passed(_gates(config), f"01_ingestion_audit_{args.dataset}")
@@ -1491,6 +1516,17 @@ def build_parser() -> argparse.ArgumentParser:
     matrix_runner.add_argument("--disk-reserve-gb", type=float, default=5.0)
     matrix_runner.add_argument("--maximum-rss-mb", type=float, default=1024.0)
     matrix_runner.set_defaults(func=cmd_run_gate12_authority_matrix)
+    external = sub.add_parser("analyze-kullamagi-examples")
+    external.add_argument("--config", required=True)
+    external.add_argument("--dataset", default="nasdaq")
+    external.add_argument("--url", default=KULLAMAGI_POSITIONS_URL)
+    external.add_argument("--lookback", type=int, default=252)
+    external.add_argument("--top-k", type=int, default=5)
+    external.add_argument("--minimum-history-gap", type=int, default=60)
+    external.add_argument("--permutations", type=int, default=1000)
+    external.add_argument("--seed", type=int, default=20210819)
+    external.add_argument("--output-dir")
+    external.set_defaults(func=cmd_analyze_kullamagi_examples)
     view_store = sub.add_parser("build-view-store")
     view_store.add_argument("--config", required=True)
     view_store.add_argument("--dataset", required=True)
