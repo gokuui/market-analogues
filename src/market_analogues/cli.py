@@ -37,6 +37,7 @@ from .gate12_registry import (
     build_gate12_registry, validate_gate12_registry, write_gate12_registry,
 )
 from .index import CoarseIndex
+from .matrix_runner import run_authority_matrix
 from .outcomes import compute_outcomes, summarize_match_outcomes
 from .oracle import run_oracle_suite, write_oracle_artifacts
 from .pruning_verification import verify_exact_safe_pruning, write_pruning_report
@@ -1013,6 +1014,22 @@ def cmd_aggregate_gate12_authorities(args: argparse.Namespace) -> int:
     return 0 if passed else 2
 
 
+def cmd_run_gate12_authority_matrix(args: argparse.Namespace) -> int:
+    result = run_authority_matrix(
+        Path(args.config), tuple(args.datasets),
+        disk_reserve_bytes=int(args.disk_reserve_gb * 1024 ** 3),
+        maximum_rss_mb=args.maximum_rss_mb,
+    )
+    print(json.dumps({
+        "passed": result.passed,
+        "completed_cases": result.completed_cases,
+        "required_cases": result.required_cases,
+        "failed_case": result.failed_case,
+        "progress_path": str(result.progress_path),
+    }, indent=2))
+    return 0 if result.passed else 2
+
+
 def cmd_build_view_store(args: argparse.Namespace) -> int:
     config, source = _load(args)
     require_passed(_gates(config), f"01_ingestion_audit_{args.dataset}")
@@ -1468,6 +1485,12 @@ def build_parser() -> argparse.ArgumentParser:
     aggregate_authority.add_argument("--authority-root")
     aggregate_authority.add_argument("--output")
     aggregate_authority.set_defaults(func=cmd_aggregate_gate12_authorities)
+    matrix_runner = sub.add_parser("run-gate12-authority-matrix")
+    matrix_runner.add_argument("--config", required=True)
+    matrix_runner.add_argument("--datasets", nargs="+", default=["nse", "nasdaq"])
+    matrix_runner.add_argument("--disk-reserve-gb", type=float, default=5.0)
+    matrix_runner.add_argument("--maximum-rss-mb", type=float, default=1024.0)
+    matrix_runner.set_defaults(func=cmd_run_gate12_authority_matrix)
     view_store = sub.add_parser("build-view-store")
     view_store.add_argument("--config", required=True)
     view_store.add_argument("--dataset", required=True)

@@ -360,6 +360,15 @@
   <p><b>Independent reload and aggregate:</b> Loader checks pass for 20 matches, content/result/repeat digests, certificates, accounting and manifest identity. The NSE progress gate now reports exactly 3/12 valid authorities and nine explicit missing cases.</p>
   <p><b>Decision:</b> T12-05 is 3/24 complete. Continue with the frozen vinylindia historical case; production recall and outcome analysis remain blocked.</p>
 </section>
+
+<section class="entry" id="log-031">
+  <h2>L-031 — Unattended sequential authority-matrix supervisor</h2>
+  <p><b>What:</b> Added <code>run-gate12-authority-matrix</code> to execute the frozen registry autonomously, one case process at a time: NSE first, then its 12/12 aggregate, NASDAQ second, then its aggregate. The durable JSON progress checkpoint records current/completed/failed cases, timestamps, episode IDs, exit codes and free disk before and after each case.</p>
+  <p><b>Why:</b> The 24 exhaustive references are intentionally expensive and should continue without requiring a user message between cases. A separate process per case releases memory and isolates failures while retaining the existing atomic frontier and authority restart behavior.</p>
+  <p><b>Guards:</b> Every listed registry must contain exactly 12 unique cases. The supervisor invokes the normal provenance-validating authority command even for an existing artifact; therefore it skips expensive work only after current query/request/registry/source-universe/benchmark integrity passes. It stops on the first nonzero case or aggregate result and before starting any case if free disk is below the 5 GiB reserve. It never invokes production recall or outcome analysis.</p>
+  <p><b>Verification:</b> Tests prove NSE-before-NASDAQ ordering across 24 cases, one aggregate per completed dataset, durable completion records and immediate stop with later cases pending on the first simulated failure. The complete repository suite passes 113 tests.</p>
+  <p><b>Operation:</b> Launch the supervisor with stdout/stderr redirected to a durable log. The first three authorities will be cheaply revalidated, then execution resumes at <code>nse-vinylindia-historical-252</code>. Generated frontier, authority, progress and run-log artifacts remain outside Git; human evidence continues in this append-only log at measured checkpoints.</p>
+</section>
 </main>
 
 <section id="reproduce">
@@ -388,7 +397,8 @@
 .venv/bin/market-analogues verify-exhaustive-scale --config config/datasets.example.yaml --dataset nasdaq --symbol CAKE --cutoff 2026-03-30 --lookback 252 --fractions 0.01 0.1
 .venv/bin/market-analogues aggregate-exhaustive-scale --config config/datasets.example.yaml --dataset nasdaq --query-episode-id cb2bdccd1386790ef8a16bd0
 .venv/bin/market-analogues build-gate12-authority --config config/datasets.example.yaml --dataset nse --case-id nse-homefirst-current-252
-.venv/bin/market-analogues aggregate-gate12-authorities --config config/datasets.example.yaml --dataset nse</code></pre>
+.venv/bin/market-analogues aggregate-gate12-authorities --config config/datasets.example.yaml --dataset nse
+.venv/bin/market-analogues run-gate12-authority-matrix --config config/datasets.example.yaml --datasets nse nasdaq</code></pre>
   <p class="muted">Source datasets are read-only. Generated artifacts live under the configured artifact directory and are intentionally excluded from Git.</p>
 </section>
 </body>
