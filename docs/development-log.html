@@ -39,7 +39,7 @@
       <tr><td>12Q Float16 practical precision</td><td class="pass">PASS (APPROXIMATE)</td><td>All 24 Gate 09 cases retain top-20 membership; minimum graded nDCG 0.9999925. One rank-16/17 swap proves it is not the native authority. Candidate stores remain float16; exhaustive reference remains native streaming.</td></tr>
       <tr><td>12D Two-pass exhaustive frontier</td><td class="pass">PASS (BOUNDED SMOKE)</td><td>Atomic/resumable NSE and NASDAQ frontier smokes return deterministic native top-20 with strict stopping certificates, ≤4.44e-16 reconstructed-bound delta and 421–436 MB RSS. Full-market scale remains T12-04.</td></tr>
       <tr><td>12E Deterministic scale ladder</td><td class="pass">PASS — BOTH MARKETS</td><td>Full NSE and NASDAQ 1%/10% aggregate gates pass. NASDAQ 10% covers 1,159 symbols/363,633 candidates, prunes 99.78%, repeats its digest, searches in 6.82/6.59 minutes and projects a 68.2-minute full search at 547 MB.</td></tr>
-      <tr><td>12F Blind authority matrix</td><td class="open">IN PROGRESS — 2/24 CASES</td><td>The full NSE homefirst current and historical authorities pass with repeated exact digests and strict stopping proofs. The NSE aggregate correctly remains incomplete at 2/12. No production ranking or forward outcome has been read.</td></tr>
+      <tr><td>12F Blind authority matrix</td><td class="open">IN PROGRESS — 3/24 CASES</td><td>Full NSE homefirst current/historical and vinylindia current authorities pass with repeated exact digests and strict stopping proofs. The NSE aggregate correctly remains incomplete at 3/12. No production ranking or forward outcome has been read.</td></tr>
       <tr><td>12 Full-universe production matrix</td><td class="open">OPEN</td><td>A bounded exact-safe reference now exists, while full-exchange scale and the independent 24-case recall matrix remain unverified.</td></tr>
     </tbody>
   </table>
@@ -350,6 +350,15 @@
   <p><b>Exact certificate:</b> Native completion evaluates 1,050 and safely prunes 939,760. Searches take 871.59 and 812.87 seconds, return identical complete payload digest <code>ab8cbc7b…c43b</code>, bind to the same manifest and establish a strict next-bound proof. Peak RSS is 582.50 MB. The sealed authority digest is <code>a7b4cdf3…d3a</code>.</p>
   <p><b>Independent reload and aggregate:</b> Loader checks pass for 20 matches, content/result/repeat digests, certificate accounting and manifest identity. The NSE progress gate now reports exactly 2/12 valid authorities and ten explicit missing cases.</p>
   <p><b>Decision:</b> Both homefirst temporal roles pass, but T12-05 remains open at 2/24. Continue the remaining frozen cases before any production recall or outcome analysis.</p>
+</section>
+
+<section class="entry" id="log-030">
+  <h2>L-030 — Third frozen authority: NSE vinylindia current</h2>
+  <p><b>Scope:</b> Generated <code>nse-vinylindia-current-252</code> / episode <code>9cd78f01a5e23a7481382f49</code> without production rankings or forward outcomes. This query had no compatible scale frontier, so all 1,843 query-specific shards were freshly and atomically built; unchanged resume revalidated every shard.</p>
+  <p><b>Frontier:</b> The full current-cutoff universe reconciles 1,040,116 eligible episodes with zero failures. Frontier construction and validation took about 28 minutes under the observed machine load. Free-disk and 1 GiB memory gates remained safe.</p>
+  <p><b>Exact certificate:</b> This query’s bound is especially selective: only 563 candidates require native completion and 1,039,553 are safely pruned. Searches take 573.67 and 527.47 seconds and return identical complete payload digest <code>05c66bb4…7ad5</code>. Both bind to the same manifest and establish strict next-bound stopping. Peak RSS is 662.14 MB; sealed authority digest <code>5f46eafe…ed95</code>.</p>
+  <p><b>Independent reload and aggregate:</b> Loader checks pass for 20 matches, content/result/repeat digests, certificates, accounting and manifest identity. The NSE progress gate now reports exactly 3/12 valid authorities and nine explicit missing cases.</p>
+  <p><b>Decision:</b> T12-05 is 3/24 complete. Continue with the frozen vinylindia historical case; production recall and outcome analysis remain blocked.</p>
 </section>
 </main>
 
