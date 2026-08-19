@@ -30,7 +30,7 @@
       <tr><td>08 Complete-universe baseline</td><td class="fail">FAIL</td><td>Coverage, causality and memory pass. Price-only candidate fidelity fails: pool-500 versus pool-1,000 top-20 recall is 0.75 NSE and 0.65 NASDAQ.</td></tr>
       <tr><td>09 Stratified exact oracle</td><td class="pass">PASS</td><td>24/24 cases; 5,850 exactly scored episodes; NSE/NASDAQ, 63/126/252 bars, historical/current cutoffs, quality and liquidity strata.</td></tr>
       <tr><td>10 Sampled multiview fusion</td><td class="pass">PASS</td><td>Pool 175 reaches a 0.95 worst-case top-20 recall floor in all 24 sampled oracle cases. Earlier pool-125 failures remain in gate history.</td></tr>
-      <tr><td>11A Persisted view shards</td><td class="open">IN PROGRESS</td><td>Schema, resume, corruption detection and warm search are implemented. Full NSE 252-bar layer passes; NASDAQ and other lookbacks remain.</td></tr>
+      <tr><td>11A Persisted view shards</td><td class="open">PARTIAL PASS</td><td>Full NSE and NASDAQ 252-bar layers, persisted-signature oracle recall, resume, corruption detection and warm search pass. Other lookbacks remain.</td></tr>
       <tr><td>12 Full-universe production matrix</td><td class="open">OPEN</td><td>Multiview smoke queries cover every eligible instrument but fail saturation and latency. Exact-safe reference retrieval does not yet exist.</td></tr>
     </tbody>
   </table>
@@ -131,6 +131,17 @@
   <p><b>Optimization evidence:</b> The same 1,264-row smoke store fell from 10.56 seconds to 0.31 seconds after vectorization and kept the exact same pre-quantization content digest. Float16 reduced a 125,907-row scale sample from 95 MB to 52 MB.</p>
   <p><b>Full NSE 252 evidence:</b> 1,843/1,843 eligible shards, 1,061,384 rows, 262 quality exclusions, zero failures, 106.64-second initial build, 442 MB disk. An unchanged run reused all 1,843 shards in 5.21 seconds with manifest digest <code>52672c6baf48323e045e45c0dd68641ce18acd06b45001a9c7294cec9c9b2b8e</code>. Warm query candidate generation over 1,040,117 eligible rows took 13.63–15.54 seconds and returned pool 1,000, versus 130.56 seconds raw-on-query.</p>
   <p><b>Limits:</b> This checkpoint covers only NSE lookback 252. Persisted candidate generation does not solve the 1,000-candidate exact-rerank cost or prove exhaustive recall. NASDAQ 252, other lookbacks and exact-safe pruning remain open.</p>
+</section>
+
+<section class="entry" id="log-010">
+  <h2>L-010 — Full NASDAQ 252 layer, adaptive precision and persisted-oracle gate</h2>
+  <p><b>What:</b> Extended Gate 11A to the complete NASDAQ 252-bar universe and added a separate oracle mode that evaluates the persisted signature contract rather than assuming the earlier on-demand cheap-v2 result transfers.</p>
+  <p><b>Incident:</b> The first full build emitted a float16 overflow warning on an extreme-but-finite signature. Continuing would have produced a rejected shard and failed manifest, so the run was interrupted. Completed shards were atomic and remained reusable.</p>
+  <p><b>Fix:</b> Changed compact storage into an adaptive policy: use float16 when all finite values fit; use float32 for only an out-of-range shard; never clip. Added a boundary regression test. Resume ran with corruption-aware repair, reused 8,583 completed shards, built/repaired 3,001 remaining shards, and produced a complete manifest. Exactly one of 11,584 final shards required float32.</p>
+  <p><b>Full NASDAQ evidence:</b> 11,584/11,584 eligible shards, 3,823,301 stored rows, 496 quality exclusions, zero failures, 148.12-second resumed completion, 1.6 GB disk. An unchanged validation reused all 11,584 shards in 27.74 seconds with manifest digest <code>698a4026b4859adac34a3c4ade0dc66b3c84bdbd722fdb0176065f8d7b158d92</code>.</p>
+  <p><b>Warm performance:</b> Persisted AAPL retrieval considered 3,786,118 eligible rows and returned pool 1,000 in 58.47–62.48 seconds, versus 791.27 seconds for raw-on-query multiview scanning. The remaining cost is opening 11,584 small files plus exact reranking.</p>
+  <p><b>Recall evidence:</b> New <code>signature</code> oracle mode passes 12/12 NSE and 12/12 NASDAQ cases at pool 175 with a 0.95 worst-case top-20 recall floor. Its cached columns are versioned <code>view-signature-v1</code> and its gate/report are separate from cheap-v2.</p>
+  <p><b>Decision:</b> The 252-bar persisted candidate layer is correct enough to proceed to exact-safe scoring. Do not build 63/126 across both exchanges yet: disk has fallen below 10 GB, and exact pruning is now the more important bottleneck. Consolidating small shards is a future I/O optimization, not a prerequisite for Gate 11B correctness.</p>
 </section>
 </main>
 

@@ -199,8 +199,20 @@ def _matches_expected(
         and metadata.source_fingerprint == source_fingerprint
         and metadata.quality_tier == quality_tier
         and metadata.dimensions == SIGNATURE_DIMENSIONS
-        and metadata.storage_dtype == storage_dtype
+        and (
+            metadata.storage_dtype == storage_dtype
+            or storage_dtype == "float16" and metadata.storage_dtype == "float32"
+        )
     )
+
+
+def _resolved_storage_dtype(signatures: np.ndarray, requested: str) -> str:
+    if requested == "float16" and (
+        signatures.size
+        and float(np.max(np.abs(signatures))) > float(np.finfo(np.float16).max)
+    ):
+        return "float32"
+    return requested
 
 
 def build_view_shard(
@@ -255,12 +267,18 @@ def build_view_shard(
         cutoffs.append(int(cutoff.value))
     id_array = np.asarray(episode_ids, dtype="U24")
     cutoff_array = np.asarray(cutoffs, dtype=np.int64)
-    stored_signatures = signature_matrix.astype(storage_dtype).astype(np.float32)
+    actual_storage_dtype = _resolved_storage_dtype(signature_matrix, storage_dtype)
+    if actual_storage_dtype != storage_dtype:
+        # Preserve extreme-but-finite market data rather than clipping it or
+        # allowing a float16 cast to create infinities. The requested float16
+        # mode is a compact-preferred policy, not a lossy requirement.
+        actual_storage_dtype = "float32"
+    stored_signatures = signature_matrix.astype(actual_storage_dtype).astype(np.float32)
     metadata = ViewShardMetadata(
         VIEW_SHARD_SCHEMA_VERSION, VIEW_SIGNATURE_VERSION,
         instrument.dataset_id, instrument.source_symbol, lookback, stride,
         representation_version, source_fingerprint, quality_tier,
-        len(id_array), SIGNATURE_DIMENSIONS, storage_dtype,
+        len(id_array), SIGNATURE_DIMENSIONS, actual_storage_dtype,
         _array_digest(id_array, cutoff_array, stored_signatures),
     )
     _write_shard(path, metadata, id_array, cutoff_array, stored_signatures)

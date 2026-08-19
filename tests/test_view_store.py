@@ -10,7 +10,7 @@ from market_analogues.adapters import DirectorySource
 from market_analogues.config import DatasetSpec
 from market_analogues.view_signatures import SIGNATURE_DIMENSIONS
 from market_analogues.view_store import (
-    ViewShardError, build_view_store, load_view_shard,
+    ViewShardError, _resolved_storage_dtype, build_view_store, load_view_shard,
 )
 
 
@@ -99,3 +99,11 @@ def test_view_store_manifest_merges_independently_built_lookbacks(
     assert manifest.lookbacks == [63, 126]
     assert len(manifest.shards) == 2
     assert first.manifest_digest != second.manifest_digest
+
+
+def test_float16_policy_falls_back_to_float32_for_extreme_finite_values() -> None:
+    ordinary = np.asarray([[0.0, 65_000.0]], dtype=np.float32)
+    extreme = np.asarray([[0.0, 70_000.0]], dtype=np.float32)
+    assert _resolved_storage_dtype(ordinary, "float16") == "float16"
+    assert _resolved_storage_dtype(extreme, "float16") == "float32"
+    assert _resolved_storage_dtype(ordinary, "float32") == "float32"

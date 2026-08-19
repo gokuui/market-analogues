@@ -49,3 +49,12 @@ def test_fusion_verifier_enriches_oracle_and_writes_report(
     assert enriched.candidate_view_version.nunique() == 1
     report = write_fusion_report(result, tmp_path / "fusion.html")
     assert "Cheap multi-view candidate union" in report.read_text()
+
+    signature = verify_candidate_fusion(
+        source, oracle, representation_version="dense-v1",
+        pool_sizes=(1, 3), acceptance_pool=3, minimum_recall=1.0,
+        per_instrument_view=3, view_mode="signature",
+    )
+    assert signature.passed
+    enriched = pd.read_parquet(oracle / f"{case_id}.parquet")
+    assert "signature_view_stage" in enriched

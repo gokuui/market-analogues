@@ -191,13 +191,15 @@ def cmd_verify_fusion(args: argparse.Namespace) -> int:
         pool_sizes=tuple(args.pool_sizes), acceptance_pool=args.acceptance_pool,
         minimum_recall=args.minimum_recall,
         per_instrument_view=args.per_instrument_view,
+        view_mode=args.view_mode,
     )
     output = Path(args.output) if args.output else (
-        config.artifact_dir / "reports" / f"multiview-fusion-{args.dataset}.html"
+        config.artifact_dir / "reports" / f"{args.view_mode}-fusion-{args.dataset}.html"
     )
     write_fusion_report(result, output)
+    gate_prefix = "10_multiview_fusion" if args.view_mode == "cheap" else "11a_signature_fusion"
     GateReport(
-        f"10_multiview_fusion_{args.dataset}", result.passed,
+        f"{gate_prefix}_{args.dataset}", result.passed,
         {**result.metrics, "case_metrics": {
             row.case_id: {
                 "candidates": int(row.candidates),
@@ -463,6 +465,7 @@ def build_parser() -> argparse.ArgumentParser:
     fusion.add_argument("--acceptance-pool", type=int, default=125)
     fusion.add_argument("--minimum-recall", type=float, default=.95)
     fusion.add_argument("--per-instrument-view", type=int, default=5)
+    fusion.add_argument("--view-mode", choices=["cheap", "signature"], default="cheap")
     fusion.add_argument("--output")
     fusion.set_defaults(func=cmd_verify_fusion)
     view_store = sub.add_parser("build-view-store")

@@ -13,6 +13,9 @@ from .candidate_views import CANDIDATE_VIEW_VERSION, VIEW_NAMES, episode_view_di
 from .episodes import build_episode
 from .fusion import preselect_per_group, reciprocal_rank_fusion
 from .types import Episode, EpisodeKey, InstrumentKey
+from .view_signatures import (
+    VIEW_SIGNATURE_VERSION, episode_view_signature, signature_view_distances,
+)
 
 
 @dataclass(frozen=True)
@@ -54,6 +57,7 @@ def verify_candidate_fusion(
     acceptance_pool: int = 125,
     minimum_recall: float = .95,
     per_instrument_view: int = 5,
+    view_mode: str = "cheap",
 ) -> FusionVerification:
     """Benchmark the production-cheap view union against Gate 09 exact rankings."""
     started = perf_counter()
@@ -64,7 +68,12 @@ def verify_candidate_fusion(
     benchmark = source.load_benchmark()
     case_rows: list[dict[str, object]] = []
     failures: list[str] = []
-    view_columns = tuple(f"candidate_view_{name}" for name in VIEW_NAMES)
+    if view_mode not in {"cheap", "signature"}:
+        raise ValueError("view_mode must be cheap or signature")
+    prefix = "candidate_view" if view_mode == "cheap" else "signature_view"
+    version = CANDIDATE_VIEW_VERSION if view_mode == "cheap" else VIEW_SIGNATURE_VERSION
+    version_column = f"{prefix}_version"
+    view_columns = tuple(f"{prefix}_{name}" for name in VIEW_NAMES)
 
     for case in summary.sort_values("case_id").itertuples(index=False):
         case_started = perf_counter()
@@ -75,23 +84,30 @@ def verify_candidate_fusion(
             source, InstrumentKey(str(source.instruments()[0].dataset_id), query_symbol),
             case.cutoff, int(case.lookback), representation_version,
         )
+        query_signature = episode_view_signature(query) if view_mode == "signature" else None
         cached_version = (
-            str(ranking.candidate_view_version.iloc[0])
-            if "candidate_view_version" in ranking and len(ranking) else ""
+            str(ranking[version_column].iloc[0])
+            if version_column in ranking and len(ranking) else ""
         )
-        if not set(view_columns).issubset(ranking.columns) or cached_version != CANDIDATE_VIEW_VERSION:
+        if not set(view_columns).issubset(ranking.columns) or cached_version != version:
             measured: dict[str, list[float]] = {column: [] for column in view_columns}
             for row in ranking.itertuples(index=False):
                 candidate = _candidate_episode(
                     source, benchmark, str(row.dataset_id), str(row.symbol), row.cutoff,
                     int(row.lookback), representation_version, str(row.quality_tier),
                 )
-                distances = episode_view_distances(query, candidate)
+                if view_mode == "signature":
+                    assert query_signature is not None
+                    candidate_signature = episode_view_signature(candidate)
+                    batch = signature_view_distances(query_signature, candidate_signature.vector)
+                    distances = {name: float(values[0]) for name, values in batch.items()}
+                else:
+                    distances = episode_view_distances(query, candidate)
                 for name, value in distances.items():
-                    measured[f"candidate_view_{name}"].append(value)
+                    measured[f"{prefix}_{name}"].append(value)
             for column, values in measured.items():
                 ranking[column] = values
-            ranking["candidate_view_version"] = CANDIDATE_VIEW_VERSION
+            ranking[version_column] = version
             ranking.to_parquet(path, index=False)
 
         local_union = preselect_per_group(
@@ -127,6 +143,8 @@ def verify_candidate_fusion(
         "cases": len(cases),
         "cases_passed": int(cases.accepted.sum()) if len(cases) else 0,
         "candidate_views": list(VIEW_NAMES),
+        "view_mode": view_mode,
+        "view_version": version,
         "per_instrument_per_view": per_instrument_view,
         "pool_sizes": sorted(set(pool_sizes + (acceptance_pool,))),
         "acceptance_pool": acceptance_pool,
@@ -150,6 +168,11 @@ def write_fusion_report(result: FusionVerification, path: Path) -> Path:
     )
     failures = "".join(f"<li>{escape(value)}</li>" for value in result.failures) or "<li>None</li>"
     status = "PASS" if result.passed else "FAIL"
-    html = f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Multi-view candidate verification</title><style>body{{font-family:system-ui,sans-serif;max-width:1300px;margin:2rem auto;padding:0 1rem;background:#f5f7f8;color:#17202a}}section,header{{background:white;border:1px solid #ddd;border-radius:10px;padding:1.3rem;margin:1rem 0}}table{{border-collapse:collapse;width:100%}}th,td{{padding:.6rem;text-align:left;border-bottom:1px solid #ddd}}.pass{{color:#117864}}.fail{{color:#b03a2e}}</style></head><body><header><h1>Cheap multi-view candidate union: <span class="{status.lower()}">{status}</span></h1><p>Independent price, stage, candle/volatility, volume/shock, market-context and structural views are computed without exact DTW. Per-instrument view winners are fused deterministically and compared with the exhaustive, overlap-deduplicated Gate 09 oracle.</p></header><section><h2>Metrics</h2><pre>{escape(json.dumps(result.metrics, indent=2))}</pre></section><section><h2>Cases</h2><table><thead><tr><th>Case</th><th>Status</th><th>Oracle candidates</th><th>Local union</th><th>Pool recall</th><th>Seconds</th></tr></thead><tbody>{rows}</tbody></table></section><section><h2>Failures</h2><ul>{failures}</ul></section></body></html>"""
+    label = (
+        "Persisted-signature candidate union"
+        if result.metrics.get("view_mode") == "signature"
+        else "Cheap multi-view candidate union"
+    )
+    html = f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Multi-view candidate verification</title><style>body{{font-family:system-ui,sans-serif;max-width:1300px;margin:2rem auto;padding:0 1rem;background:#f5f7f8;color:#17202a}}section,header{{background:white;border:1px solid #ddd;border-radius:10px;padding:1.3rem;margin:1rem 0}}table{{border-collapse:collapse;width:100%}}th,td{{padding:.6rem;text-align:left;border-bottom:1px solid #ddd}}.pass{{color:#117864}}.fail{{color:#b03a2e}}</style></head><body><header><h1>{label}: <span class="{status.lower()}">{status}</span></h1><p>Independent price, stage, candle/volatility, volume/shock, market-context and structural views are computed without exact DTW. Per-instrument view winners are fused deterministically and compared with the exhaustive, overlap-deduplicated Gate 09 oracle.</p></header><section><h2>Metrics</h2><pre>{escape(json.dumps(result.metrics, indent=2))}</pre></section><section><h2>Cases</h2><table><thead><tr><th>Case</th><th>Status</th><th>Oracle candidates</th><th>Local union</th><th>Pool recall</th><th>Seconds</th></tr></thead><tbody>{rows}</tbody></table></section><section><h2>Failures</h2><ul>{failures}</ul></section></body></html>"""
     path.write_text(html)
     return path
