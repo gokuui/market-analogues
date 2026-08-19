@@ -67,6 +67,15 @@ class OHLCVSource(ABC):
     def load_benchmark(self) -> pd.DataFrame | None:
         return None
 
+    def benchmark_fingerprint(self) -> str | None:
+        benchmark = self.load_benchmark()
+        if benchmark is None:
+            return None
+        digest = sha256()
+        digest.update("\0".join(str(column) for column in benchmark.columns).encode())
+        digest.update(pd.util.hash_pandas_object(benchmark, index=True).values.tobytes())
+        return digest.hexdigest()
+
 
 class DirectorySource(OHLCVSource):
     def __init__(self, spec: DatasetSpec):
@@ -97,6 +106,11 @@ class DirectorySource(OHLCVSource):
     def load_benchmark(self) -> pd.DataFrame | None:
         cached = self._load_benchmark()
         return cached.copy() if cached is not None else None
+
+    def benchmark_fingerprint(self) -> str | None:
+        if not self.spec.benchmark:
+            return None
+        return file_fingerprint(self.spec.benchmark.path)
 
     @lru_cache(maxsize=1)
     def _load_benchmark(self) -> pd.DataFrame | None:

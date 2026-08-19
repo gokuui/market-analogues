@@ -22,6 +22,9 @@ from .index import CoarseIndex
 from .outcomes import compute_outcomes, summarize_match_outcomes
 from .oracle import run_oracle_suite, write_oracle_artifacts
 from .pruning_verification import verify_exact_safe_pruning, write_pruning_report
+from .production_verification import (
+    verify_production_search, write_production_search_report,
+)
 from .quality import audit_source
 from .report import write_search_report
 from .representation import represent
@@ -30,6 +33,7 @@ from .scan import streaming_search
 from .types import InstrumentKey, SearchQuery
 from .universe import verify_universe, write_universe_report
 from .verification import run_synthetic_verifier, write_verification_gate
+from .view_search import persisted_exact_search
 from .view_store import build_view_store
 
 
@@ -258,6 +262,57 @@ def cmd_verify_pruning(args: argparse.Namespace) -> int:
     return 0 if result.passed else 2
 
 
+def cmd_verify_production_search(args: argparse.Namespace) -> int:
+    config, source = _load(args)
+    require_passed(
+        _gates(config), f"11a_view_shards_{args.dataset}_{args.lookback}",
+    )
+    require_passed(_gates(config), f"11b_exact_safe_pruning_{args.dataset}")
+    quality_path = config.artifact_dir / "quality" / f"{args.dataset}.parquet"
+    if not quality_path.exists():
+        raise SystemExit(f"missing quality audit: {quality_path}")
+    quality = pd.read_parquet(quality_path)
+    query = build_episode(
+        source, InstrumentKey(args.dataset, args.symbol), args.cutoff,
+        args.lookback, config.representation_version,
+    )
+    request = SearchQuery(
+        query.key, (args.dataset,), ("A", "B"), args.top_k,
+        minimum_history_gap_bars=args.minimum_history_gap,
+    )
+    view_root = Path(args.view_store_root) if args.view_store_root else (
+        config.artifact_dir / "view-store"
+    )
+    result = verify_production_search(
+        query, source, request, view_root, quality=quality,
+        candidate_pool=args.candidate_pool,
+        per_instrument_view=args.per_instrument_view,
+        workers=args.workers, repeat=args.repeat,
+        use_dtw_bound=args.lb_keogh,
+        max_seconds=args.max_seconds, max_rss_mb=args.max_rss_mb,
+        tolerance=args.tolerance,
+    )
+    output = Path(args.output) if args.output else (
+        config.artifact_dir / "reports"
+        / f"production-search-{args.dataset}-{args.symbol}-{args.lookback}.html"
+    )
+    write_production_search_report(result, output)
+    GateReport(
+        f"11c_production_search_{args.dataset}_{args.lookback}", result.passed,
+        {**result.metrics, "run_metrics": {
+            str(int(row.run)): {
+                key: value for key, value in row._asdict().items() if key != "run"
+            } for row in result.runs.itertuples(index=False)
+        }},
+        list(result.failures),
+    ).write(_gates(config))
+    print(json.dumps({
+        "passed": result.passed, **result.metrics, "failures": result.failures,
+    }, indent=2))
+    print(output)
+    return 0 if result.passed else 2
+
+
 def cmd_build_view_store(args: argparse.Namespace) -> int:
     config, source = _load(args)
     require_passed(_gates(config), f"01_ingestion_audit_{args.dataset}")
@@ -362,7 +417,51 @@ def cmd_search(args: argparse.Namespace) -> int:
         args.lookback, config.representation_version,
     )
     request = SearchQuery(query.key, (args.dataset,), ("A", "B"), args.top_k)
-    if args.streaming:
+    if args.view_store:
+        require_passed(
+            _gates(config), f"11a_view_shards_{args.dataset}_{args.lookback}",
+        )
+        require_passed(_gates(config), f"11b_exact_safe_pruning_{args.dataset}")
+        quality_path = config.artifact_dir / "quality" / f"{args.dataset}.parquet"
+        if not quality_path.exists():
+            raise SystemExit(f"missing quality audit: {quality_path}")
+        quality = pd.read_parquet(quality_path)
+        view_root = Path(args.view_store_root) if args.view_store_root else (
+            config.artifact_dir / "view-store"
+        )
+        persisted = persisted_exact_search(
+            query, source, request, view_root,
+            candidate_pool=args.candidate_pool,
+            per_instrument_view=args.per_instrument_view,
+            workers=args.workers,
+            use_dtw_bound=args.lb_keogh,
+            quality=quality,
+        )
+        matches = list(persisted.matches)
+        candidate_report = persisted.candidate_search
+        pruning_report = persisted.pruning
+        search_provenance = {
+            "search_backend": "persisted_signature_exact_safe",
+            "view_store_root": str(view_root),
+            "view_manifest_digest": candidate_report.manifest_digest,
+            "view_shards_loaded": str(candidate_report.shards_loaded),
+            "view_rows_considered": str(candidate_report.rows_considered),
+            "view_local_candidates": str(candidate_report.local_candidates),
+            "candidate_pool": str(args.candidate_pool),
+            "candidate_hits": str(len(candidate_report.hits)),
+            "fingerprints_validated": str(persisted.fingerprints_validated),
+            "fingerprint_validation_seconds": f"{persisted.fingerprint_validation_seconds:.4f}",
+            "candidate_generation_seconds": f"{candidate_report.elapsed_seconds:.4f}",
+            "materialization_seconds": f"{persisted.materialization_seconds:.4f}",
+            "exact_scoring_seconds": f"{persisted.exact_scoring_seconds:.4f}",
+            "elapsed_seconds": f"{persisted.elapsed_seconds:.4f}",
+            "pruning_mode": "symmetric_multivariate_lb_keogh" if args.lb_keogh else "non_dtw_partial_sum",
+            "exact_candidates_eligible": str(pruning_report.eligible_candidates),
+            "exact_candidates_evaluated": str(pruning_report.exact_evaluated),
+            "exact_candidates_safely_pruned": str(pruning_report.safely_pruned),
+            "dtw_bounds_evaluated": str(pruning_report.dtw_bounds_evaluated),
+        }
+    elif args.streaming:
         require_passed(_gates(config), f"01_ingestion_audit_{args.dataset}")
         require_passed(_gates(config), "03_synthetic_retrieval")
         quality_path = config.artifact_dir / "quality" / f"{args.dataset}.parquet"
@@ -442,7 +541,21 @@ def build_parser() -> argparse.ArgumentParser:
     search.add_argument("--lookback", type=int, default=252)
     search.add_argument("--top-k", type=int, default=20)
     search.add_argument("--candidate-pool", type=int, default=1000)
-    search.add_argument("--streaming", action="store_true", help="scan source windows without a prebuilt index")
+    search_backend = search.add_mutually_exclusive_group()
+    search_backend.add_argument(
+        "--streaming", action="store_true",
+        help="scan source windows without a prebuilt index",
+    )
+    search_backend.add_argument(
+        "--view-store", action="store_true",
+        help="retrieve persisted signatures and rerank with exact-safe pruning",
+    )
+    search.add_argument("--view-store-root")
+    search.add_argument("--per-instrument-view", type=int, default=5)
+    search.add_argument(
+        "--lb-keogh", action="store_true",
+        help="strengthen exact-safe pruning with optional LB_Keogh",
+    )
     search.add_argument("--instrument-limit", type=int)
     search.add_argument("--stride", type=int, default=5)
     search.add_argument("--scan-backend", choices=["auto", "vector", "mass"], default="auto")
@@ -516,6 +629,25 @@ def build_parser() -> argparse.ArgumentParser:
     pruning.add_argument("--tolerance", type=float, default=1e-12)
     pruning.add_argument("--output")
     pruning.set_defaults(func=cmd_verify_pruning)
+    production = sub.add_parser("verify-production-search")
+    production.add_argument("--config", required=True)
+    production.add_argument("--dataset", required=True)
+    production.add_argument("--symbol", required=True)
+    production.add_argument("--cutoff", required=True)
+    production.add_argument("--lookback", type=int, default=252)
+    production.add_argument("--top-k", type=int, default=20)
+    production.add_argument("--minimum-history-gap", type=int, default=60)
+    production.add_argument("--candidate-pool", type=int, default=175)
+    production.add_argument("--per-instrument-view", type=int, default=5)
+    production.add_argument("--workers", type=int, default=4)
+    production.add_argument("--repeat", type=int, default=2)
+    production.add_argument("--lb-keogh", action="store_true")
+    production.add_argument("--view-store-root")
+    production.add_argument("--max-seconds", type=float, default=300.0)
+    production.add_argument("--max-rss-mb", type=float, default=1024.0)
+    production.add_argument("--tolerance", type=float, default=1e-12)
+    production.add_argument("--output")
+    production.set_defaults(func=cmd_verify_production_search)
     view_store = sub.add_parser("build-view-store")
     view_store.add_argument("--config", required=True)
     view_store.add_argument("--dataset", required=True)

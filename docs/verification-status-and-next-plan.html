@@ -27,6 +27,7 @@
       <tr><td>Gate 10 cheap multi-view union</td><td class="pass">12/12 at pool 175; worst recall 0.95</td><td class="pass">12/12 at pool 175; worst recall 0.95</td><td>Seven independently ranked views, local per-symbol quotas, deterministic reciprocal-rank fusion, and exact reranking. Pool 125 failed and remains in immutable gate history.</td></tr>
       <tr><td>Gate 11A persisted 252-bar signatures</td><td class="pass">1,843 shards; 1,061,384 rows; 13.63–15.54 s warm retrieval</td><td class="pass">11,584 shards; 3,823,301 rows; 58.47–62.48 s warm retrieval</td><td>Atomic, resumable and corruption-checked stores; persisted-signature recall independently passes all Gate 09 cases. Other lookbacks remain open.</td></tr>
       <tr><td>Gate 11B exact-safe pruning</td><td class="pass">12/12; 67.26% default exact work avoided</td><td class="pass">12/12; 63.66% default exact work avoided</td><td>Both default and LB_Keogh modes preserve ordered IDs, totals and components over all 5,850 sampled-oracle candidates; maximum total delta 4.44e-16.</td></tr>
+      <tr><td>Gate 11C production integration</td><td class="pass">2/2 RELIANCE repeats; worst 31.54 s / 484 MB</td><td class="pass">2/2 AAPL repeats; worst 84.73 s / 776 MB</td><td>Schema-v3 complete 252-bar stores, stable ordered digest, zero total/component delta, every eligible source fingerprint and quality tier plus benchmark fingerprint validated, exact-safe reranking and explicit stage provenance. This is an integration smoke, not Gate 12.</td></tr>
       <tr><td>Synthetic financial verifier</td><td colspan="2" class="pass">Recall@10 0.953846; nDCG@10 0.935744; clone/invariance/pair ordering 1.0; critical-negative rate 0</td><td>The retrieval metric did not regress when candidate generation changed.</td></tr>
       <tr><td>Full-universe coverage</td><td class="pass">1,843/1,843 eligible; 1,040,155 windows</td><td class="pass">11,584/11,584 eligible; 3,786,156 baseline windows</td><td>Quality accounting and temporal eligibility reconcile with zero silent symbol failures.</td></tr>
       <tr><td>Full-universe candidate completeness</td><td class="fail">Pool-175 recall versus pool 1,000: 0.40</td><td class="fail">Pool-175 recall versus pool 1,000: 0.50</td><td>A larger shortlist still changes the returned exact top 20. Pool 1,000 is itself not exhaustive, so this is a lower-bound warning, not a completeness proof.</td></tr>
@@ -65,7 +66,7 @@
 
   <div class="gate">
     <h3>11C — Production retrieval integration</h3>
-    <p>Connect the complete 252-bar persisted-signature search to the verified exact-safe reranker in the user-facing command. Emit retrieval and reranking provenance, use the non-DTW bound by default, keep LB_Keogh explicit, and fail visibly when the requested store layer is absent or stale.</p>
+    <p class="pass"><b>Passed for complete 252-bar smoke queries.</b> The user-facing command connects complete persisted-signature search to the verified exact-safe reranker, emits stage provenance, uses the non-DTW bound by default, keeps LB_Keogh explicit, and fails visibly when the requested store layer or source fingerprint is absent, incomplete or stale.</p>
     <p><b>Tests:</b> command-level results equal direct library composition; temporal, overlap, tier and dataset filters survive the handoff; missing/corrupt stores stop with actionable errors; repeated searches have stable IDs and report provenance.</p>
     <p><b>Performance gate:</b> measure candidate generation, representation materialization, exact scoring, outcome/report work and peak RSS separately on both complete universes.</p>
   </div>
@@ -84,7 +85,7 @@
 
 <section>
   <h2>Current decision</h2>
-  <p class="partial"><b>Continue development; do not declare the system complete.</b> Gate 10 proves that the representation can form a high-recall bounded union on the stratified sampled oracle. Gate 11A has complete 252-bar NSE and NASDAQ layers and independently retains the 0.95 sampled-oracle recall floor. Gate 11B now reproduces all 24 exhaustive sampled-oracle rankings and avoids 65.6% of default exact evaluations across both markets. Gate 11C production integration, other lookbacks and exact-safe exchange-scale completeness remain open.</p>
+  <p class="partial"><b>Continue development; do not declare the system complete.</b> Gate 10 proves that the representation can form a high-recall bounded union on the stratified sampled oracle. Gate 11A has complete 252-bar NSE and NASDAQ layers and independently retains the 0.95 sampled-oracle recall floor. Gate 11B reproduces all 24 exhaustive sampled-oracle rankings and avoids 65.6% of default exact evaluations. Gate 11C now passes deterministic complete-store integration and performance for one current 252-bar query per market. Independent Gate 12 queries, other lookbacks and exact-safe exchange-scale completeness remain open.</p>
 </section>
 </body>
 </html>

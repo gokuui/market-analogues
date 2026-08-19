@@ -17,7 +17,8 @@ market-analogues build-view-store --config config/datasets.example.yaml \
 market-analogues verify-pruning --config config/datasets.example.yaml \
   --dataset nse
 market-analogues search --config config/datasets.example.yaml --dataset nse \
-  --symbol reliance --cutoff 2025-12-31 --streaming
+  --symbol reliance --cutoff 2026-02-11 --lookback 252 \
+  --candidate-pool 175 --view-store
 ```
 
 Source datasets are always read-only. Derived manifests, vectors, indexes, outcomes, reports, and gate records are written beneath the configured artifact directory.
@@ -58,11 +59,11 @@ positives must beat reversed/context-contradictory negatives, future mutation mu
 have zero effect, and persisted coarse-index serialization must preserve neighbors.
 Gate JSON keeps an immutable history beneath `artifact_dir/gates/history`.
 
-The current regression record is 72 passing tests. This establishes a verified retrieval baseline, not trading
+The current regression record is 76 passing tests. This establishes a verified retrieval baseline, not trading
 profitability or production-scale completeness.
 
 The stratified exact oracle and sampled multi-view recall gate pass at candidate
 pool 175. Complete-universe coverage remains sound, but the richer on-demand
 scanner is too slow and its shortlist still changes materially between pools 175
 and 1,000. The universe gate therefore remains failed until persisted view shards,
-production integration of exact-safe pruning, and independent full-universe validation are complete.
+independent multi-query full-universe validation is complete. The persisted exact-safe backend is opt-in until that Gate 12 evidence passes.

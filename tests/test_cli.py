@@ -4,16 +4,17 @@ import yaml
 
 from market_analogues.benchmark import euclidean_path
 from market_analogues.cli import build_parser, main
+from market_analogues.gates import GateReport
 
 
 def test_cli_exposes_gated_workflow() -> None:
     parser = build_parser()
-    commands = ["audit", "build-episodes", "build-index", "verify", "search", "compare-methods", "verify-universe", "verify-oracle", "verify-fusion", "verify-pruning", "build-view-store"]
+    commands = ["audit", "build-episodes", "build-index", "verify", "search", "compare-methods", "verify-universe", "verify-oracle", "verify-fusion", "verify-pruning", "verify-production-search", "build-view-store"]
     for command in commands:
         argv = [command, "--config", "config.yaml"]
-        if command in {"audit", "build-episodes", "build-index", "search", "verify-universe", "verify-oracle", "verify-fusion", "verify-pruning", "build-view-store"}:
+        if command in {"audit", "build-episodes", "build-index", "search", "verify-universe", "verify-oracle", "verify-fusion", "verify-pruning", "verify-production-search", "build-view-store"}:
             argv += ["--dataset", "test"]
-        if command in {"search", "verify-universe"}:
+        if command in {"search", "verify-universe", "verify-production-search"}:
             argv += ["--symbol", "AAA", "--cutoff", "2020-01-01"]
         if command == "verify-oracle":
             argv += ["--symbols", "AAA"]
@@ -60,6 +61,24 @@ def test_cli_runs_gated_end_to_end_workflow(
         "--output", str(streaming_report),
     ]) == 0
     assert streaming_report.exists()
+
+    assert main([
+        "build-view-store", *common, "--lookbacks", "126", "--stride", "20",
+        "--workers", "2",
+    ]) == 0
+    GateReport("11b_exact_safe_pruning_demo", True, {"test_fixture": True}).write(
+        artifacts / "gates"
+    )
+    persisted_report = tmp_path / "persisted.html"
+    assert main([
+        "search", *common, "--symbol", "AAA", "--cutoff", cutoff,
+        "--lookback", "126", "--top-k", "3", "--candidate-pool", "12",
+        "--view-store", "--per-instrument-view", "3", "--workers", "2",
+        "--output", str(persisted_report),
+    ]) == 0
+    persisted_text = persisted_report.read_text()
+    assert "persisted_signature_exact_safe" in persisted_text
+    assert "exact_candidates_safely_pruned" in persisted_text
 
     # Keep this command deterministic and independent of optional packages;
     # external methods are differentially tested in their own tests.

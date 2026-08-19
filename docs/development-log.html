@@ -31,7 +31,8 @@
       <tr><td>09 Stratified exact oracle</td><td class="pass">PASS</td><td>24/24 cases; 5,850 exactly scored episodes; NSE/NASDAQ, 63/126/252 bars, historical/current cutoffs, quality and liquidity strata.</td></tr>
       <tr><td>10 Sampled multiview fusion</td><td class="pass">PASS</td><td>Pool 175 reaches a 0.95 worst-case top-20 recall floor in all 24 sampled oracle cases. Earlier pool-125 failures remain in gate history.</td></tr>
       <tr><td>11A Persisted view shards</td><td class="open">PARTIAL PASS</td><td>Full NSE and NASDAQ 252-bar layers, persisted-signature oracle recall, resume, corruption detection and warm search pass. Other lookbacks remain.</td></tr>
-      <tr><td>11B Exact-safe pruning</td><td class="pass">PASS (SAMPLED ORACLE)</td><td>Both bounds reproduce all 24 Gate 09 rankings and components. Default avoids 65.6% of exact evaluations across 5,850 candidates; production search integration remains.</td></tr>
+      <tr><td>11B Exact-safe pruning</td><td class="pass">PASS (SAMPLED ORACLE)</td><td>Both bounds reproduce all 24 Gate 09 rankings and components. Default avoids 65.6% of exact evaluations across 5,850 candidates and is integrated by Gate 11C.</td></tr>
+      <tr><td>11C Production persisted search</td><td class="pass">PASS (252-BAR SMOKE)</td><td>Repeated RELIANCE/AAPL searches have stable digests and zero numeric delta; final schema-v3 worst 31.54/84.73 s and 484/776 MB with stocks, tiers and benchmarks validated. Independent query matrix remains Gate 12.</td></tr>
       <tr><td>12 Full-universe production matrix</td><td class="open">OPEN</td><td>Multiview smoke queries cover every eligible instrument but fail saturation and latency. Exact-safe reference retrieval does not yet exist.</td></tr>
     </tbody>
   </table>
@@ -51,6 +52,7 @@
       <tr><td>D-006</td><td>Do not promote multiview to the default yet.</td><td>Sampled Gate 10 passes, but full-universe pool saturation and raw-on-query latency fail.</td><td>After persisted shards, exact-safe pruning, and independent Gate 12 pass.</td></tr>
       <tr><td>D-007</td><td>Next build persisted view shards, then exact-safe pruning.</td><td>Full-universe runs show bounded memory but repeated raw feature computation and approximate shortlist instability. More hand-tuned weights cannot prove completeness.</td><td>Re-evaluate after Gate 11 differential and performance evidence.</td></tr>
       <tr><td>D-008</td><td>Keep LB_Keogh optional; use the non-DTW partial sum by default.</td><td>Across all Gate 09 cases LB_Keogh avoids more exact work, but aggregate scoring time is slightly better on NSE and slightly worse on NASDAQ. Extra bound work is not a universal latency win.</td><td>After a calibrated cost policy can predict when the stronger bound repays its overhead.</td></tr>
+      <tr><td>D-009</td><td>Expose persisted exact-safe search as an opt-in production backend.</td><td>Repeated complete 252-bar store searches pass determinism, latency and memory budgets, but only one current query per exchange has been locked outside Gate 09.</td><td>Make it the default only after the independent Gate 12 matrix passes.</td></tr>
     </tbody>
   </table>
 </section>
@@ -167,6 +169,21 @@
   <p><b>Regression evidence:</b> The complete suite passes 72/72 tests in 25.39 seconds; measured source coverage is 88%. Both generated Gate 11B JSON records parse successfully, both HTML reports were written, documentation HTML parses, and <code>git diff --check</code> is clean.</p>
   <p><b>Limits:</b> The verifier measures the scorer after candidate representations are materialized. User-facing search still uses the older exact reranker, and the complete exchange is not an exhaustive exact candidate set. Next integrate persisted view retrieval with the verified pruned reranker, then build an independent Gate 12 matrix.</p>
 </section>
+
+<section class="entry" id="log-013">
+  <h2>L-013 — Gate 11C production retrieval integration</h2>
+  <p><b>What:</b> Connected persisted signature retrieval to exact representation materialization and the verified Gate 11B pruned reranker in the user-facing <code>search --view-store</code> path. Added an independent <code>verify-production-search</code> command, machine gate and readable repeated-run report.</p>
+  <p><b>Why:</b> Separate candidate and pruning verifiers do not prove their production handoff. The command must retain time/overlap/tier filters, detect stale source data, preserve deterministic results, expose stage costs and fail visibly rather than silently search an incomplete store.</p>
+  <p><b>How:</b> Search validates manifest dataset, schema, signature/representation versions, digest and incomplete-build state; every loaded shard is content-checked. Hits carry source fingerprint, quality tier and representation provenance. Before exact work, current source fingerprints and quality tiers are checked for <em>every eligible shard</em>, not merely selected hits: otherwise a changed non-selected symbol could wrongly remain outside the pool. Stored episode IDs are reconstructed and verified, representations are materialized deterministically in serial or thread-pool order, then exact-safe pruning runs. HTML provenance separates candidate, fingerprint, materialization and exact stages.</p>
+  <p><b>Adversarial tests:</b> Serial and parallel materialization return identical IDs; a Parquet file mutated after store construction is rejected with an explicit rebuild instruction; command-level composition writes exact/pruning provenance; repeated verifier digests and every total/component distance must agree.</p>
+  <p><b>Late correctness finding and repair:</b> The first integration version validated stock files and tiers but could not detect a changed benchmark index, even though market-context signatures depend on it. Shard schema v3 therefore adds the benchmark content fingerprint to every shard and the manifest. Both full stores were rebuilt atomically rather than claiming old shards were current. A deliberate post-build benchmark mutation now fails. This supersedes the earlier v2 performance measurements while preserving them as history.</p>
+  <p><b>Schema-v3 store evidence:</b> NSE rebuilt 1,843 shards in 101.60 s and then reused all in 8.59 s; manifest digest <code>eee238cec7556a0894267e1ccbe6465b0ea01c8858b598e867d343cbe356c157</code>. NASDAQ rebuilt 11,584 shards in 488.95 s and reused all in 29.80 s; digest <code>760efe9c0f9e29d76670b44a035b95951155aca44c8234579a90beb4d4509891</code>. Both have the same row/quality counts as v2 and zero failures.</p>
+  <p><b>NSE final evidence:</b> Two schema-v3 252-bar RELIANCE runs loaded and source/quality/benchmark-validated all 1,843 shards, then considered 1,040,117 eligible rows. Ordered result digest <code>0badb2446edfcdaec2da97f6551324b8959c8583ad845511d3ca22aa3928ed4a</code> repeated exactly with zero numeric delta. Worst end-to-end engine time was 31.54 s, peak RSS 484.41 MB, maximum candidate stage 17.47 s, fingerprint validation 0.56 s, materialization 11.59 s and exact scoring 1.90 s. Default pruning skipped 97/175 exact candidates (55.43%).</p>
+  <p><b>NASDAQ final evidence:</b> Two schema-v3 AAPL runs validated all 11,584 shards and considered 3,786,118 eligible rows. Digest <code>371e51e49ae7934bc8ae580b8439787fc67169c6dc344a143136bf053681e26c</code> repeated exactly with zero numeric delta. Worst engine time was 84.73 s, peak RSS 776.00 MB, candidate stage 68.60 s, fingerprint validation 2.92 s, materialization 12.34 s and exact scoring 1.54 s. Default pruning skipped 88/175 candidates (50.29%).</p>
+  <p><b>Gate decision:</b> Both markets pass the declared 252-bar smoke budgets (NSE ≤120 s, NASDAQ ≤300 s, RSS ≤1 GiB). Keep this backend opt-in under D-009: one current query per exchange is an integration/performance proof, not independent full-universe recall validation.</p>
+  <p><b>Limits and next step:</b> Only lookback 252 has complete persisted stores. Gate 12 must select new symbols, historical/current cutoffs and difficult regimes not used for pool calibration; 63/126 stores require an explicit disk/storage plan before construction.</p>
+  <p><b>Regression evidence:</b> The final suite passes 76/76 tests, including stock, quality-tier and benchmark staleness failures. A targeted pytest-cov invocation exposed a NumPy/SciPy module-reload collection error in the coverage tooling; the normal regression suite is unaffected, so no new coverage percentage is claimed at this checkpoint.</p>
+</section>
 </main>
 
 <section id="reproduce">
@@ -179,7 +196,9 @@
 .venv/bin/market-analogues verify-fusion --config config/datasets.example.yaml --dataset nse --acceptance-pool 175
 .venv/bin/market-analogues verify-fusion --config config/datasets.example.yaml --dataset nasdaq --acceptance-pool 175
 .venv/bin/market-analogues verify-pruning --config config/datasets.example.yaml --dataset nse
-.venv/bin/market-analogues verify-pruning --config config/datasets.example.yaml --dataset nasdaq</code></pre>
+.venv/bin/market-analogues verify-pruning --config config/datasets.example.yaml --dataset nasdaq
+.venv/bin/market-analogues verify-production-search --config config/datasets.example.yaml --dataset nse --symbol reliance --cutoff 2026-02-11 --lookback 252 --max-seconds 120
+.venv/bin/market-analogues verify-production-search --config config/datasets.example.yaml --dataset nasdaq --symbol AAPL --cutoff 2026-03-30 --lookback 252 --max-seconds 300</code></pre>
   <p class="muted">Source datasets are read-only. Generated artifacts live under the configured artifact directory and are intentionally excluded from Git.</p>
 </section>
 </body>

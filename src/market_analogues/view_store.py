@@ -20,7 +20,7 @@ from .view_signatures import (
 )
 
 
-VIEW_SHARD_SCHEMA_VERSION = 2
+VIEW_SHARD_SCHEMA_VERSION = 3
 
 
 class ViewShardError(ValueError):
@@ -37,6 +37,7 @@ class ViewShardMetadata:
     stride: int
     representation_version: str
     source_fingerprint: str
+    benchmark_fingerprint: str | None
     quality_tier: str
     rows: int
     dimensions: int
@@ -187,6 +188,7 @@ def _matches_expected(
     stride: int,
     representation_version: str,
     source_fingerprint: str,
+    benchmark_fingerprint: str | None,
     quality_tier: str,
     storage_dtype: str,
 ) -> bool:
@@ -197,6 +199,7 @@ def _matches_expected(
         and metadata.stride == stride
         and metadata.representation_version == representation_version
         and metadata.source_fingerprint == source_fingerprint
+        and metadata.benchmark_fingerprint == benchmark_fingerprint
         and metadata.quality_tier == quality_tier
         and metadata.dimensions == SIGNATURE_DIMENSIONS
         and (
@@ -227,6 +230,7 @@ def build_view_shard(
     quality_issues: tuple[str, ...] = (),
     rebuild_invalid: bool = False,
     benchmark: pd.DataFrame | None = None,
+    benchmark_fingerprint: str | None = None,
     storage_dtype: str = "float16",
 ) -> tuple[LoadedViewShard, bool]:
     if lookback < 2:
@@ -237,6 +241,8 @@ def build_view_shard(
         raise ValueError("storage_dtype must be float16 or float32")
     path = shard_path(output_root, instrument, lookback, stride)
     source_fingerprint = source.fingerprint(instrument)
+    if benchmark_fingerprint is None:
+        benchmark_fingerprint = source.benchmark_fingerprint()
     if path.exists():
         try:
             loaded = load_view_shard(path)
@@ -248,6 +254,7 @@ def build_view_shard(
                 loaded.metadata, instrument=instrument, lookback=lookback,
                 stride=stride, representation_version=representation_version,
                 source_fingerprint=source_fingerprint, quality_tier=quality_tier,
+                benchmark_fingerprint=benchmark_fingerprint,
                 storage_dtype=storage_dtype,
             ):
                 return loaded, True
@@ -277,7 +284,8 @@ def build_view_shard(
     metadata = ViewShardMetadata(
         VIEW_SHARD_SCHEMA_VERSION, VIEW_SIGNATURE_VERSION,
         instrument.dataset_id, instrument.source_symbol, lookback, stride,
-        representation_version, source_fingerprint, quality_tier,
+        representation_version, source_fingerprint, benchmark_fingerprint,
+        quality_tier,
         len(id_array), SIGNATURE_DIMENSIONS, actual_storage_dtype,
         _array_digest(id_array, cutoff_array, stored_signatures),
     )
@@ -310,6 +318,7 @@ def build_view_store(
     started = perf_counter()
     qmap = {str(row.symbol): row for row in quality.itertuples(index=False)}
     benchmark = source.load_benchmark()
+    benchmark_fingerprint = source.benchmark_fingerprint()
     instruments = source.instruments()
     if instrument_limit is not None:
         instruments = instruments[:instrument_limit]
@@ -332,6 +341,7 @@ def build_view_store(
                 representation_version=representation_version, quality_tier=tier,
                 quality_issues=_quality_issues(record), rebuild_invalid=rebuild_invalid,
                 benchmark=benchmark,
+                benchmark_fingerprint=benchmark_fingerprint,
                 storage_dtype=storage_dtype,
             )
             return shard, reused, None
@@ -378,6 +388,7 @@ def build_view_store(
                 previous.get("schema_version") == VIEW_SHARD_SCHEMA_VERSION
                 and previous.get("signature_version") == VIEW_SIGNATURE_VERSION
                 and previous.get("representation_version") == representation_version
+                and previous.get("benchmark_fingerprint") == benchmark_fingerprint
                 and previous.get("stride") == stride
                 and previous.get("storage_dtype") == storage_dtype
             )
@@ -400,6 +411,7 @@ def build_view_store(
         "lookbacks": sorted({int(record["lookback"]) for record in shard_records}),
         "stride": stride,
         "representation_version": representation_version,
+        "benchmark_fingerprint": benchmark_fingerprint,
         "storage_dtype": storage_dtype,
         "shards": shard_records,
         "manifest_digest": manifest_digest,
