@@ -38,7 +38,7 @@
       <tr><td>12C Exact batch kernel</td><td class="pass">PASS</td><td>Final corrected rerun over all 12 frozen symbols and 1,200 windows: minimum 21.17× scalar speedup, aggregate 26.21×, ≤3.56e-15 component delta and 341 MB RSS. The first unstable-timing attempt remains failed in gate history.</td></tr>
       <tr><td>12Q Float16 practical precision</td><td class="pass">PASS (APPROXIMATE)</td><td>All 24 Gate 09 cases retain top-20 membership; minimum graded nDCG 0.9999925. One rank-16/17 swap proves it is not the native authority. Candidate stores remain float16; exhaustive reference remains native streaming.</td></tr>
       <tr><td>12D Two-pass exhaustive frontier</td><td class="pass">PASS (BOUNDED SMOKE)</td><td>Atomic/resumable NSE and NASDAQ frontier smokes return deterministic native top-20 with strict stopping certificates, ≤4.44e-16 reconstructed-bound delta and 421–436 MB RSS. Full-market scale remains T12-04.</td></tr>
-      <tr><td>12E Deterministic scale ladder</td><td class="open">IN PROGRESS — NSE FULL + NASDAQ 1% PASS</td><td>Full NSE passes. NASDAQ 1% covers 116 symbols/39,160 candidates, prunes 97.43%, repeats its exact digest and projects 1.95 h build / 2.69 h search at 487 MB. NASDAQ 10% remains open.</td></tr>
+      <tr><td>12E Deterministic scale ladder</td><td class="pass">PASS — BOTH MARKETS</td><td>Full NSE and NASDAQ 1%/10% aggregate gates pass. NASDAQ 10% covers 1,159 symbols/363,633 candidates, prunes 99.78%, repeats its digest, searches in 6.82/6.59 minutes and projects a 68.2-minute full search at 547 MB.</td></tr>
       <tr><td>12 Full-universe production matrix</td><td class="open">OPEN</td><td>A bounded exact-safe reference now exists, while full-exchange scale and the independent 24-case recall matrix remain unverified.</td></tr>
     </tbody>
   </table>
@@ -313,6 +313,15 @@
   <p><b>Projection:</b> Scaling by the exact eligible-symbol ratio projects 7,023.99 seconds (1.95 h) for a fresh full build and 9,699.62 seconds (2.69 h) for one full exact search. Both are below the preregistered six-hour NASDAQ per-phase limit, but remain estimates until a larger rung confirms them.</p>
   <p><b>Decision:</b> Authorize the nested 10% NASDAQ rung. It must reuse/revalidate these 116 shards, build the remaining locked prefix, repeat its exact digest and remain below six hours, 1 GiB RSS and the disk reserve before T12-04 can close.</p>
 </section>
+
+<section class="entry" id="log-026">
+  <h2>L-026 — T12-04 NASDAQ 10% and scale-ladder completion</h2>
+  <p><b>Scope:</b> Ran the frozen current CAKE query over 1,159 of 11,584 eligible NASDAQ symbols, the complete locked 10% hash prefix. The root seeded and revalidated all 116 passing 1% shards and built the remaining 1,043.</p>
+  <p><b>Evidence:</b> Incremental build takes 563.82 seconds and unchanged resume 1.70 seconds. The frontier contains 363,633 eligible candidates and occupies 14,314,216 logical bytes. Native completion evaluates 817 and safely prunes 362,816 (99.78%). Searches take 409.18/395.53 seconds and return identical digest <code>dc7883c2…451e</code>. Peak RSS is 546.73 MB; disk reserve, accounting, bound reconstruction, full constrained top-20 and strict stopping all pass.</p>
+  <p><b>Projection:</b> The exact symbol-ratio projection from 10% is 4,089.73 seconds (68.2 minutes) for one full NASDAQ search. The final build is mixed seeded/incremental, so no misleading fresh-full-build projection is emitted. The earlier fresh 1% build projects 1.95 hours, also within six hours.</p>
+  <p><b>Aggregate:</b> <code>12e_exhaustive_scale_full_nasdaq</code> accepts the immutable 1% and 10% records for the same frozen query and seed and passes. Together with <code>12e_exhaustive_scale_full_nse</code>, all T12-04 preregistered scale rungs now pass.</p>
+  <p><b>Decision:</b> T12-04 is complete. Proceed to T12-05, but first plan multi-query execution carefully: 24 independent exhaustive authorities are intentionally expensive, and the validation pool must remain frozen while references are generated and checkpointed.</p>
+</section>
 </main>
 
 <section id="reproduce">
@@ -337,7 +346,9 @@
 .venv/bin/market-analogues verify-exhaustive-frontier --config config/datasets.example.yaml --dataset nse --symbol homefirst --cutoff 2024-12-02 --lookback 252 --top-k 20 --instrument-limit 8
 .venv/bin/market-analogues verify-exhaustive-frontier --config config/datasets.example.yaml --dataset nasdaq --symbol CAKE --cutoff 2018-08-29 --lookback 252 --top-k 20 --instrument-limit 20
 .venv/bin/market-analogues verify-exhaustive-scale --config config/datasets.example.yaml --dataset nse --symbol homefirst --cutoff 2026-02-11 --lookback 252 --fractions 0.01 0.1
-.venv/bin/market-analogues aggregate-exhaustive-scale --config config/datasets.example.yaml --dataset nse --query-episode-id 99fe49f51285b398361b7b13</code></pre>
+.venv/bin/market-analogues aggregate-exhaustive-scale --config config/datasets.example.yaml --dataset nse --query-episode-id 99fe49f51285b398361b7b13
+.venv/bin/market-analogues verify-exhaustive-scale --config config/datasets.example.yaml --dataset nasdaq --symbol CAKE --cutoff 2026-03-30 --lookback 252 --fractions 0.01 0.1
+.venv/bin/market-analogues aggregate-exhaustive-scale --config config/datasets.example.yaml --dataset nasdaq --query-episode-id cb2bdccd1386790ef8a16bd0</code></pre>
   <p class="muted">Source datasets are read-only. Generated artifacts live under the configured artifact directory and are intentionally excluded from Git.</p>
 </section>
 </body>
