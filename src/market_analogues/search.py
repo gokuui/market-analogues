@@ -4,7 +4,10 @@ from dataclasses import dataclass
 
 import pandas as pd
 
-from .distance import DistanceConfig, representation_distance
+from .distance import (
+    DistanceConfig, complete_representation_distance, representation_distance,
+    representation_distance_lower_bound, representation_dtw_lower_bound,
+)
 from .representation import Representation, represent
 from .types import AnalogueMatch, Episode, SearchQuery
 
@@ -23,6 +26,15 @@ class SearchCandidate:
 class ScoredCandidate:
     match: AnalogueMatch
     episode: Episode
+
+
+@dataclass(frozen=True)
+class PrunedScoreReport:
+    scored: tuple[ScoredCandidate, ...]
+    eligible_candidates: int
+    exact_evaluated: int
+    safely_pruned: int
+    dtw_bounds_evaluated: int
 
 
 def _overlaps(a: Episode, b: Episode) -> bool:
@@ -112,3 +124,78 @@ def exact_search(
 ) -> list[AnalogueMatch]:
     request = request or SearchQuery(query.key)
     return select_scored(score_candidates(query, candidates, request, config), request)
+
+
+def score_candidates_pruned(
+    query: Episode,
+    candidates: list[SearchCandidate],
+    request: SearchQuery | None = None,
+    config: DistanceConfig | None = None,
+    *,
+    use_dtw_bound: bool = False,
+) -> PrunedScoreReport:
+    """Preserve the exact constrained result while safely avoiding some DTW work."""
+    request = request or SearchQuery(query.key)
+    config = config or DistanceConfig()
+    query_representation = represent(query)
+    bounded: list[tuple[float, str, SearchCandidate, dict[str, float], float]] = []
+    for candidate in candidates:
+        if not eligible(query, candidate.episode, request):
+            continue
+        lower, components, rigid = representation_distance_lower_bound(
+            query_representation, candidate.representation, config,
+        )
+        bounded.append((lower, candidate.episode.key.id, candidate, components, rigid))
+    bounded.sort(key=lambda item: (item[0], item[1]))
+
+    scored: list[ScoredCandidate] = []
+    threshold = float("inf")
+    evaluated = 0
+    dtw_bounds_evaluated = 0
+    for lower, _, candidate, components, rigid in bounded:
+        # Strict comparison preserves total-distance/episode-ID tie behavior.
+        if lower > threshold:
+            break
+        dtw_lower = 0.0
+        if use_dtw_bound:
+            dtw_lower = representation_dtw_lower_bound(
+                query_representation, candidate.representation,
+                config.dtw_band_fraction,
+            )
+            dtw_bounds_evaluated += 1
+        strengthened_lower = lower + config.weights.get("price", 0.0) * .45 * dtw_lower
+        if strengthened_lower > threshold:
+            continue
+        components = dict(components)
+        components["price"] += .45 * dtw_lower
+        total, exact_components, path = complete_representation_distance(
+            query_representation, candidate.representation, strengthened_lower,
+            components, rigid, config,
+        )
+        scored.append(ScoredCandidate(AnalogueMatch(
+            candidate.episode.key, total, exact_components, path,
+            candidate.episode.quality_tier, candidate.episode.quality_issues,
+        ), candidate.episode))
+        evaluated += 1
+        selected = select_scored(scored, request)
+        if len(selected) >= request.top_k:
+            threshold = max(match.total_distance for match in selected)
+    return PrunedScoreReport(
+        tuple(scored), len(bounded), evaluated, len(bounded) - evaluated,
+        dtw_bounds_evaluated,
+    )
+
+
+def exact_search_pruned(
+    query: Episode,
+    candidates: list[SearchCandidate],
+    request: SearchQuery | None = None,
+    config: DistanceConfig | None = None,
+    *,
+    use_dtw_bound: bool = False,
+) -> tuple[list[AnalogueMatch], PrunedScoreReport]:
+    request = request or SearchQuery(query.key)
+    report = score_candidates_pruned(
+        query, candidates, request, config, use_dtw_bound=use_dtw_bound,
+    )
+    return select_scored(list(report.scored), request), report

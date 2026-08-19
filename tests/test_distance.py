@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import numpy as np
 
-from market_analogues.distance import bounded_dtw, representation_distance
+from market_analogues.distance import (
+    bounded_dtw, representation_distance, representation_distance_lower_bound,
+    representation_dtw_lower_bound,
+)
 from market_analogues.representation import represent
 from market_analogues.synthetic import generate_case, transform_case
 
@@ -29,6 +32,22 @@ def test_exact_unit_transform_is_closer_than_reversed_path() -> None:
     negative, _, _ = representation_distance(represent(base.episode), represent(reversed_case.episode))
     assert positive < 1e-8
     assert positive < negative
+
+
+def test_partial_distance_is_a_lower_bound_on_exact_distance() -> None:
+    left = represent(generate_case("rounded_base", 1).episode)
+    right = represent(generate_case("volatile_reversal", 2).episode)
+    lower, _, _ = representation_distance_lower_bound(left, right)
+    stronger, _, _ = representation_distance_lower_bound(
+        left, right, include_dtw_bound=True,
+    )
+    exact, _, _ = representation_distance(left, right)
+    assert 0 <= lower <= exact
+    assert lower <= stronger <= exact
+    assert representation_dtw_lower_bound(left, right) >= 0
+    assert representation_dtw_lower_bound(left, right) == pytest.approx(
+        representation_dtw_lower_bound(right, left),
+    )
 
 
 import pytest

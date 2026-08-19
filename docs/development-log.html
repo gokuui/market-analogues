@@ -31,6 +31,7 @@
       <tr><td>09 Stratified exact oracle</td><td class="pass">PASS</td><td>24/24 cases; 5,850 exactly scored episodes; NSE/NASDAQ, 63/126/252 bars, historical/current cutoffs, quality and liquidity strata.</td></tr>
       <tr><td>10 Sampled multiview fusion</td><td class="pass">PASS</td><td>Pool 175 reaches a 0.95 worst-case top-20 recall floor in all 24 sampled oracle cases. Earlier pool-125 failures remain in gate history.</td></tr>
       <tr><td>11A Persisted view shards</td><td class="open">PARTIAL PASS</td><td>Full NSE and NASDAQ 252-bar layers, persisted-signature oracle recall, resume, corruption detection and warm search pass. Other lookbacks remain.</td></tr>
+      <tr><td>11B Exact-safe pruning</td><td class="open">IN PROGRESS</td><td>Zero-DTW lower bound and optional multivariate LB_Keogh return identical tested rankings. Full Gate 09 differential and production integration remain.</td></tr>
       <tr><td>12 Full-universe production matrix</td><td class="open">OPEN</td><td>Multiview smoke queries cover every eligible instrument but fail saturation and latency. Exact-safe reference retrieval does not yet exist.</td></tr>
     </tbody>
   </table>
@@ -142,6 +143,16 @@
   <p><b>Warm performance:</b> Persisted AAPL retrieval considered 3,786,118 eligible rows and returned pool 1,000 in 58.47–62.48 seconds, versus 791.27 seconds for raw-on-query multiview scanning. The remaining cost is opening 11,584 small files plus exact reranking.</p>
   <p><b>Recall evidence:</b> New <code>signature</code> oracle mode passes 12/12 NSE and 12/12 NASDAQ cases at pool 175 with a 0.95 worst-case top-20 recall floor. Its cached columns are versioned <code>view-signature-v1</code> and its gate/report are separate from cheap-v2.</p>
   <p><b>Decision:</b> The 252-bar persisted candidate layer is correct enough to proceed to exact-safe scoring. Do not build 63/126 across both exchanges yet: disk has fallen below 10 GB, and exact pruning is now the more important bottleneck. Consolidating small shards is a future I/O optimization, not a prerequisite for Gate 11B correctness.</p>
+</section>
+
+<section class="entry" id="log-011">
+  <h2>L-011 — Gate 11B first exact-safe progressive scorer</h2>
+  <p><b>What:</b> Split exact representation scoring into a non-DTW lower-bound phase and a completion phase. Added a constraint-aware progressive scorer that orders candidates by the safe bound, maintains the current overlap/per-instrument-aware top-k threshold, and skips DTW only when a candidate cannot beat that threshold. Added an optional symmetric multivariate LB_Keogh bound inside the same Sakoe–Chiba band.</p>
+  <p><b>Why:</b> Persisted candidate generation is now fast enough, but building representations and exact-reranking pool 1,000 remains the dominant end-to-end cost. All composite weights and component distances are non-negative, allowing a formal partial-sum lower bound without changing the metric.</p>
+  <p><b>Safety argument:</b> The default bound includes every exact non-DTW component and 55% rigid price contribution; the omitted DTW contribution is bounded by zero. Candidates are processed in ascending lower-bound/episode-ID order. Once a future bound is strictly greater than the worst currently selected exact match, it cannot enter a full feasible top-k. Strict comparison preserves ties. Optional LB_Keogh sums per-point multichannel deviations outside the allowed envelope and divides by the maximum possible path length, remaining below normalized DTW.</p>
+  <p><b>Differential evidence:</b> Synthetic family and overlap-heavy tests return identical IDs and distances for brute force, default pruning and stronger LB pruning. On current 252-bar oracle cases, default zero-DTW pruning returned identical rankings: NSE pruned 212/304 and reduced 3.30 to 2.38 seconds in the first run; NASDAQ pruned 120/224 and changed 3.44 to 3.26 seconds. The stronger LB version reduced exact DTWs to 60/304 on NSE and 94/224 on NASDAQ.</p>
+  <p><b>Rejected default:</b> Eager/automatic LB_Keogh was not consistently faster. In a later concurrent run it improved NSE 3.35→2.07 seconds but slowed NASDAQ 2.47→2.92 seconds. It remains opt-in; the zero-DTW bound is the default until a measured policy justifies LB overhead.</p>
+  <p><b>Limits:</b> This is a correctness-first implementation over an already materialized candidate list. It has not yet run differential checks over all 24 Gate 09 cases, does not avoid raw candidate representation construction, and is not yet wired into the user-facing search command.</p>
 </section>
 </main>
 

@@ -123,9 +123,7 @@ def _dtw_price(a: pd.DataFrame, b: pd.DataFrame, band_fraction: float) -> tuple[
     return bounded_dtw(np.column_stack(left), np.column_stack(right), band_fraction)
 
 
-def _dtw_representation(
-    a: Representation, b: Representation, band_fraction: float,
-) -> tuple[float, list[tuple[int, int]]]:
+def _dtw_matrices(a: Representation, b: Representation) -> tuple[np.ndarray, np.ndarray]:
     left, right = [], []
     for name in ("close_path", "atr_pct", "volume_robust_z", "relative_path"):
         x, y = a.samples_64.get(name), b.samples_64.get(name)
@@ -135,8 +133,46 @@ def _dtw_representation(
         left.append(x)
         right.append(y)
     if not left:
+        return np.empty((0, 0)), np.empty((0, 0))
+    return np.column_stack(left), np.column_stack(right)
+
+
+def _dtw_representation(
+    a: Representation, b: Representation, band_fraction: float,
+) -> tuple[float, list[tuple[int, int]]]:
+    left, right = _dtw_matrices(a, b)
+    if not len(left):
         return 0.0, []
-    return bounded_dtw(np.column_stack(left), np.column_stack(right), band_fraction)
+    return bounded_dtw(left, right, band_fraction)
+
+
+def _lb_keogh_one_way(query: np.ndarray, candidate: np.ndarray, band: int) -> float:
+    if not len(query) or not len(candidate):
+        return 0.0
+    total = 0.0
+    for index, value in enumerate(candidate):
+        start, end = max(0, index - band), min(len(query), index + band + 1)
+        neighborhood = query[start:end]
+        lower, upper = neighborhood.min(axis=0), neighborhood.max(axis=0)
+        deviation = np.maximum(lower - value, 0.0) + np.minimum(upper - value, 0.0)
+        total += float(np.sqrt(np.mean(deviation * deviation)))
+    # bounded_dtw returns cumulative cost divided by path length. Every candidate
+    # point must be visited and a path can contain at most n+m-1 positions.
+    return total / max(len(query) + len(candidate) - 1, 1)
+
+
+def representation_dtw_lower_bound(
+    a: Representation, b: Representation, band_fraction: float = .12,
+) -> float:
+    """Symmetric multivariate LB_Keogh bound for the normalized DTW component."""
+    left, right = _dtw_matrices(a, b)
+    if not len(left):
+        return 0.0
+    band = max(abs(len(left) - len(right)), int(max(len(left), len(right)) * band_fraction), 1)
+    return max(
+        _lb_keogh_one_way(left, right, band),
+        _lb_keogh_one_way(right, left, band),
+    )
 
 
 def structural_distance(a: pd.DataFrame, b: pd.DataFrame) -> float:
@@ -151,6 +187,20 @@ def stage_distance(a: pd.DataFrame, b: pd.DataFrame, stages: int = 12) -> float:
 
 
 def representation_distance(a: Representation, b: Representation, config: DistanceConfig | None = None) -> tuple[float, dict[str, float], list[tuple[int, int]]]:
+    lower_bound, components, rigid_price = representation_distance_lower_bound(a, b, config)
+    return complete_representation_distance(
+        a, b, lower_bound, components, rigid_price, config,
+    )
+
+
+def representation_distance_lower_bound(
+    a: Representation,
+    b: Representation,
+    config: DistanceConfig | None = None,
+    *,
+    include_dtw_bound: bool = False,
+) -> tuple[float, dict[str, float], float]:
+    """Exact non-DTW work plus a safe zero lower bound for the DTW remainder."""
     config = config or DistanceConfig()
     coarse_scale = max(float(np.std(np.r_[a.coarse, b.coarse])), 1e-6)
     components = {"coarse": float(np.sqrt(np.mean(((a.coarse - b.coarse) / coarse_scale) ** 2)))}
@@ -162,9 +212,34 @@ def representation_distance(a: Representation, b: Representation, config: Distan
             components[group] = channel_distance(
                 a.channels, b.channels, names, config.samples_per_channel,
             )
-    dtw, path = _dtw_representation(a, b, config.dtw_band_fraction)
-    # Price morphology uses the mean of a rigid and a locally elastic view.
-    components["price"] = .55 * components["price"] + .45 * dtw
+    rigid_price = components["price"]
+    dtw_lower_bound = (
+        representation_dtw_lower_bound(a, b, config.dtw_band_fraction)
+        if include_dtw_bound else 0.0
+    )
+    components["price"] = .55 * rigid_price + .45 * dtw_lower_bound
     components["structural"] = float(np.sqrt(np.mean((a.structural - b.structural) ** 2)))
-    total = sum(config.weights.get(name, 0.0) * value for name, value in components.items())
+    lower_bound = sum(
+        config.weights.get(name, 0.0) * value for name, value in components.items()
+    )
+    return float(lower_bound), components, float(rigid_price)
+
+
+def complete_representation_distance(
+    a: Representation,
+    b: Representation,
+    lower_bound: float,
+    lower_components: dict[str, float],
+    rigid_price: float,
+    config: DistanceConfig | None = None,
+) -> tuple[float, dict[str, float], list[tuple[int, int]]]:
+    """Complete a previously computed safe lower bound with exact bounded DTW."""
+    config = config or DistanceConfig()
+    dtw, path = _dtw_representation(a, b, config.dtw_band_fraction)
+    components = dict(lower_components)
+    dtw_lower_bound = max((components["price"] - .55 * rigid_price) / .45, 0.0)
+    components["price"] = .55 * rigid_price + .45 * dtw
+    total = lower_bound + config.weights.get("price", 0.0) * .45 * (
+        dtw - dtw_lower_bound
+    )
     return float(total), components, path

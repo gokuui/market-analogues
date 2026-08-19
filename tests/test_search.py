@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import math
 
+import numpy as np
 import pandas as pd
 
 from market_analogues.search import (
-    SearchCandidate, exact_search, latest_eligible_cutoff, score_candidates,
+    SearchCandidate, exact_search, exact_search_pruned, latest_eligible_cutoff, score_candidates,
     select_scored,
 )
 from market_analogues.synthetic import FAMILIES, transform_case, verification_corpus
@@ -96,6 +97,8 @@ def test_overlapping_results_are_deduplicated() -> None:
     candidates = [SearchCandidate.from_episode(x) for x in [first, second]]
     result = exact_search(query, candidates, SearchQuery(query.key, top_k=10))
     assert len(result) == 1
+    pruned, _ = exact_search_pruned(query, candidates, SearchQuery(query.key, top_k=10))
+    assert [match.episode_key.id for match in pruned] == [match.episode_key.id for match in result]
 
 
 def test_reusing_candidate_scores_preserves_exact_search_ranking() -> None:
@@ -107,3 +110,32 @@ def test_reusing_candidate_scores_preserves_exact_search_ranking() -> None:
     reused = select_scored(score_candidates(query, candidates, request), request)
     assert [match.episode_key for match in reused] == [match.episode_key for match in direct]
     assert [match.total_distance for match in reused] == [match.total_distance for match in direct]
+
+
+def test_safe_pruning_is_identical_to_brute_force() -> None:
+    base_query = verification_corpus(seeds_per_family=1)[0]
+    query = transform_case(base_query, name="later", time_shift_days=3000).episode
+    corpus = verification_corpus(seeds_per_family=5)
+    candidates = [SearchCandidate.from_episode(case.episode) for case in corpus]
+    request = SearchQuery(query.key, ("synthetic",), ("A",), 5,
+                          minimum_history_gap_bars=0)
+    brute = exact_search(query, candidates, request)
+    pruned, report = exact_search_pruned(query, candidates, request)
+    assert [match.episode_key.id for match in pruned] == [
+        match.episode_key.id for match in brute
+    ]
+    np.testing.assert_allclose(
+        [match.total_distance for match in pruned],
+        [match.total_distance for match in brute],
+    )
+    assert report.exact_evaluated + report.safely_pruned == report.eligible_candidates
+    assert report.safely_pruned > 0
+    assert report.dtw_bounds_evaluated == 0
+    stronger, stronger_report = exact_search_pruned(
+        query, candidates, request, use_dtw_bound=True,
+    )
+    assert [match.episode_key.id for match in stronger] == [
+        match.episode_key.id for match in brute
+    ]
+    assert stronger_report.exact_evaluated <= report.exact_evaluated
+    assert stronger_report.dtw_bounds_evaluated > 0
