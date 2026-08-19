@@ -39,7 +39,7 @@
       <tr><td>12Q Float16 practical precision</td><td class="pass">PASS (APPROXIMATE)</td><td>All 24 Gate 09 cases retain top-20 membership; minimum graded nDCG 0.9999925. One rank-16/17 swap proves it is not the native authority. Candidate stores remain float16; exhaustive reference remains native streaming.</td></tr>
       <tr><td>12D Two-pass exhaustive frontier</td><td class="pass">PASS (BOUNDED SMOKE)</td><td>Atomic/resumable NSE and NASDAQ frontier smokes return deterministic native top-20 with strict stopping certificates, ≤4.44e-16 reconstructed-bound delta and 421–436 MB RSS. Full-market scale remains T12-04.</td></tr>
       <tr><td>12E Deterministic scale ladder</td><td class="pass">PASS — BOTH MARKETS</td><td>Full NSE and NASDAQ 1%/10% aggregate gates pass. NASDAQ 10% covers 1,159 symbols/363,633 candidates, prunes 99.78%, repeats its digest, searches in 6.82/6.59 minutes and projects a 68.2-minute full search at 547 MB.</td></tr>
-      <tr><td>12F Blind authority matrix</td><td class="open">IN PROGRESS — 3/24 CASES</td><td>Full NSE homefirst current/historical and vinylindia current authorities pass with repeated exact digests and strict stopping proofs. The NSE aggregate correctly remains incomplete at 3/12. No production ranking or forward outcome has been read.</td></tr>
+      <tr><td>12F Blind authority matrix</td><td class="open">RUNNING — 3/24 SEALED; CASE 4 ACTIVE</td><td>The unattended sequential supervisor revalidated the first three authorities and is building vinylindia historical. It will continue through NSE 12/12 and then NASDAQ 12/12, stopping only on a visible failure or disk guard. No production ranking or forward outcome is read.</td></tr>
       <tr><td>12 Full-universe production matrix</td><td class="open">OPEN</td><td>A bounded exact-safe reference now exists, while full-exchange scale and the independent 24-case recall matrix remain unverified.</td></tr>
     </tbody>
   </table>
@@ -368,6 +368,13 @@
   <p><b>Guards:</b> Every listed registry must contain exactly 12 unique cases. The supervisor invokes the normal provenance-validating authority command even for an existing artifact; therefore it skips expensive work only after current query/request/registry/source-universe/benchmark integrity passes. It stops on the first nonzero case or aggregate result and before starting any case if free disk is below the 5 GiB reserve. It never invokes production recall or outcome analysis.</p>
   <p><b>Verification:</b> Tests prove NSE-before-NASDAQ ordering across 24 cases, one aggregate per completed dataset, durable completion records and immediate stop with later cases pending on the first simulated failure. The complete repository suite passes 113 tests.</p>
   <p><b>Operation:</b> Launch the supervisor with stdout/stderr redirected to a durable log. The first three authorities will be cheaply revalidated, then execution resumes at <code>nse-vinylindia-historical-252</code>. Generated frontier, authority, progress and run-log artifacts remain outside Git; human evidence continues in this append-only log at measured checkpoints.</p>
+</section>
+
+<section class="entry" id="log-032">
+  <h2>L-032 — Autonomous 24-case matrix execution launched</h2>
+  <p><b>Launch:</b> Started the persistent sequential supervisor on 19 August 2026 after commit <code>9e79dff</code> and a 113-test full regression pass. Output is tee’d to <code>gate12/authorities/matrix-runner.log</code>; atomic machine progress is stored in <code>gate12/authorities/matrix-runner.json</code>.</p>
+  <p><b>Initial behavior:</b> The supervisor independently revalidated the three sealed authorities against current universe provenance and marked them PASS without repeating exact searches. It then automatically started case 4/24, <code>nse-vinylindia-historical-252</code>. At the first operational checkpoint its child process was live, 148 query-specific shards were durable, approximately 8.75 GiB remained free and no failure was recorded.</p>
+  <p><b>Continuation policy:</b> No user message is required between cases. After each successful artifact, progress is atomically advanced and the next registry case starts in a fresh process. A failing case, failed 12-case aggregate, or free disk below 5 GiB stops the sequence visibly; it does not skip ahead or reduce scope.</p>
 </section>
 </main>
 
