@@ -180,6 +180,12 @@ def score_candidates_pruned(
         selected = select_scored(scored, request)
         if len(selected) >= request.top_k:
             threshold = max(match.total_distance for match in selected)
+        else:
+            # A newly evaluated lower-distance candidate can overlap several
+            # previously selected episodes (or consume a per-instrument slot),
+            # temporarily reopening the constrained top-k. The old threshold
+            # is then unsafe because a farther replacement may be required.
+            threshold = float("inf")
     return PrunedScoreReport(
         tuple(scored), len(bounded), evaluated, len(bounded) - evaluated,
         dtw_bounds_evaluated,

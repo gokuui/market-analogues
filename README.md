@@ -59,7 +59,7 @@ positives must beat reversed/context-contradictory negatives, future mutation mu
 have zero effect, and persisted coarse-index serialization must preserve neighbors.
 Gate JSON keeps an immutable history beneath `artifact_dir/gates/history`.
 
-The current regression record is 76 passing tests. This establishes a verified retrieval baseline, not trading
+The current regression record is 77 passing tests. This establishes a verified retrieval baseline, not trading
 profitability or production-scale completeness.
 
 The stratified exact oracle and sampled multi-view recall gate pass at candidate

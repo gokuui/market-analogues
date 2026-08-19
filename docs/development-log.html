@@ -32,7 +32,7 @@
       <tr><td>10 Sampled multiview fusion</td><td class="pass">PASS</td><td>Pool 175 reaches a 0.95 worst-case top-20 recall floor in all 24 sampled oracle cases. Earlier pool-125 failures remain in gate history.</td></tr>
       <tr><td>11A Persisted view shards</td><td class="open">PARTIAL PASS</td><td>Full NSE and NASDAQ 252-bar layers, persisted-signature oracle recall, resume, corruption detection and warm search pass. Other lookbacks remain.</td></tr>
       <tr><td>11B Exact-safe pruning</td><td class="pass">PASS (SAMPLED ORACLE)</td><td>Both bounds reproduce all 24 Gate 09 rankings and components. Default avoids 65.6% of exact evaluations across 5,850 candidates and is integrated by Gate 11C.</td></tr>
-      <tr><td>11C Production persisted search</td><td class="pass">PASS (252-BAR SMOKE)</td><td>Repeated RELIANCE/AAPL searches have stable digests and zero numeric delta; final schema-v3 worst 31.54/84.73 s and 484/776 MB with stocks, tiers and benchmarks validated. Independent query matrix remains Gate 12.</td></tr>
+      <tr><td>11C Production persisted search</td><td class="pass">PASS (252-BAR SMOKE)</td><td>Repeated RELIANCE/AAPL searches have stable digests and zero numeric delta after the overlap-threshold correction; worst 29.05/76.23 s and 476/772 MB. Independent query matrix remains Gate 12.</td></tr>
       <tr><td>12 Full-universe production matrix</td><td class="open">OPEN</td><td>Multiview smoke queries cover every eligible instrument but fail saturation and latency. Exact-safe reference retrieval does not yet exist.</td></tr>
     </tbody>
   </table>
@@ -183,6 +183,16 @@
   <p><b>Gate decision:</b> Both markets pass the declared 252-bar smoke budgets (NSE ≤120 s, NASDAQ ≤300 s, RSS ≤1 GiB). Keep this backend opt-in under D-009: one current query per exchange is an integration/performance proof, not independent full-universe recall validation.</p>
   <p><b>Limits and next step:</b> Only lookback 252 has complete persisted stores. Gate 12 must select new symbols, historical/current cutoffs and difficult regimes not used for pool calibration; 63/126 stores require an explicit disk/storage plan before construction.</p>
   <p><b>Regression evidence:</b> The final suite passes 76/76 tests, including stock, quality-tier and benchmark staleness failures. A targeted pytest-cov invocation exposed a NumPy/SciPy module-reload collection error in the coverage tooling; the normal regression suite is unaffected, so no new coverage percentage is claimed at this checkpoint.</p>
+</section>
+
+<section class="entry" id="log-014">
+  <h2>L-014 — Constrained-pruning threshold correction</h2>
+  <p><b>Finding:</b> Planning an exhaustive Gate 12 reference exposed an adversarial case absent from the 24 sampled oracles. Suppose A and B initially fill top-2. A later, cheaper C overlaps both, so greedy overlap selection now contains only C and requires farther non-overlapping D. The scorer recomputed the selected set but retained the old A/B finite threshold when the set became incomplete; D could therefore be stopped even though it was required.</p>
+  <p><b>Fix:</b> After every exact evaluation, set the bound threshold to the worst selected distance only when the constrained result contains <code>top_k</code> matches. If overlap deduplication or an instrument cap leaves fewer than <code>top_k</code>, reopen the threshold to infinity until the result is full again. This preserves the safe stopping proof: every candidate capable of changing the complete constrained prefix has been evaluated before a finite frontier can stop the scan.</p>
+  <p><b>Regression:</b> Added the explicit A/B/C/D overlap topology. The old implementation would return only C; the corrected scorer evaluates D and returns C,D. This test is independent of financial feature values and directly exercises the control-flow invariant.</p>
+  <p><b>Gate 11B rerun:</b> All 12 NSE and 12 NASDAQ exact-oracle cases still pass with maximum total delta <code>4.44e-16</code> and zero component delta. Work counts are unchanged: default prunes 2,147/3,192 NSE and 1,692/2,658 NASDAQ candidates; optional LB_Keogh prunes 2,411 and 1,817.</p>
+  <p><b>Gate 11C rerun:</b> Schema-v3 RELIANCE digest remains <code>0badb2446edfcdaec2da97f6551324b8959c8583ad845511d3ca22aa3928ed4a</code>; worst repeated time 29.05 s and peak 476.02 MB. AAPL remains <code>371e51e49ae7934bc8ae580b8439787fc67169c6dc344a143136bf053681e26c</code>; worst 76.23 s and 772.26 MB. Both have zero repeat delta and the same 97/175 and 88/175 prune counts.</p>
+  <p><b>Decision:</b> Supersede the incomplete threshold rule described in L-011 with the reopen-on-incomplete invariant above. Keep the broader Gate 12 claim open: passing known cases did not substitute for adversarial reasoning here.</p>
 </section>
 </main>
 

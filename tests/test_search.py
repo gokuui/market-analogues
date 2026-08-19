@@ -10,7 +10,7 @@ from market_analogues.search import (
     select_scored,
 )
 from market_analogues.synthetic import FAMILIES, transform_case, verification_corpus
-from market_analogues.types import SearchQuery
+from market_analogues.types import Episode, EpisodeKey, InstrumentKey, SearchQuery
 
 
 def _ndcg(labels: list[int], k: int = 10) -> float:
@@ -139,3 +139,59 @@ def test_safe_pruning_is_identical_to_brute_force() -> None:
     ]
     assert stronger_report.exact_evaluated <= report.exact_evaluated
     assert stronger_report.dtw_bounds_evaluated > 0
+
+
+def test_pruning_reopens_threshold_when_overlap_displaces_multiple_matches(
+    monkeypatch,
+) -> None:
+    import market_analogues.search as search_module
+
+    instrument = InstrumentKey("test", "ONE")
+
+    def episode(name: str, timestamps: list[str]) -> Episode:
+        bars = pd.DataFrame({"timestamp": pd.to_datetime(timestamps)})
+        key = EpisodeKey(
+            instrument, pd.Timestamp(timestamps[-1]), len(timestamps), f"test-{name}",
+        )
+        return Episode(key, bars)
+
+    query = Episode(
+        EpisodeKey(
+            InstrumentKey("test", "QUERY"), pd.Timestamp("2030-01-01"), 1, "test",
+        ),
+        pd.DataFrame({"timestamp": pd.to_datetime(["2030-01-01"])}),
+    )
+    # A and B initially fill top-2. Cheaper C overlaps both, leaving only one
+    # selected result. D is farther than the obsolete A/B threshold but is the
+    # required non-overlapping second result.
+    candidates = [
+        SearchCandidate(episode("a", ["2020-01-01"]), "a"),
+        SearchCandidate(episode("b", ["2020-01-02"]), "b"),
+        SearchCandidate(episode("c", ["2020-01-01", "2020-01-02"]), "c"),
+        SearchCandidate(episode("d", ["2020-01-03"]), "d"),
+    ]
+    lower = {"a": .1, "b": .2, "c": .3, "d": 2.5}
+    exact = {"a": 1.0, "b": 2.0, "c": .5, "d": 3.0}
+    monkeypatch.setattr(search_module, "represent", lambda _episode: "query")
+    monkeypatch.setattr(search_module, "eligible", lambda *_args: True)
+    monkeypatch.setattr(
+        search_module, "representation_distance_lower_bound",
+        lambda _query, candidate, _config: (
+            lower[candidate], {"price": 0.0}, 0.0,
+        ),
+    )
+    monkeypatch.setattr(
+        search_module, "complete_representation_distance",
+        lambda _query, candidate, *_args: (
+            exact[candidate], {"price": exact[candidate]}, [],
+        ),
+    )
+
+    matches, report = exact_search_pruned(
+        query, candidates, SearchQuery(query.key, top_k=2),
+    )
+
+    assert [match.episode_key for match in matches] == [
+        candidates[2].episode.key, candidates[3].episode.key,
+    ]
+    assert report.exact_evaluated == 4
