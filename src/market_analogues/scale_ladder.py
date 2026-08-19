@@ -56,6 +56,38 @@ class ScaleLadderResult:
     failures: tuple[str, ...]
 
 
+def collect_scale_history(
+    gates: Path, dataset_id: str, query_episode_id: str, seed: str,
+) -> dict[float, dict[str, object]]:
+    records: dict[float, tuple[str, dict[str, object]]] = {}
+    paths = list((gates / "history").glob(f"12e_exhaustive_scale_*_{dataset_id}/*.json"))
+    paths.extend(gates.glob(f"12e_exhaustive_scale_*_{dataset_id}.json"))
+    for path in sorted(set(paths)):
+        try:
+            payload = json.loads(path.read_text())
+            metrics = payload["metrics"]
+        except (OSError, KeyError, TypeError, json.JSONDecodeError):
+            continue
+        if (
+            not payload.get("passed")
+            or metrics.get("dataset") != dataset_id
+            or metrics.get("query_episode_id") != query_episode_id
+            or metrics.get("seed") != seed
+        ):
+            continue
+        for rung in metrics.get("rungs", []):
+            if (
+                not rung.get("passed")
+                or rung.get("result_digest") != rung.get("repeated_digest")
+            ):
+                continue
+            fraction = float(rung["fraction"])
+            stamp = str(payload.get("created_at", ""))
+            if fraction not in records or stamp > records[fraction][0]:
+                records[fraction] = (stamp, rung)
+    return {fraction: value[1] for fraction, value in sorted(records.items())}
+
+
 def deterministic_instrument_prefixes(
     source: OHLCVSource,
     quality: pd.DataFrame,

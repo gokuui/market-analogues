@@ -33,7 +33,7 @@
       <tr><td>Gate 12C exact batch kernel</td><td colspan="2" class="pass">12 symbols; 1,200 windows; minimum 21.17×; 341 MB RSS</td><td>Exact fields/lower bounds match scalar within 3.56e-15; chunking and context edge cases pass. The final rerun includes the corrected missing-channel denominator.</td></tr>
       <tr><td>Float16 behavioral audit</td><td class="pass">12/12; recall 1.0; nDCG ≥0.9999925</td><td class="pass">12/12; recall/nDCG 1.0</td><td>Float16 is approved for approximate candidate storage followed by native reranking. One NSE order changed; it remains unsafe as the native exhaustive bound and still does not fit as a full store.</td></tr>
       <tr><td>Gate 12D exhaustive frontier smoke</td><td class="pass">4,351 eligible; 52.95% pruned; 33.71 s; 436 MB</td><td class="pass">2,594 eligible; 16.46% pruned; 34.29 s; 421 MB</td><td>Atomic resume, provenance, native bound reconstruction, strict stop certificate and repeated top-20 determinism pass after the symbol-draining optimization. These are bounded 8/20-instrument smokes.</td></tr>
-      <tr><td>Gate 12E scale ladder</td><td class="partial">1%/10%/50% pass; 50% has 526,248 candidates, 99.83% pruned, 571.31 s, 564 MB</td><td class="partial">Not started</td><td>Locked hash prefixes, resume and repeated digests pass. The 50% rung projects a 27.6-minute full build and 19.0-minute full search. NSE 100% and NASDAQ 1%/10% remain required.</td></tr>
+      <tr><td>Gate 12E scale ladder</td><td class="pass">FULL PASS; 1,843 symbols; 1,040,116 candidates; 99.88% pruned; 913.82 s; 638 MB</td><td class="partial">Not started</td><td>All four locked hash rungs pass and aggregate from immutable history. Full NSE repeats the exact digest, resumes in 3.35 s and uses a 37.4 MB frontier. NASDAQ 1%/10% remain required.</td></tr>
       <tr><td>Synthetic financial verifier</td><td colspan="2" class="pass">Recall@10 0.953846; nDCG@10 0.935744; clone/invariance/pair ordering 1.0; critical-negative rate 0</td><td>The retrieval metric did not regress when candidate generation changed.</td></tr>
       <tr><td>Full-universe coverage</td><td class="pass">1,843/1,843 eligible; 1,040,155 windows</td><td class="pass">11,584/11,584 eligible; 3,786,156 baseline windows</td><td>Quality accounting and temporal eligibility reconcile with zero silent symbol failures.</td></tr>
       <tr><td>Full-universe candidate completeness</td><td class="fail">Pool-175 recall versus pool 1,000: 0.40</td><td class="fail">Pool-175 recall versus pool 1,000: 0.50</td><td>A larger shortlist still changes the returned exact top 20. Pool 1,000 is itself not exhaustive, so this is a lower-bound warning, not a completeness proof.</td></tr>
@@ -82,8 +82,8 @@
     <p class="pass"><b>Registry and storage architecture are now locked.</b> Twenty-four untouched 252-bar cases span both markets, A/B tiers, three liquidity strata and historical/current cutoffs. Gate 12B rejected reduced-precision authority and selected a memory-bounded two-pass exact reference rather than a larger approximate pool.</p>
     <p class="pass"><b>T12-02 passed:</b> the exact lower-bound kernel matches scalar values within 3.56e-15, clears 20× on every frozen symbol and stays below 512 MB; the corrected final rerun reaches 21.17× minimum speedup at 341 MB.</p>
     <p class="pass"><b>T12-03 bounded architecture passed:</b> resumable frontiers, native grouped reconstruction, brute-force equality and strict stop certificates are established on both markets.</p>
-    <p class="pass"><b>T12-04 progress:</b> locked 1%, 10% and 50% NSE rungs pass. At 50%, the exact authority evaluates only 900 of 526,248 candidates, repeats the same digest, and projects a full search at 19.0 minutes while using 564 MB RSS.</p>
-    <p><b>Next:</b> Run NSE 100%, then NASDAQ 1%/10%, separately measuring frontier build and native completion before any 24-case recall matrix.</p>
+    <p class="pass"><b>T12-04 NSE complete:</b> all 1%, 10%, 50% and 100% rungs pass. The full exact authority covers 1,843 symbols and 1,040,116 candidates, repeats its digest, completes searches in 913.82/950.78 seconds and peaks at 638 MB.</p>
+    <p><b>Next:</b> Run NASDAQ 1%/10%, separately measuring frontier build and native completion before any 24-case recall matrix.</p>
     <p><b>Pass:</b> ≥95% top-20 recall in every query for the fast path versus the exact-safe reference; zero future/overlap/quality failures; deterministic repeated and serial/parallel digests; NSE ≤120 s and NASDAQ ≤300 s for 252 bars; RSS ≤1 GiB.</p>
     <p><b>Detailed locked plan:</b> <a href="gate12-exhaustive-reference-plan.html">exhaustive reference and independent validation plan</a>. It freezes 24 untouched cases before recall measurement and uses a two-pass exact lower-bound frontier rather than treating a larger approximate pool as truth.</p>
   </div>
@@ -96,7 +96,7 @@
 
 <section>
   <h2>Current decision</h2>
-  <p class="partial"><b>Continue development; do not declare the system complete.</b> Gate 12 now has frozen queries, a measured storage decision, a verified exact batch kernel, a bounded two-pass authority, and passing 1%/10%/50% NSE scale rungs. NSE 100%, NASDAQ scaling, the independent 24-case recall matrix, other lookbacks and exchange-scale completeness remain open.</p>
+  <p class="partial"><b>Continue development; do not declare the system complete.</b> The complete NSE scale ladder now passes. NASDAQ scaling, the independent 24-case recall matrix, other lookbacks and cross-market exchange-scale completeness remain open.</p>
 </section>
 </body>
 </html>

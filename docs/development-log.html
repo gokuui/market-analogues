@@ -38,7 +38,7 @@
       <tr><td>12C Exact batch kernel</td><td class="pass">PASS</td><td>Final corrected rerun over all 12 frozen symbols and 1,200 windows: minimum 21.17× scalar speedup, aggregate 26.21×, ≤3.56e-15 component delta and 341 MB RSS. The first unstable-timing attempt remains failed in gate history.</td></tr>
       <tr><td>12Q Float16 practical precision</td><td class="pass">PASS (APPROXIMATE)</td><td>All 24 Gate 09 cases retain top-20 membership; minimum graded nDCG 0.9999925. One rank-16/17 swap proves it is not the native authority. Candidate stores remain float16; exhaustive reference remains native streaming.</td></tr>
       <tr><td>12D Two-pass exhaustive frontier</td><td class="pass">PASS (BOUNDED SMOKE)</td><td>Atomic/resumable NSE and NASDAQ frontier smokes return deterministic native top-20 with strict stopping certificates, ≤4.44e-16 reconstructed-bound delta and 421–436 MB RSS. Full-market scale remains T12-04.</td></tr>
-      <tr><td>12E Deterministic scale ladder</td><td class="open">IN PROGRESS — NSE 1%/10%/50% PASS</td><td>The 50% rung covers 922 symbols and 526,248 candidates, safely prunes 99.83%, repeats its exact digest, and projects a 19.0-minute full search at 564 MB. NSE 100% and NASDAQ 1%/10% remain open.</td></tr>
+      <tr><td>12E Deterministic scale ladder</td><td class="open">IN PROGRESS — NSE FULL PASS</td><td>All four NSE rungs aggregate as passing. Full NSE covers 1,843 symbols/1,040,116 candidates, prunes 99.88%, repeats its exact digest, searches in 15.23/15.85 minutes and peaks at 638 MB. NASDAQ 1%/10% remain open.</td></tr>
       <tr><td>12 Full-universe production matrix</td><td class="open">OPEN</td><td>A bounded exact-safe reference now exists, while full-exchange scale and the independent 24-case recall matrix remain unverified.</td></tr>
     </tbody>
   </table>
@@ -295,6 +295,16 @@
   <p><b>Tests:</b> A nested 50%/100% fixture proves the full rung seeds two verified shards, reuses both, builds the remaining eligible shard, repeats the same exact digest and reconciles candidate accounting. All 108 repository tests pass.</p>
   <p><b>Decision:</b> Proceed to the actual 100% NSE rung using the locked two-shard completion cache and the existing 50% certificate as the validated seed.</p>
 </section>
+
+<section class="entry" id="log-024">
+  <h2>L-024 — Complete NSE exhaustive authority and ladder aggregation</h2>
+  <p><b>Scope:</b> Ran the frozen current homefirst query over every one of the 1,843 eligible A/B NSE symbols in the locked hash universe. The full frontier contains 1,040,116 temporally eligible, non-query-overlapping stride-five episodes.</p>
+  <p><b>Build:</b> Seeded and revalidated all 922 certified 50% shards, then built the remaining 921 atomically in 846.93 seconds. An unchanged complete resume validates all shards in 3.35 seconds. Logical frontier size is 37,381,718 bytes and free disk remains 9,369,423,872 bytes, above the 5 GiB reserve.</p>
+  <p><b>Exact result:</b> Only 1,278 candidates require native completion; 1,038,838 are safely pruned (99.88%). Independent searches take 913.82 and 950.78 seconds and return identical digest <code>4149ea4b…e4e1</code>. Peak RSS is 638.14 MB. Exact/pruned accounting, full constrained top-20, bound reconstruction and strict next-bound stopping all pass.</p>
+  <p><b>Bookkeeping correction:</b> Individual rung invocations originally updated a generic smoke gate, while immutable history correctly retained 1%, 10%, 50% and 100%. Added a reproducible aggregate command that accepts only passing rungs with the same dataset, frozen query, locked seed and identical repeated digest, keeps the newest valid record per fraction, and emits the full gate only when every preregistered fraction exists. <code>12e_exhaustive_scale_full_nse</code> now passes with all four rungs.</p>
+  <p><b>Tests:</b> History aggregation rejects failed, mismatched and nondeterministic records and selects the newest matching passing rung. Parser coverage and the full repository suite now pass 109 tests.</p>
+  <p><b>Decision:</b> The NSE portion of T12-04 is complete. This is one full exact reference query, not the 24-case recall matrix. Proceed to NASDAQ 1% and 10%; do not start T12-05 until both pass their six-hour, 1 GiB and disk gates.</p>
+</section>
 </main>
 
 <section id="reproduce">
@@ -318,7 +328,8 @@
 .venv/bin/market-analogues verify-float16-precision --config config/datasets.example.yaml --dataset nasdaq
 .venv/bin/market-analogues verify-exhaustive-frontier --config config/datasets.example.yaml --dataset nse --symbol homefirst --cutoff 2024-12-02 --lookback 252 --top-k 20 --instrument-limit 8
 .venv/bin/market-analogues verify-exhaustive-frontier --config config/datasets.example.yaml --dataset nasdaq --symbol CAKE --cutoff 2018-08-29 --lookback 252 --top-k 20 --instrument-limit 20
-.venv/bin/market-analogues verify-exhaustive-scale --config config/datasets.example.yaml --dataset nse --symbol homefirst --cutoff 2026-02-11 --lookback 252 --fractions 0.01 0.1</code></pre>
+.venv/bin/market-analogues verify-exhaustive-scale --config config/datasets.example.yaml --dataset nse --symbol homefirst --cutoff 2026-02-11 --lookback 252 --fractions 0.01 0.1
+.venv/bin/market-analogues aggregate-exhaustive-scale --config config/datasets.example.yaml --dataset nse --query-episode-id 99fe49f51285b398361b7b13</code></pre>
   <p class="muted">Source datasets are read-only. Generated artifacts live under the configured artifact directory and are intentionally excluded from Git.</p>
 </section>
 </body>

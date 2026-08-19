@@ -46,7 +46,9 @@ from .quality import audit_source
 from .report import write_search_report
 from .representation import represent
 from .search import SearchCandidate, exact_search
-from .scale_ladder import run_scale_ladder, write_scale_ladder_report
+from .scale_ladder import (
+    collect_scale_history, run_scale_ladder, write_scale_ladder_report,
+)
 from .scan import streaming_search
 from .types import InstrumentKey, SearchQuery
 from .universe import verify_universe, write_universe_report
@@ -768,6 +770,44 @@ def cmd_verify_exhaustive_scale(args: argparse.Namespace) -> int:
     return 0 if result.passed else 2
 
 
+def cmd_aggregate_exhaustive_scale(args: argparse.Namespace) -> int:
+    config, source = _load(args)
+    require_passed(_gates(config), f"12a_query_registry_{args.dataset}")
+    quality_path = config.artifact_dir / "quality" / f"{args.dataset}.parquet"
+    quality = pd.read_parquet(quality_path)
+    registry_directory = config.artifact_dir / "gate12" / args.dataset
+    registry_yaml = registry_directory / "query-registry.yaml"
+    failures = validate_gate12_registry(source, registry_yaml, quality)
+    if failures:
+        raise SystemExit("; ".join(failures))
+    registry = pd.read_parquet(registry_directory / "query-registry.parquet")
+    if args.query_episode_id not in set(registry.episode_id.astype(str)):
+        raise SystemExit("aggregate query is not in the frozen Gate 12 registry")
+    rungs = collect_scale_history(
+        _gates(config), args.dataset, args.query_episode_id, args.seed,
+    )
+    required = (
+        {0.01, 0.1, 0.5, 1.0} if args.dataset == "nse" else {0.01, 0.1}
+    )
+    missing = sorted(required.difference(rungs))
+    passed = not missing
+    metrics = {
+        "dataset": args.dataset, "query_episode_id": args.query_episode_id,
+        "seed": args.seed, "required_fractions": sorted(required),
+        "observed_fractions": sorted(rungs),
+        "rungs": [rungs[fraction] for fraction in sorted(rungs)],
+    }
+    aggregate_failures = [f"missing passing fraction {value:g}" for value in missing]
+    scope = "full" if passed else "progress"
+    GateReport(
+        f"12e_exhaustive_scale_{scope}_{args.dataset}", passed,
+        metrics, aggregate_failures,
+    ).write(_gates(config))
+    print(json.dumps({"passed": passed, **metrics,
+                      "failures": aggregate_failures}, indent=2, default=str))
+    return 0 if passed else 2
+
+
 def cmd_build_view_store(args: argparse.Namespace) -> int:
     config, source = _load(args)
     require_passed(_gates(config), f"01_ingestion_audit_{args.dataset}")
@@ -1189,6 +1229,12 @@ def build_parser() -> argparse.ArgumentParser:
     scale.add_argument("--frontier-root")
     scale.add_argument("--output")
     scale.set_defaults(func=cmd_verify_exhaustive_scale)
+    aggregate_scale = sub.add_parser("aggregate-exhaustive-scale")
+    aggregate_scale.add_argument("--config", required=True)
+    aggregate_scale.add_argument("--dataset", required=True)
+    aggregate_scale.add_argument("--query-episode-id", required=True)
+    aggregate_scale.add_argument("--seed", default="gate12-scale-v1")
+    aggregate_scale.set_defaults(func=cmd_aggregate_exhaustive_scale)
     view_store = sub.add_parser("build-view-store")
     view_store.add_argument("--config", required=True)
     view_store.add_argument("--dataset", required=True)
