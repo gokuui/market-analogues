@@ -16,6 +16,8 @@ market-analogues build-view-store --config config/datasets.example.yaml \
   --dataset nse --lookbacks 252 --stride 5
 market-analogues verify-pruning --config config/datasets.example.yaml \
   --dataset nse
+market-analogues build-gate12-registry --config config/datasets.example.yaml \
+  --dataset nse
 market-analogues search --config config/datasets.example.yaml --dataset nse \
   --symbol reliance --cutoff 2026-02-11 --lookback 252 \
   --candidate-pool 175 --view-store
@@ -60,7 +62,7 @@ positives must beat reversed/context-contradictory negatives, future mutation mu
 have zero effect, and persisted coarse-index serialization must preserve neighbors.
 Gate JSON keeps an immutable history beneath `artifact_dir/gates/history`.
 
-The current regression record is 77 passing tests. This establishes a verified retrieval baseline, not trading
+The current regression record is 78 passing tests. This establishes a verified retrieval baseline, not trading
 profitability or production-scale completeness.
 
 The stratified exact oracle and sampled multi-view recall gate pass at candidate

@@ -29,7 +29,7 @@
 
 <section>
   <h2>Independent query registry rule</h2>
-  <p>Selection seed is <code>gate12-query-v1</code>. Exclude all Gate 09 query symbols and every symbol sampled as a Gate 09 candidate. Require at least 1,000 rows. Within each market and each A/B × low/middle/high liquidity cell, choose the smallest SHA-256 order of <code>seed:market:tier:stratum:symbol</code>. This rule was executed before any Gate 12 result.</p>
+  <p>Selection seed is <code>gate12-query-v1</code>. Exclude all Gate 09 query symbols and every symbol sampled as a Gate 09 candidate. Require at least 1,000 rows and a last bar within 120 calendar days of the market’s latest audited timestamp, so “current” does not silently mean a delisted series last observed years ago. Within each market and each A/B × low/middle/high liquidity cell, choose the smallest SHA-256 order of <code>seed:market:tier:stratum:symbol</code>. This rule was finalized before any Gate 12 recall result.</p>
   <table>
     <thead><tr><th>Market</th><th>Tier / liquidity</th><th>Locked symbol</th><th>Rows at lock</th><th>Median 252-bar dollar volume</th></tr></thead>
     <tbody>
@@ -40,21 +40,22 @@
       <tr><td>NSE</td><td>B / low</td><td>aceinteg</td><td>2,123</td><td>₹0.120m</td></tr>
       <tr><td>NSE</td><td>B / middle</td><td>onwardtec</td><td>6,876</td><td>₹11.5m</td></tr>
       <tr><td>NASDAQ</td><td>A / high</td><td>CAKE</td><td>6,599</td><td>$69.4m</td></tr>
-      <tr><td>NASDAQ</td><td>A / low</td><td>ZICA</td><td>2,331</td><td>$0.015m</td></tr>
+      <tr><td>NASDAQ</td><td>A / low</td><td>TAIT</td><td>5,414</td><td>$0.025m</td></tr>
       <tr><td>NASDAQ</td><td>A / middle</td><td>SLE</td><td>1,783</td><td>$0.234m</td></tr>
       <tr><td>NASDAQ</td><td>B / high</td><td>TVTX</td><td>4,063</td><td>$38.7m</td></tr>
-      <tr><td>NASDAQ</td><td>B / low</td><td>ABEOW</td><td>1,135</td><td>$0</td></tr>
-      <tr><td>NASDAQ</td><td>B / middle</td><td>THRD_old</td><td>3,727</td><td>$0.042m</td></tr>
+      <tr><td>NASDAQ</td><td>B / low</td><td>YGMZ</td><td>1,334</td><td>$0.027m</td></tr>
+      <tr><td>NASDAQ</td><td>B / middle</td><td>RKDA</td><td>2,734</td><td>$0.034m</td></tr>
     </tbody>
   </table>
   <p>Each symbol contributes two 252-bar queries: the latest observed cutoff and the cutoff at position <code>251 + round(0.70 × (rows − 1 − 251))</code>. The registry will persist explicit cutoffs and stock/benchmark fingerprints. No symbol or cutoff may be replaced after seeing recall; an unavailable or invalid locked query is a visible failure.</p>
 </section>
 
 <section class="task">
-  <h2>T12-00 — Persist the frozen registry and baseline evidence</h2>
+  <h2 class="pass">T12-00 — Persist the frozen registry and baseline evidence — PASS</h2>
   <p><b>Build:</b> Add a deterministic registry generator and a reviewed YAML/Parquet registry containing the 24 cases, exclusion-set digest, selection seed/rule, explicit cutoffs, tier/liquidity labels, lookback, source fingerprint and benchmark fingerprint.</p>
-  <p><b>Tests:</b> shuffled liquidity rows yield the same registry; every case is absent from Gate 09 query/candidate symbols; every query has 252 prior bars and the historical cutoff has at least 60 later observed sessions; source mutation invalidates the registry.</p>
+  <p><b>Tests:</b> shuffled liquidity rows yield the same registry; every case is absent from Gate 09 query/candidate symbols; every current case passes the 120-day freshness rule; every query has 252 prior bars and the historical cutoff has at least 60 later observed sessions; source or benchmark mutation invalidates the registry.</p>
   <p><b>Pass before proceeding:</b> 24/24 cases valid, unique and reproducible; registry digest written to the log.</p>
+  <p class="pass"><b>Evidence:</b> schema v2 passes 12/12 per market. NSE registry digest <code>1d31b954f43f56b1883ba3f92d3195dc99e41fc3522587f9696c39302b7656dd</code>, exclusion digest <code>cce8289007953e524ef8bda9c39eaf852239c7d7bfc3e30b9c431e37fdb6318c</code>. NASDAQ registry digest <code>d2106561e356dadd38f35003cfed27cbd0a3a5990c77adb59b213fe8b55be43e</code>, exclusion digest <code>6f03768f7ee319a414232c487c6e0672eb78a0adf6100097fa60e7f6ed573c5a</code>. Both saved YAML, Parquet and HTML artifacts and revalidated from disk with no failures.</p>
 </section>
 
 <section class="task">

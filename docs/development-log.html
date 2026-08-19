@@ -33,6 +33,7 @@
       <tr><td>11A Persisted view shards</td><td class="open">PARTIAL PASS</td><td>Full NSE and NASDAQ 252-bar layers, persisted-signature oracle recall, resume, corruption detection and warm search pass. Other lookbacks remain.</td></tr>
       <tr><td>11B Exact-safe pruning</td><td class="pass">PASS (SAMPLED ORACLE)</td><td>Both bounds reproduce all 24 Gate 09 rankings and components. Default avoids 65.6% of exact evaluations across 5,850 candidates and is integrated by Gate 11C.</td></tr>
       <tr><td>11C Production persisted search</td><td class="pass">PASS (252-BAR SMOKE)</td><td>Repeated RELIANCE/AAPL searches have stable digests and zero numeric delta after the overlap-threshold correction; worst 29.05/76.23 s and 476/772 MB. Independent query matrix remains Gate 12.</td></tr>
+      <tr><td>12A Independent query registry</td><td class="pass">PASS</td><td>24 fingerprint-locked cases across markets, A/B tiers, three liquidity strata and historical/latest cutoffs; excludes all Gate 09 query/candidate symbols. No Gate 12 recall measured yet.</td></tr>
       <tr><td>12 Full-universe production matrix</td><td class="open">OPEN</td><td>Multiview smoke queries cover every eligible instrument but fail saturation and latency. Exact-safe reference retrieval does not yet exist.</td></tr>
     </tbody>
   </table>
@@ -204,6 +205,16 @@
   <p><b>Decision:</b> Implement T12-00 registry persistence next. Do not build 63/126 stores or promote persisted search by default until the exact-reference feasibility and independent 252-bar matrix pass.</p>
   <p>Readable plan: <a href="gate12-exhaustive-reference-plan.html">Gate 12 exhaustive reference and independent validation</a>.</p>
 </section>
+
+<section class="entry" id="log-016">
+  <h2>L-016 — T12-00 deterministic independent query registry</h2>
+  <p><b>What:</b> Added a market-agnostic Gate 12 registry generator, validator, CLI command, machine gate and YAML/Parquet/HTML artifacts. The registry records explicit query cutoffs/positions, episode IDs, quality/liquidity cell, source and benchmark fingerprints, exclusion-set digest, selection hash and whole-registry digest.</p>
+  <p><b>Why:</b> Independent validation queries must be frozen before recall and must not overlap the Gate 09 queries or sampled candidate instruments used while choosing pool 175. A readable symbol list alone does not detect later source, benchmark, quality, cutoff or registry changes.</p>
+  <p><b>Rejected v1:</b> The first deterministic run selected ZICA, ABEOW and THRD_old for NASDAQ low/middle cells, but their latest observations were 2009, 2019 and 2014. No Gate 12 recall had been computed. Calling those “current” would be misleading, so schema v1 was rejected visibly and the pre-registration rule was versioned before validation.</p>
+  <p><b>v2 rule:</b> In addition to ≥1,000 rows and Gate 09 exclusion, require the last bar to be within 120 calendar days of the market’s latest audited timestamp. This leaves NSE unchanged and selects active TAIT, YGMZ and RKDA for those NASDAQ cells. A future data refresh may invalidate the fingerprinted registry; it must not silently select replacements after recall exists.</p>
+  <p><b>Evidence:</b> NSE: 26 excluded symbols, 12/12 cases, registry digest <code>1d31b954f43f56b1883ba3f92d3195dc99e41fc3522587f9696c39302b7656dd</code>, exclusion digest <code>cce8289007953e524ef8bda9c39eaf852239c7d7bfc3e30b9c431e37fdb6318c</code>. NASDAQ: 20 excluded, 12/12 cases, registry <code>d2106561e356dadd38f35003cfed27cbd0a3a5990c77adb59b213fe8b55be43e</code>, exclusion <code>6f03768f7ee319a414232c487c6e0672eb78a0adf6100097fa60e7f6ed573c5a</code>. Both validators return zero failures from saved YAML.</p>
+  <p><b>Tests:</b> Liquidity-row shuffling preserves registry digest; all six cells and two cutoffs exist; Gate 09 symbols are absent; historical cases retain ≥60 future sessions; stock mutation, benchmark mutation, quality-tier drift, cutoff/episode tampering and exclusion/registry digest mismatch fail. T12-01 is next; no recall has been inspected.</p>
+</section>
 </main>
 
 <section id="reproduce">
@@ -218,7 +229,9 @@
 .venv/bin/market-analogues verify-pruning --config config/datasets.example.yaml --dataset nse
 .venv/bin/market-analogues verify-pruning --config config/datasets.example.yaml --dataset nasdaq
 .venv/bin/market-analogues verify-production-search --config config/datasets.example.yaml --dataset nse --symbol reliance --cutoff 2026-02-11 --lookback 252 --max-seconds 120
-.venv/bin/market-analogues verify-production-search --config config/datasets.example.yaml --dataset nasdaq --symbol AAPL --cutoff 2026-03-30 --lookback 252 --max-seconds 300</code></pre>
+.venv/bin/market-analogues verify-production-search --config config/datasets.example.yaml --dataset nasdaq --symbol AAPL --cutoff 2026-03-30 --lookback 252 --max-seconds 300
+.venv/bin/market-analogues build-gate12-registry --config config/datasets.example.yaml --dataset nse
+.venv/bin/market-analogues build-gate12-registry --config config/datasets.example.yaml --dataset nasdaq</code></pre>
   <p class="muted">Source datasets are read-only. Generated artifacts live under the configured artifact directory and are intentionally excluded from Git.</p>
 </section>
 </body>

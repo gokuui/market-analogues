@@ -18,6 +18,7 @@ from .config import AppConfig, load_config
 from .episodes import build_episode, build_manifest
 from .gates import GateReport, require_passed
 from .fusion_verification import verify_candidate_fusion, write_fusion_report
+from .gate12_registry import build_gate12_registry, write_gate12_registry
 from .index import CoarseIndex
 from .outcomes import compute_outcomes, summarize_match_outcomes
 from .oracle import run_oracle_suite, write_oracle_artifacts
@@ -310,6 +311,43 @@ def cmd_verify_production_search(args: argparse.Namespace) -> int:
         "passed": result.passed, **result.metrics, "failures": result.failures,
     }, indent=2))
     print(output)
+    return 0 if result.passed else 2
+
+
+def cmd_build_gate12_registry(args: argparse.Namespace) -> int:
+    config, source = _load(args)
+    require_passed(_gates(config), f"09_exhaustive_oracle_{args.dataset}")
+    oracle_directory = Path(args.oracle_dir) if args.oracle_dir else (
+        config.artifact_dir / "oracles" / args.dataset
+    )
+    quality_path = config.artifact_dir / "quality" / f"{args.dataset}.parquet"
+    if not quality_path.exists():
+        raise SystemExit(f"missing quality audit: {quality_path}")
+    quality = pd.read_parquet(quality_path)
+    result = build_gate12_registry(
+        source, oracle_directory, seed=args.seed, lookback=args.lookback,
+        historical_quantile=args.historical_quantile,
+        minimum_rows=args.minimum_rows,
+        minimum_future_sessions=args.minimum_future_sessions,
+        representation_version=config.representation_version,
+        quality=quality,
+        maximum_staleness_days=args.maximum_staleness_days,
+    )
+    output_directory = Path(args.output_dir) if args.output_dir else (
+        config.artifact_dir / "gate12" / args.dataset
+    )
+    yaml_path, parquet_path, html_path = write_gate12_registry(
+        result, output_directory,
+    )
+    GateReport(
+        f"12a_query_registry_{args.dataset}", result.passed,
+        {**result.metrics, "yaml": str(yaml_path), "parquet": str(parquet_path)},
+        list(result.failures),
+    ).write(_gates(config))
+    print(json.dumps({
+        "passed": result.passed, **result.metrics, "failures": result.failures,
+    }, indent=2))
+    print(html_path)
     return 0 if result.passed else 2
 
 
@@ -648,6 +686,18 @@ def build_parser() -> argparse.ArgumentParser:
     production.add_argument("--tolerance", type=float, default=1e-12)
     production.add_argument("--output")
     production.set_defaults(func=cmd_verify_production_search)
+    registry = sub.add_parser("build-gate12-registry")
+    registry.add_argument("--config", required=True)
+    registry.add_argument("--dataset", required=True)
+    registry.add_argument("--oracle-dir")
+    registry.add_argument("--seed", default="gate12-query-v1")
+    registry.add_argument("--lookback", type=int, default=252)
+    registry.add_argument("--historical-quantile", type=float, default=.70)
+    registry.add_argument("--minimum-rows", type=int, default=1000)
+    registry.add_argument("--minimum-future-sessions", type=int, default=60)
+    registry.add_argument("--maximum-staleness-days", type=int, default=120)
+    registry.add_argument("--output-dir")
+    registry.set_defaults(func=cmd_build_gate12_registry)
     view_store = sub.add_parser("build-view-store")
     view_store.add_argument("--config", required=True)
     view_store.add_argument("--dataset", required=True)
