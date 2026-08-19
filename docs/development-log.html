@@ -38,7 +38,7 @@
       <tr><td>12C Exact batch kernel</td><td class="pass">PASS</td><td>Final corrected rerun over all 12 frozen symbols and 1,200 windows: minimum 21.17× scalar speedup, aggregate 26.21×, ≤3.56e-15 component delta and 341 MB RSS. The first unstable-timing attempt remains failed in gate history.</td></tr>
       <tr><td>12Q Float16 practical precision</td><td class="pass">PASS (APPROXIMATE)</td><td>All 24 Gate 09 cases retain top-20 membership; minimum graded nDCG 0.9999925. One rank-16/17 swap proves it is not the native authority. Candidate stores remain float16; exhaustive reference remains native streaming.</td></tr>
       <tr><td>12D Two-pass exhaustive frontier</td><td class="pass">PASS (BOUNDED SMOKE)</td><td>Atomic/resumable NSE and NASDAQ frontier smokes return deterministic native top-20 with strict stopping certificates, ≤4.44e-16 reconstructed-bound delta and 421–436 MB RSS. Full-market scale remains T12-04.</td></tr>
-      <tr><td>12E Deterministic scale ladder</td><td class="open">IN PROGRESS — NSE 1%/10% PASS</td><td>Hash-nested current-query rungs pass through 185 symbols and 104,396 candidates. The two-shard policy gives a 36.4-minute full-search projection at 510 MB. NSE 50%/100% and NASDAQ 1%/10% remain open.</td></tr>
+      <tr><td>12E Deterministic scale ladder</td><td class="open">IN PROGRESS — NSE 1%/10%/50% PASS</td><td>The 50% rung covers 922 symbols and 526,248 candidates, safely prunes 99.83%, repeats its exact digest, and projects a 19.0-minute full search at 564 MB. NSE 100% and NASDAQ 1%/10% remain open.</td></tr>
       <tr><td>12 Full-universe production matrix</td><td class="open">OPEN</td><td>A bounded exact-safe reference now exists, while full-exchange scale and the independent 24-case recall matrix remain unverified.</td></tr>
     </tbody>
   </table>
@@ -276,6 +276,15 @@
   <p><b>10% NSE evidence:</b> The locked prefix contains 185 symbols and 104,396 candidates. Only 906 require native completion; 103,490 are safely pruned (99.13%). Both runs return digest <code>d8b0f8c9…d347</code>. The conservative full-search projection is 2,184.07 s (36.4 minutes), below the two-hour offline limit; disk reserve passes. The build is resume-only in the final certificate, so no fresh-build projection is claimed from that run.</p>
   <p><b>Regression:</b> Brute-force differentials pass after the traversal change, including one-row discovery batches, ties, overlaps and per-symbol caps. Refreshed T12-03 NSE/NASDAQ smokes retain their thresholds, deterministic results and ≤4.44e-16 bound parity.</p>
   <p><b>Decision:</b> T12-04 remains incomplete. The 50% and 100% NSE rungs and 1%/10% NASDAQ rungs must pass before T12-05. The next NSE rung is allowed by the 10% time/RSS/disk evidence, but its repeated native run is long and must remain an explicit measured task.</p>
+</section>
+
+<section class="entry" id="log-022">
+  <h2>L-022 — T12-04 NSE 50% exact scale rung</h2>
+  <p><b>Scope:</b> Ran the frozen current homefirst query over the first 50% of the locked <code>gate12-scale-v1</code> SHA-256 order: 922 of 1,843 eligible A/B symbols. No query, distance, precision, top-k, gap, cache or coverage control changed from the accepted ladder policy.</p>
+  <p><b>Pass 1:</b> A fresh atomic frontier built all 922 shards in 827.66 seconds (13.79 minutes). The unchanged resume revalidated them in 1.93 seconds. The frontier contains 526,248 eligible candidate rows and occupies 18,885,389 bytes; the full projection is about 37.7 MB, so the 5 GiB disk reserve passes comfortably.</p>
+  <p><b>Pass 2:</b> The native exhaustive authority evaluates 900 candidates and safely prunes 525,348 (99.83%). Searches complete in 571.31 and 579.00 seconds and return the identical digest <code>c0781c24…cabf</code>. Peak RSS is 564.06 MB. Exact/pruned accounting reconciles, the selected top-20 is full, and the next-bound stopping certificate passes.</p>
+  <p><b>Projection:</b> Scaling the measured 50% work by the exact eligible-symbol ratio projects 1,654.43 seconds (27.6 minutes) for a fresh full build and 1,141.99 seconds (19.0 minutes) for a full exact search. Both are below the two-hour NSE offline limit. Projections remain planning evidence; only the actual 100% rung can establish complete NSE authority.</p>
+  <p><b>Decision:</b> The 100% NSE rung is authorized by time, RSS and disk evidence. T12-04 is still open until that rung and the NASDAQ 1%/10% rungs pass.</p>
 </section>
 </main>
 
