@@ -9,10 +9,10 @@ from market_analogues.gates import GateReport
 
 def test_cli_exposes_gated_workflow() -> None:
     parser = build_parser()
-    commands = ["audit", "build-episodes", "build-index", "verify", "search", "compare-methods", "verify-universe", "verify-oracle", "verify-fusion", "verify-pruning", "verify-float16-precision", "verify-production-search", "build-gate12-registry", "verify-exact-storage", "verify-exact-batch", "verify-exhaustive-frontier", "verify-exhaustive-scale", "aggregate-exhaustive-scale", "build-view-store"]
+    commands = ["audit", "build-episodes", "build-index", "verify", "search", "compare-methods", "verify-universe", "verify-oracle", "verify-fusion", "verify-pruning", "verify-float16-precision", "verify-production-search", "build-gate12-registry", "verify-exact-storage", "verify-exact-batch", "verify-exhaustive-frontier", "verify-exhaustive-scale", "aggregate-exhaustive-scale", "build-gate12-authority", "aggregate-gate12-authorities", "build-view-store"]
     for command in commands:
         argv = [command, "--config", "config.yaml"]
-        if command in {"audit", "build-episodes", "build-index", "search", "verify-universe", "verify-oracle", "verify-fusion", "verify-pruning", "verify-float16-precision", "verify-production-search", "build-gate12-registry", "verify-exhaustive-frontier", "verify-exhaustive-scale", "aggregate-exhaustive-scale", "build-view-store"}:
+        if command in {"audit", "build-episodes", "build-index", "search", "verify-universe", "verify-oracle", "verify-fusion", "verify-pruning", "verify-float16-precision", "verify-production-search", "build-gate12-registry", "verify-exhaustive-frontier", "verify-exhaustive-scale", "aggregate-exhaustive-scale", "build-gate12-authority", "aggregate-gate12-authorities", "build-view-store"}:
             argv += ["--dataset", "test"]
         if command in {"search", "verify-universe", "verify-production-search", "verify-exhaustive-frontier", "verify-exhaustive-scale"}:
             argv += ["--symbol", "AAA", "--cutoff", "2020-01-01"]
@@ -20,6 +20,8 @@ def test_cli_exposes_gated_workflow() -> None:
             argv += ["--fractions", "0.01"]
         if command == "aggregate-exhaustive-scale":
             argv += ["--query-episode-id", "abc"]
+        if command == "build-gate12-authority":
+            argv += ["--case-id", "demo-case"]
         if command == "verify-oracle":
             argv += ["--symbols", "AAA"]
         args = parser.parse_args(argv)

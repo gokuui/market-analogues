@@ -39,6 +39,7 @@
       <tr><td>12Q Float16 practical precision</td><td class="pass">PASS (APPROXIMATE)</td><td>All 24 Gate 09 cases retain top-20 membership; minimum graded nDCG 0.9999925. One rank-16/17 swap proves it is not the native authority. Candidate stores remain float16; exhaustive reference remains native streaming.</td></tr>
       <tr><td>12D Two-pass exhaustive frontier</td><td class="pass">PASS (BOUNDED SMOKE)</td><td>Atomic/resumable NSE and NASDAQ frontier smokes return deterministic native top-20 with strict stopping certificates, ≤4.44e-16 reconstructed-bound delta and 421–436 MB RSS. Full-market scale remains T12-04.</td></tr>
       <tr><td>12E Deterministic scale ladder</td><td class="pass">PASS — BOTH MARKETS</td><td>Full NSE and NASDAQ 1%/10% aggregate gates pass. NASDAQ 10% covers 1,159 symbols/363,633 candidates, prunes 99.78%, repeats its digest, searches in 6.82/6.59 minutes and projects a 68.2-minute full search at 547 MB.</td></tr>
+      <tr><td>12F Blind authority matrix</td><td class="open">RUNNER READY — 0/24 CASES</td><td>Versioned exact-reference artifacts, provenance validation, atomic resume, readable case reports and 12-case aggregation gates are implemented. No production ranking or forward outcome is read during authority generation.</td></tr>
       <tr><td>12 Full-universe production matrix</td><td class="open">OPEN</td><td>A bounded exact-safe reference now exists, while full-exchange scale and the independent 24-case recall matrix remain unverified.</td></tr>
     </tbody>
   </table>
@@ -322,6 +323,16 @@
   <p><b>Aggregate:</b> <code>12e_exhaustive_scale_full_nasdaq</code> accepts the immutable 1% and 10% records for the same frozen query and seed and passes. Together with <code>12e_exhaustive_scale_full_nse</code>, all T12-04 preregistered scale rungs now pass.</p>
   <p><b>Decision:</b> T12-04 is complete. Proceed to T12-05, but first plan multi-query execution carefully: 24 independent exhaustive authorities are intentionally expensive, and the validation pool must remain frozen while references are generated and checkpointed.</p>
 </section>
+
+<section class="entry" id="log-027">
+  <h2>L-027 — T12-05 blind, resumable authority contract</h2>
+  <p><b>What:</b> Added a standalone exact-authority module plus <code>build-gate12-authority</code> and <code>aggregate-gate12-authorities</code> commands. Each frozen case produces an atomic JSON authority and a readable HTML certificate. A valid completed artifact is the restart checkpoint, so expensive exact work is not repeated.</p>
+  <p><b>Why:</b> The 24 validation queries must remain genuinely untouched. Exact answers need to be generated and frozen before production pool recall or forward outcomes are inspected, while multi-hour market runs must survive interruption without accepting partial output.</p>
+  <p><b>Integrity:</b> The artifact binds the frozen registry digest, query and request, query-source and benchmark fingerprints, exact frontier manifest, build/resume provenance, complete ranked match IDs/distances/components/alignments, repeated result and both search certificates. Content and result digests expose mutation. Candidate accounting must reconcile. The proof accepts strict next-bound stopping or, for a universe with nothing left to prune, literal full exhaustion; ambiguous partial completion fails.</p>
+  <p><b>Reuse:</b> A matching scale-ladder frontier may seed a case through hard links or copies, but every shard is revalidated by the normal frontier builder against the current source, benchmark, quality, request, schema and content digest. Other queries build independent query-specific shards.</p>
+  <p><b>Verification:</b> Round-trip, candidate-universe and registry provenance drift, tamper detection, full-exhaustion certificate, scale-frontier seeding, completed-checkpoint resume, HTML output and existing exhaustive/brute-force differentials pass. The complete repository suite passes 111 tests. Authority generation is now ready; no case authority or recall result is claimed by this implementation checkpoint.</p>
+  <p><b>Next:</b> Generate and freeze all 12 NSE and 12 NASDAQ authorities, checkpointing case by case. Aggregate both matrices only after all artifacts validate, and only then run the preregistered production pool recall comparison.</p>
+</section>
 </main>
 
 <section id="reproduce">
@@ -348,7 +359,9 @@
 .venv/bin/market-analogues verify-exhaustive-scale --config config/datasets.example.yaml --dataset nse --symbol homefirst --cutoff 2026-02-11 --lookback 252 --fractions 0.01 0.1
 .venv/bin/market-analogues aggregate-exhaustive-scale --config config/datasets.example.yaml --dataset nse --query-episode-id 99fe49f51285b398361b7b13
 .venv/bin/market-analogues verify-exhaustive-scale --config config/datasets.example.yaml --dataset nasdaq --symbol CAKE --cutoff 2026-03-30 --lookback 252 --fractions 0.01 0.1
-.venv/bin/market-analogues aggregate-exhaustive-scale --config config/datasets.example.yaml --dataset nasdaq --query-episode-id cb2bdccd1386790ef8a16bd0</code></pre>
+.venv/bin/market-analogues aggregate-exhaustive-scale --config config/datasets.example.yaml --dataset nasdaq --query-episode-id cb2bdccd1386790ef8a16bd0
+.venv/bin/market-analogues build-gate12-authority --config config/datasets.example.yaml --dataset nse --case-id nse-homefirst-current-252
+.venv/bin/market-analogues aggregate-gate12-authorities --config config/datasets.example.yaml --dataset nse</code></pre>
   <p class="muted">Source datasets are read-only. Generated artifacts live under the configured artifact directory and are intentionally excluded from Git.</p>
 </section>
 </body>

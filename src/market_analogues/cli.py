@@ -14,6 +14,10 @@ import pandas as pd
 import yaml
 
 from .adapters import source_from_spec
+from .authority import (
+    AuthorityError, authority_universe_digest, run_authority_case,
+    validate_authority_artifact, write_authority_report,
+)
 from .benchmark import (
     available_methods, benchmark_synthetic, benchmark_ucr, results_frame,
     write_comparison_report,
@@ -808,6 +812,207 @@ def cmd_aggregate_exhaustive_scale(args: argparse.Namespace) -> int:
     return 0 if passed else 2
 
 
+def _validated_gate12_registry(config, source, dataset_id: str):
+    quality = pd.read_parquet(
+        config.artifact_dir / "quality" / f"{dataset_id}.parquet"
+    )
+    directory = config.artifact_dir / "gate12" / dataset_id
+    yaml_path = directory / "query-registry.yaml"
+    failures = validate_gate12_registry(source, yaml_path, quality)
+    if failures:
+        raise SystemExit("; ".join(failures))
+    payload = yaml.safe_load(yaml_path.read_text()) or {}
+    yaml_registry = pd.DataFrame(payload["cases_data"])
+    parquet_registry = pd.read_parquet(directory / "query-registry.parquet")
+    try:
+        pd.testing.assert_frame_equal(
+            yaml_registry.reset_index(drop=True), parquet_registry.reset_index(drop=True),
+            check_dtype=False,
+        )
+    except AssertionError as exc:
+        raise SystemExit(f"Gate 12 registry copies disagree: {exc}") from exc
+    return quality, parquet_registry, str(payload["registry_digest"])
+
+
+def _largest_seed_frontier(config, dataset_id: str, query_episode_id: str) -> Path | None:
+    root = config.artifact_dir / "gate12" / "scale-ladder" / dataset_id
+    candidates = []
+    for path in root.glob("scale-*"):
+        try:
+            scale = int(path.name.removeprefix("scale-"))
+        except ValueError:
+            continue
+        if (path / query_episode_id / "shards").exists():
+            candidates.append((scale, path))
+    return max(candidates)[1] if candidates else None
+
+
+def cmd_build_gate12_authority(args: argparse.Namespace) -> int:
+    config, source = _load(args)
+    require_passed(_gates(config), f"12e_exhaustive_scale_full_{args.dataset}")
+    quality, registry, registry_digest = _validated_gate12_registry(
+        config, source, args.dataset,
+    )
+    selected = registry[registry.case_id.astype(str) == args.case_id]
+    if len(selected) != 1:
+        choices = ", ".join(sorted(registry.case_id.astype(str)))
+        raise SystemExit(f"unknown or duplicate case {args.case_id!r}; choose from {choices}")
+    case = selected.iloc[0]
+    query = build_episode(
+        source, InstrumentKey(args.dataset, str(case.symbol)), str(case.cutoff),
+        int(case.lookback), str(case.representation_version),
+    )
+    if query.key.id != str(case.episode_id):
+        raise SystemExit("authority query does not match its frozen episode ID")
+    request = SearchQuery(
+        query.key, (args.dataset,), ("A", "B"), args.top_k,
+        max_per_instrument=args.max_per_instrument,
+        minimum_history_gap_bars=args.minimum_history_gap,
+    )
+    authority_root = Path(args.authority_root) if args.authority_root else (
+        config.artifact_dir / "gate12" / "authorities" / args.dataset
+    )
+    frontier_root = authority_root / "frontiers"
+    artifact_path = authority_root / "cases" / f"{query.key.id}.json"
+    if args.seed_frontier_root:
+        seed_root = Path(args.seed_frontier_root)
+    elif args.no_auto_seed:
+        seed_root = None
+    else:
+        seed_root = _largest_seed_frontier(config, args.dataset, query.key.id)
+    try:
+        artifact, seeded, build, resume = run_authority_case(
+            query, source, request, quality, frontier_root, artifact_path,
+            registry_digest=registry_digest, seed_frontier_root=seed_root,
+            stride=args.stride, batch_size=args.batch_size,
+            frontier_batch_rows=args.frontier_batch_rows,
+            representation_cache_shards=args.representation_cache_shards,
+            tolerance=args.tolerance, rebuild_invalid=args.rebuild_invalid,
+        )
+    except AuthorityError as exc:
+        raise SystemExit(str(exc)) from exc
+    report = Path(args.output) if args.output else (
+        config.artifact_dir / "reports" / f"authority-{args.dataset}-{query.key.id}.html"
+    )
+    write_authority_report(artifact_path, report)
+    payload = json.loads(artifact_path.read_text())
+    certificate = payload["certificate"]
+    rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024
+    failures = []
+    if rss > args.maximum_rss_mb:
+        failures.append(f"peak RSS {rss:.2f} MB exceeds {args.maximum_rss_mb:.2f} MB")
+    metrics = {
+        "case_id": args.case_id, "dataset": args.dataset,
+        "query_episode_id": query.key.id, "artifact": str(artifact_path),
+        "authority_digest": artifact.authority_digest,
+        "result_digest": artifact.result_digest,
+        "eligible_candidates": artifact.eligible_candidates,
+        "exact_evaluated": artifact.exact_evaluated,
+        "safely_pruned": artifact.safely_pruned,
+        "stopped_early": bool(certificate["stopped_early"]),
+        "search_seconds": certificate["elapsed_seconds"],
+        "repeat_search_seconds": payload["repeated_certificate"]["elapsed_seconds"],
+        "seed_frontier_root": str(seed_root) if seed_root else None,
+        "seeded_shards": seeded, "instruments_built": build.instruments_built,
+        "instruments_reused": build.instruments_reused,
+        "resume_instruments_reused": resume.instruments_reused,
+        "peak_rss_mb": rss,
+    }
+    passed = not failures
+    GateReport(
+        f"12f_authority_case_{args.dataset}_{query.key.id}", passed, metrics, failures,
+    ).write(_gates(config))
+    print(json.dumps({"passed": passed, **metrics, "failures": failures}, indent=2))
+    print(report)
+    return 0 if passed else 2
+
+
+def cmd_aggregate_gate12_authorities(args: argparse.Namespace) -> int:
+    config, source = _load(args)
+    require_passed(_gates(config), f"12e_exhaustive_scale_full_{args.dataset}")
+    quality, registry, registry_digest = _validated_gate12_registry(
+        config, source, args.dataset,
+    )
+    authority_root = Path(args.authority_root) if args.authority_root else (
+        config.artifact_dir / "gate12" / "authorities" / args.dataset
+    )
+    failures = []
+    records = []
+    universe_request = SearchQuery(
+        build_episode(
+            source,
+            InstrumentKey(args.dataset, str(registry.iloc[0].symbol)),
+            str(registry.iloc[0].cutoff), int(registry.iloc[0].lookback),
+            str(registry.iloc[0].representation_version),
+        ).key,
+        (args.dataset,), ("A", "B"), args.top_k,
+        max_per_instrument=args.max_per_instrument,
+        minimum_history_gap_bars=args.minimum_history_gap,
+    )
+    universe_digest = authority_universe_digest(source, universe_request, quality)
+    for case in registry.sort_values("case_id").itertuples(index=False):
+        query = build_episode(
+            source, InstrumentKey(args.dataset, str(case.symbol)), str(case.cutoff),
+            int(case.lookback), str(case.representation_version),
+        )
+        request = SearchQuery(
+            query.key, (args.dataset,), ("A", "B"), args.top_k,
+            max_per_instrument=args.max_per_instrument,
+            minimum_history_gap_bars=args.minimum_history_gap,
+        )
+        path = authority_root / "cases" / f"{query.key.id}.json"
+        try:
+            artifact = validate_authority_artifact(
+                path, query=query, request=request,
+                source_fingerprint=source.fingerprint(query.key.instrument),
+                benchmark_fingerprint=source.benchmark_fingerprint(),
+                registry_digest=registry_digest,
+                universe_source_digest=universe_digest,
+            )
+        except (AuthorityError, OSError) as exc:
+            failures.append(f"{case.case_id}: {exc}")
+            records.append({"case_id": str(case.case_id), "status": "MISSING/INVALID"})
+        else:
+            records.append({
+                "case_id": str(case.case_id), "status": "PASS",
+                "query_episode_id": query.key.id,
+                "authority_digest": artifact.authority_digest,
+                "eligible_candidates": artifact.eligible_candidates,
+                "exact_evaluated": artifact.exact_evaluated,
+                "safely_pruned": artifact.safely_pruned,
+            })
+    passed = not failures and len(records) == 12
+    metrics = {
+        "dataset": args.dataset, "registry_digest": registry_digest,
+        "required_cases": 12, "completed_cases": sum(r["status"] == "PASS" for r in records),
+        "cases": records,
+    }
+    scope = "full" if passed else "progress"
+    GateReport(
+        f"12f_authority_matrix_{scope}_{args.dataset}", passed, metrics, failures,
+    ).write(_gates(config))
+    output = Path(args.output) if args.output else (
+        config.artifact_dir / "reports" / f"authority-matrix-{args.dataset}.html"
+    )
+    output.parent.mkdir(parents=True, exist_ok=True)
+    rows = "".join(
+        f"<tr><td>{record['case_id']}</td><td>{record['status']}</td>"
+        f"<td>{record.get('eligible_candidates', '')}</td>"
+        f"<td>{record.get('exact_evaluated', '')}</td></tr>" for record in records
+    )
+    output.write_text(
+        "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><title>Authority matrix</title>"
+        "<style>body{font-family:system-ui,sans-serif;max-width:1100px;margin:2rem auto}table{border-collapse:collapse;width:100%}th,td{padding:.5rem;border-bottom:1px solid #ddd}</style>"
+        f"</head><body><h1>Gate 12 {args.dataset} authority matrix: {'PASS' if passed else 'IN PROGRESS'}</h1>"
+        f"<p>{metrics['completed_cases']} of 12 frozen cases have valid, provenance-locked exact authorities.</p>"
+        f"<table><thead><tr><th>Case</th><th>Status</th><th>Eligible</th><th>Exact</th></tr></thead><tbody>{rows}</tbody></table>"
+        f"<h2>Failures</h2><pre>{json.dumps(failures, indent=2)}</pre></body></html>"
+    )
+    print(json.dumps({"passed": passed, **metrics, "failures": failures}, indent=2))
+    print(output)
+    return 0 if passed else 2
+
+
 def cmd_build_view_store(args: argparse.Namespace) -> int:
     config, source = _load(args)
     require_passed(_gates(config), f"01_ingestion_audit_{args.dataset}")
@@ -1235,6 +1440,34 @@ def build_parser() -> argparse.ArgumentParser:
     aggregate_scale.add_argument("--query-episode-id", required=True)
     aggregate_scale.add_argument("--seed", default="gate12-scale-v1")
     aggregate_scale.set_defaults(func=cmd_aggregate_exhaustive_scale)
+    authority = sub.add_parser("build-gate12-authority")
+    authority.add_argument("--config", required=True)
+    authority.add_argument("--dataset", required=True)
+    authority.add_argument("--case-id", required=True)
+    authority.add_argument("--top-k", type=int, default=20)
+    authority.add_argument("--max-per-instrument", type=int, default=3)
+    authority.add_argument("--minimum-history-gap", type=int, default=60)
+    authority.add_argument("--stride", type=int, default=5)
+    authority.add_argument("--batch-size", type=int, default=128)
+    authority.add_argument("--frontier-batch-rows", type=int, default=256)
+    authority.add_argument("--representation-cache-shards", type=int, default=2)
+    authority.add_argument("--tolerance", type=float, default=1e-12)
+    authority.add_argument("--maximum-rss-mb", type=float, default=1024.0)
+    authority.add_argument("--rebuild-invalid", action="store_true")
+    authority.add_argument("--authority-root")
+    authority.add_argument("--seed-frontier-root")
+    authority.add_argument("--no-auto-seed", action="store_true")
+    authority.add_argument("--output")
+    authority.set_defaults(func=cmd_build_gate12_authority)
+    aggregate_authority = sub.add_parser("aggregate-gate12-authorities")
+    aggregate_authority.add_argument("--config", required=True)
+    aggregate_authority.add_argument("--dataset", required=True)
+    aggregate_authority.add_argument("--top-k", type=int, default=20)
+    aggregate_authority.add_argument("--max-per-instrument", type=int, default=3)
+    aggregate_authority.add_argument("--minimum-history-gap", type=int, default=60)
+    aggregate_authority.add_argument("--authority-root")
+    aggregate_authority.add_argument("--output")
+    aggregate_authority.set_defaults(func=cmd_aggregate_gate12_authorities)
     view_store = sub.add_parser("build-view-store")
     view_store.add_argument("--config", required=True)
     view_store.add_argument("--dataset", required=True)

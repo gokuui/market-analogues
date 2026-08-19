@@ -94,7 +94,8 @@
 
 <section class="task">
   <h2>T12-05 — Independent 252-bar validation matrix</h2>
-  <p><b>Run:</b> Produce the exhaustive authority for all 24 frozen cases. Against each authority, evaluate the unchanged production signature pools 175, 250, 500 and 1,000. Pool 175 remains the pre-registered primary result; larger pools diagnose misses but cannot retroactively turn the same matrix into calibration evidence.</p>
+  <p><b>Authority phase:</b> Produce all 24 exhaustive references before reading any production ranking or forward outcome. Each case writes an atomic, versioned JSON checkpoint containing the complete ranked matches, component distances, alignments, request and registry digests, source/benchmark fingerprints, frontier manifest, repeat certificate and tamper-evident content digest. A reference is accepted only with reconciled candidate accounting and either a strict <code>next bound &gt; threshold</code> proof or literal full exhaustion. The dataset aggregation gate remains incomplete until all 12 frozen cases validate against the current registry.</p>
+  <p><b>Recall phase:</b> Only after both 12-case authority matrices are complete, evaluate the unchanged production signature pools 175, 250, 500 and 1,000. Pool 175 remains the pre-registered primary result; larger pools diagnose misses but cannot retroactively turn the same matrix into calibration evidence.</p>
   <p><b>Pass:</b> primary pool-175 top-20 recall ≥0.95 in every case, nDCG@20 ≥0.95 in every case, exact reranking identical for shared members, zero temporal/overlap/tier/source failures, repeated digest stability, fast path ≤120 s NSE / ≤300 s NASDAQ and RSS ≤1 GiB.</p>
   <p><b>If failed:</b> preserve the failed gate. Move any candidate-method changes to a new development set and reserve a new untouched validation registry; never tune on these 24 cases and report them again as independent.</p>
 </section>
