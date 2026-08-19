@@ -27,6 +27,9 @@ market-analogues verify-float16-precision --config config/datasets.example.yaml 
 market-analogues verify-exhaustive-frontier --config config/datasets.example.yaml \
   --dataset nse --symbol homefirst --cutoff 2024-12-02 \
   --lookback 252 --top-k 20 --instrument-limit 8
+market-analogues verify-exhaustive-scale --config config/datasets.example.yaml \
+  --dataset nse --symbol homefirst --cutoff 2026-02-11 \
+  --lookback 252 --fractions 0.01 0.1
 market-analogues search --config config/datasets.example.yaml --dataset nse \
   --symbol reliance --cutoff 2026-02-11 --lookback 252 \
   --candidate-pool 175 --view-store
@@ -72,7 +75,7 @@ positives must beat reversed/context-contradictory negatives, future mutation mu
 have zero effect, and persisted coarse-index serialization must preserve neighbors.
 Gate JSON keeps an immutable history beneath `artifact_dir/gates/history`.
 
-The current regression record is 106 passing tests. This establishes a verified retrieval baseline, not trading
+The current regression record is 108 passing tests. This establishes a verified retrieval baseline, not trading
 profitability or production-scale completeness.
 
 The stratified exact oracle and sampled multi-view recall gate pass at candidate

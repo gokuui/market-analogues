@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+from dataclasses import asdict
 from hashlib import sha256
 import importlib.util
 import json
@@ -45,6 +46,7 @@ from .quality import audit_source
 from .report import write_search_report
 from .representation import represent
 from .search import SearchCandidate, exact_search
+from .scale_ladder import run_scale_ladder, write_scale_ladder_report
 from .scan import streaming_search
 from .types import InstrumentKey, SearchQuery
 from .universe import verify_universe, write_universe_report
@@ -690,6 +692,82 @@ def cmd_verify_exhaustive_frontier(args: argparse.Namespace) -> int:
     return 0 if passed else 2
 
 
+def cmd_verify_exhaustive_scale(args: argparse.Namespace) -> int:
+    config, source = _load(args)
+    require_passed(_gates(config), f"12d_exhaustive_frontier_smoke_{args.dataset}")
+    quality_path = config.artifact_dir / "quality" / f"{args.dataset}.parquet"
+    quality = pd.read_parquet(quality_path)
+    registry_directory = config.artifact_dir / "gate12" / args.dataset
+    registry_yaml = registry_directory / "query-registry.yaml"
+    registry_failures = validate_gate12_registry(source, registry_yaml, quality)
+    if registry_failures:
+        raise SystemExit("; ".join(registry_failures))
+    yaml_registry = pd.DataFrame(
+        (yaml.safe_load(registry_yaml.read_text()) or {})["cases_data"]
+    )
+    registry = pd.read_parquet(registry_directory / "query-registry.parquet")
+    try:
+        pd.testing.assert_frame_equal(
+            yaml_registry.reset_index(drop=True), registry.reset_index(drop=True),
+            check_dtype=False,
+        )
+    except AssertionError as exc:
+        raise SystemExit(f"Gate 12 registry copies disagree: {exc}") from exc
+    query = build_episode(
+        source, InstrumentKey(args.dataset, args.symbol), args.cutoff,
+        args.lookback, config.representation_version,
+    )
+    if query.key.id not in set(registry.episode_id.astype(str)):
+        raise SystemExit("scale-ladder query is not in the frozen Gate 12 registry")
+    request = SearchQuery(
+        query.key, (args.dataset,), ("A", "B"), args.top_k,
+        max_per_instrument=args.max_per_instrument,
+        minimum_history_gap_bars=args.minimum_history_gap,
+    )
+    root = Path(args.frontier_root) if args.frontier_root else (
+        config.artifact_dir / "gate12" / "scale-ladder" / args.dataset
+    )
+    hours = args.maximum_projected_hours
+    if hours is None:
+        hours = 2.0 if args.dataset == "nse" else 6.0
+    result = run_scale_ladder(
+        query, source, request, quality, root,
+        fractions=tuple(args.fractions), seed=args.seed, stride=args.stride,
+        batch_size=args.batch_size,
+        frontier_batch_rows=args.frontier_batch_rows,
+        representation_cache_shards=args.representation_cache_shards,
+        tolerance=args.tolerance, maximum_rss_mb=args.maximum_rss_mb,
+        disk_reserve_bytes=int(args.disk_reserve_gb * 1024 ** 3),
+        maximum_projected_hours=hours,
+        rebuild_invalid=args.rebuild_invalid,
+    )
+    output = Path(args.output) if args.output else (
+        config.artifact_dir / "reports"
+        / f"exhaustive-scale-ladder-{args.dataset}-{args.symbol}.html"
+    )
+    write_scale_ladder_report(result, output)
+    required = (
+        {0.01, 0.1, 0.5, 1.0} if args.dataset == "nse" else {0.01, 0.1}
+    )
+    scope = "full" if required.issubset(set(args.fractions)) else "smoke"
+    metrics = {
+        "dataset": result.dataset_id,
+        "query_episode_id": result.query_episode_id,
+        "seed": result.seed,
+        "total_eligible_instruments": result.total_eligible_instruments,
+        "fractions": list(result.fractions),
+        "rungs": [asdict(rung) for rung in result.rungs],
+    }
+    GateReport(
+        f"12e_exhaustive_scale_{scope}_{args.dataset}", result.passed,
+        metrics, list(result.failures),
+    ).write(_gates(config))
+    print(json.dumps({"passed": result.passed, **metrics,
+                      "failures": result.failures}, indent=2, default=str))
+    print(output)
+    return 0 if result.passed else 2
+
+
 def cmd_build_view_store(args: argparse.Namespace) -> int:
     config, source = _load(args)
     require_passed(_gates(config), f"01_ingestion_audit_{args.dataset}")
@@ -1088,6 +1166,29 @@ def build_parser() -> argparse.ArgumentParser:
     exhaustive.add_argument("--frontier-root")
     exhaustive.add_argument("--output")
     exhaustive.set_defaults(func=cmd_verify_exhaustive_frontier)
+    scale = sub.add_parser("verify-exhaustive-scale")
+    scale.add_argument("--config", required=True)
+    scale.add_argument("--dataset", required=True)
+    scale.add_argument("--symbol", required=True)
+    scale.add_argument("--cutoff", required=True)
+    scale.add_argument("--lookback", type=int, default=252)
+    scale.add_argument("--fractions", type=float, nargs="+", required=True)
+    scale.add_argument("--seed", default="gate12-scale-v1")
+    scale.add_argument("--top-k", type=int, default=20)
+    scale.add_argument("--max-per-instrument", type=int, default=3)
+    scale.add_argument("--minimum-history-gap", type=int, default=60)
+    scale.add_argument("--stride", type=int, default=5)
+    scale.add_argument("--batch-size", type=int, default=128)
+    scale.add_argument("--frontier-batch-rows", type=int, default=256)
+    scale.add_argument("--representation-cache-shards", type=int, default=2)
+    scale.add_argument("--rebuild-invalid", action="store_true")
+    scale.add_argument("--tolerance", type=float, default=1e-12)
+    scale.add_argument("--maximum-rss-mb", type=float, default=1024.0)
+    scale.add_argument("--maximum-projected-hours", type=float)
+    scale.add_argument("--disk-reserve-gb", type=float, default=5.0)
+    scale.add_argument("--frontier-root")
+    scale.add_argument("--output")
+    scale.set_defaults(func=cmd_verify_exhaustive_scale)
     view_store = sub.add_parser("build-view-store")
     view_store.add_argument("--config", required=True)
     view_store.add_argument("--dataset", required=True)

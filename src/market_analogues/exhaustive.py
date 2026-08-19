@@ -230,10 +230,13 @@ def build_exact_frontier(
     stride: int = 5,
     batch_size: int = 128,
     instrument_limit: int | None = None,
+    instrument_keys: tuple[InstrumentKey, ...] | None = None,
     rebuild_invalid: bool = False,
 ) -> FrontierBuildResult:
     if stride < 1 or batch_size < 1:
         raise ValueError("stride and batch size must be positive")
+    if instrument_limit is not None and instrument_keys is not None:
+        raise ValueError("instrument_limit and instrument_keys are mutually exclusive")
     started = perf_counter()
     query_representation = represent(query)
     request_digest = _request_scope_digest(request)
@@ -244,7 +247,15 @@ def build_exact_frontier(
     instruments = sorted(source.instruments())
     if request.search_datasets:
         instruments = [key for key in instruments if key.dataset_id in request.search_datasets]
-    if instrument_limit is not None:
+    if instrument_keys is not None:
+        requested = tuple(instrument_keys)
+        if len(set(requested)) != len(requested):
+            raise ValueError("instrument_keys contains duplicates")
+        unknown = set(requested).difference(instruments)
+        if unknown:
+            raise ValueError(f"instrument_keys are unavailable: {sorted(unknown)}")
+        instruments = sorted(requested)
+    elif instrument_limit is not None:
         instruments = instruments[:instrument_limit]
     failures: list[str] = []
     records: list[dict[str, object]] = []
@@ -290,6 +301,13 @@ def build_exact_frontier(
                 frame, benchmark, lookback=query.key.lookback, stride=stride,
                 batch_size=batch_size,
             )
+            expected_windows = max(
+                0, 1 + (len(frame) - query.key.lookback) // stride,
+            )
+            if len(batch.positions) != expected_windows:
+                raise FrontierError(
+                    f"batch emitted {len(batch.positions)} of {expected_windows} windows"
+                )
             bounds = batch_representation_lower_bounds(
                 query_representation, batch.representations,
             ).totals
@@ -349,6 +367,8 @@ def build_exact_frontier(
         "representation_version": query.key.representation_version,
         "benchmark_fingerprint": benchmark_fingerprint,
         "eligible_rows": eligible_rows,
+        "instruments_considered": len(instruments),
+        "instrument_scope_digest": stable_hash([str(key) for key in instruments]),
         "shards": records,
         "manifest_digest": digest,
         "failures": failures,
@@ -458,23 +478,27 @@ def exhaustive_frontier_search(
     while heap:
         pending: list[tuple[float, str, int, int]] = []
         if np.isfinite(threshold):
-            while (
-                heap and heap[0][0] <= threshold
-                and len(pending) < frontier_batch_rows
-            ):
-                item = heapq.heappop(heap)
-                pending.append(item)
-                shard = shards[item[2]]
-                next_row = item[3] + 1
-                if next_row < len(shard.lower_bounds):
-                    heapq.heappush(heap, (
-                        float(shard.lower_bounds[next_row]),
-                        str(shard.episode_ids[next_row]), item[2], next_row,
-                    ))
-            if not pending:
+            if heap[0][0] > threshold:
                 stopped_early = True
                 next_lower = float(heap[0][0])
                 break
+            item = heapq.heappop(heap)
+            shard = shards[item[2]]
+            end = int(np.searchsorted(
+                shard.lower_bounds, threshold, side="right",
+            ))
+            pending.extend(
+                (
+                    float(shard.lower_bounds[row]), str(shard.episode_ids[row]),
+                    item[2], row,
+                )
+                for row in range(item[3], end)
+            )
+            if end < len(shard.lower_bounds):
+                heapq.heappush(heap, (
+                    float(shard.lower_bounds[end]), str(shard.episode_ids[end]),
+                    item[2], end,
+                ))
         else:
             while heap and len(pending) < frontier_batch_rows:
                 item = heapq.heappop(heap)

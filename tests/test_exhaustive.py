@@ -110,6 +110,18 @@ def test_frontier_chunk_size_is_deterministic_and_missing_shard_resumes(
     assert resumed.instruments_built == 1 and resumed.instruments_reused == 1
     assert resumed.manifest_digest == first.manifest_digest
 
+    keys = tuple(source.instruments()[:1])
+    selected = build_exact_frontier(
+        query, source, request, quality, tmp_path / "selected",
+        stride=5, instrument_keys=keys,
+    )
+    assert selected.passed and selected.instruments_considered == 1
+    with pytest.raises(ValueError, match="mutually exclusive"):
+        build_exact_frontier(
+            query, source, request, quality, tmp_path / "invalid",
+            stride=5, instrument_limit=1, instrument_keys=keys,
+        )
+
 
 def test_frontier_corruption_and_stale_source_fail_visibly(
     directory_dataset: Path, bars: pd.DataFrame, tmp_path: Path,
