@@ -21,6 +21,7 @@ from .episodes import build_episode, build_manifest
 from .exact_storage_feasibility import (
     verify_exact_storage_feasibility, write_exact_storage_report,
 )
+from .exact_batch_verification import verify_exact_batch_kernel, write_exact_batch_report
 from .gates import GateReport, require_passed
 from .fusion_verification import verify_candidate_fusion, write_fusion_report
 from .gate12_registry import (
@@ -476,6 +477,57 @@ def cmd_verify_exact_storage(args: argparse.Namespace) -> int:
     return 0 if result.passed else 2
 
 
+def cmd_verify_exact_batch(args: argparse.Namespace) -> int:
+    config = load_config(args.config)
+    require_passed(_gates(config), "12b_exact_storage_feasibility")
+    unknown = set(args.datasets).difference(config.datasets)
+    if unknown:
+        raise SystemExit(f"unknown datasets {sorted(unknown)}")
+    sources = {}
+    registries = {}
+    for dataset_id in args.datasets:
+        require_passed(_gates(config), f"12a_query_registry_{dataset_id}")
+        source = source_from_spec(config.datasets[dataset_id])
+        directory = config.artifact_dir / "gate12" / dataset_id
+        yaml_path = directory / "query-registry.yaml"
+        parquet_path = directory / "query-registry.parquet"
+        quality_path = config.artifact_dir / "quality" / f"{dataset_id}.parquet"
+        quality = pd.read_parquet(quality_path)
+        failures = validate_gate12_registry(source, yaml_path, quality)
+        if failures:
+            raise SystemExit("; ".join(failures))
+        yaml_registry = pd.DataFrame((yaml.safe_load(yaml_path.read_text()) or {})["cases_data"])
+        parquet_registry = pd.read_parquet(parquet_path)
+        try:
+            pd.testing.assert_frame_equal(
+                yaml_registry.reset_index(drop=True),
+                parquet_registry.reset_index(drop=True), check_dtype=False,
+            )
+        except AssertionError as exc:
+            raise SystemExit(f"Gate 12 registry copies disagree: {exc}") from exc
+        sources[dataset_id] = source
+        registries[dataset_id] = parquet_registry
+    result = verify_exact_batch_kernel(
+        sources, registries, windows_per_symbol=args.windows_per_symbol,
+        stride=args.stride, batch_size=args.batch_size,
+        tolerance=args.tolerance, minimum_speedup=args.minimum_speedup,
+        maximum_rss_mb=args.maximum_rss_mb,
+    )
+    output = Path(args.output) if args.output else (
+        config.artifact_dir / "reports" / "exact-batch-kernel.html"
+    )
+    write_exact_batch_report(result, output)
+    GateReport(
+        "12c_exact_batch_kernel", result.passed,
+        {**result.metrics, "case_metrics": result.cases.to_dict(orient="records")},
+        list(result.failures),
+    ).write(_gates(config))
+    print(json.dumps({"passed": result.passed, **result.metrics,
+                      "failures": result.failures}, indent=2))
+    print(output)
+    return 0 if result.passed else 2
+
+
 def cmd_build_view_store(args: argparse.Namespace) -> int:
     config, source = _load(args)
     require_passed(_gates(config), f"01_ingestion_audit_{args.dataset}")
@@ -835,6 +887,17 @@ def build_parser() -> argparse.ArgumentParser:
     storage.add_argument("--compression-safety-factor", type=float, default=1.25)
     storage.add_argument("--output")
     storage.set_defaults(func=cmd_verify_exact_storage)
+    exact_batch = sub.add_parser("verify-exact-batch")
+    exact_batch.add_argument("--config", required=True)
+    exact_batch.add_argument("--datasets", nargs="+", default=["nse", "nasdaq"])
+    exact_batch.add_argument("--windows-per-symbol", type=int, default=100)
+    exact_batch.add_argument("--stride", type=int, default=5)
+    exact_batch.add_argument("--batch-size", type=int, default=128)
+    exact_batch.add_argument("--tolerance", type=float, default=1e-12)
+    exact_batch.add_argument("--minimum-speedup", type=float, default=20.0)
+    exact_batch.add_argument("--maximum-rss-mb", type=float, default=512.0)
+    exact_batch.add_argument("--output")
+    exact_batch.set_defaults(func=cmd_verify_exact_batch)
     view_store = sub.add_parser("build-view-store")
     view_store.add_argument("--config", required=True)
     view_store.add_argument("--dataset", required=True)

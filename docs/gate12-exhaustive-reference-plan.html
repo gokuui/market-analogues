@@ -67,10 +67,11 @@
 </section>
 
 <section class="task">
-  <h2>T12-02 — Vectorized exact lower-bound kernel</h2>
+  <h2 class="pass">T12-02 — Vectorized exact lower-bound kernel — PASS</h2>
   <p><b>Build:</b> Compute, for every stride-five window of one symbol, exactly the same coarse, 48-sample groups, stage, structural and rigid-price values used by the scalar representation. Compare them with one query in batches and emit exact non-DTW lower bounds plus episode metadata. Do not reuse candidate-signature distances as bounds.</p>
   <p><b>Tests:</b> scalar-versus-batch field, component and lower-bound agreement ≤1e-12 on random windows and all edge fixtures; every bound ≤ completed exact distance; serial/parallel and batch-size changes produce identical sorted rows/digest; future benchmark mutations have zero effect before a cutoff.</p>
   <p><b>Performance gate:</b> ≥20× scalar throughput on a stratified sample, ≤512 MB per worker, and no non-finite or silently skipped eligible window.</p>
+  <p class="pass"><b>Evidence:</b> Scalar differential across all 12 frozen symbols and 1,200 252-bar windows gives maximum total delta 8.88e-16 and component delta 3.55e-15. Every symbol clears 20× after a warm-up plus median-of-three batch protocol: minimum 20.5536×, aggregate 25.0741×, peak RSS 373.99 MB. Full/partial/missing context, constant/zero-volume, future mutation and chunk-size identity tests pass. The first cold single-timing run failed three symbols and remains in gate history.</p>
 </section>
 
 <section class="task">

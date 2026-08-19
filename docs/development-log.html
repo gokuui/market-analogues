@@ -35,6 +35,7 @@
       <tr><td>11C Production persisted search</td><td class="pass">PASS (252-BAR SMOKE)</td><td>Repeated RELIANCE/AAPL searches have stable digests and zero numeric delta after the overlap-threshold correction; worst 29.05/76.23 s and 476/772 MB. Independent query matrix remains Gate 12.</td></tr>
       <tr><td>12A Independent query registry</td><td class="pass">PASS</td><td>24 fingerprint-locked cases across markets, A/B tiers, three liquidity strata and historical/latest cutoffs; excludes all Gate 09 query/candidate symbols. No Gate 12 recall measured yet.</td></tr>
       <tr><td>12B Exact-storage feasibility</td><td class="pass">PASS — STREAMING SELECTED</td><td>Native mixed precision is exact but projects to 52.81 GiB plus a 0.29 GiB frontier. Float32/float16 violate the 1e-12 authority contract. Two-pass streaming is locked for the exhaustive reference.</td></tr>
+      <tr><td>12C Exact batch kernel</td><td class="pass">PASS</td><td>All 12 frozen symbols and 1,200 windows: minimum 20.55× scalar speedup, aggregate 25.07×, ≤3.56e-15 component delta and 374 MB RSS. The first unstable-timing attempt remains failed in gate history.</td></tr>
       <tr><td>12 Full-universe production matrix</td><td class="open">OPEN</td><td>Multiview smoke queries cover every eligible instrument but fail saturation and latency. Exact-safe reference retrieval does not yet exist.</td></tr>
     </tbody>
   </table>
@@ -228,6 +229,16 @@
   <p><b>Resource decision:</b> Free space at the final gate was 10,179,444,736 bytes (9.48 GiB), of which 5 GiB must remain reserved. A lossless store plus frontier would need 57,021,268,583 bytes. Gate 12B therefore passes by selecting <code>two_pass_streaming</code>, as explicitly allowed by T12-01; it does not build the infeasible store.</p>
   <p><b>Tests and visible failure:</b> Tests cover missing optional context, constant arrays, extreme finite values, native equality, reduced-precision detection, corrupt/truncated payload, version mismatch and invalid resource controls. The complete regression passes 88/88. The first real command used unavailable <code>/usr/bin/time</code> and exited 127 before any work; the shell-timed retry completed in 6.09 seconds. A diff audit then found that distance comparisons were concentrated at the start of the sample; before commit they were spread across positions <code>0,15,31,47</code> and eight disjoint candidates spanning both exchanges, layout validation was strengthened, and the final gate passed in 7.02 seconds. T12-02 vectorized exact lower-bound work is next; no Gate 12 recall has been measured.</p>
 </section>
+
+<section class="entry" id="log-018">
+  <h2>L-018 — T12-02 vectorized exact lower-bound kernel</h2>
+  <p><b>What:</b> Added a market-independent sliding exact-representation kernel and vectorized lower-bound comparison. It reproduces the scalar 128-value float32 coarse vector, 19×48 optional samples, 4×64 DTW samples, 48 stage values, 9 directional-event structural values, missing-channel masks and every non-DTW component. Configurable chunking bounds memory without changing positions or results.</p>
+  <p><b>How:</b> Sliding OHLCV windows are processed as matrices. Rolling mean/extrema and the two-stage robust median/MAD transforms operate across windows; interpolation retains the scalar missing-data rule; benchmark path/drawdown/relative channels reset causally inside each episode; stage blocks and structural directional events are evaluated in batches. Lower-bound groups use the identical pairwise robust scale, float32 coarse evaluation order and configured weights.</p>
+  <p><b>Correctness:</b> Full, partial and absent benchmark context, constant price, zero volume, future benchmark mutation and whole-versus-chunked runs match scalar fields within 1e-12. Across the real gate, maximum total delta is <code>8.88e-16</code> and maximum component/rigid delta is <code>3.55e-15</code>. Tests caught and corrected two float32 operation-order differences in coarse distance and an initial vectorized structural-loop axis error before the gate.</p>
+  <p><b>Failed performance attempt retained:</b> The first 12-symbol run used a single cold timing. Aggregate speedup was 25.15× and RSS 352 MB, but CAKE, homefirst and onwardtec measured only 18.94×, 17.41× and 18.43×, so Gate 12C failed. The 20× threshold was not reduced.</p>
+  <p><b>Final benchmark protocol and evidence:</b> Warm a ten-window batch, then use the median of three complete batch timings to reduce cold-start/noise bias; the scalar reference remains a full online representation plus lower bound for every window. All 12 frozen symbols and 1,200 windows pass individually: minimum speedup <code>20.5536×</code>, aggregate <code>25.0741×</code>, peak RSS <code>373.99 MB</code> against the 512 MB limit. Final wall time was 61.46 seconds.</p>
+  <p><b>Decision:</b> T12-02 passes. Proceed to T12-03’s resumable frontier and constrained two-pass exhaustive authority. No independent Gate 12 recall has yet been measured.</p>
+</section>
 </main>
 
 <section id="reproduce">
@@ -245,7 +256,8 @@
 .venv/bin/market-analogues verify-production-search --config config/datasets.example.yaml --dataset nasdaq --symbol AAPL --cutoff 2026-03-30 --lookback 252 --max-seconds 300
 .venv/bin/market-analogues build-gate12-registry --config config/datasets.example.yaml --dataset nse
 .venv/bin/market-analogues build-gate12-registry --config config/datasets.example.yaml --dataset nasdaq
-.venv/bin/market-analogues verify-exact-storage --config config/datasets.example.yaml --datasets nse nasdaq</code></pre>
+.venv/bin/market-analogues verify-exact-storage --config config/datasets.example.yaml --datasets nse nasdaq
+.venv/bin/market-analogues verify-exact-batch --config config/datasets.example.yaml --datasets nse nasdaq</code></pre>
   <p class="muted">Source datasets are read-only. Generated artifacts live under the configured artifact directory and are intentionally excluded from Git.</p>
 </section>
 </body>
