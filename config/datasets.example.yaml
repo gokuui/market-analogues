@@ -1,0 +1,29 @@
+artifact_dir: data/analogues
+representation_version: dense-v1
+candidate_stride_bars: 5
+lookbacks: [21, 63, 126, 252]
+datasets:
+  nse:
+    adapter: directory
+    path: /home/vinay/code/loser/data/validated
+    format: parquet
+    file_glob: "*.parquet"
+    symbol_from: filename
+    timestamp_column: date
+    interval: 1d
+    timezone: Asia/Kolkata
+    benchmark:
+      path: /home/vinay/code/loser/data/validated/nifty 50.parquet
+  nasdaq:
+    adapter: directory
+    path: /home/vinay/code/loser-nasdaq/data/nasdaq/validated
+    format: parquet
+    file_glob: "*.parquet"
+    symbol_from: filename
+    timestamp_column: date
+    interval: 1d
+    timezone: America/New_York
+    benchmark:
+      path: /home/vinay/code/loser-nasdaq/data/nasdaq/index/IXIC.parquet
+    quality_manifest: /home/vinay/code/loser-nasdaq/data/nasdaq/quality_report.csv
+

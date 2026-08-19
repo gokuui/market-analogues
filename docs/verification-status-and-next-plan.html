@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Verification status and next implementation plan</title>
+  <style>
+    body{font-family:system-ui,sans-serif;max-width:1180px;margin:2rem auto;padding:0 1rem;background:#f5f7f8;color:#17202a;line-height:1.55}
+    header,section{background:#fff;border:1px solid #d5d8dc;border-radius:10px;padding:1.35rem;margin:1rem 0}
+    table{border-collapse:collapse;width:100%}th,td{padding:.65rem;text-align:left;vertical-align:top;border-bottom:1px solid #ddd}
+    .pass{color:#117864}.fail{color:#b03a2e}.partial{color:#9a6700}.gate{border-left:5px solid #2471a3;padding-left:1rem;margin:1.2rem 0}
+    code{overflow-wrap:anywhere}.muted{color:#566573}
+  </style>
+</head>
+<body>
+<header>
+  <h1>Verification status and next implementation plan</h1>
+  <p><b>Recorded 19 August 2026.</b> The engine is causal, deterministic, market-agnostic, and tested. The sampled multi-view recall target now passes. It is <b>not yet correct or fast enough to claim exhaustive nearest analogues over a complete exchange</b>; the full-universe evidence below keeps that claim open.</p>
+</header>
+
+<section>
+  <h2>What is established</h2>
+  <table>
+    <thead><tr><th>Evidence</th><th>NSE</th><th>NASDAQ</th><th>Interpretation</th></tr></thead>
+    <tbody>
+      <tr><td>Gate 09 exact sampled oracle</td><td class="pass">12/12 cases; 3,192 exact episodes</td><td class="pass">12/12 cases; 2,658 exact episodes</td><td>Quality A/B and low/middle/high liquidity strata, 63/126/252 bars, historical and current cutoffs; zero temporal or overlap violations.</td></tr>
+      <tr><td>Gate 10 cheap multi-view union</td><td class="pass">12/12 at pool 175; worst recall 0.95</td><td class="pass">12/12 at pool 175; worst recall 0.95</td><td>Seven independently ranked views, local per-symbol quotas, deterministic reciprocal-rank fusion, and exact reranking. Pool 125 failed and remains in immutable gate history.</td></tr>
+      <tr><td>Synthetic financial verifier</td><td colspan="2" class="pass">Recall@10 0.953846; nDCG@10 0.935744; clone/invariance/pair ordering 1.0; critical-negative rate 0</td><td>The retrieval metric did not regress when candidate generation changed.</td></tr>
+      <tr><td>Full-universe coverage</td><td class="pass">1,843/1,843 eligible; 1,040,155 windows</td><td class="pass">11,584/11,584 eligible; 3,786,156 baseline windows</td><td>Quality accounting and temporal eligibility reconcile with zero silent symbol failures.</td></tr>
+      <tr><td>Full-universe candidate completeness</td><td class="fail">Pool-175 recall versus pool 1,000: 0.40</td><td class="fail">Pool-175 recall versus pool 1,000: 0.50</td><td>A larger shortlist still changes the returned exact top 20. Pool 1,000 is itself not exhaustive, so this is a lower-bound warning, not a completeness proof.</td></tr>
+      <tr><td>Full-universe latency / memory</td><td class="fail">130.6 s scan; 311.7 s total; 458 MB peak</td><td class="fail">791.3 s scan; 902.6 s total; 757 MB peak</td><td>Memory passes, but recomputing all views from raw files for every query is not a production architecture. These markets ran concurrently, so isolated wall time may improve, but the NASDAQ miss is too large to be explained away by contention.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>What changed</h2>
+  <p>The candidate stage now has versioned, vectorized views for coarse multichannel context, price shape, 12-stage development, candle/volatility, volume/shock, benchmark/relative movement, and structural drawdown/direction. Each view proposes local candidates; scale-incompatible distances are combined by stable ranks, never by an arbitrary raw weighted sum. Exact composite scoring remains the final authority.</p>
+  <p>Gate 09 Parquets explicitly mark the overlap-deduplicated oracle membership and rank. They also cache candidate-view distances with a version, allowing later fusion experiments to run in seconds while invalidating stale measurements after a view change.</p>
+</section>
+
+<section>
+  <h2>Acceptance rule</h2>
+  <p>A good average is insufficient. A gate passes only when every locked case clears its threshold, results are deterministic under row order and serial/parallel execution, the history gap and overlap rules hold, no instrument fails silently, the synthetic suite does not regress, and measured latency/RSS remain inside the declared budget. Calibration cases and final validation cases must be different.</p>
+</section>
+
+<section>
+  <h2>Next implementation sequence</h2>
+
+  <div class="gate">
+    <h3>11A — Persisted, versioned view shards</h3>
+    <p>Materialize each cheap view once per dataset, lookback, stride, symbol, and source fingerprint. Store columnar shards plus candidate IDs, cutoffs, quality tier, code/config hash, view version, and a completion manifest. Build atomically per symbol and support deterministic resume.</p>
+    <p><b>Tests:</b> online-versus-shard distances agree within numeric tolerance; source or representation changes invalidate only affected shards; interruption and resume produce the same manifest and ranking digest; corrupt/missing shards fail visibly; serial and parallel builds agree.</p>
+    <p><b>Performance gate:</b> a warm query scans ranks rather than raw OHLCV and meets NSE ≤120 s, NASDAQ ≤300 s, RSS ≤1 GiB.</p>
+  </div>
+
+  <div class="gate">
+    <h3>11B — Exact-safe progressive scoring and pruning</h3>
+    <p>Compute cheap exact components first and accumulate their non-negative weighted contribution as a formal lower bound. Add LB_Keogh or LB_Webb for the DTW term. Evaluate expensive components only when the bound can still beat the current constrained top-k threshold. Preserve overlap deduplication and per-instrument limits when maintaining that threshold.</p>
+    <p><b>Tests:</b> pruned and brute-force searches return identical IDs, order, component values, and digest on every Gate 09 case; adversarial ties, missing benchmark context, constant paths, and overlap-heavy symbols are included; a deliberately invalid bound is caught by the synthetic verifier.</p>
+    <p><b>Performance gate:</b> record candidates rejected at each bound, exact evaluations avoided, time, throughput, and RSS. Optimization is accepted only with bitwise-stable membership and tolerance-stable distances.</p>
+  </div>
+
+  <div class="gate">
+    <h3>12 — Independent full-universe validation matrix</h3>
+    <p>Lock new queries not used to choose pool 175: both markets, at least four symbols per market, 63/126/252 bars, historical and current cutoffs, different liquidity/stage regimes, and difficult missing-context cases. Use the exact-safe engine as the reference rather than a larger approximate pool.</p>
+    <p><b>Pass:</b> ≥95% top-20 recall in every query for the fast path versus the exact-safe reference; zero future/overlap/quality failures; deterministic repeated and serial/parallel digests; NSE ≤120 s and NASDAQ ≤300 s for 252 bars; RSS ≤1 GiB.</p>
+  </div>
+
+  <div class="gate">
+    <h3>13 — Operational hardening</h3>
+    <p>Add checkpoint restart tests, artifact provenance, schema migration failure messages, disk-budget checks, and a single HTML run index linking every gate and report. Only after Gate 12 passes should <code>multiview</code> become the default search strategy.</p>
+  </div>
+</section>
+
+<section>
+  <h2>Current decision</h2>
+  <p class="partial"><b>Continue development; do not declare the system complete.</b> Gate 10 proves that the representation can form a high-recall bounded union on the stratified sampled oracle. The full-universe smoke run shows that the current on-demand implementation neither saturates early enough nor meets latency. Persisted shards and exact-safe pruning are the next justified work; another hand-tuned approximate weighting is not.</p>
+</section>
+</body>
+</html>

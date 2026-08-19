@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Market Analogues — development and decision log</title>
+  <style>
+    :root{--ink:#17202a;--muted:#566573;--paper:#fff;--bg:#f4f6f7;--line:#d5d8dc;--green:#117864;--red:#b03a2e;--amber:#9a6700;--blue:#2471a3}
+    *{box-sizing:border-box}body{font-family:system-ui,sans-serif;max-width:1180px;margin:0 auto;padding:2rem;background:var(--bg);color:var(--ink);line-height:1.55}
+    header,section{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:1.4rem;margin:0 0 1rem}
+    nav a{margin-right:1rem}table{border-collapse:collapse;width:100%}th,td{text-align:left;vertical-align:top;padding:.65rem;border-bottom:1px solid var(--line)}
+    .entry{border-left:5px solid var(--blue)}.pass{color:var(--green);font-weight:700}.fail{color:var(--red);font-weight:700}.open{color:var(--amber);font-weight:700}
+    code{background:#eef2f3;padding:.1rem .3rem;overflow-wrap:anywhere}.muted{color:var(--muted)}li{margin:.4rem 0}
+  </style>
+</head>
+<body>
+<header>
+  <h1>Development and decision log</h1>
+  <p>This is the running, append-only human record for the standalone Market Analogues project. Each material milestone records <b>what</b> changed, <b>why</b> it was chosen, <b>how</b> it was implemented or measured, what failed, and what evidence controls the next decision.</p>
+  <p><b>Logging rule:</b> add an entry before each material checkpoint commit. Never rewrite a failed result into a pass; later entries may supersede a decision while preserving the original reasoning.</p>
+  <nav><a href="#status">Current status</a><a href="#decisions">Decision register</a><a href="#entries">Chronology</a><a href="#reproduce">Reproduction</a></nav>
+</header>
+
+<section id="status">
+  <h2>Current status — 19 August 2026</h2>
+  <table>
+    <thead><tr><th>Gate</th><th>Status</th><th>Evidence</th></tr></thead>
+    <tbody>
+      <tr><td>03 Synthetic retrieval</td><td class="pass">PASS</td><td>Recall@10 0.953846; nDCG@10 0.935744; clone, invariance and pair ordering 1.0; critical-negative rate 0.</td></tr>
+      <tr><td>08 Complete-universe baseline</td><td class="fail">FAIL</td><td>Coverage, causality and memory pass. Price-only candidate fidelity fails: pool-500 versus pool-1,000 top-20 recall is 0.75 NSE and 0.65 NASDAQ.</td></tr>
+      <tr><td>09 Stratified exact oracle</td><td class="pass">PASS</td><td>24/24 cases; 5,850 exactly scored episodes; NSE/NASDAQ, 63/126/252 bars, historical/current cutoffs, quality and liquidity strata.</td></tr>
+      <tr><td>10 Sampled multiview fusion</td><td class="pass">PASS</td><td>Pool 175 reaches a 0.95 worst-case top-20 recall floor in all 24 sampled oracle cases. Earlier pool-125 failures remain in gate history.</td></tr>
+      <tr><td>12 Full-universe production matrix</td><td class="open">OPEN</td><td>Multiview smoke queries cover every eligible instrument but fail saturation and latency. Exact-safe reference retrieval does not yet exist.</td></tr>
+    </tbody>
+  </table>
+  <p>The software is a verified research baseline, not a complete exchange-scale nearest-neighbour engine and not a trading-profit claim.</p>
+</section>
+
+<section id="decisions">
+  <h2>Decision register</h2>
+  <table>
+    <thead><tr><th>ID</th><th>Decision</th><th>Reason</th><th>Revisit when</th></tr></thead>
+    <tbody>
+      <tr><td>D-001</td><td>Keep this as a standalone OHLCV project.</td><td>The engine must work on NASDAQ, NSE, or any canonical OHLCV source without coupling to either parent repository.</td><td>Do not revisit unless the input contract itself changes.</td></tr>
+      <tr><td>D-002</td><td>Retrieve historical analogues; do not classify named chart patterns.</td><td>The desired question is “what prior paths resemble the current development, and what followed?” Named labels discard uncertainty and morphology.</td><td>Named labels may be added only as post-retrieval explanations.</td></tr>
+      <tr><td>D-003</td><td>Use causal, explainable multichannel representations.</td><td>A professional chart reading includes OHLC movement, stages, volatility/contraction, volume/shocks, market regime, relative strength and structural turns.</td><td>Any new channel must pass causality, invariance and ablation tests.</td></tr>
+      <tr><td>D-004</td><td>Keep exact composite distance as the authority.</td><td>One cheap weighted proxy hid good matches in individual views. Candidate generation may approximate; final ranking must remain explainable.</td><td>Only replace after a common-oracle comparison proves a better metric.</td></tr>
+      <tr><td>D-005</td><td>Use observed trading sessions for the history gap.</td><td>Business-day estimates can disagree with exchange sessions and admit temporally invalid candidates.</td><td>Never; this is a correctness invariant.</td></tr>
+      <tr><td>D-006</td><td>Do not promote multiview to the default yet.</td><td>Sampled Gate 10 passes, but full-universe pool saturation and raw-on-query latency fail.</td><td>After persisted shards, exact-safe pruning, and independent Gate 12 pass.</td></tr>
+      <tr><td>D-007</td><td>Next build persisted view shards, then exact-safe pruning.</td><td>Full-universe runs show bounded memory but repeated raw feature computation and approximate shortlist instability. More hand-tuned weights cannot prove completeness.</td><td>Re-evaluate after Gate 11 differential and performance evidence.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<main id="entries">
+<section class="entry" id="log-001">
+  <h2>L-001 — Standalone market-agnostic foundation</h2>
+  <p><b>What:</b> Created canonical CSV/Parquet directory and long-table adapters, quality audit, causal episode construction, benchmark alignment, representations, exact distance, outcomes and HTML reporting.</p>
+  <p><b>Why:</b> Existing NASDAQ/NSE repositories are data providers, not a suitable home for a reusable analogue engine. Source data must remain read-only and derived artifacts isolated.</p>
+  <p><b>How:</b> Normalized the input contract to timestamp/open/high/low/close/volume plus symbol, used dataset configuration rather than market-specific branches, and wrote artifacts beneath a configured output directory.</p>
+  <p><b>Verification:</b> Adapter canonicalization, quality rules, scale invariance, causal episode boundaries, context alignment and report tests.</p>
+</section>
+
+<section class="entry" id="log-002">
+  <h2>L-002 — Research and prior-art incorporation</h2>
+  <p><b>What:</b> Compared chart-pattern literature, time-series similarity papers, DTW/ShapeDTW, matrix-profile/MASS approaches, public stock matchers, aeon, tslearn and UCR baselines.</p>
+  <p><b>Why:</b> Reuse validated ideas and avoid rebuilding known methods without knowing their limitations.</p>
+  <p><b>How:</b> Adopted streaming candidate generation, optional MASS acceleration, bounded DTW, overlap exclusion, structural events, method comparison and outcome summaries. Kept generic time-series baselines separate from the financial metamorphic oracle.</p>
+  <p><b>Decision:</b> No inspected repository supplied the complete requested combination of professional-chart context, causal controls, exact reranking, outcome separation and market-agnostic ingestion. Ideas were incorporated without copying incompatible code.</p>
+  <p>Detailed sources and comparisons remain in <a href="research-evidence.html">research evidence</a> and <a href="repository-comparison.html">repository comparison</a>.</p>
+</section>
+
+<section class="entry" id="log-003">
+  <h2>L-003 — Verified exact metric baseline</h2>
+  <p><b>What:</b> Locked a composite distance over coarse, stage, price/DTW, candle-volatility, volume-shock, market-context and structural components.</p>
+  <p><b>Why:</b> The representation must preserve the stock’s development and market context while remaining price-unit and volume-unit invariant.</p>
+  <p><b>How:</b> Precomputed resampled representation arrays, stage and structural signatures; reused exact scores through selection; kept forward outcomes strictly outside retrieval.</p>
+  <p><b>Evidence:</b> Synthetic retrieval passes at recall@10 0.953846 and nDCG@10 0.935744 with zero critical-negative errors and zero future-mutation delta.</p>
+  <p><b>Rejected:</b> Simple metric reweighting and a single dense weighted proxy reduced synthetic or candidate evidence, so the stable metric was restored.</p>
+</section>
+
+<section class="entry" id="log-004">
+  <h2>L-004 — Complete-universe baseline measurement</h2>
+  <p><b>What:</b> Added deterministic serial/parallel scans, explicit failure accounting, coverage reconciliation, memory/time metrics and pool-saturation reports.</p>
+  <p><b>Why:</b> Passing unit tests or a few symbols cannot establish complete-universe behavior.</p>
+  <p><b>How:</b> Scanned every quality-eligible symbol at stride five and reranked a bounded pool. Used observed query sessions for the 60-bar gap.</p>
+  <p><b>Evidence:</b> NSE scanned 1,843 instruments and 1,040,155 windows in 92.61 s at 436 MB. NASDAQ scanned 11,584 instruments and 3,786,156 windows in 203.49 s at 453 MB. Zero eligible-symbol failures.</p>
+  <p><b>Failure retained:</b> pool-500 recall versus pool 1,000 was only 0.75 NSE and 0.65 NASDAQ; coarse/exact Spearman was 0.145 and 0.080. Gate 08 remains failed.</p>
+</section>
+
+<section class="entry" id="log-005">
+  <h2>L-005 — Stratified exhaustive sampled oracle</h2>
+  <p><b>What:</b> Built Gate 09 to exactly score every candidate in deterministic market/quality/liquidity/time samples and persist full component rankings.</p>
+  <p><b>Why:</b> Comparing pool 500 to pool 1,000 only measures saturation against another approximate pool. A locked exact target is required to reason about recall.</p>
+  <p><b>How:</b> Measured recent median dollar volume for all A/B instruments; selected deterministic low/middle/high strata; sampled episodes across eligible history; scored all with the exact composite; explicitly marked post-overlap-deduplication oracle membership/rank; persisted digests and Parquet rankings.</p>
+  <p><b>Evidence:</b> NSE 12/12 cases, 3,192 episodes, 24 stratified instruments. NASDAQ 12/12 cases, 2,658 episodes, 18 stratified instruments. Zero temporal, duplicate, non-finite or top-k failures.</p>
+</section>
+
+<section class="entry" id="log-006">
+  <h2>L-006 — Deterministic multiview fusion</h2>
+  <p><b>What:</b> Added independent coarse, price-shape, 12-stage development, candle-volatility, volume-shock, market-context and structural candidate views; local per-symbol quotas; stable reciprocal-rank fusion; cached/versioned oracle view distances; and a reusable Gate 10 command/report.</p>
+  <p><b>Why:</b> Raw distances have incompatible scales, and one weighted proxy can bury a strong match visible in only one professional-chart view.</p>
+  <p><b>How:</b> Converted each smaller-is-better view to deterministic ranks, guaranteed view representation, deduplicated candidates, then exact-reranked. Stable candidate IDs break all ties. Serial/parallel and shuffled-input tests assert determinism.</p>
+  <p><b>Iterations:</b> Cheap v1 failed badly: only 1/12 NSE and 3/12 NASDAQ at pool 125, worst recall 0.60/0.75. v2 added a multichannel coarse view and aligned stage development with the exact 12-stage structure. At pool 125 it still failed 4 NSE and 1 NASDAQ cases. Pool 175 is the first tested pool to clear 0.95 in every sampled case.</p>
+  <p><b>Evidence:</b> Gate 10 passes 12/12 per market at a worst-case recall of 0.95. Failed attempts remain under gate history.</p>
+</section>
+
+<section class="entry" id="log-007">
+  <h2>L-007 — Full-universe multiview smoke and stop decision</h2>
+  <p><b>What:</b> Ran one 252-bar current query over each complete quality-eligible universe with multiview scanning and exact reranking of pool 1,000. Runs executed concurrently and wrote separate smoke reports without overwriting Gate 08.</p>
+  <p><b>Why:</b> A calibrated sampled pass must not be promoted without whole-market fidelity and performance evidence.</p>
+  <p><b>Evidence:</b> NSE: 1,843 instruments, 1,040,155 windows, 130.56 s scan, 311.71 s total, 458 MB peak, pool-175 versus pool-1,000 recall 0.40. NASDAQ: 11,584 instruments, 3,786,156 windows, 791.27 s scan, 902.61 s total, 757 MB peak, recall 0.50. Both had zero scan/build failures.</p>
+  <p><b>Interpretation:</b> Memory and coverage are sound. Latency and shortlist saturation fail. Pool 1,000 is not exhaustive, so even these recall numbers are not completeness guarantees.</p>
+  <p><b>Decision:</b> Keep multiview opt-in. Stop approximate weight tuning. Proceed to persisted view shards and mathematically safe progressive exact scoring before independent Gate 12.</p>
+</section>
+
+<section class="entry" id="log-008">
+  <h2>L-008 — Initial Git checkpoint</h2>
+  <p><b>What:</b> Added this running log and prepared the complete source, tests, configuration examples and readable plans for the repository’s first commit.</p>
+  <p><b>Why:</b> Future work needs both code-level rollback and the reasoning needed to understand why a previous approach passed, failed or was rejected.</p>
+  <p><b>Scope:</b> Generated market data, large oracle Parquets, reports, gates, virtual environments and caches remain ignored. Their compact metrics and decisions are recorded here; they are reproducible from source and local datasets.</p>
+</section>
+</main>
+
+<section id="reproduce">
+  <h2>Reproduction commands</h2>
+  <pre><code>.venv/bin/pytest -q
+.venv/bin/pytest --cov=market_analogues --cov-report=term-missing -q
+.venv/bin/market-analogues verify --config config/datasets.example.yaml
+.venv/bin/market-analogues verify-oracle --config config/datasets.example.yaml --dataset nse --symbols reliance tcs --instruments-per-stratum 4
+.venv/bin/market-analogues verify-oracle --config config/datasets.example.yaml --dataset nasdaq --symbols AAPL MSFT --instruments-per-stratum 3
+.venv/bin/market-analogues verify-fusion --config config/datasets.example.yaml --dataset nse --acceptance-pool 175
+.venv/bin/market-analogues verify-fusion --config config/datasets.example.yaml --dataset nasdaq --acceptance-pool 175</code></pre>
+  <p class="muted">Source datasets are read-only. Generated artifacts live under the configured artifact directory and are intentionally excluded from Git.</p>
+</section>
+</body>
+</html>
