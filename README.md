@@ -8,6 +8,8 @@ Required logical columns are `timestamp`, `open`, `high`, `low`, `close`, `volum
 
 ```bash
 python -m pip install -e '.[dev,bench]'
+# Add `external-data` when running the Yahoo-labelled-example workbook.
+python -m pip install -e '.[dev,external-data]'
 market-analogues audit --config config/datasets.example.yaml --dataset nse
 market-analogues build-episodes --config config/datasets.example.yaml --dataset nse
 market-analogues verify --config config/datasets.example.yaml
@@ -40,6 +42,8 @@ market-analogues run-gate12-authority-matrix --config config/datasets.example.ya
   --datasets nse nasdaq
 market-analogues analyze-kullamagi-examples --config config/datasets.example.yaml \
   --dataset nasdaq
+market-analogues analyze-kullamagi-yfinance --config config/datasets.example.yaml \
+  --target-purity 0.75
 market-analogues search --config config/datasets.example.yaml --dataset nse \
   --symbol reliance --cutoff 2026-02-11 --lookback 252 \
   --candidate-pool 175 --view-store
@@ -71,6 +75,8 @@ the ranking. Results are descriptive historical evidence, not forecasts.
 - [Precision policy: float16 versus native](docs/precision-policy.html)
 - External labelled-example audit: generated at
   `config/data/analogues/external-examples/kullamagi-positions-2021/report.html`
+- Yahoo-expanded tracker workbook: generated at
+  `config/data/analogues/external-examples/kullamagi-yfinance-2021/kullamagi-pattern-analysis.xlsx`
 - [Running development and decision log](docs/development-log.html)
 
 ## Verification
@@ -87,7 +93,7 @@ positives must beat reversed/context-contradictory negatives, future mutation mu
 have zero effect, and persisted coarse-index serialization must preserve neighbors.
 Gate JSON keeps an immutable history beneath `artifact_dir/gates/history`.
 
-The current regression record is 116 passing tests. This establishes a verified retrieval baseline, not trading
+The current regression record is 118 passing tests. This establishes a verified retrieval baseline, not trading
 profitability or production-scale completeness.
 
 The stratified exact oracle and sampled multi-view recall gate pass at candidate

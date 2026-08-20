@@ -91,7 +91,7 @@ def test_external_analysis_is_causal_cross_symbol_and_outcome_blind() -> None:
     source = _MemorySource()
     result = analyze_kullamagi_examples(
         source, _example_csv(source), "test-v1",
-        source_url="https://example.test/sheet.csv", lookback=126, top_k=1,
+        source_url="https://example.test/sheet.csv", lookback=126, top_k=2,
         minimum_history_gap_bars=5, permutations=10, seed=7,
     )
 
@@ -104,6 +104,9 @@ def test_external_analysis_is_causal_cross_symbol_and_outcome_blind() -> None:
     assert (result.neighbours.query_symbol != result.neighbours.candidate_symbol).all()
     assert "query_result" not in result.neighbours
     assert "candidate_result" not in result.neighbours
+    assert result.neighbours.groupby(
+        ["mode", "query_index", "candidate_symbol"],
+    ).size().max() == 1
     causal = result.neighbours[result.neighbours["mode"] == "causal_5_sessions"]
     assert (
         pd.to_datetime(causal.candidate_cutoff)

@@ -22,7 +22,7 @@
 </header>
 
 <section id="status">
-  <h2>Current status — 19 August 2026</h2>
+  <h2>Current status — 20 August 2026</h2>
   <table>
     <thead><tr><th>Gate</th><th>Status</th><th>Evidence</th></tr></thead>
     <tbody>
@@ -39,9 +39,10 @@
       <tr><td>12Q Float16 practical precision</td><td class="pass">PASS (APPROXIMATE)</td><td>All 24 Gate 09 cases retain top-20 membership; minimum graded nDCG 0.9999925. One rank-16/17 swap proves it is not the native authority. Candidate stores remain float16; exhaustive reference remains native streaming.</td></tr>
       <tr><td>12D Two-pass exhaustive frontier</td><td class="pass">PASS (BOUNDED SMOKE)</td><td>Atomic/resumable NSE and NASDAQ frontier smokes return deterministic native top-20 with strict stopping certificates, ≤4.44e-16 reconstructed-bound delta and 421–436 MB RSS. Full-market scale remains T12-04.</td></tr>
       <tr><td>12E Deterministic scale ladder</td><td class="pass">PASS — BOTH MARKETS</td><td>Full NSE and NASDAQ 1%/10% aggregate gates pass. NASDAQ 10% covers 1,159 symbols/363,633 candidates, prunes 99.78%, repeats its digest, searches in 6.82/6.59 minutes and projects a 68.2-minute full search at 547 MB.</td></tr>
-      <tr><td>12F Blind authority matrix</td><td class="open">RUNNING — 4/24 SEALED; CASE 5 ACTIVE</td><td>The unattended sequential supervisor sealed both vinylindia cases and is building shrirampps current. It will continue through NSE 12/12 and then NASDAQ 12/12, stopping only on a visible failure or disk guard. No production ranking or forward outcome is read.</td></tr>
+      <tr><td>12F Blind authority matrix</td><td class="open">RUNNING — 13/24 SEALED; CASE 14 ACTIVE</td><td>All 12 NSE authorities and their aggregate pass. NASDAQ CAKE current passes; CAKE historical is active. The supervisor continues automatically, stopping only on a visible failure or disk guard. No production ranking or forward outcome is read.</td></tr>
       <tr><td>12 Full-universe production matrix</td><td class="open">OPEN</td><td>A bounded exact-safe reference now exists, while full-exchange scale and the independent 24-case recall matrix remain unverified.</td></tr>
       <tr><td>External Kullamagi examples</td><td class="pass">AUDIT COMPLETE — PARTIAL COVERAGE</td><td>132 unique 252-session episodes across 56 NASDAQ-source symbols. Causal top-5 label purity is 51.5% versus a 41.4% frequency baseline (within-query random-candidate p=0.001); causal minority-setup recovery remains weak.</td></tr>
+      <tr><td>Yahoo-expanded Kullamagi examples</td><td class="fail">75% TARGET NOT REACHED</td><td>Yahoo expands coverage to 361 episodes across 129 symbols. With one match per candidate symbol, primary causal top-5 purity is 54.44% versus a 50.44% within-query random expectation (p=0.003): measurable but far below the target and concentrated in breakouts.</td></tr>
     </tbody>
   </table>
   <p>The software is a verified research baseline, not a complete exchange-scale nearest-neighbour engine and not a trading-profit claim.</p>
@@ -64,6 +65,7 @@
       <tr><td>D-010</td><td>Build the exhaustive authority as two-pass streaming, not a full exact-feature store.</td><td>The lossless native layout needs float32 coarse plus float64 exact fields and projects to 52.81 GiB; reduced precision changes authoritative values, while only 9.47 GiB is free and 5 GiB is reserved.</td><td>Only revisit after the exact representation contract or available storage changes and the feasibility gate is rerun.</td></tr>
       <tr><td>D-011</td><td>Use behavioral precision contracts: float16 candidates, native reference.</td><td>Float16 preserved all 24 top-20 sets and ≥0.9999925 nDCG, so twelve-decimal equality is unnecessary for approximate retrieval. It changed one order, is not a safe native lower bound, and still cannot fit as a full store.</td><td>Revisit if a formal quantization-error bound is proven or storage/resources materially change.</td></tr>
       <tr><td>D-012</td><td>Use trader-labelled examples as a diagnostic benchmark, not ground truth.</td><td>The sheet is valuable independent evidence, but labels are imbalanced, symbol coverage is partial, and daily bars cannot reproduce the intraday trigger. Outcomes must stay outside retrieval.</td><td>Revisit label-specific conclusions after broader venue/delisted coverage and a preregistered full-universe walk-forward audit.</td></tr>
+      <tr><td>D-013</td><td>Keep 75% as a visible target; never tune the audit until it passes.</td><td>The broader Yahoo result fails the target: top-1 is indistinguishable from random, while top-5 has only a four-point lift concentrated in breakouts. Changing labels, cutoffs or weights after observing it would convert evaluation into calibration.</td><td>Only evaluate a new trigger-aware representation on a separately locked holdout.</td></tr>
     </tbody>
   </table>
 </section>
@@ -395,6 +397,19 @@
   <p><b>Checkpoint:</b> While the external audit ran independently, the existing supervisor completed <code>nse-vinylindia-historical-252</code>. The authority covers 693,650 eligible episodes, evaluates 894 exactly, safely prunes 692,756 and repeats its full result digest. Searches take 703.58 and 722.66 seconds, peak RSS is 556.68 MB, and all certificate/accounting checks pass.</p>
   <p><b>Continuation:</b> Progress is now 4/24 sealed. The supervisor automatically started <code>nse-shrirampps-current-252</code> as case 5; no production ranking or outcome has been read.</p>
 </section>
+
+<section class="entry" id="log-035">
+  <h2>L-035 — Yahoo-expanded tracker audit and copyable Excel workbook</h2>
+  <p><b>Request:</b> Replace the NASDAQ-only coverage limitation by fetching all symbols and trade dates from the published Kullamagi positions tracker through <code>yfinance</code>, declare 75% setup purity as the desired threshold, and provide a workbook that can be copied and inspected.</p>
+  <p><b>Implementation:</b> Added an optional <code>external-data</code> dependency group with <code>yfinance 1.5.2</code> and <code>openpyxl</code>, a cached Yahoo Parquet source, class-share symbol normalization, batched downloads plus individual omission retries, SPY benchmark context, provenance manifest, provider coverage export and <code>analyze-kullamagi-yfinance</code> command. Data uses split-adjusted daily OHLCV from 26 December 2018 through 31 December 2021. Unsupported/delisted tickers remain explicit; none is silently replaced by an acquirer.</p>
+  <p><b>Workbook:</b> Generated <code>kullamagi-pattern-analysis.xlsx</code> with Summary, Query Summary, Top1 Matches, Causal TopK, Setup Performance, Trade Coverage and Yahoo Coverage sheets. It contains all 205 causally evaluable queries, 1,025 ranked matches, component distances, setup/side agreement flags, clickable entry-chart URLs, provider failures and the declared target result. Each top five contains distinct candidate symbols; repeated overlapping trades from one ticker cannot inflate purity.</p>
+  <p><b>Coverage:</b> Yahoo returns history for 147/180 requested symbols. After requiring 252 sessions before entry and deduplicating identical symbol/cutoff episodes, 361 examples across 129 symbols are usable—2.7× the prior 132-example NASDAQ audit. The remaining tracker rows comprise 66 unavailable-symbol rows, 36 insufficient-history rows and 23 duplicate symbol/cutoff rows.</p>
+  <p><b>Primary result:</b> The 75% target is not reached. Across 205 queries with candidates at least 60 observed sessions earlier, top-1 setup agreement is 51.22% and is indistinguishable from random (<code>p=0.451</code>). Top-5 purity is 54.44% versus a 50.44% within-query distinct-symbol random expectation (<code>p=0.003</code>). This is a small statistically detectable neighborhood effect, not the requested confidence level.</p>
+  <p><b>Pattern breakdown:</b> Breakout top-5 purity is 71.95%, breakdown 11.33%, episodic pivot 3.33%, parabolic 5.71%, and mean reversion 3.33%. Eighty-five of 205 individual queries reach at least 80% top-5 purity, and all 85 are breakout queries; this does not establish balanced pattern recovery. Retrospective all-date breakout purity reaches 79.53%, but same-date/sector peers and future examples make that diagnostic, not causal evidence.</p>
+  <p><b>Interpretation:</b> The broader result preserves only a modest top-five signal and shows that the earlier partial-source estimate overstated its magnitude. The representation describes pre-entry development through the previous close. Episodic pivots and other trigger-defined setups depend heavily on entry-day gap, partial-session price and relative-volume pace, which are intentionally absent from this daily pre-entry audit.</p>
+  <p><b>Performance and integrity:</b> The corrected low-priority real run completes 9,342 exact pairs in 431.40 seconds while Gate 12 runs concurrently. The spreadsheet's live-price formulas change the raw snapshot hash, but the canonical date/symbol/side/setup digest remains stable. Outcomes never enter similarity. All 118 repository tests pass; new tests cover Yahoo normalization/cache artifacts, benchmark loading, workbook sheet structure, causal cutoffs, distinct-symbol candidates and outcome blindness.</p>
+  <p><b>Next:</b> Do not tune this 2021 audit toward 75%. Specify a trigger-aware representation—previous-close state plus entry-open gap and, where independently available, point-in-time intraday volume pace—then freeze a development/test split before measuring it. The existing pre-entry result remains the baseline.</p>
+</section>
 </main>
 
 <section id="reproduce">
@@ -425,7 +440,8 @@
 .venv/bin/market-analogues build-gate12-authority --config config/datasets.example.yaml --dataset nse --case-id nse-homefirst-current-252
 .venv/bin/market-analogues aggregate-gate12-authorities --config config/datasets.example.yaml --dataset nse
 .venv/bin/market-analogues run-gate12-authority-matrix --config config/datasets.example.yaml --datasets nse nasdaq
-.venv/bin/market-analogues analyze-kullamagi-examples --config config/datasets.example.yaml --dataset nasdaq</code></pre>
+.venv/bin/market-analogues analyze-kullamagi-examples --config config/datasets.example.yaml --dataset nasdaq
+.venv/bin/market-analogues analyze-kullamagi-yfinance --config config/datasets.example.yaml --target-purity 0.75</code></pre>
   <p class="muted">Source datasets are read-only. Generated artifacts live under the configured artifact directory and are intentionally excluded from Git.</p>
 </section>
 </body>

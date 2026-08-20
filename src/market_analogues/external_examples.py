@@ -183,7 +183,15 @@ def _mode_metrics(
     expected = []
     for index in by_query:
         candidates = candidate_sets[index]
-        expected.append(np.mean([labels[j] == labels[index] for j in candidates]))
+        by_symbol: dict[str, list[int]] = {}
+        for candidate in candidates:
+            by_symbol.setdefault(
+                prepared[candidate].record.symbol, [],
+            ).append(candidate)
+        expected.append(np.mean([
+            np.mean([labels[candidate] == labels[index] for candidate in values])
+            for values in by_symbol.values()
+        ]))
     setup_counts = Counter(labels[index] for index in by_query)
     per_setup = {}
     for setup, count in sorted(setup_counts.items()):
@@ -191,7 +199,18 @@ def _mode_metrics(
             float(labels[index] == str(values[0]["candidate_setup"]))
             for index, values in by_query.items() if labels[index] == setup
         ]
-        per_setup[setup] = {"queries": count, "top1_agreement": float(np.mean(selected))}
+        selected_purity = [
+            float(np.mean([
+                labels[index] == str(value["candidate_setup"])
+                for value in values
+            ]))
+            for index, values in by_query.items() if labels[index] == setup
+        ]
+        per_setup[setup] = {
+            "queries": count,
+            "top1_agreement": float(np.mean(selected)),
+            "top_k_purity": float(np.mean(selected_purity)),
+        }
     eligible_setups = [value["top1_agreement"] for value in per_setup.values() if value["queries"] >= 3]
     observed_top1 = float(top1.mean()) if len(top1) else 0.0
     observed_purity = float(purity.mean()) if len(purity) else 0.0
@@ -200,10 +219,20 @@ def _mode_metrics(
     randomized_purity = []
     query_indices = tuple(by_query)
     for _ in range(permutations):
-        random_candidates = {
-            index: rng.choice(candidate_sets[index], size=top_k, replace=False)
-            for index in query_indices
-        }
+        random_candidates = {}
+        for index in query_indices:
+            candidates_by_symbol: dict[str, list[int]] = {}
+            for candidate in candidate_sets[index]:
+                candidates_by_symbol.setdefault(
+                    prepared[candidate].record.symbol, [],
+                ).append(candidate)
+            selected_symbols = rng.choice(
+                tuple(candidates_by_symbol), size=top_k, replace=False,
+            )
+            random_candidates[index] = np.asarray([
+                rng.choice(candidates_by_symbol[str(symbol)])
+                for symbol in selected_symbols
+            ])
         randomized_top1.append(np.mean([
             labels[index] == labels[int(random_candidates[index][0])]
             for index in query_indices
@@ -314,7 +343,7 @@ def analyze_kullamagi_examples(
                     or candidate.episode.key.cutoff <= latest
                 )
             )
-            if len(candidates) < top_k:
+            if len({prepared[index].record.symbol for index in candidates}) < top_k:
                 continue
             mode_sets[query_index] = candidates
             ordered = []
@@ -324,17 +353,27 @@ def analyze_kullamagi_examples(
                 ordered.append((bound[0], prepared[candidate_index].episode.key.id,
                                 candidate_index, bound))
             ordered.sort()
-            scored: list[tuple[float, str, int, dict[str, float]]] = []
+            scored_by_symbol: dict[
+                str, tuple[float, str, int, dict[str, float]]
+            ] = {}
             threshold = float("inf")
             for lower, episode_id, candidate_index, bound in ordered:
-                if len(scored) >= top_k and lower > threshold:
+                if len(scored_by_symbol) >= top_k and lower > threshold:
                     break
                 total, components = complete(query_index, candidate_index, bound)
-                scored.append((total, episode_id, candidate_index, components))
-                scored.sort(key=lambda value: (value[0], value[1]))
-                scored = scored[:top_k]
+                symbol = prepared[candidate_index].record.symbol
+                value = (total, episode_id, candidate_index, components)
+                previous = scored_by_symbol.get(symbol)
+                if previous is None or value[:2] < previous[:2]:
+                    scored_by_symbol[symbol] = value
+                scored = sorted(
+                    scored_by_symbol.values(), key=lambda item: (item[0], item[1]),
+                )[:top_k]
                 if len(scored) >= top_k:
                     threshold = scored[-1][0]
+            scored = sorted(
+                scored_by_symbol.values(), key=lambda item: (item[0], item[1]),
+            )[:top_k]
             for rank, (total, _, candidate_index, components) in enumerate(scored, 1):
                 candidate = prepared[candidate_index]
                 neighbour_rows.append({
@@ -345,11 +384,15 @@ def analyze_kullamagi_examples(
                     "query_cutoff": query.episode.key.cutoff.isoformat(),
                     "query_setup": query.record.setup,
                     "query_side": query.record.side,
+                    "query_chart_url": query.record.chart_url,
                     "candidate_symbol": candidate.record.symbol,
                     "candidate_entry_date": candidate.record.entry_date.isoformat(),
                     "candidate_cutoff": candidate.episode.key.cutoff.isoformat(),
                     "candidate_setup": candidate.record.setup,
                     "candidate_side": candidate.record.side,
+                    "candidate_chart_url": candidate.record.chart_url,
+                    "same_setup": query.record.setup == candidate.record.setup,
+                    "same_side": query.record.side == candidate.record.side,
                     "total_distance": total,
                     **{f"distance_{name}": value for name, value in components.items()},
                 })
@@ -375,6 +418,7 @@ def analyze_kullamagi_examples(
         "lookback": lookback,
         "cutoff_policy": "previous_completed_session",
         "same_symbol_candidates_excluded": True,
+        "max_matches_per_candidate_symbol": 1,
         "minimum_history_gap_bars": minimum_history_gap_bars,
         "outcomes_used_in_similarity": False,
         "exact_pairs_completed": len(exact),
@@ -439,5 +483,18 @@ def write_external_example_artifacts(
         f"<td>{float(row.total_distance):.4f}</td></tr>"
         for row in examples.itertuples(index=False)
     )
-    report_path.write_text(f"""<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>Kullamagi labelled-example analysis</title><style>body{{font-family:system-ui,sans-serif;max-width:1300px;margin:2rem auto;padding:0 1rem;background:#f5f7f8;color:#17202a}}header,section{{background:white;border:1px solid #ddd;border-radius:10px;padding:1.2rem;margin:1rem 0}}table{{border-collapse:collapse;width:100%}}th,td{{padding:.5rem;border-bottom:1px solid #ddd;text-align:left}}.warn{{color:#9a6700}}code{{overflow-wrap:anywhere}}</style></head><body><header><h1>Kullamagi positions: exact chart-morphology audit</h1><p>This is a separate external labelled-example benchmark, not Gate 12 and not a profitability claim. Similarity uses only OHLCV and benchmark information available before the entry date; spreadsheet outcomes are never scored.</p></header><section><h2>Coverage</h2><p>The published sheet has {result.metrics['source_rows']} parsed trade rows. Our current NASDAQ-focused source supports {result.metrics['usable_unique_episodes']} unique pre-entry 252-session episodes across {result.metrics['usable_unique_symbols']} symbols.</p><table><thead><tr><th>Status</th><th>Rows</th></tr></thead><tbody>{coverage_rows}</tbody></table><p class=\"warn\">Missing NYSE/ETF/delisted symbols and recent IPOs make this a partial, selection-biased audit.</p></section><section><h2>Does the metric recover the sheet's setup labels?</h2><table><thead><tr><th>Mode</th><th>Queries</th><th>Top-1 setup</th><th>Majority baseline</th><th>Top-{result.metrics['modes']['retrospective']['top_k']} purity</th><th>Frequency baseline</th><th>Macro top-1</th><th>Random-candidate top-1 p</th><th>Random-candidate top-k p</th></tr></thead><tbody>{mode_rows}</tbody></table><p><b>Retrospective</b> permits examples from any date and asks only whether chart morphology clusters. It is inflated by same-date sector peers and is diagnostic only. <b>Causal</b> permits candidates at least {result.metrics['minimum_history_gap_bars']} observed query sessions earlier and is the primary result. Same-symbol candidates are excluded in both. Random-candidate tests sample from each query's own eligible set, preserving its date restrictions and available class mix.</p></section><section><h2>Primary causal nearest examples</h2><table><thead><tr><th>Query</th><th>Entry</th><th>Label</th><th>Nearest earlier stock</th><th>Entry</th><th>Label</th><th>Distance</th></tr></thead><tbody>{example_rows}</tbody></table></section><section><h2>Method boundaries</h2><ul><li>This appears to be a third-party tracker of Kullamagi positions, so its setup labels are external annotations rather than assumed ground truth.</li><li>Primary cutoff is the previous completed daily session. This avoids using an entry-day close or volume that was unknown at an intraday entry.</li><li>Setup labels are normalized only through declared aliases such as EP → episodic pivot.</li><li>Exact composite distance includes price development, candles/volatility, volume/shocks, market context, relative strength, structural turns and bounded DTW.</li><li>Class imbalance is reported explicitly; raw agreement alone cannot establish pattern recovery.</li><li>The benchmark tests whether labelled examples cluster among one another. It does not yet retrieve every matching window from the full historical universe.</li><li>Current symbol coverage is survivorship- and venue-limited, and contemporary adjusted OHLCV may not exactly reproduce the chart visible in 2021.</li><li>The spreadsheet itself states that entries/exits and sizing do not represent Kullamagi’s actual performance.</li></ul></section><section><h2>Integrity</h2><p>Source: <code>{escape(str(result.metrics['source_url']))}</code></p><p>Raw snapshot SHA-256: <code>{result.metrics['source_sha256']}</code></p><p>Analysis-input SHA-256: <code>{result.metrics['analysis_input_sha256']}</code></p><p>The sheet contains live price formulas, so the raw snapshot can change while the entry-date/symbol/side/setup analysis input remains unchanged.</p><p>Exact pairs completed: {result.metrics['exact_pairs_completed']}; elapsed: {result.metrics['elapsed_seconds']:.2f} seconds.</p></section></body></html>""")
+    target = result.metrics.get("target_setup_purity")
+    target_section = ""
+    if isinstance(target, (int, float)):
+        causal_mode = f"causal_{result.metrics['minimum_history_gap_bars']}_sessions"
+        causal = modes[causal_mode]
+        reached = causal["top_k_setup_purity"] >= float(target)
+        target_section = (
+            "<section><h2>Predeclared target</h2>"
+            f"<p>Target causal top-{causal['top_k']} purity: {float(target):.1%}. "
+            f"Observed: {causal['top_k_setup_purity']:.1%}. "
+            f"<b>{'REACHED' if reached else 'NOT REACHED'}</b>. "
+            "The target is reported, not used to tune or relabel the data.</p></section>"
+        )
+    report_path.write_text(f"""<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>Kullamagi labelled-example analysis</title><style>body{{font-family:system-ui,sans-serif;max-width:1300px;margin:2rem auto;padding:0 1rem;background:#f5f7f8;color:#17202a}}header,section{{background:white;border:1px solid #ddd;border-radius:10px;padding:1.2rem;margin:1rem 0}}table{{border-collapse:collapse;width:100%}}th,td{{padding:.5rem;border-bottom:1px solid #ddd;text-align:left}}.warn{{color:#9a6700}}code{{overflow-wrap:anywhere}}</style></head><body><header><h1>Kullamagi positions: exact chart-morphology audit</h1><p>This is a separate external labelled-example benchmark, not Gate 12 and not a profitability claim. Similarity uses only OHLCV and benchmark information available before the entry date; spreadsheet outcomes are never scored.</p></header><section><h2>Coverage</h2><p>The published sheet has {result.metrics['source_rows']} parsed trade rows. The selected OHLCV source supports {result.metrics['usable_unique_episodes']} unique pre-entry 252-session episodes across {result.metrics['usable_unique_symbols']} symbols.</p><table><thead><tr><th>Status</th><th>Rows</th></tr></thead><tbody>{coverage_rows}</tbody></table><p class=\"warn\">Unavailable/delisted symbols and recent IPOs make this a partial, selection-biased audit; consult the coverage exports rather than assuming absence means no pattern.</p></section><section><h2>Does the metric recover the sheet's setup labels?</h2><table><thead><tr><th>Mode</th><th>Queries</th><th>Top-1 setup</th><th>Majority baseline</th><th>Top-{result.metrics['modes']['retrospective']['top_k']} purity</th><th>Frequency baseline</th><th>Macro top-1</th><th>Random-candidate top-1 p</th><th>Random-candidate top-k p</th></tr></thead><tbody>{mode_rows}</tbody></table><p><b>Retrospective</b> permits examples from any date and asks only whether chart morphology clusters. It is inflated by same-date sector peers and is diagnostic only. <b>Causal</b> permits candidates at least {result.metrics['minimum_history_gap_bars']} observed query sessions earlier and is the primary result. Same-symbol candidates are excluded in both. Random-candidate tests sample from each query's own eligible set, preserving its date restrictions and available class mix.</p></section>{target_section}<section><h2>Primary causal nearest examples</h2><table><thead><tr><th>Query</th><th>Entry</th><th>Label</th><th>Nearest earlier stock</th><th>Entry</th><th>Label</th><th>Distance</th></tr></thead><tbody>{example_rows}</tbody></table></section><section><h2>Method boundaries</h2><ul><li>This appears to be a third-party tracker of Kullamagi positions, so its setup labels are external annotations rather than assumed ground truth.</li><li>Primary cutoff is the previous completed daily session. This avoids using an entry-day close or volume that was unknown at an intraday entry.</li><li>Setup labels are normalized only through declared aliases such as EP → episodic pivot.</li><li>Exact composite distance includes price development, candles/volatility, volume/shocks, market context, relative strength, structural turns and bounded DTW.</li><li>Class imbalance is reported explicitly; raw agreement alone cannot establish pattern recovery.</li><li>The benchmark tests whether labelled examples cluster among one another. It does not yet retrieve every matching window from the full historical universe.</li><li>Current symbol coverage is survivorship- and venue-limited, and contemporary adjusted OHLCV may not exactly reproduce the chart visible in 2021.</li><li>The spreadsheet itself states that entries/exits and sizing do not represent Kullamagi’s actual performance.</li></ul></section><section><h2>Integrity</h2><p>Source: <code>{escape(str(result.metrics['source_url']))}</code></p><p>Data provider: <code>{escape(str(result.metrics.get('data_provider', 'configured local source')))}</code></p><p>Raw snapshot SHA-256: <code>{result.metrics['source_sha256']}</code></p><p>Analysis-input SHA-256: <code>{result.metrics['analysis_input_sha256']}</code></p><p>The sheet contains live price formulas, so the raw snapshot can change while the entry-date/symbol/side/setup analysis input remains unchanged.</p><p>Exact pairs completed: {result.metrics['exact_pairs_completed']}; elapsed: {result.metrics['elapsed_seconds']:.2f} seconds.</p></section></body></html>""")
     return source_path, metrics_path, neighbours_path, coverage_path, report_path

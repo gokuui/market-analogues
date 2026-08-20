@@ -29,7 +29,8 @@ from .exact_storage_feasibility import (
 )
 from .external_examples import (
     KULLAMAGI_POSITIONS_URL, analyze_kullamagi_examples,
-    download_kullamagi_positions, write_external_example_artifacts,
+    download_kullamagi_positions, parse_kullamagi_positions,
+    write_external_example_artifacts,
 )
 from .exhaustive import (
     build_exact_frontier, exhaustive_frontier_search, write_exhaustive_report,
@@ -64,6 +65,7 @@ from .universe import verify_universe, write_universe_report
 from .verification import run_synthetic_verifier, write_verification_gate
 from .view_search import persisted_exact_search
 from .view_store import build_view_store
+from .yahoo_examples import fetch_yahoo_examples, write_external_example_workbook
 
 
 def _load(args: argparse.Namespace) -> tuple[AppConfig, object]:
@@ -1055,6 +1057,55 @@ def cmd_analyze_kullamagi_examples(args: argparse.Namespace) -> int:
     return 0 if result.passed else 2
 
 
+def cmd_analyze_kullamagi_yfinance(args: argparse.Namespace) -> int:
+    config = load_config(args.config)
+    csv_bytes = download_kullamagi_positions(args.url)
+    records = parse_kullamagi_positions(csv_bytes.decode("utf-8-sig"))
+    if not records:
+        raise SystemExit("the published tracker contains no parsed trade rows")
+    directory = Path(args.output_dir) if args.output_dir else (
+        config.artifact_dir / "external-examples" / "kullamagi-yfinance-2021"
+    )
+    start = min(record.entry_date for record in records) - pd.Timedelta(days=800)
+    end = max(record.entry_date for record in records) + pd.Timedelta(days=2)
+    fetch = fetch_yahoo_examples(
+        records, directory / "yahoo-cache", start=start, end=end,
+        batch_size=args.batch_size, reuse_cache=not args.refresh,
+    )
+    result = analyze_kullamagi_examples(
+        fetch.source, csv_bytes, config.representation_version,
+        source_url=args.url, lookback=args.lookback, top_k=args.top_k,
+        minimum_history_gap_bars=args.minimum_history_gap,
+        permutations=args.permutations, seed=args.seed,
+    )
+    causal_mode = f"causal_{args.minimum_history_gap}_sessions"
+    causal = result.metrics["modes"][causal_mode]
+    result.metrics.update({
+        "data_provider": "Yahoo Finance via yfinance",
+        "target_setup_purity": args.target_purity,
+        "causal_top1_target_reached": (
+            causal["top1_setup_agreement"] >= args.target_purity
+        ),
+        "causal_top_k_target_reached": (
+            causal["top_k_setup_purity"] >= args.target_purity
+        ),
+        "yahoo_manifest": str(fetch.manifest_path),
+    })
+    paths = list(write_external_example_artifacts(result, csv_bytes, directory))
+    yahoo_coverage = directory / "yahoo-coverage.parquet"
+    fetch.coverage.to_parquet(yahoo_coverage, index=False)
+    workbook = write_external_example_workbook(
+        result, fetch, directory / "kullamagi-pattern-analysis.xlsx",
+        target_purity=args.target_purity,
+    )
+    paths.extend((fetch.manifest_path, yahoo_coverage, workbook))
+    print(json.dumps({
+        "passed": result.passed, **result.metrics,
+        "failures": result.failures, "artifacts": [str(path) for path in paths],
+    }, indent=2, default=str))
+    return 0 if result.passed else 2
+
+
 def cmd_build_view_store(args: argparse.Namespace) -> int:
     config, source = _load(args)
     require_passed(_gates(config), f"01_ingestion_audit_{args.dataset}")
@@ -1527,6 +1578,19 @@ def build_parser() -> argparse.ArgumentParser:
     external.add_argument("--seed", type=int, default=20210819)
     external.add_argument("--output-dir")
     external.set_defaults(func=cmd_analyze_kullamagi_examples)
+    yahoo_external = sub.add_parser("analyze-kullamagi-yfinance")
+    yahoo_external.add_argument("--config", required=True)
+    yahoo_external.add_argument("--url", default=KULLAMAGI_POSITIONS_URL)
+    yahoo_external.add_argument("--lookback", type=int, default=252)
+    yahoo_external.add_argument("--top-k", type=int, default=5)
+    yahoo_external.add_argument("--minimum-history-gap", type=int, default=60)
+    yahoo_external.add_argument("--permutations", type=int, default=1000)
+    yahoo_external.add_argument("--seed", type=int, default=20210819)
+    yahoo_external.add_argument("--target-purity", type=float, default=0.75)
+    yahoo_external.add_argument("--batch-size", type=int, default=25)
+    yahoo_external.add_argument("--refresh", action="store_true")
+    yahoo_external.add_argument("--output-dir")
+    yahoo_external.set_defaults(func=cmd_analyze_kullamagi_yfinance)
     view_store = sub.add_parser("build-view-store")
     view_store.add_argument("--config", required=True)
     view_store.add_argument("--dataset", required=True)
