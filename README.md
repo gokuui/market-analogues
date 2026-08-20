@@ -72,6 +72,7 @@ the ranking. Results are descriptive historical evidence, not forecasts.
 - [Complete-universe verification and next-step plan](docs/universe-verification-plan.html)
 - [Current verification status and next implementation plan](docs/verification-status-and-next-plan.html)
 - [Gate 12 exhaustive reference and independent validation plan](docs/gate12-exhaustive-reference-plan.html)
+- [Case-based market memory: implementation and verification plan](docs/case-based-market-memory-plan.html)
 - [Precision policy: float16 versus native](docs/precision-policy.html)
 - External labelled-example audit: generated at
   `config/data/analogues/external-examples/kullamagi-positions-2021/report.html`

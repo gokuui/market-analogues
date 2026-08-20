@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Case-Based Market Memory — implementation and verification plan</title>
+  <style>
+    :root{--ink:#17202a;--muted:#5d6d7e;--paper:#fff;--bg:#f3f6f7;--line:#d5d8dc;--blue:#2471a3;--green:#117864;--amber:#9a6700;--red:#b03a2e}
+    *{box-sizing:border-box}body{font-family:system-ui,sans-serif;max-width:1220px;margin:0 auto;padding:2rem;background:var(--bg);color:var(--ink);line-height:1.55}
+    header,section{background:var(--paper);border:1px solid var(--line);border-radius:11px;padding:1.45rem;margin:0 0 1rem}h1{margin:.15rem 0}h2{margin-top:0}h3{margin-bottom:.35rem}
+    table{border-collapse:collapse;width:100%}th,td{text-align:left;vertical-align:top;padding:.65rem;border-bottom:1px solid var(--line)}li{margin:.4rem 0}code{background:#eef2f3;padding:.1rem .3rem;overflow-wrap:anywhere}
+    .lead{font-size:1.15rem}.muted{color:var(--muted)}.pass{color:var(--green);font-weight:700}.open{color:var(--amber);font-weight:700}.fail{color:var(--red);font-weight:700}
+    .callout{border-left:5px solid var(--blue)}.warning{border-left:5px solid var(--amber)}.gate{border-left:5px solid var(--blue);padding-left:1rem;margin:1.25rem 0}.gate.done{border-color:var(--green)}
+    .flow{display:grid;grid-template-columns:repeat(5,1fr);gap:.65rem;align-items:stretch}.node{border:1px solid var(--line);border-radius:9px;padding:.8rem;background:#f8fafb}.arrow{text-align:center;color:var(--blue);font-size:1.4rem}.tag{display:inline-block;border-radius:1rem;background:#eaf2f8;color:#1a5276;padding:.2rem .55rem;margin:.1rem;font-size:.82rem}
+    @media(max-width:850px){.flow{grid-template-columns:1fr}.arrow{transform:rotate(90deg)}}
+  </style>
+</head>
+<body>
+<header>
+  <div><span class="tag">LOCK BEFORE OUTCOME TUNING</span><span class="tag">NO PATTERN NAMES REQUIRED</span><span class="tag">DECISION SUPPORT, NOT ADVICE</span></div>
+  <h1>Case-Based Market Memory</h1>
+  <p class="lead">For a stock chart known at time <i>T</i>, retrieve genuinely similar episodes that ended before <i>T</i>, reveal what happened after each one, and summarize the historical evidence with uncertainty and explicit reasons to abstain.</p>
+  <p><b>Product question:</b> “What has the market previously done from states like this—and how consistent, independent, and relevant is that history?”</p>
+</header>
+
+<section class="callout">
+  <h2>The intended learning loop</h2>
+  <p>Experienced traders build memory by studying thousands of charts, comparing present development with prior development, observing successes and failures, and learning when context changes the outcome. This system makes that case-based process reproducible; it does not need to call a setup VCP, cup, flag, or anything else.</p>
+  <div class="flow">
+    <div class="node"><b>1. Observe today</b><br>Only information available at the chosen decision timestamp.</div>
+    <div class="node"><b>2. Recall history</b><br>Retrieve diverse, causally earlier chart states.</div>
+    <div class="node"><b>3. Explain similarity</b><br>Price, structure, volume, relative strength and regime.</div>
+    <div class="node"><b>4. Replay futures</b><br>Normalized paths, returns, MFE, MAE and failure routes.</div>
+    <div class="node"><b>5. Calibrate evidence</b><br>Sample independence, uncertainty, novelty and abstention.</div>
+  </div>
+</section>
+
+<section class="warning">
+  <h2>What “perfect” must mean here</h2>
+  <p>No historical system can promise that a chart “will grow.” Markets change, analogues are dependent, and rare events remain possible. A trustworthy system is instead <b>causal, exhaustive within its declared universe, falsifiable, calibrated, explainable, and willing to say “insufficient evidence.”</b></p>
+  <table>
+    <tr><th>Allowed conclusion</th><td>“Among 34 independent close analogues, 21 reached +2 ATR before −1 ATR over 20 sessions; the interval is wide and evidence weakens outside risk-on regimes.”</td></tr>
+    <tr><th>Forbidden conclusion</th><td>“This pattern has 62% confidence and will rise,” when the matches are overlapping, future-contaminated, regime-shifted, or selected after trying many definitions.</td></tr>
+  </table>
+</section>
+
+<section>
+  <h2>End-to-end contract</h2>
+  <table>
+    <thead><tr><th>Layer</th><th>Required behavior</th><th>Failure behavior</th></tr></thead>
+    <tbody>
+      <tr><td>Decision timestamp</td><td>Explicitly choose after-close daily, entry-open, or point-in-time intraday. Every feature is truncated there.</td><td>Never mix end-of-day bars with intraday decisions. Missing point-in-time data means that mode is unavailable.</td></tr>
+      <tr><td>Historical universe</td><td>Point-in-time listings where available, adjusted OHLCV, delisted securities, benchmark and sector context, source fingerprints.</td><td>Disclose survivorship and delisting gaps; do not silently replace old tickers with acquirers.</td></tr>
+      <tr><td>Chart state</td><td>Multi-resolution price development, candles, gaps, volatility/contraction, volume/shocks, structural turns, market/sector regime and relative strength.</td><td>Missing context remains missing; it is not forward-filled across closed-market sessions.</td></tr>
+      <tr><td>Retrieval</td><td>Fast multi-view candidates followed by exact explainable distance. Return diverse dates/symbols and a novelty score.</td><td>If the exact-safe pool is incomplete or no close analogue exists, stop or visibly downgrade the evidence.</td></tr>
+      <tr><td>Outcome replay</td><td>Only after retrieval is frozen, attach forward paths and multiple descriptive outcome definitions.</td><td>Outcomes never influence similarity weights in the same validation fold.</td></tr>
+      <tr><td>Evidence synthesis</td><td>Raw examples first, then robust distributions, effective sample size, regime splits and calibrated intervals.</td><td>Do not turn correlated examples into a large fictitious sample.</td></tr>
+      <tr><td>User report</td><td>Show matches, why they match, what followed, counterexamples, uncertainty, data limitations and abstention reasons.</td><td>No single green/red prediction and no hidden threshold optimization.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>Representation of the chart a professional sees</h2>
+  <table>
+    <thead><tr><th>View</th><th>Information retained</th><th>Why separate</th></tr></thead>
+    <tbody>
+      <tr><td>Long development</td><td>252-session normalized path, drawdowns, distance from highs, major turns, moving-average slopes.</td><td>Distinguishes early, mature and damaged structures.</td></tr>
+      <tr><td>Intermediate structure</td><td>126/63-session swings, base depth/duration, compression progression, recovery symmetry.</td><td>Preserves the geometry that named patterns attempt to summarize.</td></tr>
+      <tr><td>Immediate state</td><td>21/10/5-session returns, gaps, candles, ATR, range contraction, close location.</td><td>Separates a similar long base from a different present trigger state.</td></tr>
+      <tr><td>Volume and participation</td><td>Robust relative volume, dry-up, accumulation/distribution shocks, volume-price agreement.</td><td>Price-only similarity can pair quiet bases with distribution.</td></tr>
+      <tr><td>Context</td><td>Benchmark and sector trend/volatility, relative-strength path, breadth when available.</td><td>The same stock shape can behave differently in hostile or supportive markets.</td></tr>
+      <tr><td>Structural graph</td><td>Causally confirmed extrema, ordered swing directions, depth/time ratios and compression topology.</td><td>Creates a label-free, independently testable description of “same setup.”</td></tr>
+      <tr><td>Elastic path</td><td>Bounded multichannel DTW/shape-aware alignment.</td><td>Allows the same development to unfold at moderately different speeds without arbitrary warping.</td></tr>
+    </tbody>
+  </table>
+  <p><b>Retrieval modes shown side by side:</b> structure-first, full-context, and shape-only. The product must reveal when they disagree; one blended score must not hide the reason.</p>
+</section>
+
+<section>
+  <h2>Outcome replay—not one arbitrary “win” label</h2>
+  <p>Each historical analogue produces a future path normalized to the query’s scale. The system stores observations, not a conclusion:</p>
+  <ul>
+    <li>Forward close return and benchmark-relative return at 5, 10, 20, 40, 60 and 126 sessions.</li>
+    <li>Maximum favorable and adverse excursion in return, ATR and structural-risk units.</li>
+    <li>Time to +1/+2/+3 ATR and −1/−2 ATR; which barrier was reached first.</li>
+    <li>Maximum drawdown before the best advance, gap failure, failed follow-through and recovery time.</li>
+    <li>Complete normalized future trajectory so users can see paths that share an endpoint but carry very different risk.</li>
+    <li>Censoring flags whenever a horizon is incomplete. A censored episode never enters that horizon’s denominator.</li>
+  </ul>
+  <p><b>Critical causality rule:</b> for a historical query at time <i>T</i> and outcome horizon <i>H</i>, an analogue is outcome-eligible only if its entire <i>H</i>-session future was already observable before <i>T</i>. Retrieval may use a newer analogue, but that analogue cannot contribute to a falsely historical outcome estimate.</p>
+</section>
+
+<section>
+  <h2>From analogue paths to evidence</h2>
+  <table>
+    <thead><tr><th>Problem</th><th>Required control</th></tr></thead>
+    <tbody>
+      <tr><td>One market event creates 30 “examples”</td><td>Cluster by event date, sector and correlated path; cap contribution per event cluster and report raw versus effective sample size.</td></tr>
+      <tr><td>One ticker appears repeatedly</td><td>Default evidence panel uses one best episode per symbol; a separate same-symbol memory panel is allowed but never mixed silently.</td></tr>
+      <tr><td>Distant analogues dilute close ones</td><td>Show distance distribution, neighborhood stability over k, and both unweighted and preregistered similarity-weighted estimates.</td></tr>
+      <tr><td>Current setup is novel</td><td>Calibrate nearest-distance percentile against historical queries and abstain above the locked novelty threshold.</td></tr>
+      <tr><td>Market regime changed</td><td>Show all-shape and context-matched outcomes separately. If their conclusions conflict, downgrade the evidence.</td></tr>
+      <tr><td>Many outcome definitions invite cherry-picking</td><td>Lock a primary horizon/barrier definition before evaluation; display the rest as a complete sensitivity table.</td></tr>
+      <tr><td>Probability is uncalibrated</td><td>Call results empirical frequencies until walk-forward calibration passes Brier/log-loss, reliability and interval-coverage tests.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>The evidence card presented to a user</h2>
+  <ol>
+    <li><b>Query snapshot:</b> symbol, cutoff, resolution, market/sector state and data quality.</li>
+    <li><b>Closest historical cases:</b> aligned charts, distance, component explanation, date/symbol diversity and novelty.</li>
+    <li><b>What happened next:</b> overlaid normalized future paths plus a sortable table of every analogue.</li>
+    <li><b>Outcome distribution:</b> median, quartiles, tails, MFE/MAE, barrier order and censored counts.</li>
+    <li><b>Counterexamples:</b> the closest failures must be as visible as successes.</li>
+    <li><b>Context sensitivity:</b> same-regime, different-regime, same-sector and cross-sector panels.</li>
+    <li><b>Evidence grade:</b> based on closeness, effective sample size, stability, data quality and validated calibration—not on whether the result is bullish.</li>
+    <li><b>Boundary:</b> “historical descriptive evidence, not a recommendation,” with reproducible source/config hashes.</li>
+  </ol>
+</section>
+
+<section>
+  <h2>Gated implementation sequence</h2>
+
+  <div class="gate">
+    <h3>M00 — Freeze the product and causality charter</h3>
+    <p><b>Build:</b> version the three decision modes, default horizons, primary barrier definition, analogue eligibility, distinct-symbol/event rules, abstention vocabulary and trial ledger.</p>
+    <p><b>Correctness tests:</b> mutate any post-cutoff bar and require zero query/ranking change; verify each horizon’s outcome was fully known before a historical query.</p>
+    <p><b>Pass:</b> machine-readable contract and readable HTML agree; no result is measured before the contract hash is frozen.</p>
+  </div>
+
+  <div class="gate">
+    <h3>M01 — Point-in-time data and universe ledger</h3>
+    <p><b>Build:</b> source adapters for available NASDAQ/NSE/Yahoo data, corporate-action provenance, benchmarks/sectors, point-in-time listing membership where available, and explicit delisting gaps.</p>
+    <p><b>Correctness tests:</b> schema/range checks, split discontinuities, duplicate sessions, source mutation, ticker reuse, benchmark staleness, missing delisting outcome and survivorship accounting.</p>
+    <p><b>Performance:</b> resumable incremental ingest; no source file rewritten; complete manifest and content hashes.</p>
+    <p><b>Pass:</b> 100% of eligible instruments accounted for as usable, quarantined or explicitly unavailable; zero silent failure.</p>
+  </div>
+
+  <div class="gate">
+    <h3>M02 — Multi-resolution point-in-time chart state</h3>
+    <p><b>Build:</b> one representation contract spanning 252/126/63/21/10/5 sessions, volume, market/sector context, relative strength and structural graph. Entry-open is a synthetic partial bar containing only information actually known at the open; intraday mode requires true point-in-time bars.</p>
+    <p><b>Correctness tests:</b> price/volume unit invariance, future mutation, prefix stability, missing-context masks, constant/zero-volume data, split adjustment and time-zone/session boundaries.</p>
+    <p><b>Pass:</b> exact invariants hold and every field has a documented observation timestamp.</p>
+  </div>
+
+  <div class="gate">
+    <h3>M03 — Label-free structural verifier</h3>
+    <p><b>Build:</b> expand deterministic OHLCV generators into many unnamed latent setup families with controlled base depth, pivot topology, contraction, volume, context and maturity. Produce hard positives through scale/time/noise transformations and hard negatives by changing one decisive structural relation.</p>
+    <p><b>Independent oracle:</b> generator parameters and event topology define sameness; the retrieval distance never sees the latent family identifier.</p>
+    <p><b>Tests:</b> exact clones, noisy/time-stretched positives, partial formations, near-miss negatives, context contradictions, missing channels and cross-market scaling.</p>
+    <p><b>Pass:</b> structural precision@5 ≥75%, top-1 ≥75%, critical-negative error ≤2%, and ≥75% in every sufficiently populated latent family—not only the average.</p>
+  </div>
+
+  <div class="gate">
+    <h3>M04 — Exhaustive and diverse historical retrieval</h3>
+    <p><b>Existing foundation:</b> multi-view persisted candidates, exact composite reranking, safe lower bounds and resumable exhaustive authorities exist. Gate 12 is currently generating the independent full-universe matrix.</p>
+    <p><b>Complete:</b> distinct-symbol/event-aware top-k, separate same-symbol memory, multi-resolution query, novelty percentile and component explanations.</p>
+    <p><b>Correctness tests:</b> exact authority equality, overlap/event deduplication, stable ties, serial/parallel identity, source/config drift and complete candidate accounting.</p>
+    <p><b>Pass:</b> production top-20 recall ≥95% in every locked Gate 12 query; no temporal/quality violation; latency and RSS remain within market budgets.</p>
+  </div>
+
+  <div class="gate">
+    <h3>M05 — Causal outcome store</h3>
+    <p><b>Build:</b> immutable post-retrieval outcome table for all horizons, raw/relative/ATR-normalized paths, MFE/MAE, barriers, failure routes and censoring. Bind each row to episode and source fingerprints.</p>
+    <p><b>Correctness tests:</b> hand-calculated paths, gaps, suspensions, delisting, partial horizons, benchmark alignment and outcome-embargo enforcement.</p>
+    <p><b>Pass:</b> every denominator reconciles as observed or censored; future outcomes cannot affect representation, candidate generation, ranking or evidence weights.</p>
+  </div>
+
+  <div class="gate">
+    <h3>M06 — Historical evidence aggregator</h3>
+    <p><b>Build:</b> event-cluster deduplication, effective sample size, unweighted and locked similarity-weighted distributions, regime/sector sensitivity, distance stability and novelty/abstention.</p>
+    <p><b>Correctness tests:</b> duplicating one market day cannot increase effective evidence; adding distant cases cannot increase confidence; contradictory regimes visibly lower the grade.</p>
+    <p><b>Pass:</b> synthetic distributions recover known quantiles/coverage; all raw contributing cases reconcile with the summary.</p>
+  </div>
+
+  <div class="gate">
+    <h3>M07 — Walk-forward calibration and falsification</h3>
+    <p><b>Protocol:</b> expanding-window folds. At each query date, use only prior representations, prior completed outcomes and the then-valid universe. Lock development, validation and final test periods plus a trial ledger.</p>
+    <p><b>Baselines:</b> unconditional market/sector frequency, regime-only frequency, return-matched random neighbors, price-only similarity and the current composite.</p>
+    <p><b>Metrics:</b> Brier/log loss for barrier events; reliability diagrams and expected calibration error; interval coverage/width and pinball loss; median/path error; abstention coverage; regime and calendar stability.</p>
+    <p><b>Pass:</b> no promotion from hit rate alone. The analogue system must improve locked proper-scoring metrics over simple baselines, maintain coverage on the final untouched period, and fail visibly if calibration breaks under shift.</p>
+  </div>
+
+  <div class="gate">
+    <h3>M08 — Evidence report and API</h3>
+    <p><b>Build:</b> self-contained HTML/Excel/API evidence card with raw analogues, aligned charts, future paths, counterexamples, uncertainty, provenance and plain-language limitations.</p>
+    <p><b>Tests:</b> every displayed number traces to stored rows; links and exports agree; absent data cannot render as zero; deterministic snapshot tests.</p>
+    <p><b>Pass:</b> a user can reproduce the query and audit every contributing case without reading source code.</p>
+  </div>
+
+  <div class="gate">
+    <h3>M09 — Shadow operation before decision use</h3>
+    <p><b>Run:</b> timestamp and freeze daily reports before future bars arrive. Never revise a report after its outcome. Monitor drift, novelty, calibration, latency and data failures.</p>
+    <p><b>Pass:</b> sustained out-of-sample calibration and operational reliability across multiple regimes. Trading costs and explicit decision rules are a later, separately preregistered evaluation.</p>
+  </div>
+</section>
+
+<section>
+  <h2>Evaluation matrix that prevents self-deception</h2>
+  <table>
+    <thead><tr><th>Axis</th><th>Locked comparisons</th></tr></thead>
+    <tbody>
+      <tr><td>Information time</td><td>Previous close; entry open; true point-in-time intraday—never mixed.</td></tr>
+      <tr><td>History length</td><td>63, 126 and 252 primary; multi-resolution fusion versus each alone.</td></tr>
+      <tr><td>Similarity</td><td>Price-only, structure-only, context-only, full composite, bounded DTW and generic baselines.</td></tr>
+      <tr><td>Neighbor count</td><td>k = 5, 10, 20, 50; choose on validation, freeze for final test; always show sensitivity.</td></tr>
+      <tr><td>Diversity</td><td>One per symbol; event/sector cluster cap; same-symbol results separate.</td></tr>
+      <tr><td>Market context</td><td>All-shape versus regime-matched versus sector-matched, reported separately.</td></tr>
+      <tr><td>Outcome</td><td>Primary 20-session barrier event; complete return/MFE/MAE horizons retained as sensitivity, not cherry-picked.</td></tr>
+      <tr><td>Time split</td><td>Development years, validation years, untouched final years, then live shadow.</td></tr>
+      <tr><td>Universe</td><td>NASDAQ and NSE separately first; cross-market only after scale/invariance verification.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>Owner questions resolved by defaults—and choices to revisit with evidence</h2>
+  <p>None of these questions blocks the first implementation pass: the safe default is explicit so work can proceed, while each choice remains visible and testable.</p>
+  <table>
+    <thead><tr><th>Question</th><th>Safe starting decision</th><th>Revisit trigger</th></tr></thead>
+    <tbody>
+      <tr><td>When is “today’s chart” observed?</td><td>After the completed daily session. Entry-open and intraday are separate products.</td><td>Point-in-time intraday history is available and independently verified.</td></tr>
+      <tr><td>Who is the first user and holding style?</td><td>A discretionary long-side swing trader studying daily charts over roughly 5–60 sessions.</td><td>A different user supplies a distinct decision, risk and holding contract.</td></tr>
+      <tr><td>What is the initial direction?</td><td>Long setups first; retain all bearish future paths and failures. Short-side retrieval is a separately scored mode.</td><td>The long workflow passes walk-forward calibration and the short outcome contract is frozen.</td></tr>
+      <tr><td>How much chart history defines the present?</td><td>Use 252 sessions with explicit 126/63/21/10/5-session views; do not force one winning window.</td><td>Locked ablation evidence supports removing a view without losing calibration or structural coverage.</td></tr>
+      <tr><td>Should the same ticker appear?</td><td>Yes, but in a separate self-history panel; cross-symbol evidence defaults to one episode per symbol.</td><td>Walk-forward evidence shows a preregistered alternative is better calibrated.</td></tr>
+      <tr><td>Can analogues cross NASDAQ and NSE?</td><td>Validate and report each market separately first. A cross-market panel is optional and visibly identified.</td><td>Unit-invariance and untouched cross-market tests show stable retrieval and calibration.</td></tr>
+      <tr><td>Must regime match?</td><td>Retrieve by complete state and also expose shape-only. Show disagreement rather than enforce one hidden filter.</td><td>Locked calibration supports a stricter context policy.</td></tr>
+      <tr><td>Should sector and industry be hard filters?</td><td>No. Use them as context and sensitivity panels so rare valid cross-sector shapes remain discoverable.</td><td>Independent evidence shows a hard filter improves proper scores without destroying coverage.</td></tr>
+      <tr><td>Should earnings and news events be excluded?</td><td>Keep them when point-in-time event data is unavailable, disclose that limitation, and never infer an event from future price.</td><td>Reliable point-in-time event history permits preregistered event-aware panels.</td></tr>
+      <tr><td>What counts as winning?</td><td>No universal label. Primary barrier outcome plus complete returns/MFE/MAE paths.</td><td>A user supplies a separately specified risk/holding policy.</td></tr>
+      <tr><td>How many analogues?</td><td>Show 20 raw cases; estimate only when effective sample size and closeness gates pass.</td><td>Validation selects k before final testing.</td></tr>
+      <tr><td>How conservative should abstention be?</td><td>Prefer no estimate over a novel, dependent or poorly calibrated estimate; always preserve the raw cases.</td><td>Shadow results quantify the coverage-versus-reliability tradeoff on untouched dates.</td></tr>
+      <tr><td>What should users see first?</td><td>Aligned historical charts and subsequent paths first; summary statistics and evidence grade second.</td><td>Auditability testing shows another order improves comprehension without hiding failures.</td></tr>
+      <tr><td>Can user feedback tune similarity?</td><td>Record feedback separately; never update production weights online or contaminate the locked evaluation set.</td><td>A versioned development/final-test protocol is approved for a new matcher version.</td></tr>
+      <tr><td>Can this say “buy”?</td><td>No. It reports historical conditional evidence and uncertainty.</td><td>Only a separately tested decision policy with costs, risk limits and governance could change this boundary.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>Research translated into design decisions</h2>
+  <table>
+    <thead><tr><th>Primary evidence</th><th>Design consequence</th></tr></thead>
+    <tbody>
+      <tr><td><a href="https://arxiv.org/abs/1909.00221">Kang et al., Déjà vu: forecasting through cross-similarity</a></td><td>Supports retrieving cross-series analogues and aggregating their future paths, while evaluating both point behavior and interval uncertainty.</td></tr>
+      <tr><td><a href="https://www.sciencedirect.com/science/article/pii/S0031320317303710">Zhao &amp; Itti, shapeDTW</a></td><td>Use local shape context and constrained alignment; raw pointwise DTW is not a complete chart-state measure.</td></tr>
+      <tr><td><a href="https://www.cs.ucr.edu/~hdau001/ucr_archive/">UCR archive</a> and <a href="https://github.com/stumpy-dev/stumpy">STUMPY</a></td><td>Keep independent generic baselines and exact motif/search implementations; a finance-specific composite is not presumed universally superior.</td></tr>
+      <tr><td><a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC3082144/">Murphy et al., metamorphic testing</a></td><td>Use transformations and known relations when no human label or perfect real-data oracle exists.</td></tr>
+      <tr><td><a href="https://onlinelibrary.wiley.com/doi/10.1111/j.1540-6261.1997.tb03818.x">Shumway, delisting bias</a></td><td>Outcome claims require explicit delisting and survivorship accounting; free current-ticker history is insufficient for a production claim.</td></tr>
+      <tr><td><a href="https://papers.ssrn.com/sol3/papers.cfm?abstract_id=2308659">Bailey et al., backtest overfitting</a></td><td>Freeze folds, metrics and trial counts. Repeatedly changing similarity/outcome definitions against the same history invalidates performance evidence.</td></tr>
+      <tr><td><a href="https://proceedings.mlr.press/v162/zaffran22a.html">Zaffran et al., adaptive conformal prediction for time series</a></td><td>Prediction intervals under dependence and shift need time-aware calibration; ordinary exchangeable conformal claims are not imported blindly.</td></tr>
+      <tr><td><a href="https://proceedings.mlr.press/v266/retzlaff25a.html">Retzlaff et al., coverage tests for non-stationary series</a></td><td>Test marginal and conditional interval coverage formally; nominal coverage alone is not proof of calibration.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="callout">
+  <h2>Immediate execution order from the current repository state</h2>
+  <ol>
+    <li>Let the unattended Gate 12 matrix finish or stop safely at its disk guard; it is currently the retrieval-completeness authority.</li>
+    <li>Freeze M00 before looking at any new forward-outcome result: decision modes, horizon eligibility, diversity, primary outcome and abstention.</li>
+    <li>Implement M05’s outcome-embargoed path store and tests using the already retrieved episodes.</li>
+    <li>Expand the synthetic verifier into M03’s richer unnamed structural families and lock ≥75% per-family acceptance.</li>
+    <li>Implement M06 evidence aggregation with event-cluster effective sample size and novelty.</li>
+    <li>Run M07 walk-forward evaluation against unconditional, regime-only, random-neighbor and price-only baselines.</li>
+    <li>Only after those pass, expose the M08 evidence card for daily shadow operation.</li>
+  </ol>
+  <p><b>No step promotes itself.</b> Each task writes machine artifacts, a readable report, correctness tests, resource measurements and a running-log entry before the next gate begins.</p>
+</section>
+
+<section>
+  <h2>Final success definition</h2>
+  <p>The system succeeds when it can say, reproducibly:</p>
+  <blockquote>“These are the closest causally valid, diverse historical chart states. Here is exactly why they resemble today. Here are all their subsequent paths, including failures. The effective evidence is N, the current state is/is not novel, these outcome intervals have passed/failed walk-forward calibration, and this is where the evidence stops.”</blockquote>
+  <p>That is the computerized equivalent of disciplined chart study. It is useful even when the answer is neutral or uncertain.</p>
+</section>
+</body>
+</html>
