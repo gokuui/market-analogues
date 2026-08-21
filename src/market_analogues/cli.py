@@ -52,6 +52,9 @@ from .production_verification import (
 from .precision_verification import (
     verify_float16_oracle_precision, write_precision_report,
 )
+from .product_contract import (
+    load_product_contract, validate_trial_ledger, write_contract_artifacts,
+)
 from .quality import audit_source
 from .report import write_search_report
 from .representation import represent
@@ -121,6 +124,47 @@ def cmd_verify(args: argparse.Namespace) -> int:
     print(json.dumps(report.to_dict(), indent=2))
     print(path)
     return 0 if report.passed else 2
+
+
+def cmd_verify_case_memory_contract(args: argparse.Namespace) -> int:
+    config = load_config(args.config)
+    contract = load_product_contract(args.contract)
+    declared_ledger = Path(contract.payload["evaluation"]["trial_ledger"])
+    ledger_path = Path(args.trial_ledger).resolve() if args.trial_ledger else (
+        declared_ledger if declared_ledger.is_absolute()
+        else (contract.source.parent / declared_ledger).resolve()
+    )
+    ledger = validate_trial_ledger(ledger_path, contract)
+    machine_path = Path(args.machine_output) if args.machine_output else (
+        config.artifact_dir / "contracts" / f"{contract.contract_id}.json"
+    )
+    html_path = Path(args.output) if args.output else (
+        config.artifact_dir / "reports" / f"m00-{contract.contract_id}.html"
+    )
+    write_contract_artifacts(contract, ledger, machine_path, html_path)
+    metrics = {
+        "schema_version": contract.payload["schema_version"],
+        "contract_id": contract.contract_id,
+        "contract_digest": contract.digest,
+        "status": contract.payload["status"],
+        "primary_mode": contract.payload["decision"]["primary_mode"],
+        "entry_open_enabled": contract.payload["decision"]["modes"]["entry_open"]["enabled"],
+        "intraday_enabled": contract.payload["decision"]["modes"]["intraday"]["enabled"],
+        "outcomes_may_affect_similarity": contract.payload["outcomes"]["outcomes_may_affect_similarity"],
+        "trial_count": len(ledger["trials"]),
+        "machine_artifact": str(machine_path.resolve()),
+        "html_artifact": str(html_path.resolve()),
+    }
+    GateReport(
+        "m00_case_memory_contract", True, metrics,
+        source_hashes={
+            "contract": contract.digest,
+            "trial_ledger": sha256(ledger_path.read_bytes()).hexdigest(),
+        },
+    ).write(_gates(config))
+    print(json.dumps({"passed": True, **metrics}, indent=2))
+    print(html_path)
+    return 0
 
 
 def cmd_compare(args: argparse.Namespace) -> int:
@@ -1360,6 +1404,13 @@ def build_parser() -> argparse.ArgumentParser:
     verify.add_argument("--config", required=True)
     verify.add_argument("--seeds-per-family", type=int, default=5)
     verify.set_defaults(func=cmd_verify)
+    contract = sub.add_parser("verify-case-memory-contract")
+    contract.add_argument("--config", required=True)
+    contract.add_argument("--contract", required=True)
+    contract.add_argument("--trial-ledger")
+    contract.add_argument("--machine-output")
+    contract.add_argument("--output")
+    contract.set_defaults(func=cmd_verify_case_memory_contract)
     compare = sub.add_parser("compare-methods")
     compare.add_argument("--config", required=True)
     compare.add_argument("--seeds-per-family", type=int, default=5)

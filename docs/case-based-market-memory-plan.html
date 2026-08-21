@@ -124,11 +124,12 @@
 <section>
   <h2>Gated implementation sequence</h2>
 
-  <div class="gate">
+  <div class="gate done">
     <h3>M00 — Freeze the product and causality charter</h3>
     <p><b>Build:</b> version the three decision modes, default horizons, primary barrier definition, analogue eligibility, distinct-symbol/event rules, abstention vocabulary and trial ledger.</p>
     <p><b>Correctness tests:</b> mutate any post-cutoff bar and require zero query/ranking change; verify each horizon’s outcome was fully known before a historical query.</p>
     <p><b>Pass:</b> machine-readable contract and readable HTML agree; no result is measured before the contract hash is frozen.</p>
+    <p class="pass"><b>Status:</b> PASS. Contract <code>daily-long-swing-v1</code> is frozen at digest <code>8b333ac8…3fa53</code>; the entry-open and intraday modes remain disabled, the trial ledger is empty, and the generated JSON/HTML agreement plus outcome-embargo boundary tests pass.</p>
   </div>
 
   <div class="gate">
@@ -156,7 +157,7 @@
 
   <div class="gate">
     <h3>M04 — Exhaustive and diverse historical retrieval</h3>
-    <p><b>Existing foundation:</b> multi-view persisted candidates, exact composite reranking, safe lower bounds and resumable exhaustive authorities exist. Gate 12 is currently generating the independent full-universe matrix.</p>
+    <p><b>Existing foundation:</b> multi-view persisted candidates, exact composite reranking, safe lower bounds and resumable exhaustive authorities exist. All 24 independent Gate 12 exact authorities and both market aggregates pass; production recall against them remains open.</p>
     <p><b>Complete:</b> distinct-symbol/event-aware top-k, separate same-symbol memory, multi-resolution query, novelty percentile and component explanations.</p>
     <p><b>Correctness tests:</b> exact authority equality, overlap/event deduplication, stable ties, serial/parallel identity, source/config drift and complete candidate accounting.</p>
     <p><b>Pass:</b> production top-20 recall ≥95% in every locked Gate 12 query; no temporal/quality violation; latency and RSS remain within market budgets.</p>
@@ -261,13 +262,13 @@
 <section class="callout">
   <h2>Immediate execution order from the current repository state</h2>
   <ol>
-    <li>Let the unattended Gate 12 matrix finish or stop safely at its disk guard; it is currently the retrieval-completeness authority.</li>
-    <li>Freeze M00 before looking at any new forward-outcome result: decision modes, horizon eligibility, diversity, primary outcome and abstention.</li>
-    <li>Implement M05’s outcome-embargoed path store and tests using the already retrieved episodes.</li>
-    <li>Expand the synthetic verifier into M03’s richer unnamed structural families and lock ≥75% per-family acceptance.</li>
-    <li>Implement M06 evidence aggregation with event-cluster effective sample size and novelty.</li>
-    <li>Run M07 walk-forward evaluation against unconditional, regime-only, random-neighbor and price-only baselines.</li>
-    <li>Only after those pass, expose the M08 evidence card for daily shadow operation.</li>
+    <li><span class="pass">Complete:</span> preserve the 24/24 Gate 12 exact authorities and both passing aggregates as the independent retrieval references.</li>
+    <li><span class="pass">Complete:</span> preserve M00 contract <code>daily-long-swing-v1</code> and its empty trial ledger before any new case-memory outcome evaluation.</li>
+    <li>Execute M01: account for every instrument in the available NASDAQ and NSE sources as usable, quarantined or explicitly unavailable, with point-in-time limitations visible.</li>
+    <li>Execute M02 and M03: complete the six-resolution state and richer unnamed structural verifier, then lock ≥75% per-family acceptance.</li>
+    <li>Finish M04 by comparing production retrieval with every frozen Gate 12 authority and adding evidence diversity/novelty controls.</li>
+    <li>Implement M05 and M06: outcome-embargoed paths, effective sample size, context sensitivity and abstention.</li>
+    <li>Run M07 against locked simple baselines; only after it passes expose M08 evidence cards and M09 daily shadow operation.</li>
   </ol>
   <p><b>No step promotes itself.</b> Each task writes machine artifacts, a readable report, correctness tests, resource measurements and a running-log entry before the next gate begins.</p>
 </section>

@@ -22,10 +22,11 @@
 </header>
 
 <section id="status">
-  <h2>Current status — 20 August 2026</h2>
+  <h2>Current status — 21 August 2026</h2>
   <table>
     <thead><tr><th>Gate</th><th>Status</th><th>Evidence</th></tr></thead>
     <tbody>
+      <tr><td>M00 Case-memory contract</td><td class="pass">PASS — FROZEN</td><td><code>daily-long-swing-v1</code> digest <code>8b333ac8…3fa53</code>; synchronized YAML/JSON/HTML, empty digest-bound trial ledger, strict safety validation and historical outcome-embargo boundary tests.</td></tr>
       <tr><td>03 Synthetic retrieval</td><td class="pass">PASS</td><td>Recall@10 0.953846; nDCG@10 0.935744; clone, invariance and pair ordering 1.0; critical-negative rate 0.</td></tr>
       <tr><td>08 Complete-universe baseline</td><td class="fail">FAIL</td><td>Coverage, causality and memory pass. Price-only candidate fidelity fails: pool-500 versus pool-1,000 top-20 recall is 0.75 NSE and 0.65 NASDAQ.</td></tr>
       <tr><td>09 Stratified exact oracle</td><td class="pass">PASS</td><td>24/24 cases; 5,850 exactly scored episodes; NSE/NASDAQ, 63/126/252 bars, historical/current cutoffs, quality and liquidity strata.</td></tr>
@@ -39,8 +40,8 @@
       <tr><td>12Q Float16 practical precision</td><td class="pass">PASS (APPROXIMATE)</td><td>All 24 Gate 09 cases retain top-20 membership; minimum graded nDCG 0.9999925. One rank-16/17 swap proves it is not the native authority. Candidate stores remain float16; exhaustive reference remains native streaming.</td></tr>
       <tr><td>12D Two-pass exhaustive frontier</td><td class="pass">PASS (BOUNDED SMOKE)</td><td>Atomic/resumable NSE and NASDAQ frontier smokes return deterministic native top-20 with strict stopping certificates, ≤4.44e-16 reconstructed-bound delta and 421–436 MB RSS. Full-market scale remains T12-04.</td></tr>
       <tr><td>12E Deterministic scale ladder</td><td class="pass">PASS — BOTH MARKETS</td><td>Full NSE and NASDAQ 1%/10% aggregate gates pass. NASDAQ 10% covers 1,159 symbols/363,633 candidates, prunes 99.78%, repeats its digest, searches in 6.82/6.59 minutes and projects a 68.2-minute full search at 547 MB.</td></tr>
-      <tr><td>12F Blind authority matrix</td><td class="open">RUNNING — 19/24 SEALED; CASE 20 ACTIVE</td><td>All 12 NSE authorities and their aggregate pass. Seven NASDAQ authorities pass; TVTX historical is active. The supervisor continues automatically, stopping only on a visible failure or disk guard. No production ranking or forward outcome is read.</td></tr>
-      <tr><td>12 Full-universe production matrix</td><td class="open">OPEN</td><td>A bounded exact-safe reference now exists, while full-exchange scale and the independent 24-case recall matrix remain unverified.</td></tr>
+      <tr><td>12F Blind authority matrix</td><td class="pass">PASS — 24/24 SEALED</td><td>All 12 NSE and 12 NASDAQ authorities pass along with both market aggregates. Each artifact has complete candidate accounting, repeat-result identity and a strict exact stopping certificate. No production ranking or forward outcome was read.</td></tr>
+      <tr><td>12 Full-universe production comparison</td><td class="open">OPEN</td><td>The independent exact references are complete. Production top-20 recall against all 24 references, diversity behavior and promotion remain unmeasured.</td></tr>
       <tr><td>External Kullamagi examples</td><td class="pass">AUDIT COMPLETE — PARTIAL COVERAGE</td><td>132 unique 252-session episodes across 56 NASDAQ-source symbols. Causal top-5 label purity is 51.5% versus a 41.4% frequency baseline (within-query random-candidate p=0.001); causal minority-setup recovery remains weak.</td></tr>
       <tr><td>Yahoo-expanded Kullamagi examples</td><td class="fail">75% TARGET NOT REACHED</td><td>Yahoo expands coverage to 361 episodes across 129 symbols. With one match per candidate symbol, primary causal top-5 purity is 54.44% versus a 50.44% within-query random expectation (p=0.003): measurable but far below the target and concentrated in breakouts.</td></tr>
     </tbody>
@@ -66,6 +67,7 @@
       <tr><td>D-011</td><td>Use behavioral precision contracts: float16 candidates, native reference.</td><td>Float16 preserved all 24 top-20 sets and ≥0.9999925 nDCG, so twelve-decimal equality is unnecessary for approximate retrieval. It changed one order, is not a safe native lower bound, and still cannot fit as a full store.</td><td>Revisit if a formal quantization-error bound is proven or storage/resources materially change.</td></tr>
       <tr><td>D-012</td><td>Use trader-labelled examples as a diagnostic benchmark, not ground truth.</td><td>The sheet is valuable independent evidence, but labels are imbalanced, symbol coverage is partial, and daily bars cannot reproduce the intraday trigger. Outcomes must stay outside retrieval.</td><td>Revisit label-specific conclusions after broader venue/delisted coverage and a preregistered full-universe walk-forward audit.</td></tr>
       <tr><td>D-013</td><td>Keep 75% as a visible target; never tune the audit until it passes.</td><td>The broader Yahoo result fails the target: top-1 is indistinguishable from random, while top-5 has only a four-point lift concentrated in breakouts. Changing labels, cutoffs or weights after observing it would convert evaluation into calibration.</td><td>Only evaluate a new trigger-aware representation on a separately locked holdout.</td></tr>
+      <tr><td>D-014</td><td>Freeze daily long-swing case memory before new outcome evaluation.</td><td>Historical analogue evidence is vulnerable to changing decision times, horizons, barriers, diversity rules and abstention after seeing results. A digest-bound contract and empty append-only trial ledger make later changes visible.</td><td>Create a new version and ledger entry; never rewrite <code>daily-long-swing-v1</code>.</td></tr>
     </tbody>
   </table>
 </section>
@@ -420,12 +422,25 @@
   <p><b>Current operation:</b> This plan does not promote the existing matcher. At this checkpoint the unattended Gate 12 supervisor has sealed 19/24 authorities with no failures, all NSE cases and the NSE aggregate pass, and NASDAQ TVTX historical is case 20. Approximately 5.8 GiB is free against the 5 GiB start guard, so the existing supervisor—not this document—decides whether later cases can safely begin.</p>
   <p>Readable plan: <a href="case-based-market-memory-plan.html">Case-Based Market Memory implementation and verification plan</a>.</p>
 </section>
+
+<section class="entry" id="log-037">
+  <h2>L-037 — M00 frozen case-memory and causality contract</h2>
+  <p><b>What:</b> Added the strict machine-readable <code>daily-long-swing-v1</code> contract, a digest-bound empty trial ledger, reusable historical-outcome eligibility enforcement, synchronized canonical JSON/HTML generation, a CLI verifier and immutable gate record. The frozen digest is <code>8b333ac8a6cdf0df9d71d3599e25336f7db246957d3a29a925fedc0e9103fa53</code>.</p>
+  <p><b>Locked scope:</b> The primary product observes completed daily bars after the official close for a discretionary long-side swing horizon. Entry-open and intraday modes remain disabled. The state requires 252/126/63/21/10/5-session views. Primary evidence shows 20 neighbours with at most one contribution per symbol and event cluster; same-symbol memory is separate.</p>
+  <p><b>Locked outcome:</b> The primary descriptive event is first touch of +2 ATR versus −1 ATR within 20 observed sessions using a 20-session simple-mean true range. A daily bar touching both is ambiguous and excluded. Secondary horizons are 5/10/20/40/60/126 sessions. Outcomes attach only after retrieval freezes and can contribute to a historical query only when their completion timestamp was already observable; incomplete futures are censored.</p>
+  <p><b>Abstention and claims:</b> Insufficient effective sample size, novelty, unstable neighbours, contradictory context, poor data and failed calibration are mandatory reasons to abstain. The contract forbids guaranteed direction, recommendations and calibrated-probability language before M07 passes.</p>
+  <p><b>Verification:</b> Tests reject draft/advisory/future-aware/outcome-fed contracts and altered abstention vocabulary; prove digest independence from YAML key order; prove that any contract change breaks the frozen trial-ledger binding; exercise exact outcome-embargo boundaries, incomplete horizons and non-earlier analogues; and parse the generated HTML back to the exact JSON object. The existing synthetic test still requires exactly zero representation change after post-cutoff mutation. Focused tests pass 14/14 and the complete suite passes 130/130.</p>
+  <p><b>Artifacts:</b> The generated readable contract is <code>config/data/analogues/reports/m00-daily-long-swing-v1.html</code>, its machine envelope is <code>config/data/analogues/contracts/daily-long-swing-v1.json</code>, and the immutable gate history is under <code>config/data/analogues/gates/history/m00_case_memory_contract</code>. Generated artifacts stay outside Git; the source contract and trial ledger are versioned.</p>
+  <p><b>Independent background completion:</b> The pre-existing Gate 12 supervisor separately finished all 24/24 blind exact authorities and both market aggregates with no failure. This completes the reference set, not the production recall comparison and not outcome validation.</p>
+  <p><b>Next:</b> Execute M01 against available NASDAQ/NSE data and account for every source instrument plus unavailable point-in-time fields. Do not compute new case-memory outcome performance yet.</p>
+</section>
 </main>
 
 <section id="reproduce">
   <h2>Reproduction commands</h2>
   <pre><code>.venv/bin/pytest -q
 .venv/bin/pytest --cov=market_analogues --cov-report=term-missing -q
+.venv/bin/market-analogues verify-case-memory-contract --config config/datasets.example.yaml --contract config/case-memory-contract.yaml
 .venv/bin/market-analogues verify --config config/datasets.example.yaml
 .venv/bin/market-analogues verify-oracle --config config/datasets.example.yaml --dataset nse --symbols reliance tcs --instruments-per-stratum 4
 .venv/bin/market-analogues verify-oracle --config config/datasets.example.yaml --dataset nasdaq --symbols AAPL MSFT --instruments-per-stratum 3

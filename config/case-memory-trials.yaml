@@ -1,0 +1,8 @@
+schema_version: case-memory-trial-ledger-v1
+contract_id: daily-long-swing-v1
+contract_digest: 8b333ac8a6cdf0df9d71d3599e25336f7db246957d3a29a925fedc0e9103fa53
+policy:
+  append_only: true
+  record_before_execution: true
+  outcomes_cannot_rewrite_prior_trials: true
+trials: []

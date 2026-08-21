@@ -13,6 +13,8 @@ python -m pip install -e '.[dev,external-data]'
 market-analogues audit --config config/datasets.example.yaml --dataset nse
 market-analogues build-episodes --config config/datasets.example.yaml --dataset nse
 market-analogues verify --config config/datasets.example.yaml
+market-analogues verify-case-memory-contract --config config/datasets.example.yaml \
+  --contract config/case-memory-contract.yaml
 market-analogues compare-methods --config config/datasets.example.yaml
 market-analogues build-view-store --config config/datasets.example.yaml \
   --dataset nse --lookbacks 252 --stride 5
@@ -73,6 +75,8 @@ the ranking. Results are descriptive historical evidence, not forecasts.
 - [Current verification status and next implementation plan](docs/verification-status-and-next-plan.html)
 - [Gate 12 exhaustive reference and independent validation plan](docs/gate12-exhaustive-reference-plan.html)
 - [Case-based market memory: implementation and verification plan](docs/case-based-market-memory-plan.html)
+- [Frozen M00 case-memory contract](config/case-memory-contract.yaml)
+- [Append-only case-memory trial ledger](config/case-memory-trials.yaml)
 - [Precision policy: float16 versus native](docs/precision-policy.html)
 - External labelled-example audit: generated at
   `config/data/analogues/external-examples/kullamagi-positions-2021/report.html`
@@ -94,11 +98,11 @@ positives must beat reversed/context-contradictory negatives, future mutation mu
 have zero effect, and persisted coarse-index serialization must preserve neighbors.
 Gate JSON keeps an immutable history beneath `artifact_dir/gates/history`.
 
-The current regression record is 118 passing tests. This establishes a verified retrieval baseline, not trading
+The current regression record is 130 passing tests. This establishes a verified retrieval baseline, not trading
 profitability or production-scale completeness.
 
 The stratified exact oracle and sampled multi-view recall gate pass at candidate
-pool 175. Complete-universe coverage remains sound, but the richer on-demand
-scanner is too slow and its shortlist still changes materially between pools 175
-and 1,000. The universe gate therefore remains failed until persisted view shards,
-independent multi-query full-universe validation is complete. The persisted exact-safe backend is opt-in until that Gate 12 evidence passes.
+pool 175. All 24 independent Gate 12 full-universe authorities and both market
+aggregates now pass, providing frozen exact reference rankings. Production recall
+against those references has not yet been measured, so the persisted exact-safe
+backend remains opt-in. This is completeness evidence, not outcome or profitability evidence.

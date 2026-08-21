@@ -1,0 +1,125 @@
+schema_version: case-memory-contract-v1
+contract_id: daily-long-swing-v1
+status: frozen
+frozen_before_outcome_evaluation: true
+
+purpose:
+  question: What happened after causally earlier market states that most closely resemble the chart visible now?
+  intended_user: discretionary swing trader studying daily charts
+  output_kind: historical_descriptive_evidence
+  prediction_or_advice: false
+
+decision:
+  primary_mode: after_close_daily
+  intended_direction: long
+  holding_horizon_sessions: [5, 60]
+  modes:
+    after_close_daily:
+      enabled: true
+      observation_timestamp: official_session_close
+      permitted_information: completed_daily_bars_through_query_cutoff
+    entry_open:
+      enabled: false
+      observation_timestamp: official_session_open
+      permitted_information: prior_completed_daily_bars_plus_current_open_only
+      enable_only_after: synthetic_partial_bar_representation_is_verified
+    intraday:
+      enabled: false
+      observation_timestamp: explicit_point_in_time
+      permitted_information: verified_point_in_time_intraday_bars_only
+      enable_only_after: point_in_time_intraday_history_is_verified
+
+representation:
+  required_lookbacks_sessions: [252, 126, 63, 21, 10, 5]
+  required_views:
+    - normalized_price_development
+    - candle_and_gap_geometry
+    - volatility_and_contraction
+    - volume_and_participation
+    - relative_strength
+    - market_and_sector_context
+    - causal_structural_graph
+    - bounded_elastic_path
+  missing_context_policy: preserve_missingness_with_explicit_mask
+  future_data_policy: forbidden
+
+retrieval:
+  displayed_neighbors: 20
+  minimum_history_gap_sessions: 60
+  primary_evidence_max_per_symbol: 1
+  same_symbol_memory: separate_panel_only
+  event_cluster_contribution_cap: 1
+  market_policy: validate_and_report_each_market_separately_first
+  similarity_views:
+    - structure_first
+    - full_context
+    - shape_only
+  retrieval_must_be_frozen_before_outcomes: true
+  minimum_full_universe_top20_recall: 0.95
+
+outcomes:
+  primary:
+    kind: first_touch_atr_barrier
+    horizon_sessions: 20
+    favorable_atr: 2.0
+    adverse_atr: 1.0
+    atr_lookback_sessions: 20
+    atr_method: simple_mean_true_range
+    same_bar_both_touched: ambiguous_excluded
+  descriptive_horizons_sessions: [5, 10, 20, 40, 60, 126]
+  required_measures:
+    - close_return
+    - benchmark_relative_return
+    - maximum_favorable_excursion
+    - maximum_adverse_excursion
+    - barrier_first_touch
+    - complete_normalized_future_path
+  incomplete_horizon_policy: censored_excluded_from_denominator
+  causal_embargo:
+    eligible_when: outcome_completion_timestamp_lte_historical_query_timestamp
+    retrieval_of_newer_analogue: allowed_without_outcome_contribution
+  outcomes_may_affect_similarity: false
+
+evidence:
+  raw_cases_before_summary: true
+  minimum_effective_sample_size: 10
+  report_raw_and_effective_sample_size: true
+  report_unweighted_and_locked_weighted_results: true
+  required_sensitivity_panels:
+    - neighbor_count
+    - same_regime_vs_different_regime
+    - same_sector_vs_cross_sector
+    - structure_vs_full_context
+  abstain_when:
+    - insufficient_effective_sample_size
+    - historically_novel_query
+    - unstable_neighborhood
+    - contradictory_context
+    - poor_data_quality
+    - failed_calibration
+  novelty_threshold_policy: calibrate_on_development_split_then_freeze_before_final_test
+
+evaluation:
+  protocol: expanding_window_walk_forward
+  split_policy: freeze_development_validation_and_final_periods_before_m07
+  primary_metrics: [brier_score, log_loss, reliability, interval_coverage]
+  required_baselines:
+    - unconditional_market_frequency
+    - sector_frequency
+    - regime_only_frequency
+    - random_historical_neighbors
+    - recent_return_matched_neighbors
+    - price_only_similarity
+  promotion_from_hit_rate_alone: forbidden
+  trial_ledger: case-memory-trials.yaml
+
+reporting:
+  formats: [html, xlsx, json]
+  show_counterexamples: true
+  show_component_explanations: true
+  show_provenance_hashes: true
+  allowed_claim: historical conditional evidence with uncertainty
+  forbidden_claims:
+    - guaranteed_future_direction
+    - buy_or_sell_recommendation
+    - calibrated_probability_before_m07_passes
