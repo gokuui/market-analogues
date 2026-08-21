@@ -132,12 +132,13 @@
     <p class="pass"><b>Status:</b> PASS. Contract <code>daily-long-swing-v1</code> is frozen at digest <code>8b333ac8…3fa53</code>; the entry-open and intraday modes remain disabled, the trial ledger is empty, and the generated JSON/HTML agreement plus outcome-embargo boundary tests pass.</p>
   </div>
 
-  <div class="gate">
+  <div class="gate done">
     <h3>M01 — Point-in-time data and universe ledger</h3>
     <p><b>Build:</b> source adapters for available NASDAQ/NSE/Yahoo data, corporate-action provenance, benchmarks/sectors, point-in-time listing membership where available, and explicit delisting gaps.</p>
     <p><b>Correctness tests:</b> schema/range checks, split discontinuities, duplicate sessions, source mutation, ticker reuse, benchmark staleness, missing delisting outcome and survivorship accounting.</p>
     <p><b>Performance:</b> resumable incremental ingest; no source file rewritten; complete manifest and content hashes.</p>
     <p><b>Pass:</b> 100% of eligible instruments accounted for as usable, quarantined or explicitly unavailable; zero silent failure.</p>
+    <p class="pass"><b>Status:</b> PASS WITH MATERIAL LIMITATIONS for the configured-source boundary. All 14,185 instruments reconcile with zero fingerprint changes; 13,427 are usable and 758 quarantined. Historical membership, delisting returns, ticker identity, sector history and event history are unavailable. The stock snapshots are 144–191 calendar days old as of 21 August 2026, so current-date analysis remains unavailable until ingestion is refreshed.</p>
   </div>
 
   <div class="gate">
@@ -264,7 +265,7 @@
   <ol>
     <li><span class="pass">Complete:</span> preserve the 24/24 Gate 12 exact authorities and both passing aggregates as the independent retrieval references.</li>
     <li><span class="pass">Complete:</span> preserve M00 contract <code>daily-long-swing-v1</code> and its empty trial ledger before any new case-memory outcome evaluation.</li>
-    <li>Execute M01: account for every instrument in the available NASDAQ and NSE sources as usable, quarantined or explicitly unavailable, with point-in-time limitations visible.</li>
+    <li><span class="pass">Complete:</span> M01 accounts for every available NASDAQ/NSE source instrument and makes stale coverage plus unavailable point-in-time fields explicit.</li>
     <li>Execute M02 and M03: complete the six-resolution state and richer unnamed structural verifier, then lock ≥75% per-family acceptance.</li>
     <li>Finish M04 by comparing production retrieval with every frozen Gate 12 authority and adding evidence diversity/novelty controls.</li>
     <li>Implement M05 and M06: outcome-embargoed paths, effective sample size, context sensitivity and abstention.</li>

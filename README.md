@@ -15,6 +15,8 @@ market-analogues build-episodes --config config/datasets.example.yaml --dataset 
 market-analogues verify --config config/datasets.example.yaml
 market-analogues verify-case-memory-contract --config config/datasets.example.yaml \
   --contract config/case-memory-contract.yaml
+market-analogues build-data-ledger --config config/datasets.example.yaml \
+  --availability config/data-availability.yaml --datasets nse nasdaq --workers 8
 market-analogues compare-methods --config config/datasets.example.yaml
 market-analogues build-view-store --config config/datasets.example.yaml \
   --dataset nse --lookbacks 252 --stride 5
@@ -77,6 +79,7 @@ the ranking. Results are descriptive historical evidence, not forecasts.
 - [Case-based market memory: implementation and verification plan](docs/case-based-market-memory-plan.html)
 - [Frozen M00 case-memory contract](config/case-memory-contract.yaml)
 - [Append-only case-memory trial ledger](config/case-memory-trials.yaml)
+- [M01 data-availability declaration](config/data-availability.yaml)
 - [Precision policy: float16 versus native](docs/precision-policy.html)
 - External labelled-example audit: generated at
   `config/data/analogues/external-examples/kullamagi-positions-2021/report.html`
@@ -98,8 +101,15 @@ positives must beat reversed/context-contradictory negatives, future mutation mu
 have zero effect, and persisted coarse-index serialization must preserve neighbors.
 Gate JSON keeps an immutable history beneath `artifact_dir/gates/history`.
 
-The current regression record is 130 passing tests. This establishes a verified retrieval baseline, not trading
+The current regression record is 138 passing tests. This establishes a verified retrieval baseline, not trading
 profitability or production-scale completeness.
+
+M01 accounts for all 14,185 configured source instruments with zero changed
+fingerprints: 1,843 NSE and 11,584 NASDAQ instruments are usable, while 262 and
+496 are explicitly quarantined. The available stock snapshots end on 11 February
+2026 and 30 March 2026 respectively, so they support historical development but
+not a current-date query. Point-in-time membership, delisting returns, identity
+history, sector history and event history remain declared unavailable.
 
 The stratified exact oracle and sampled multi-view recall gate pass at candidate
 pool 175. All 24 independent Gate 12 full-universe authorities and both market

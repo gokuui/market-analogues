@@ -27,6 +27,7 @@
     <thead><tr><th>Gate</th><th>Status</th><th>Evidence</th></tr></thead>
     <tbody>
       <tr><td>M00 Case-memory contract</td><td class="pass">PASS — FROZEN</td><td><code>daily-long-swing-v1</code> digest <code>8b333ac8…3fa53</code>; synchronized YAML/JSON/HTML, empty digest-bound trial ledger, strict safety validation and historical outcome-embargo boundary tests.</td></tr>
+      <tr><td>M01 Available-data ledger</td><td class="pass">PASS — MATERIAL LIMITATIONS</td><td>14,185/14,185 configured instruments accounted, zero changed fingerprints, 13,427 usable and 758 quarantined. No current-within-seven-days instruments; point-in-time membership, delisting returns, identity, sector and event history unavailable.</td></tr>
       <tr><td>03 Synthetic retrieval</td><td class="pass">PASS</td><td>Recall@10 0.953846; nDCG@10 0.935744; clone, invariance and pair ordering 1.0; critical-negative rate 0.</td></tr>
       <tr><td>08 Complete-universe baseline</td><td class="fail">FAIL</td><td>Coverage, causality and memory pass. Price-only candidate fidelity fails: pool-500 versus pool-1,000 top-20 recall is 0.75 NSE and 0.65 NASDAQ.</td></tr>
       <tr><td>09 Stratified exact oracle</td><td class="pass">PASS</td><td>24/24 cases; 5,850 exactly scored episodes; NSE/NASDAQ, 63/126/252 bars, historical/current cutoffs, quality and liquidity strata.</td></tr>
@@ -68,6 +69,7 @@
       <tr><td>D-012</td><td>Use trader-labelled examples as a diagnostic benchmark, not ground truth.</td><td>The sheet is valuable independent evidence, but labels are imbalanced, symbol coverage is partial, and daily bars cannot reproduce the intraday trigger. Outcomes must stay outside retrieval.</td><td>Revisit label-specific conclusions after broader venue/delisted coverage and a preregistered full-universe walk-forward audit.</td></tr>
       <tr><td>D-013</td><td>Keep 75% as a visible target; never tune the audit until it passes.</td><td>The broader Yahoo result fails the target: top-1 is indistinguishable from random, while top-5 has only a four-point lift concentrated in breakouts. Changing labels, cutoffs or weights after observing it would convert evaluation into calibration.</td><td>Only evaluate a new trigger-aware representation on a separately locked holdout.</td></tr>
       <tr><td>D-014</td><td>Freeze daily long-swing case memory before new outcome evaluation.</td><td>Historical analogue evidence is vulnerable to changing decision times, horizons, barriers, diversity rules and abstention after seeing results. A digest-bound contract and empty append-only trial ledger make later changes visible.</td><td>Create a new version and ledger entry; never rewrite <code>daily-long-swing-v1</code>.</td></tr>
+      <tr><td>D-015</td><td>Define M01's present universe as configured source instruments, not exchange membership.</td><td>No dated membership, delisting-return or permanent-identity tables accompany the sources. Treating the directory as the complete historical exchange would silently introduce survivorship and identity assumptions.</td><td>Expand the boundary only after a separately fingerprinted point-in-time master is ingested and reconciled.</td></tr>
     </tbody>
   </table>
 </section>
@@ -434,6 +436,19 @@
   <p><b>Independent background completion:</b> The pre-existing Gate 12 supervisor separately finished all 24/24 blind exact authorities and both market aggregates with no failure. This completes the reference set, not the production recall comparison and not outcome validation.</p>
   <p><b>Next:</b> Execute M01 against available NASDAQ/NSE data and account for every source instrument plus unavailable point-in-time fields. Do not compute new case-memory outcome performance yet.</p>
 </section>
+
+<section class="entry" id="log-038">
+  <h2>L-038 — M01 complete available-data and limitation ledger</h2>
+  <p><b>What:</b> Added a strict availability declaration, market-agnostic instrument ledger builder, live content-fingerprint reconciliation, independent benchmark audit, freshness measurement, deterministic ledger digests, per-instrument Parquet output, combined JSON/HTML reporting, CLI command and immutable M01 gate.</p>
+  <p><b>Boundary:</b> The declared universe is <code>configured_source_instruments_only</code>. Source OHLCV and benchmark OHLCV are available. Corporate-action adjustment provenance is unknown. Historical listing membership, delisting returns, ticker rename/reuse/merger identity, point-in-time sector/industry and point-in-time event calendars are unavailable with explicit reasons. M01 therefore passes available-data accounting, not survivorship-free exchange history.</p>
+  <p><b>NSE result:</b> 2,105/2,105 files are accounted: 1,843 usable and 262 quarantined. 2,104 content hashes match the prior audit; one unreadable file remains explicitly quarantined with an unverified hash. There are zero fingerprint changes. The configured NIFTY 50 benchmark loads and is tier B. Stock coverage spans 2 January 1991 through 11 February 2026.</p>
+  <p><b>NASDAQ result:</b> 12,080/12,080 files are accounted: 11,584 usable and 496 quarantined. All 12,080 content hashes match and none changed. The configured NASDAQ Composite benchmark loads and is tier A. Stock coverage spans 3 January 2000 through 30 March 2026.</p>
+  <p><b>Freshness finding:</b> As of 21 August 2026 the newest NSE and NASDAQ stock observations are 191 and 144 calendar days old. Zero usable instruments are current within seven days. These snapshots remain suitable for historical representation and walk-forward development, but the product must reject a present-day chart request until a refreshed ingest passes the same ledger.</p>
+  <p><b>Correctness tests:</b> Synthetic tests require every capability declaration, reject contradictions between configured and declared sources, reconcile every source, prove stable content/ledger digests across worker counts, detect post-audit byte mutation, preserve unreadable files as explicit quarantines, fail on a missing quality row or falsely declared benchmark, audit a real configured benchmark and exercise the gated CLI. Focused adapter/ledger/CLI tests pass 14/14; the complete suite passes 138/138.</p>
+  <p><b>Performance:</b> The first uncached real fingerprint pass took 3.87 seconds for NSE and 24.69 seconds for NASDAQ. A warm rerun took 0.34 and 1.62 seconds. Outputs total about 2.3 MiB, and source files remain read-only.</p>
+  <p><b>Artifacts:</b> Readable report <code>config/data/analogues/data-ledger/data-ledger.html</code>; machine summary <code>data-ledger.json</code>; per-instrument <code>nse-instruments.parquet</code> and <code>nasdaq-instruments.parquet</code>; immutable gate history under <code>gates/history/m01_point_in_time_data_ledger</code>.</p>
+  <p><b>Next:</b> Execute M02 using historical cutoffs inside the verified snapshots. Every representation field must declare its observation timestamp and pass future-mutation, unit, missing-context and session-boundary invariants.</p>
+</section>
 </main>
 
 <section id="reproduce">
@@ -441,6 +456,7 @@
   <pre><code>.venv/bin/pytest -q
 .venv/bin/pytest --cov=market_analogues --cov-report=term-missing -q
 .venv/bin/market-analogues verify-case-memory-contract --config config/datasets.example.yaml --contract config/case-memory-contract.yaml
+.venv/bin/market-analogues build-data-ledger --config config/datasets.example.yaml --availability config/data-availability.yaml --datasets nse nasdaq --workers 8
 .venv/bin/market-analogues verify --config config/datasets.example.yaml
 .venv/bin/market-analogues verify-oracle --config config/datasets.example.yaml --dataset nse --symbols reliance tcs --instruments-per-stratum 4
 .venv/bin/market-analogues verify-oracle --config config/datasets.example.yaml --dataset nasdaq --symbols AAPL MSFT --instruments-per-stratum 3

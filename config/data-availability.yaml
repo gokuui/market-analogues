@@ -1,0 +1,55 @@
+schema_version: data-availability-v1
+universe_boundary: configured_source_instruments_only
+datasets:
+  nse:
+    capabilities:
+      source_ohlcv:
+        status: available
+        reason: One canonical daily OHLCV file is configured per source symbol.
+      benchmark_ohlcv:
+        status: available
+        reason: The configured NIFTY 50 daily OHLCV file is independently fingerprinted and audited.
+      corporate_action_provenance:
+        status: unknown
+        reason: Prices may be source-adjusted, but no versioned split, dividend, or adjustment ledger accompanies these files.
+      point_in_time_listing_membership:
+        status: unavailable
+        reason: No dated exchange membership snapshots accompany the configured source directory.
+      delisting_returns:
+        status: unavailable
+        reason: No authoritative delisting-return or terminal-cash-flow table accompanies the configured source.
+      ticker_identity_history:
+        status: unavailable
+        reason: No point-in-time rename, reuse, merger, or identifier mapping accompanies the configured source.
+      point_in_time_sector_industry:
+        status: unavailable
+        reason: No dated sector or industry classification accompanies the configured source.
+      point_in_time_event_calendar:
+        status: unavailable
+        reason: No dated earnings, offering, split, or news-event calendar accompanies the configured source.
+  nasdaq:
+    capabilities:
+      source_ohlcv:
+        status: available
+        reason: One canonical daily OHLCV file is configured per source symbol.
+      benchmark_ohlcv:
+        status: available
+        reason: The configured NASDAQ Composite daily OHLCV file is independently fingerprinted and audited.
+      corporate_action_provenance:
+        status: unknown
+        reason: Prices may be source-adjusted, but no versioned split, dividend, or adjustment ledger accompanies these files.
+      point_in_time_listing_membership:
+        status: unavailable
+        reason: No dated exchange membership snapshots accompany the configured source directory.
+      delisting_returns:
+        status: unavailable
+        reason: No authoritative delisting-return or terminal-cash-flow table accompanies the configured source.
+      ticker_identity_history:
+        status: unavailable
+        reason: No point-in-time rename, reuse, merger, or permanent-identifier mapping accompanies the configured source.
+      point_in_time_sector_industry:
+        status: unavailable
+        reason: No dated sector or industry classification accompanies the configured source.
+      point_in_time_event_calendar:
+        status: unavailable
+        reason: No dated earnings, offering, split, or news-event calendar accompanies the configured source.

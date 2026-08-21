@@ -148,6 +148,10 @@ class LongTableSource(OHLCVSource):
         return canonicalize(rows, self.spec, symbol=key.source_symbol)
 
     def fingerprint(self, key: InstrumentKey) -> str:
+        return self._source_fingerprint()
+
+    @lru_cache(maxsize=1)
+    def _source_fingerprint(self) -> str:
         return file_fingerprint(self.spec.path)
 
 

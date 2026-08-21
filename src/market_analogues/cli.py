@@ -23,6 +23,9 @@ from .benchmark import (
     write_comparison_report,
 )
 from .config import AppConfig, load_config
+from .data_ledger import (
+    build_data_ledger, load_availability_declaration, write_data_ledger_artifacts,
+)
 from .episodes import build_episode, build_manifest
 from .exact_storage_feasibility import (
     verify_exact_storage_feasibility, write_exact_storage_report,
@@ -165,6 +168,67 @@ def cmd_verify_case_memory_contract(args: argparse.Namespace) -> int:
     print(json.dumps({"passed": True, **metrics}, indent=2))
     print(html_path)
     return 0
+
+
+def cmd_build_data_ledger(args: argparse.Namespace) -> int:
+    config = load_config(args.config)
+    require_passed(_gates(config), "m00_case_memory_contract")
+    declaration = load_availability_declaration(args.availability)
+    results = []
+    source_hashes = {"availability_declaration": declaration.digest}
+    for dataset_id in args.datasets:
+        if dataset_id not in config.datasets:
+            raise SystemExit(f"unknown dataset {dataset_id!r}; choose from {sorted(config.datasets)}")
+        quality_path = config.artifact_dir / "quality" / f"{dataset_id}.parquet"
+        if not quality_path.exists():
+            raise SystemExit(f"missing quality audit: {quality_path}")
+        quality = pd.read_parquet(quality_path)
+        source = source_from_spec(config.datasets[dataset_id])
+        results.append(build_data_ledger(
+            config.datasets[dataset_id], source, quality, declaration,
+            workers=args.workers,
+        ))
+        source_hashes[f"quality_{dataset_id}"] = sha256(quality_path.read_bytes()).hexdigest()
+    output_dir = Path(args.output_dir) if args.output_dir else config.artifact_dir / "data-ledger"
+    machine_path, html_path, parquet_paths = write_data_ledger_artifacts(
+        results, declaration, output_dir,
+    )
+    passed = bool(results) and all(result.passed for result in results)
+    metrics = {
+        "schema_version": "point-in-time-data-ledger-v1",
+        "availability_digest": declaration.digest,
+        "universe_boundary": declaration.universe_boundary,
+        "datasets": {
+            str(result.metrics["dataset"]): {
+                key: result.metrics[key] for key in (
+                    "source_instruments", "accounted_instruments", "usable_instruments",
+                    "quarantined_instruments", "fingerprints_verified",
+                    "fingerprints_unverified_load_error", "fingerprint_mismatches",
+                    "first_source_timestamp", "last_source_timestamp",
+                    "freshness_age_calendar_days", "freshness_status",
+                    "current_usable_instruments_within_7_days",
+                    "current_coverage_fraction_of_usable",
+                    "current_after_close_analysis_available", "elapsed_seconds",
+                    "instrument_ledger_digest",
+                )
+            }
+            for result in results
+        },
+        "machine_artifact": str(machine_path.resolve()),
+        "html_artifact": str(html_path.resolve()),
+        "instrument_artifacts": [str(path.resolve()) for path in parquet_paths],
+    }
+    failures = [
+        f"{result.metrics['dataset']}:{failure}"
+        for result in results for failure in result.failures
+    ]
+    GateReport(
+        "m01_point_in_time_data_ledger", passed, metrics, failures,
+        source_hashes=source_hashes,
+    ).write(_gates(config))
+    print(json.dumps({"passed": passed, **metrics, "failures": failures}, indent=2))
+    print(html_path)
+    return 0 if passed else 2
 
 
 def cmd_compare(args: argparse.Namespace) -> int:
@@ -1411,6 +1475,13 @@ def build_parser() -> argparse.ArgumentParser:
     contract.add_argument("--machine-output")
     contract.add_argument("--output")
     contract.set_defaults(func=cmd_verify_case_memory_contract)
+    ledger = sub.add_parser("build-data-ledger")
+    ledger.add_argument("--config", required=True)
+    ledger.add_argument("--availability", required=True)
+    ledger.add_argument("--datasets", nargs="+", required=True)
+    ledger.add_argument("--workers", type=int, default=4)
+    ledger.add_argument("--output-dir")
+    ledger.set_defaults(func=cmd_build_data_ledger)
     compare = sub.add_parser("compare-methods")
     compare.add_argument("--config", required=True)
     compare.add_argument("--seeds-per-family", type=int, default=5)
