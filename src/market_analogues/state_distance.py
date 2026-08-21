@@ -60,6 +60,12 @@ SUMMARY_WEIGHTS = {
 
 REBASED_CHANNELS = {"close_path", "relative_path", "benchmark_path", "benchmark_close"}
 
+TOPOLOGY_HORIZON_WEIGHTS = {252: .55, 126: .30, 63: .15}
+TOPOLOGY_SMOOTHING_WINDOWS = (1, 3, 5)
+TOPOLOGY_LANDMARK_FRACTION = .25
+TOPOLOGY_SLOPE_FRACTION = .75
+TOPOLOGY_FRACTION = .20
+
 
 def state_distance_contract() -> dict[str, object]:
     payload: dict[str, object] = {
@@ -74,6 +80,32 @@ def state_distance_contract() -> dict[str, object]:
         "summary_fraction": .32,
         "missing_one_side_penalty": 2.0,
         "distance_clip": 4.0,
+    }
+    payload["digest"] = stable_hash(payload)
+    return payload
+
+
+def state_distance_v2_contract() -> dict[str, object]:
+    payload: dict[str, object] = {
+        "schema_version": "masked-multiresolution-distance-v2",
+        "base_distance_digest": state_distance_contract()["digest"],
+        "base_fraction": 1.0 - TOPOLOGY_FRACTION,
+        "topology_fraction": TOPOLOGY_FRACTION,
+        "topology": {
+            "channel": "close_path",
+            "horizon_weights": TOPOLOGY_HORIZON_WEIGHTS,
+            "smoothing_windows": list(TOPOLOGY_SMOOTHING_WINDOWS),
+            "landmark_fraction": TOPOLOGY_LANDMARK_FRACTION,
+            "slope_fraction": TOPOLOGY_SLOPE_FRACTION,
+            "landmark_scales": {
+                "path_level": .12,
+                "turn_location_fraction": .15,
+                "drawdown": .12,
+                "recovery": .12,
+            },
+            "slope_scale": .025,
+            "distance_clip": 4.0,
+        },
     }
     payload["digest"] = stable_hash(payload)
     return payload
@@ -133,3 +165,73 @@ def multiresolution_state_distance(
         horizon_scores[str(horizon)] = score
         total += HORIZON_WEIGHTS[horizon] * score
     return float(total), horizon_scores
+
+
+def _edge_smoothed(values: np.ndarray, window: int) -> np.ndarray:
+    if window == 1:
+        return values
+    pad = window // 2
+    padded = np.pad(values, (pad, pad), mode="edge")
+    return np.convolve(padded, np.ones(window) / window, mode="valid")
+
+
+def _topology_horizon_distance(left, right) -> float | None:
+    a = left.samples["close_path"]
+    b = right.samples["close_path"]
+    common = a.observed & b.observed
+    if int(common.sum()) < 8:
+        return None
+    x = a.values[common].astype(float)
+    y = b.values[common].astype(float)
+    x -= x[0]
+    y -= y[0]
+    n = len(x)
+
+    def landmarks(values: np.ndarray) -> np.ndarray:
+        running_peak = np.maximum.accumulate(values)
+        drawdown = values - running_peak
+        trough = int(np.argmin(values))
+        deepest_drawdown = int(np.argmin(drawdown))
+        return np.asarray([
+            values.min() / .12,
+            values.max() / .12,
+            values[-1] / .12,
+            (trough / (n - 1)) / .15,
+            (deepest_drawdown / (n - 1)) / .15,
+            drawdown.min() / .12,
+            (values[-1] - values[trough]) / .12,
+        ])
+
+    landmark_distance = min(
+        float(np.sqrt(np.mean((landmarks(x) - landmarks(y)) ** 2))), 4.0,
+    )
+    slope_distances = []
+    for window in TOPOLOGY_SMOOTHING_WINDOWS:
+        x_slope = np.gradient(_edge_smoothed(x, window))
+        y_slope = np.gradient(_edge_smoothed(y, window))
+        slope_distances.append(min(
+            float(np.sqrt(np.mean(((x_slope - y_slope) / .025) ** 2))), 4.0,
+        ))
+    return (
+        TOPOLOGY_LANDMARK_FRACTION * landmark_distance
+        + TOPOLOGY_SLOPE_FRACTION * float(np.mean(slope_distances))
+    )
+
+
+def multiresolution_state_distance_v2(
+    left: MultiResolutionState,
+    right: MultiResolutionState,
+) -> tuple[float, dict[str, float]]:
+    base, _ = multiresolution_state_distance(left, right)
+    topology_total = topology_weight = 0.0
+    topology_components: dict[str, float] = {}
+    for horizon, weight in TOPOLOGY_HORIZON_WEIGHTS.items():
+        value = _topology_horizon_distance(left.views[horizon], right.views[horizon])
+        if value is None:
+            continue
+        topology_components[f"topology_{horizon}"] = value
+        topology_total += weight * value
+        topology_weight += weight
+    topology = topology_total / topology_weight if topology_weight else 0.0
+    total = (1.0 - TOPOLOGY_FRACTION) * base + TOPOLOGY_FRACTION * topology
+    return float(total), {"base": base, "topology": topology, **topology_components}

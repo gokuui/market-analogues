@@ -73,6 +73,10 @@ from .structural_verification import (
     load_structural_verifier_spec, verify_latent_structures,
     write_structural_verification,
 )
+from .structural_verification_v2 import (
+    load_structural_verifier_v2_spec, verify_latent_structures_v2,
+    write_structural_verification_v2,
+)
 from .types import InstrumentKey, SearchQuery
 from .universe import verify_universe, write_universe_report
 from .verification import run_synthetic_verifier, write_verification_gate
@@ -300,6 +304,32 @@ def cmd_verify_latent_structures(args: argparse.Namespace) -> int:
     )
     GateReport(
         "m03_latent_structural_retrieval", result.passed,
+        {
+            **result.metrics,
+            "machine_artifact": str(machine_path.resolve()),
+            "html_artifact": str(html_path.resolve()),
+            "distance_contract_artifact": str(distance_path.resolve()),
+        },
+        list(result.failures), source_hashes={"verifier_config": spec.digest},
+    ).write(_gates(config))
+    print(json.dumps({"passed": result.passed, **result.metrics, "failures": result.failures}, indent=2))
+    print(html_path)
+    return 0 if result.passed else 2
+
+
+def cmd_verify_latent_structures_v2(args: argparse.Namespace) -> int:
+    config = load_config(args.config)
+    require_passed(_gates(config), "m02_multiresolution_chart_state")
+    spec = load_structural_verifier_v2_spec(args.verifier)
+    result = verify_latent_structures_v2(spec)
+    output_dir = Path(args.output_dir) if args.output_dir else (
+        config.artifact_dir / "m03b-latent-structures"
+    )
+    machine_path, html_path, distance_path = write_structural_verification_v2(
+        result, spec, output_dir,
+    )
+    GateReport(
+        "m03b_latent_structural_retrieval", result.passed,
         {
             **result.metrics,
             "machine_artifact": str(machine_path.resolve()),
@@ -1578,6 +1608,11 @@ def build_parser() -> argparse.ArgumentParser:
     latent.add_argument("--verifier", required=True)
     latent.add_argument("--output-dir")
     latent.set_defaults(func=cmd_verify_latent_structures)
+    latent_v2 = sub.add_parser("verify-latent-structures-v2")
+    latent_v2.add_argument("--config", required=True)
+    latent_v2.add_argument("--verifier", required=True)
+    latent_v2.add_argument("--output-dir")
+    latent_v2.set_defaults(func=cmd_verify_latent_structures_v2)
     compare = sub.add_parser("compare-methods")
     compare.add_argument("--config", required=True)
     compare.add_argument("--seeds-per-family", type=int, default=5)

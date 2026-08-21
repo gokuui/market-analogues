@@ -21,6 +21,8 @@ market-analogues verify-multiresolution-state --config config/datasets.example.y
   --datasets nse nasdaq
 market-analogues verify-latent-structures --config config/datasets.example.yaml \
   --verifier config/structural-verifier.yaml
+market-analogues verify-latent-structures-v2 --config config/datasets.example.yaml \
+  --verifier config/structural-verifier-v2.yaml
 market-analogues compare-methods --config config/datasets.example.yaml
 market-analogues build-view-store --config config/datasets.example.yaml \
   --dataset nse --lookbacks 252 --stride 5
@@ -88,6 +90,7 @@ missing benchmark context remains missing rather than becoming an observed zero.
 - [Case-based market memory: implementation and verification plan](docs/case-based-market-memory-plan.html)
 - [Frozen M00 case-memory contract](config/case-memory-contract.yaml)
 - [Append-only case-memory trial ledger](config/case-memory-trials.yaml)
+- [Passing M03b topology verifier](config/structural-verifier-v2.yaml)
 - [M01 data-availability declaration](config/data-availability.yaml)
 - [Precision policy: float16 versus native](docs/precision-policy.html)
 - External labelled-example audit: generated at
@@ -110,9 +113,10 @@ positives must beat reversed/context-contradictory negatives, future mutation mu
 have zero effect, and persisted coarse-index serialization must preserve neighbors.
 Gate JSON keeps an immutable history beneath `artifact_dir/gates/history`.
 
-The current regression record is 153 passing tests. M03's first locked unseen
-structural trial failed one per-family precision threshold and its runtime budget;
-the failure is retained in the append-only ledger. This establishes a verified retrieval baseline, not trading
+The current regression record is 158 passing tests. M03's first locked unseen
+trial failed and remains in the ledger. The separately preregistered M03b holdout
+passes all eight unnamed families at 100% top-1, 100% precision@5 and zero
+critical-negative errors in 33.71 seconds. This establishes a verified retrieval baseline, not trading
 profitability or production-scale completeness.
 
 M01 accounts for all 14,185 configured source instruments with zero changed

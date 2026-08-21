@@ -149,13 +149,13 @@
     <p class="pass"><b>Status:</b> PASS for the available historical data. The state retains 252 raw derived sessions, exposes 252/126/63/21/10/5 views, documents all 42 fields, preserves missing-context masks and carries source quality warnings. Five synthetic families and all 24 independent real cases pass with zero future-mutation delta, 1.70e−12 maximum unit delta, 5.18 seconds total and 329 MB peak RSS. Corporate-action adjustment provenance remains an M01 limitation.</p>
   </div>
 
-  <div class="gate">
+  <div class="gate done">
     <h3>M03 — Label-free structural verifier</h3>
     <p><b>Build:</b> expand deterministic OHLCV generators into many unnamed latent setup families with controlled base depth, pivot topology, contraction, volume, context and maturity. Produce hard positives through scale/time/noise transformations and hard negatives by changing one decisive structural relation.</p>
     <p><b>Independent oracle:</b> generator parameters and event topology define sameness; the retrieval distance never sees the latent family identifier.</p>
     <p><b>Tests:</b> exact clones, noisy/time-stretched positives, partial formations, near-miss negatives, context contradictions, missing channels and cross-market scaling.</p>
     <p><b>Pass:</b> structural precision@5 ≥75%, top-1 ≥75%, critical-negative error ≤2%, and ≥75% in every sufficiently populated latent family—not only the average.</p>
-    <p class="fail"><b>Status:</b> V1 FAILED AND RETAINED. Overall top-1 was 96.88%, precision@5 95.31% and critical-negative error 0%, but hidden family 04 precision@5 was 65% and runtime was 65.06 seconds. Both violate the frozen gate. A correction requires a new contract digest and untouched validation seeds.</p>
+    <p class="pass"><b>Status:</b> PASS VIA SEPARATELY LOCKED M03B; V1 FAILURE RETAINED. V1 missed family-04 precision and runtime. M03b added a 20% multi-scale topology term, then passed all eight families at 100% top-1, 100% precision@5 and zero critical-negative errors on untouched seeds in 33.71 seconds at 215.8 MB. This is synthetic structural evidence, not real-market or outcome validation.</p>
   </div>
 
   <div class="gate">
@@ -269,7 +269,7 @@
     <li><span class="pass">Complete:</span> preserve M00 contract <code>daily-long-swing-v1</code> and its empty trial ledger before any new case-memory outcome evaluation.</li>
     <li><span class="pass">Complete:</span> M01 accounts for every available NASDAQ/NSE source instrument and makes stale coverage plus unavailable point-in-time fields explicit.</li>
     <li><span class="pass">Complete:</span> M02 supplies the causal six-resolution state, field-time contract and explicit missingness masks.</li>
-    <li><span class="fail">Failed trial retained:</span> M03 v1 missed family-04 precision@5 and runtime. Develop M03b on disjoint data and execute a separately frozen unseen verifier once.</li>
+    <li><span class="pass">Complete:</span> retain M03 v1's failure and M03b's separately preregistered all-family pass; use the topology-aware distance only as an M04 challenger.</li>
     <li>Finish M04 by comparing production retrieval with every frozen Gate 12 authority and adding evidence diversity/novelty controls.</li>
     <li>Implement M05 and M06: outcome-embargoed paths, effective sample size, context sensitivity and abstention.</li>
     <li>Run M07 against locked simple baselines; only after it passes expose M08 evidence cards and M09 daily shadow operation.</li>

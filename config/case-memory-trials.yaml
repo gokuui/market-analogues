@@ -38,3 +38,36 @@ trials:
     peak_rss_mb: 222.546875
     real_forward_outcomes_accessed: false
     note: Locked unseen validation failed and remains part of the append-only record; it is not retuned or rerun.
+  - trial_id: m03b-unseen-validation-v1
+    event: registered
+    registered_at: "2026-08-21T16:23:25Z"
+    verifier_config_digest: 06b17330d48889bb27b9257fd4776dbc4066cc7f007ec3a626822f7949fb7245
+    verifier_file_sha256: 86111c09db5a6712b13706696ebf0cc6d76cbaaa9672ea26caaa232b7cbb0afd
+    distance_contract_digest: 4771d409e0a497d3f483e64a6a9f954da040826adf8f6d458cf166502bf465d3
+    baseline_distance_contract_digest: 6e7f62428ff0313c8ef8d635996e004fa4f38c26218df06d4948827d897741f7
+    validation_query_seeds: [600, 601, 602, 603, 604, 605, 606, 607]
+    prior_observed_query_seeds: [100, 101, 102, 103, 104, 105, 106, 107, 200, 201, 202, 203, 204, 205, 206, 207, 400, 401, 402, 403, 404, 405, 406, 407, 700, 701, 702, 703, 704]
+    acceptance:
+      minimum_top1_per_family: 0.75
+      minimum_precision_at_5_per_family: 0.75
+      maximum_critical_negative_error_per_family: 0.02
+      maximum_total_seconds: 60.0
+      maximum_rss_mb: 1024.0
+    real_forward_outcomes_accessed: false
+    note: Official seeds are untouched; v2 was selected on disjoint development seeds 100-107 and 400-407, while 700-704 were exercised only by two-family unit tests.
+  - trial_id: m03b-unseen-validation-v1
+    event: completed
+    completed_at: "2026-08-21T16:24:58Z"
+    verifier_config_digest: 06b17330d48889bb27b9257fd4776dbc4066cc7f007ec3a626822f7949fb7245
+    machine_result_sha256: 7b1ad08af55631566140522cb78722846d762664386f39b254f23e419891cf4c
+    gate_result_sha256: 845d40df0d6526c34a4f7c731173604bd907958bd33b3f795ad83c16d585f3cb
+    query_result_digest: 750eb0a0b93d8166638d42209c00cbad690b4e4635dc28cd74064964abffbe33
+    passed: true
+    failures: []
+    overall_top1: 1.0
+    overall_precision_at_5: 1.0
+    overall_critical_negative_error: 0.0
+    elapsed_seconds: 33.70859945297707
+    peak_rss_mb: 215.8046875
+    real_forward_outcomes_accessed: false
+    note: All eight hidden families pass every locked acceptance threshold on the single official execution.
