@@ -19,6 +19,8 @@ market-analogues build-data-ledger --config config/datasets.example.yaml \
   --availability config/data-availability.yaml --datasets nse nasdaq --workers 8
 market-analogues verify-multiresolution-state --config config/datasets.example.yaml \
   --datasets nse nasdaq
+market-analogues verify-latent-structures --config config/datasets.example.yaml \
+  --verifier config/structural-verifier.yaml
 market-analogues compare-methods --config config/datasets.example.yaml
 market-analogues build-view-store --config config/datasets.example.yaml \
   --dataset nse --lookbacks 252 --stride 5
@@ -108,7 +110,9 @@ positives must beat reversed/context-contradictory negatives, future mutation mu
 have zero effect, and persisted coarse-index serialization must preserve neighbors.
 Gate JSON keeps an immutable history beneath `artifact_dir/gates/history`.
 
-The current regression record is 149 passing tests. This establishes a verified retrieval baseline, not trading
+The current regression record is 153 passing tests. M03's first locked unseen
+structural trial failed one per-family precision threshold and its runtime budget;
+the failure is retained in the append-only ledger. This establishes a verified retrieval baseline, not trading
 profitability or production-scale completeness.
 
 M01 accounts for all 14,185 configured source instruments with zero changed

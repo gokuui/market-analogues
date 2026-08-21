@@ -5,4 +5,36 @@ policy:
   append_only: true
   record_before_execution: true
   outcomes_cannot_rewrite_prior_trials: true
-trials: []
+trials:
+  - trial_id: m03-unseen-validation-v1
+    event: registered
+    registered_at: "2026-08-21T16:05:00Z"
+    verifier_config_digest: 45f83429849ff8906c0d6d28a26d7cd08302550edcbfe4543e41787fadbfd377
+    validation_query_seeds: [200, 201, 202, 203, 204, 205, 206, 207]
+    real_forward_outcomes_accessed: false
+    note: Structural synthetic validation only; development smoke used disjoint seeds 100 through 107.
+  - trial_id: m03-unseen-validation-v1
+    event: registration_superseded_before_execution
+    registered_at: "2026-08-21T16:08:00Z"
+    supersedes_verifier_config_digest: 45f83429849ff8906c0d6d28a26d7cd08302550edcbfe4543e41787fadbfd377
+    verifier_config_digest: 5a59236fb207266ecc54c995dc63c6d505c6a54fb9eda5e46ec1e9c1468046bf
+    reason: The first registration omitted the fixed distance-contract digest; discovered before any validation seed ran.
+    validation_query_seeds: [200, 201, 202, 203, 204, 205, 206, 207]
+    real_forward_outcomes_accessed: false
+  - trial_id: m03-unseen-validation-v1
+    event: completed
+    completed_at: "2026-08-21T16:11:25Z"
+    verifier_config_digest: 5a59236fb207266ecc54c995dc63c6d505c6a54fb9eda5e46ec1e9c1468046bf
+    machine_result_sha256: 93e2b86f21d74c6a88f7823f5d5b91d6f388a9a0109fe8df0f961c6a45f9426b
+    query_result_digest: 2d12e48d8a5bbb722c8b4824778a797db1e6ca1a3e084b723ccd379cddc317bf
+    passed: false
+    failures:
+      - "latent-04:precision@5=0.650 below threshold"
+      - "elapsed 65.06s exceeds 60.00s"
+    overall_top1: 0.96875
+    overall_precision_at_5: 0.953125
+    overall_critical_negative_error: 0.0
+    elapsed_seconds: 65.06290873599937
+    peak_rss_mb: 222.546875
+    real_forward_outcomes_accessed: false
+    note: Locked unseen validation failed and remains part of the append-only record; it is not retuned or rerun.

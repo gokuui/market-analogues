@@ -201,7 +201,7 @@ def validate_trial_ledger(path: str | Path, contract: ProductContract) -> dict[s
         raise ProductContractError("all trial ledger safeguards must be true")
     if not isinstance(ledger["trials"], list):
         raise ProductContractError("trial ledger trials must be a list")
-    return json.loads(json.dumps(ledger, sort_keys=True))
+    return json.loads(json.dumps(ledger, sort_keys=True, default=str))
 
 
 def historical_outcome_eligibility(

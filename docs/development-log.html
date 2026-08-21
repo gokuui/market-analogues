@@ -26,9 +26,10 @@
   <table>
     <thead><tr><th>Gate</th><th>Status</th><th>Evidence</th></tr></thead>
     <tbody>
-      <tr><td>M00 Case-memory contract</td><td class="pass">PASS — FROZEN</td><td><code>daily-long-swing-v1</code> digest <code>8b333ac8…3fa53</code>; synchronized YAML/JSON/HTML, empty digest-bound trial ledger, strict safety validation and historical outcome-embargo boundary tests.</td></tr>
+      <tr><td>M00 Case-memory contract</td><td class="pass">PASS — FROZEN</td><td><code>daily-long-swing-v1</code> digest <code>8b333ac8…3fa53</code>; synchronized YAML/JSON/HTML, append-only digest-bound trial ledger, strict safety validation and historical outcome-embargo boundary tests.</td></tr>
       <tr><td>M01 Available-data ledger</td><td class="pass">PASS — MATERIAL LIMITATIONS</td><td>14,185/14,185 configured instruments accounted, zero changed fingerprints, 13,427 usable and 758 quarantined. No current-within-seven-days instruments; point-in-time membership, delisting returns, identity, sector and event history unavailable.</td></tr>
       <tr><td>M02 Multi-resolution state</td><td class="pass">PASS</td><td>252/126/63/21/10/5-session views, 23 full channels plus 19 summaries, per-sample missingness masks and observation-time contract. Five synthetic families and 24/24 independent real cases pass; future delta 0, unit delta 1.70e−12.</td></tr>
+      <tr><td>M03 Case-memory structural retrieval</td><td class="fail">FAIL — V1 RETAINED</td><td>Locked unseen trial: overall top-1 96.88%, precision@5 95.31% and critical-negative error 0%; hidden family 04 precision@5 is 65% versus 75% required, and 65.06 s exceeds the 60 s budget.</td></tr>
       <tr><td>03 Synthetic retrieval</td><td class="pass">PASS</td><td>Recall@10 0.953846; nDCG@10 0.935744; clone, invariance and pair ordering 1.0; critical-negative rate 0.</td></tr>
       <tr><td>08 Complete-universe baseline</td><td class="fail">FAIL</td><td>Coverage, causality and memory pass. Price-only candidate fidelity fails: pool-500 versus pool-1,000 top-20 recall is 0.75 NSE and 0.65 NASDAQ.</td></tr>
       <tr><td>09 Stratified exact oracle</td><td class="pass">PASS</td><td>24/24 cases; 5,850 exactly scored episodes; NSE/NASDAQ, 63/126/252 bars, historical/current cutoffs, quality and liquidity strata.</td></tr>
@@ -72,6 +73,7 @@
       <tr><td>D-014</td><td>Freeze daily long-swing case memory before new outcome evaluation.</td><td>Historical analogue evidence is vulnerable to changing decision times, horizons, barriers, diversity rules and abstention after seeing results. A digest-bound contract and empty append-only trial ledger make later changes visible.</td><td>Create a new version and ledger entry; never rewrite <code>daily-long-swing-v1</code>.</td></tr>
       <tr><td>D-015</td><td>Define M01's present universe as configured source instruments, not exchange membership.</td><td>No dated membership, delisting-return or permanent-identity tables accompany the sources. Treating the directory as the complete historical exchange would silently introduce survivorship and identity assumptions.</td><td>Expand the boundary only after a separately fingerprinted point-in-time master is ingested and reconciled.</td></tr>
       <tr><td>D-016</td><td>Add M02 as a non-breaking state layer with explicit masks.</td><td>The verified production representation is single-lookback and its coarse vector substitutes zero for missing values. Replacing it before a common verifier would invalidate Gate 12; a separate six-resolution layer can retain full channels and distinguish missing from neutral before M03 comparison.</td><td>Integrate a new distance only after M03 structural verification and later Gate 12 production-reference comparison pass.</td></tr>
+      <tr><td>D-017</td><td>Retain the failed M03 v1 trial and require a new holdout for any correction.</td><td>The overall averages passed, but family 04 precision@5 and the total runtime failed their locked limits. Tuning or rerunning the same seeds would turn the verifier into a training set.</td><td>Develop from the generator contract and disjoint development seeds, preregister a changed distance and untouched validation seeds, then execute it once.</td></tr>
     </tbody>
   </table>
 </section>
@@ -462,6 +464,16 @@
   <p><b>Artifacts:</b> Readable report <code>config/data/analogues/m02-multiresolution/m02-multiresolution-verification.html</code>; machine result <code>m02-multiresolution-verification.json</code>; complete field contract <code>field-observation-contract.json</code>; immutable gate history under <code>gates/history/m02_multiresolution_chart_state</code>.</p>
   <p><b>Limits and next:</b> M02 does not manufacture corporate-action provenance missing in M01 and does not alter similarity weights. M03 must expand unnamed latent structural families, define an oracle independent of the distance, compare the old and new representations, and require ≥75% top-1 and precision@5 in every sufficiently populated family with ≤2% critical-negative error.</p>
 </section>
+
+<section class="entry" id="log-040">
+  <h2>L-040 — M03 v1 unnamed structural retrieval: locked failure</h2>
+  <p><b>What:</b> Added eight unnamed deterministic latent OHLCV families, an independent generator oracle, scale/time/noise positives, decisive tail/context negatives, a causal masked six-resolution distance, strict verifier/config digests, CLI artifacts and an append-only trial record. The distance never receives the latent family ID and no real forward outcome is accessed.</p>
+  <p><b>Protocol:</b> Candidate seeds 0–7, development-smoke seeds 100–107 and locked unseen validation seeds 200–207 are disjoint. The first registration was visibly superseded before execution because it omitted the distance-contract digest. The corrected digest <code>5a59236f…8046bf</code> was then executed exactly once.</p>
+  <p><b>Result:</b> The new distance achieved 96.875% overall top-1, 95.3125% overall precision@5 and zero critical-negative errors. Seven of eight hidden families cleared every structural threshold. Family <code>latent-04</code> reached the 75% top-1 floor but only 65% precision@5, below the locked 75% requirement. Runtime was 65.06 seconds against 60 seconds; peak RSS was 222.55 MB against 1,024 MB. The legacy comparator had 100% top-1 and 97.5% precision@5 overall but a 15.625% critical-negative error, so its high family recognition does not make it structurally safe.</p>
+  <p><b>Why it failed:</b> The retained query evidence shows the deep-decline/recovery family interleaving with the shallower decline/recovery family in four top-five neighborhoods. This is a morphology-separation failure, not a naming problem. The five-second runtime miss is also real and is not waived.</p>
+  <p><b>Artifacts:</b> Readable report <code>config/data/analogues/m03-latent-structures/m03-latent-structural-verification.html</code>; machine result <code>m03-latent-structural-verification.json</code>; distance contract <code>state-distance-contract.json</code>; immutable gate history under <code>gates/history/m03_latent_structural_retrieval</code>. The machine result SHA-256 is <code>93e2b86f…f9426b</code>.</p>
+  <p><b>Next:</b> Do not alter or rerun v1. Add a principled topology/alignment distinction and remove avoidable comparator cost using only disjoint development data, freeze it as M03b, and run a new untouched validation set exactly once. M04 remains blocked until a structural version passes.</p>
+</section>
 </main>
 
 <section id="reproduce">
@@ -471,6 +483,7 @@
 .venv/bin/market-analogues verify-case-memory-contract --config config/datasets.example.yaml --contract config/case-memory-contract.yaml
 .venv/bin/market-analogues build-data-ledger --config config/datasets.example.yaml --availability config/data-availability.yaml --datasets nse nasdaq --workers 8
 .venv/bin/market-analogues verify-multiresolution-state --config config/datasets.example.yaml --datasets nse nasdaq
+.venv/bin/market-analogues verify-latent-structures --config config/datasets.example.yaml --verifier config/structural-verifier.yaml
 .venv/bin/market-analogues verify --config config/datasets.example.yaml
 .venv/bin/market-analogues verify-oracle --config config/datasets.example.yaml --dataset nse --symbols reliance tcs --instruments-per-stratum 4
 .venv/bin/market-analogues verify-oracle --config config/datasets.example.yaml --dataset nasdaq --symbols AAPL MSFT --instruments-per-stratum 3

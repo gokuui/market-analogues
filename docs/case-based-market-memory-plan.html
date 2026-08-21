@@ -129,7 +129,7 @@
     <p><b>Build:</b> version the three decision modes, default horizons, primary barrier definition, analogue eligibility, distinct-symbol/event rules, abstention vocabulary and trial ledger.</p>
     <p><b>Correctness tests:</b> mutate any post-cutoff bar and require zero query/ranking change; verify each horizon’s outcome was fully known before a historical query.</p>
     <p><b>Pass:</b> machine-readable contract and readable HTML agree; no result is measured before the contract hash is frozen.</p>
-    <p class="pass"><b>Status:</b> PASS. Contract <code>daily-long-swing-v1</code> is frozen at digest <code>8b333ac8…3fa53</code>; the entry-open and intraday modes remain disabled, the trial ledger is empty, and the generated JSON/HTML agreement plus outcome-embargo boundary tests pass.</p>
+    <p class="pass"><b>Status:</b> PASS. Contract <code>daily-long-swing-v1</code> is frozen at digest <code>8b333ac8…3fa53</code>; the entry-open and intraday modes remain disabled, the append-only trial ledger is digest-bound, and the generated JSON/HTML agreement plus outcome-embargo boundary tests pass.</p>
   </div>
 
   <div class="gate done">
@@ -155,6 +155,7 @@
     <p><b>Independent oracle:</b> generator parameters and event topology define sameness; the retrieval distance never sees the latent family identifier.</p>
     <p><b>Tests:</b> exact clones, noisy/time-stretched positives, partial formations, near-miss negatives, context contradictions, missing channels and cross-market scaling.</p>
     <p><b>Pass:</b> structural precision@5 ≥75%, top-1 ≥75%, critical-negative error ≤2%, and ≥75% in every sufficiently populated latent family—not only the average.</p>
+    <p class="fail"><b>Status:</b> V1 FAILED AND RETAINED. Overall top-1 was 96.88%, precision@5 95.31% and critical-negative error 0%, but hidden family 04 precision@5 was 65% and runtime was 65.06 seconds. Both violate the frozen gate. A correction requires a new contract digest and untouched validation seeds.</p>
   </div>
 
   <div class="gate">
@@ -268,7 +269,7 @@
     <li><span class="pass">Complete:</span> preserve M00 contract <code>daily-long-swing-v1</code> and its empty trial ledger before any new case-memory outcome evaluation.</li>
     <li><span class="pass">Complete:</span> M01 accounts for every available NASDAQ/NSE source instrument and makes stale coverage plus unavailable point-in-time fields explicit.</li>
     <li><span class="pass">Complete:</span> M02 supplies the causal six-resolution state, field-time contract and explicit missingness masks.</li>
-    <li>Execute M03: build richer unnamed structural families on the frozen M02 state and lock ≥75% per-family acceptance.</li>
+    <li><span class="fail">Failed trial retained:</span> M03 v1 missed family-04 precision@5 and runtime. Develop M03b on disjoint data and execute a separately frozen unseen verifier once.</li>
     <li>Finish M04 by comparing production retrieval with every frozen Gate 12 authority and adding evidence diversity/novelty controls.</li>
     <li>Implement M05 and M06: outcome-embargoed paths, effective sample size, context sensitivity and abstention.</li>
     <li>Run M07 against locked simple baselines; only after it passes expose M08 evidence cards and M09 daily shadow operation.</li>

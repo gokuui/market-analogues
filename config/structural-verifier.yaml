@@ -1,0 +1,31 @@
+schema_version: latent-structural-verifier-v1
+verifier_id: m03-unseen-validation-v1
+distance_contract_digest: 6e7f62428ff0313c8ef8d635996e004fa4f38c26218df06d4948827d897741f7
+latent_ids:
+  - latent-00
+  - latent-01
+  - latent-02
+  - latent-03
+  - latent-04
+  - latent-05
+  - latent-06
+  - latent-07
+candidate_seeds: [0, 1, 2, 3, 4, 5, 6, 7]
+validation_query_seeds: [200, 201, 202, 203, 204, 205, 206, 207]
+positive_transformations:
+  tempo_by_query_index: [0.9, 0.9666666667, 1.0333333333, 1.1]
+  noise_scale_by_query_index: [0.9, 1.0, 1.1]
+  price_scale: 3.7
+  volume_scale: 11.0
+critical_negative:
+  reverse_tail_direction: true
+  invert_tail_participation: true
+  weaken_tail_market_context: true
+acceptance:
+  top_k: 5
+  minimum_top1_per_family: 0.75
+  minimum_precision_at_k_per_family: 0.75
+  maximum_critical_negative_error_per_family: 0.02
+  maximum_total_seconds: 60.0
+  maximum_rss_mb: 1024.0
+legacy_comparison: informational_not_acceptance

@@ -69,6 +69,10 @@ from .scale_ladder import (
     collect_scale_history, run_scale_ladder, write_scale_ladder_report,
 )
 from .scan import streaming_search
+from .structural_verification import (
+    load_structural_verifier_spec, verify_latent_structures,
+    write_structural_verification,
+)
 from .types import InstrumentKey, SearchQuery
 from .universe import verify_universe, write_universe_report
 from .verification import run_synthetic_verifier, write_verification_gate
@@ -277,6 +281,32 @@ def cmd_verify_multiresolution_state(args: argparse.Namespace) -> int:
             "field_contract_artifact": str(field_path.resolve()),
         },
         list(result.failures), source_hashes=source_hashes,
+    ).write(_gates(config))
+    print(json.dumps({"passed": result.passed, **result.metrics, "failures": result.failures}, indent=2))
+    print(html_path)
+    return 0 if result.passed else 2
+
+
+def cmd_verify_latent_structures(args: argparse.Namespace) -> int:
+    config = load_config(args.config)
+    require_passed(_gates(config), "m02_multiresolution_chart_state")
+    spec = load_structural_verifier_spec(args.verifier)
+    result = verify_latent_structures(spec)
+    output_dir = Path(args.output_dir) if args.output_dir else (
+        config.artifact_dir / "m03-latent-structures"
+    )
+    machine_path, html_path, distance_path = write_structural_verification(
+        result, spec, output_dir,
+    )
+    GateReport(
+        "m03_latent_structural_retrieval", result.passed,
+        {
+            **result.metrics,
+            "machine_artifact": str(machine_path.resolve()),
+            "html_artifact": str(html_path.resolve()),
+            "distance_contract_artifact": str(distance_path.resolve()),
+        },
+        list(result.failures), source_hashes={"verifier_config": spec.digest},
     ).write(_gates(config))
     print(json.dumps({"passed": result.passed, **result.metrics, "failures": result.failures}, indent=2))
     print(html_path)
@@ -1543,6 +1573,11 @@ def build_parser() -> argparse.ArgumentParser:
     multiresolution.add_argument("--maximum-rss-mb", type=float, default=1024.0)
     multiresolution.add_argument("--output-dir")
     multiresolution.set_defaults(func=cmd_verify_multiresolution_state)
+    latent = sub.add_parser("verify-latent-structures")
+    latent.add_argument("--config", required=True)
+    latent.add_argument("--verifier", required=True)
+    latent.add_argument("--output-dir")
+    latent.set_defaults(func=cmd_verify_latent_structures)
     compare = sub.add_parser("compare-methods")
     compare.add_argument("--config", required=True)
     compare.add_argument("--seeds-per-family", type=int, default=5)

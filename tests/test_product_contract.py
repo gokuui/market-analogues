@@ -57,7 +57,9 @@ def test_repository_contract_and_trial_ledger_are_frozen_and_bound() -> None:
     ledger = validate_trial_ledger(LEDGER_PATH, contract)
     assert len(contract.digest) == 64
     assert ledger["contract_digest"] == contract.digest
-    assert ledger["trials"] == []
+    assert ledger["trials"]
+    assert ledger["trials"][0]["event"] == "registered"
+    assert ledger["trials"][0]["real_forward_outcomes_accessed"] is False
     assert contract.payload["decision"]["primary_mode"] == "after_close_daily"
     assert contract.payload["decision"]["modes"]["entry_open"]["enabled"] is False
     assert contract.payload["outcomes"]["outcomes_may_affect_similarity"] is False
@@ -170,4 +172,4 @@ def test_contract_cli_writes_artifacts_and_gate(tmp_path: Path) -> None:
     gate_payload = json.loads(gate.read_text())
     assert gate_payload["passed"] is True
     assert gate_payload["metrics"]["contract_digest"] == contract.digest
-    assert gate_payload["metrics"]["trial_count"] == 0
+    assert gate_payload["metrics"]["trial_count"] == 3
