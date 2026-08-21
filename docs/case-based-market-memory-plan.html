@@ -164,6 +164,7 @@
     <p><b>Complete:</b> distinct-symbol/event-aware top-k, separate same-symbol memory, multi-resolution query, novelty percentile and component explanations.</p>
     <p><b>Correctness tests:</b> exact authority equality, overlap/event deduplication, stable ties, serial/parallel identity, source/config drift and complete candidate accounting.</p>
     <p><b>Pass:</b> production top-20 recall ≥95% in every locked Gate 12 query; no temporal/quality violation; latency and RSS remain within market budgets.</p>
+    <p class="fail"><b>Development scout:</b> The existing pool 175 retrieves only 25% of the HOMEFIRST-current exact top 20. Pool 5,000 reaches 90% and pool 20,000 reaches 100% on that declared development query. The remaining 23 cases are held back until a digest-bound M04 matrix contract is frozen; no production promotion has occurred.</p>
   </div>
 
   <div class="gate">
