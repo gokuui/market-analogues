@@ -17,6 +17,8 @@ market-analogues verify-case-memory-contract --config config/datasets.example.ya
   --contract config/case-memory-contract.yaml
 market-analogues build-data-ledger --config config/datasets.example.yaml \
   --availability config/data-availability.yaml --datasets nse nasdaq --workers 8
+market-analogues verify-multiresolution-state --config config/datasets.example.yaml \
+  --datasets nse nasdaq
 market-analogues compare-methods --config config/datasets.example.yaml
 market-analogues build-view-store --config config/datasets.example.yaml \
   --dataset nse --lookbacks 252 --stride 5
@@ -70,6 +72,11 @@ matches from one instrument are deduplicated.
 Forward returns and excursions are computed only after retrieval and never enter
 the ranking. Results are descriptive historical evidence, not forecasts.
 
+The M02 state layer retains the complete 252-session derived channel frame and
+adds explicit 252/126/63/21/10/5-session summaries and masked samples. Every one
+of its 42 fields declares source inputs, earliest observation time and missingness;
+missing benchmark context remains missing rather than becoming an observed zero.
+
 - [Implementation and verification plan](docs/implementation-plan.html)
 - [Research evidence map](docs/research-evidence.html)
 - [Repository comparison and adopted ideas](docs/repository-comparison.html)
@@ -101,7 +108,7 @@ positives must beat reversed/context-contradictory negatives, future mutation mu
 have zero effect, and persisted coarse-index serialization must preserve neighbors.
 Gate JSON keeps an immutable history beneath `artifact_dir/gates/history`.
 
-The current regression record is 138 passing tests. This establishes a verified retrieval baseline, not trading
+The current regression record is 149 passing tests. This establishes a verified retrieval baseline, not trading
 profitability or production-scale completeness.
 
 M01 accounts for all 14,185 configured source instruments with zero changed

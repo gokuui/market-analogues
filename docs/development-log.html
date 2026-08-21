@@ -28,6 +28,7 @@
     <tbody>
       <tr><td>M00 Case-memory contract</td><td class="pass">PASS — FROZEN</td><td><code>daily-long-swing-v1</code> digest <code>8b333ac8…3fa53</code>; synchronized YAML/JSON/HTML, empty digest-bound trial ledger, strict safety validation and historical outcome-embargo boundary tests.</td></tr>
       <tr><td>M01 Available-data ledger</td><td class="pass">PASS — MATERIAL LIMITATIONS</td><td>14,185/14,185 configured instruments accounted, zero changed fingerprints, 13,427 usable and 758 quarantined. No current-within-seven-days instruments; point-in-time membership, delisting returns, identity, sector and event history unavailable.</td></tr>
+      <tr><td>M02 Multi-resolution state</td><td class="pass">PASS</td><td>252/126/63/21/10/5-session views, 23 full channels plus 19 summaries, per-sample missingness masks and observation-time contract. Five synthetic families and 24/24 independent real cases pass; future delta 0, unit delta 1.70e−12.</td></tr>
       <tr><td>03 Synthetic retrieval</td><td class="pass">PASS</td><td>Recall@10 0.953846; nDCG@10 0.935744; clone, invariance and pair ordering 1.0; critical-negative rate 0.</td></tr>
       <tr><td>08 Complete-universe baseline</td><td class="fail">FAIL</td><td>Coverage, causality and memory pass. Price-only candidate fidelity fails: pool-500 versus pool-1,000 top-20 recall is 0.75 NSE and 0.65 NASDAQ.</td></tr>
       <tr><td>09 Stratified exact oracle</td><td class="pass">PASS</td><td>24/24 cases; 5,850 exactly scored episodes; NSE/NASDAQ, 63/126/252 bars, historical/current cutoffs, quality and liquidity strata.</td></tr>
@@ -70,6 +71,7 @@
       <tr><td>D-013</td><td>Keep 75% as a visible target; never tune the audit until it passes.</td><td>The broader Yahoo result fails the target: top-1 is indistinguishable from random, while top-5 has only a four-point lift concentrated in breakouts. Changing labels, cutoffs or weights after observing it would convert evaluation into calibration.</td><td>Only evaluate a new trigger-aware representation on a separately locked holdout.</td></tr>
       <tr><td>D-014</td><td>Freeze daily long-swing case memory before new outcome evaluation.</td><td>Historical analogue evidence is vulnerable to changing decision times, horizons, barriers, diversity rules and abstention after seeing results. A digest-bound contract and empty append-only trial ledger make later changes visible.</td><td>Create a new version and ledger entry; never rewrite <code>daily-long-swing-v1</code>.</td></tr>
       <tr><td>D-015</td><td>Define M01's present universe as configured source instruments, not exchange membership.</td><td>No dated membership, delisting-return or permanent-identity tables accompany the sources. Treating the directory as the complete historical exchange would silently introduce survivorship and identity assumptions.</td><td>Expand the boundary only after a separately fingerprinted point-in-time master is ingested and reconciled.</td></tr>
+      <tr><td>D-016</td><td>Add M02 as a non-breaking state layer with explicit masks.</td><td>The verified production representation is single-lookback and its coarse vector substitutes zero for missing values. Replacing it before a common verifier would invalidate Gate 12; a separate six-resolution layer can retain full channels and distinguish missing from neutral before M03 comparison.</td><td>Integrate a new distance only after M03 structural verification and later Gate 12 production-reference comparison pass.</td></tr>
     </tbody>
   </table>
 </section>
@@ -449,6 +451,17 @@
   <p><b>Artifacts:</b> Readable report <code>config/data/analogues/data-ledger/data-ledger.html</code>; machine summary <code>data-ledger.json</code>; per-instrument <code>nse-instruments.parquet</code> and <code>nasdaq-instruments.parquet</code>; immutable gate history under <code>gates/history/m01_point_in_time_data_ledger</code>.</p>
   <p><b>Next:</b> Execute M02 using historical cutoffs inside the verified snapshots. Every representation field must declare its observation timestamp and pass future-mutation, unit, missing-context and session-boundary invariants.</p>
 </section>
+
+<section class="entry" id="log-039">
+  <h2>L-039 — M02 causal six-resolution chart state</h2>
+  <p><b>What:</b> Added a market-agnostic chart-state layer that truncates stock and benchmark inputs at the declared cutoff, retains the complete 252-session derived channel frame, and exposes 252/126/63/21/10/5-session views. Each view contains 32-point samples with a separate observed mask plus price, candle, volatility, volume, relative-strength, market-context and causal-structure summaries.</p>
+  <p><b>Field-time contract:</b> All 23 channel fields and 19 summary fields declare their source inputs, earliest observation time, expected missingness, availability by the after-close decision and prohibition on future inputs. Overnight movement is available at the session open; fields requiring high, low, close, volume or benchmark close are available only at the official close.</p>
+  <p><b>Why masks:</b> The earlier coarse representation uses zeros for portable fixed-size search. M02 retains the raw channel missingness and attaches a mask to every sample, so a missing benchmark, relative-strength value or rolling warm-up cannot be interpreted as a real neutral observation. Production ranking is deliberately unchanged until M03 evaluates the new state.</p>
+  <p><b>Verification:</b> Nine direct state tests cover exact six-horizon/session counts, field-contract agreement, fully missing context, exact post-cutoff stock/benchmark mutation, price/volume unit scaling, constant price, zero volume, duplicate/unsorted sessions, timezone-aware cutoffs and preservation of unverified corporate-action warnings. A gated verifier adds five deterministic synthetic families, repeat digests, field artifacts and all 24 frozen Gate 12 cases. Focused M02/CLI tests pass 13/13 and the complete suite passes 149/149.</p>
+  <p><b>Measured result:</b> All 24 real cases pass—12 tier A and 12 tier B—with complete benchmark context and their source quality warnings preserved. Future-mutation delta is exactly zero; maximum price/volume unit delta is <code>1.694644424787839e-12</code>; the slowest real pair of repeated state builds is 0.208 seconds; the complete verifier takes 5.18 seconds at 329.40 MB peak RSS.</p>
+  <p><b>Artifacts:</b> Readable report <code>config/data/analogues/m02-multiresolution/m02-multiresolution-verification.html</code>; machine result <code>m02-multiresolution-verification.json</code>; complete field contract <code>field-observation-contract.json</code>; immutable gate history under <code>gates/history/m02_multiresolution_chart_state</code>.</p>
+  <p><b>Limits and next:</b> M02 does not manufacture corporate-action provenance missing in M01 and does not alter similarity weights. M03 must expand unnamed latent structural families, define an oracle independent of the distance, compare the old and new representations, and require ≥75% top-1 and precision@5 in every sufficiently populated family with ≤2% critical-negative error.</p>
+</section>
 </main>
 
 <section id="reproduce">
@@ -457,6 +470,7 @@
 .venv/bin/pytest --cov=market_analogues --cov-report=term-missing -q
 .venv/bin/market-analogues verify-case-memory-contract --config config/datasets.example.yaml --contract config/case-memory-contract.yaml
 .venv/bin/market-analogues build-data-ledger --config config/datasets.example.yaml --availability config/data-availability.yaml --datasets nse nasdaq --workers 8
+.venv/bin/market-analogues verify-multiresolution-state --config config/datasets.example.yaml --datasets nse nasdaq
 .venv/bin/market-analogues verify --config config/datasets.example.yaml
 .venv/bin/market-analogues verify-oracle --config config/datasets.example.yaml --dataset nse --symbols reliance tcs --instruments-per-stratum 4
 .venv/bin/market-analogues verify-oracle --config config/datasets.example.yaml --dataset nasdaq --symbols AAPL MSFT --instruments-per-stratum 3

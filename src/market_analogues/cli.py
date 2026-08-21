@@ -46,6 +46,9 @@ from .gate12_registry import (
 )
 from .index import CoarseIndex
 from .matrix_runner import run_authority_matrix
+from .multiresolution_verification import (
+    verify_multiresolution_state, write_multiresolution_verification,
+)
 from .outcomes import compute_outcomes, summarize_match_outcomes
 from .oracle import run_oracle_suite, write_oracle_artifacts
 from .pruning_verification import verify_exact_safe_pruning, write_pruning_report
@@ -229,6 +232,55 @@ def cmd_build_data_ledger(args: argparse.Namespace) -> int:
     print(json.dumps({"passed": passed, **metrics, "failures": failures}, indent=2))
     print(html_path)
     return 0 if passed else 2
+
+
+def cmd_verify_multiresolution_state(args: argparse.Namespace) -> int:
+    config = load_config(args.config)
+    require_passed(_gates(config), "m01_point_in_time_data_ledger")
+    real_inputs = []
+    source_hashes: dict[str, str] = {}
+    registry_root = Path(args.registry_root) if args.registry_root else (
+        config.artifact_dir / "gate12"
+    )
+    for dataset_id in args.datasets:
+        if dataset_id not in config.datasets:
+            raise SystemExit(f"unknown dataset {dataset_id!r}; choose from {sorted(config.datasets)}")
+        quality_path = config.artifact_dir / "quality" / f"{dataset_id}.parquet"
+        registry_path = registry_root / dataset_id / "query-registry.parquet"
+        for required in (quality_path, registry_path):
+            if not required.exists():
+                raise SystemExit(f"missing M02 input: {required}")
+        quality = pd.read_parquet(quality_path)
+        registry = pd.read_parquet(registry_path)
+        source = source_from_spec(config.datasets[dataset_id])
+        real_inputs.append((dataset_id, source, quality, registry))
+        source_hashes[f"quality_{dataset_id}"] = sha256(quality_path.read_bytes()).hexdigest()
+        source_hashes[f"registry_{dataset_id}"] = sha256(registry_path.read_bytes()).hexdigest()
+    result = verify_multiresolution_state(
+        real_inputs,
+        maximum_total_seconds=args.maximum_total_seconds,
+        maximum_case_seconds=args.maximum_case_seconds,
+        maximum_rss_mb=args.maximum_rss_mb,
+    )
+    output_dir = Path(args.output_dir) if args.output_dir else (
+        config.artifact_dir / "m02-multiresolution"
+    )
+    machine_path, html_path, field_path = write_multiresolution_verification(
+        result, output_dir,
+    )
+    GateReport(
+        "m02_multiresolution_chart_state", result.passed,
+        {
+            **result.metrics,
+            "machine_artifact": str(machine_path.resolve()),
+            "html_artifact": str(html_path.resolve()),
+            "field_contract_artifact": str(field_path.resolve()),
+        },
+        list(result.failures), source_hashes=source_hashes,
+    ).write(_gates(config))
+    print(json.dumps({"passed": result.passed, **result.metrics, "failures": result.failures}, indent=2))
+    print(html_path)
+    return 0 if result.passed else 2
 
 
 def cmd_compare(args: argparse.Namespace) -> int:
@@ -1482,6 +1534,15 @@ def build_parser() -> argparse.ArgumentParser:
     ledger.add_argument("--workers", type=int, default=4)
     ledger.add_argument("--output-dir")
     ledger.set_defaults(func=cmd_build_data_ledger)
+    multiresolution = sub.add_parser("verify-multiresolution-state")
+    multiresolution.add_argument("--config", required=True)
+    multiresolution.add_argument("--datasets", nargs="+", required=True)
+    multiresolution.add_argument("--registry-root")
+    multiresolution.add_argument("--maximum-total-seconds", type=float, default=60.0)
+    multiresolution.add_argument("--maximum-case-seconds", type=float, default=2.0)
+    multiresolution.add_argument("--maximum-rss-mb", type=float, default=1024.0)
+    multiresolution.add_argument("--output-dir")
+    multiresolution.set_defaults(func=cmd_verify_multiresolution_state)
     compare = sub.add_parser("compare-methods")
     compare.add_argument("--config", required=True)
     compare.add_argument("--seeds-per-family", type=int, default=5)
