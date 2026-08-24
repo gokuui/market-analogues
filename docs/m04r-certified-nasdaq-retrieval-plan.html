@@ -19,7 +19,7 @@
 <body>
 <header>
   <h1>M04R — certified NASDAQ analogue retrieval remediation</h1>
-  <p><b>Planning date:</b> 24 August 2026. <b>Status:</b> final evidence-backed implementation plan, frozen after the research/POC preflight. M04R-00 is verified complete; M04R-01 is next. No retrieval repair is claimed yet.</p>
+  <p><b>Planning date:</b> 24 August 2026. <b>Status:</b> final evidence-backed implementation plan, frozen after the research/POC preflight. M04R-00 and M04R-01 are verified complete; M04R-02 is next. No retrieval repair is claimed yet.</p>
   <p><b>Target outcome:</b> given a current 252-session NASDAQ chart state, return the historically eligible charts with the smallest frozen exact OHLCV/volume/market-context distance. Interactive mode must be fast and candid about approximation. Certified mode must prove that no eligible episode capable of beating the final constrained top-20 was discarded.</p>
   <p>This plan is outcome-blind. Forward returns, trader profits and setup names are not inputs to representation, retrieval, tuning or acceptance.</p>
 </header>
@@ -133,6 +133,7 @@
   <p><b>Synthetic tests:</b> Equivalent Parquet rewrite passes; future append passes for an older cutoff; historical insertion/deletion/revision fails; duplicate/reordered timestamps fail; benchmark mutation after cutoff passes; mutation at/before cutoff fails.</p>
   <p><b>Real verifier:</b> Existing NASDAQ authorities revalidate against unchanged causal prefixes. A current query after an append receives a new episode/store generation rather than silently reusing stale evidence.</p>
   <p><b>Pass before next:</b> Zero false invalidations from append-only data and zero accepted historical revisions.</p>
+  <p class="pass"><b>Verified 24 August 2026:</b> PASS. The canonical <code>canonical-ohlcv-prefix-v1</code> contract retains physical file SHA-256 for audit but hashes normalized ordered timestamp/OHLCV values only through the declared cutoff. Synthetic gates cover equivalent Parquet rewrites, old-cutoff future appends, insertion/deletion/revision, duplicates, raw reordering, benchmark mutations and new-query generation identity. Two real executions were byte-identical and passed 96/96 checks across all 12 frozen NASDAQ authorities, with zero false append invalidations and zero accepted historical revisions. The changed legacy NSE files remain blocked because no trustworthy prefix baseline existed before their update; no retroactive evidence was manufactured.</p>
 </section>
 
 <section class="task" id="m04r-02">

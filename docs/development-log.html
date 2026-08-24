@@ -533,6 +533,17 @@
   <p><b>Artifacts:</b> Generated readable report <code>config/data/analogues/m04r-incident/m04r-incident.html</code>; 708-KiB machine report <code>m04r-incident.json</code>; immutable gate history under <code>gates/history/m04r_incident_attribution</code>. Generated evidence remains under the ignored artifact root; the implementation, tests, command and this log are versioned.</p>
   <p><b>Boundary and next:</b> This checkpoint proves why the old candidate route lost known exact neighbours; it does not repair retrieval or validate trading outcomes. Proceed to M04R-01 canonical causal-prefix digests so append-only daily updates stop invalidating historical queries while historical revisions remain detectable.</p>
 </section>
+
+<section class="entry" id="log-047">
+  <h2>L-047 — M04R-01 canonical causal-prefix provenance</h2>
+  <p><b>What:</b> Added <code>canonical-ohlcv-prefix-v1</code>, a storage-format-independent SHA-256 over ordered timestamp/open/high/low/close/volume values visible through an explicit cutoff. Numeric inputs are normalized to float64, timestamps to nanoseconds, negative zero and missing values are canonicalized, and physical file SHA-256 remains available separately for byte-level audit. Stock and benchmark sources expose the same prefix API, and a versioned generation digest binds dataset, query cutoff, representation version and all supplied prefixes.</p>
+  <p><b>Why:</b> The old whole-file fingerprint treated a harmless daily append exactly like a historical correction. The new identity leaves an older query unchanged after future appends or equivalent Parquet rewrites, while any insertion, deletion or value revision at/before the cutoff changes the digest. Duplicate timestamps and raw source reordering are rejected rather than silently sorted into apparent validity. A query at a newly appended cutoff receives a different generation digest.</p>
+  <p><b>Synthetic verification:</b> Tests cover equivalent rewrites with a different Parquet compression/dtype and changed physical SHA; future append invariance; historical value revision, row deletion and insertion; duplicate and reordered timestamps; preservation of raw-order warnings through the source adapter; identical benchmark rules; and new-cutoff generation change. All six new causal-prefix tests pass.</p>
+  <p><b>Real NASDAQ verification:</b> The <code>verify-m04r-causal-prefixes</code> gate validated all 12 frozen NASDAQ authorities. It executed 96 stock/benchmark physical-binding, repeatability, future-mutation and historical-revision checks with zero failures, zero false append invalidations and zero accepted historical revisions. Two executions produced result digest <code>aeaa1c37…1732dd</code> and byte-identical machine SHA-256 <code>979c069f…a3d3d</code>. No outcome input was accessed.</p>
+  <p><b>Non-retroactivity:</b> The 11 legacy NSE holdouts remain <code>blocked_input_version</code>. Because their v1 registry stored only whole-file hashes, a causal prefix existing before the append cannot be reconstructed as prior evidence without assuming the history was unchanged. New registries and immutable packed-store generations can bind this prefix contract; old Gate 12 artifacts remain unchanged.</p>
+  <p><b>Verification and artifacts:</b> The complete repository suite passes 171/171. Generated reports are <code>config/data/analogues/m04r-causal-prefixes/m04r-causal-prefixes.html</code> and <code>m04r-causal-prefixes.json</code>, with immutable gate history under <code>gates/history/m04r_causal_prefixes</code>. Generated evidence remains ignored; implementation, tests, CLI and this log are versioned.</p>
+  <p><b>Next:</b> M04R-02 must freeze the exact distance-v1 mathematics and implement an independent slow reference before any lower-bound proof is promoted.</p>
+</section>
 </main>
 
 <section id="reproduce">
@@ -547,6 +558,7 @@
 .venv/bin/market-analogues verify-m04-candidate-case --config config/datasets.example.yaml --contract config/m04-candidate-recall-contract.yaml --episode-id 1736f00c337dfa0b6cf60e10
 .venv/bin/market-analogues aggregate-m04-candidate-recall --config config/datasets.example.yaml --contract config/m04-candidate-recall-contract.yaml
 .venv/bin/market-analogues diagnose-m04r-incident --config config/datasets.example.yaml --contract config/m04-candidate-recall-contract.yaml
+.venv/bin/market-analogues verify-m04r-causal-prefixes --config config/datasets.example.yaml --contract config/m04-candidate-recall-contract.yaml --dataset nasdaq
 .venv/bin/market-analogues verify --config config/datasets.example.yaml
 .venv/bin/market-analogues verify-oracle --config config/datasets.example.yaml --dataset nse --symbols reliance tcs --instruments-per-stratum 4
 .venv/bin/market-analogues verify-oracle --config config/datasets.example.yaml --dataset nasdaq --symbols AAPL MSFT --instruments-per-stratum 3

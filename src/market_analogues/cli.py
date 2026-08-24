@@ -51,6 +51,9 @@ from .m04_candidate_recall import (
     verify_m04_candidate_case, write_m04_case, write_m04_matrix,
 )
 from .m04r_incident import diagnose_m04r_incident, write_m04r_incident
+from .m04r_prefix_verification import (
+    verify_m04r_causal_prefixes, write_m04r_prefix_verification,
+)
 from .multiresolution_verification import (
     verify_multiresolution_state, write_multiresolution_verification,
 )
@@ -442,6 +445,40 @@ def cmd_diagnose_m04r_incident(args: argparse.Namespace) -> int:
         **result.metrics,
         "baseline_digest": result.baseline_digest,
         "failures": result.failures,
+    }, indent=2))
+    print(html)
+    return 0 if result.passed else 2
+
+
+def cmd_verify_m04r_causal_prefixes(args: argparse.Namespace) -> int:
+    config = load_config(args.config)
+    spec = load_m04_candidate_recall_spec(args.contract)
+    if args.dataset not in config.datasets:
+        raise SystemExit(f"dataset {args.dataset!r} is not configured")
+    source = source_from_spec(config.datasets[args.dataset])
+    result = verify_m04r_causal_prefixes(
+        spec, source, config.artifact_dir, dataset_id=args.dataset,
+    )
+    output_dir = Path(args.output_dir) if args.output_dir else (
+        config.artifact_dir / "m04r-causal-prefixes"
+    )
+    machine, html = write_m04r_prefix_verification(
+        result, output_dir / "m04r-causal-prefixes.json",
+        output_dir / "m04r-causal-prefixes.html",
+    )
+    GateReport(
+        "m04r_causal_prefixes", result.passed,
+        {
+            **result.metrics,
+            "result_digest": result.result_digest,
+            "machine_artifact": str(machine.resolve()),
+            "html_artifact": str(html.resolve()),
+        },
+        list(result.failures), source_hashes={"m04_contract": spec.digest},
+    ).write(_gates(config))
+    print(json.dumps({
+        "passed": result.passed, **result.metrics,
+        "result_digest": result.result_digest, "failures": result.failures,
     }, indent=2))
     print(html)
     return 0 if result.passed else 2
@@ -1733,6 +1770,12 @@ def build_parser() -> argparse.ArgumentParser:
     m04r_incident.add_argument("--contract", required=True)
     m04r_incident.add_argument("--output-dir")
     m04r_incident.set_defaults(func=cmd_diagnose_m04r_incident)
+    m04r_prefix = sub.add_parser("verify-m04r-causal-prefixes")
+    m04r_prefix.add_argument("--config", required=True)
+    m04r_prefix.add_argument("--contract", required=True)
+    m04r_prefix.add_argument("--dataset", default="nasdaq")
+    m04r_prefix.add_argument("--output-dir")
+    m04r_prefix.set_defaults(func=cmd_verify_m04r_causal_prefixes)
     compare = sub.add_parser("compare-methods")
     compare.add_argument("--config", required=True)
     compare.add_argument("--seeds-per-family", type=int, default=5)

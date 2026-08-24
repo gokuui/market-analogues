@@ -9,6 +9,7 @@ from typing import Iterator
 import pandas as pd
 
 from .config import DatasetSpec
+from .causal_prefix import CausalPrefixDigest, causal_prefix_digest
 from .types import InstrumentKey
 
 CANONICAL_COLUMNS = ["timestamp", "open", "high", "low", "close", "volume"]
@@ -44,6 +45,8 @@ def canonicalize(frame: pd.DataFrame, spec: DatasetSpec, *, symbol: str | None =
     cols = CANONICAL_COLUMNS + [c for c in ("source", "confidence") if c in df.columns]
     df = df[cols]
     df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
+    source_timestamp_reordered = not df["timestamp"].is_monotonic_increasing
+    source_duplicate_timestamps = bool(df["timestamp"].duplicated().any())
     for col in ["open", "high", "low", "close", "volume"]:
         df[col] = pd.to_numeric(df[col], errors="coerce")
     df = df.sort_values("timestamp", kind="stable").reset_index(drop=True)
@@ -51,6 +54,8 @@ def canonicalize(frame: pd.DataFrame, spec: DatasetSpec, *, symbol: str | None =
         df.attrs["symbol"] = symbol
     df.attrs["dataset_id"] = spec.dataset_id
     df.attrs["interval"] = spec.interval
+    df.attrs["source_timestamp_reordered"] = source_timestamp_reordered
+    df.attrs["source_duplicate_timestamps"] = source_duplicate_timestamps
     return df
 
 
@@ -75,6 +80,17 @@ class OHLCVSource(ABC):
         digest.update("\0".join(str(column) for column in benchmark.columns).encode())
         digest.update(pd.util.hash_pandas_object(benchmark, index=True).values.tobytes())
         return digest.hexdigest()
+
+    def causal_prefix_fingerprint(
+        self, key: InstrumentKey, cutoff: pd.Timestamp | str,
+    ) -> CausalPrefixDigest:
+        return causal_prefix_digest(self.load(key), cutoff)
+
+    def benchmark_causal_prefix_fingerprint(
+        self, cutoff: pd.Timestamp | str,
+    ) -> CausalPrefixDigest | None:
+        benchmark = self.load_benchmark()
+        return causal_prefix_digest(benchmark, cutoff) if benchmark is not None else None
 
 
 class DirectorySource(OHLCVSource):
