@@ -22,7 +22,7 @@
 </header>
 
 <section id="status">
-  <h2>Current status — 21 August 2026</h2>
+  <h2>Current status — 24 August 2026</h2>
   <table>
     <thead><tr><th>Gate</th><th>Status</th><th>Evidence</th></tr></thead>
     <tbody>
@@ -45,6 +45,7 @@
       <tr><td>12E Deterministic scale ladder</td><td class="pass">PASS — BOTH MARKETS</td><td>Full NSE and NASDAQ 1%/10% aggregate gates pass. NASDAQ 10% covers 1,159 symbols/363,633 candidates, prunes 99.78%, repeats its digest, searches in 6.82/6.59 minutes and projects a 68.2-minute full search at 547 MB.</td></tr>
       <tr><td>12F Blind authority matrix</td><td class="pass">PASS — 24/24 SEALED</td><td>All 12 NSE and 12 NASDAQ authorities pass along with both market aggregates. Each artifact has complete candidate accounting, repeat-result identity and a strict exact stopping certificate. No production ranking or forward outcome was read.</td></tr>
       <tr><td>12 Full-universe production comparison</td><td class="open">OPEN</td><td>The independent exact references are complete. Production top-20 recall against all 24 references, diversity behavior and promotion remain unmeasured.</td></tr>
+      <tr><td>M04R certified retrieval repair</td><td class="open">M04R-00…07 PASS; EXACT COMPLETION OPEN</td><td>The 11,584-symbol immutable bound pack and global 1,170-candidate proposal union pass. Composite top-1,000 retains all 240 development-authority targets (maximum bound rank 343); full worst-query forward/reverse scans are identical at 263.11/263.32 s and 279.73 MiB. M04R-08 must still prove exact constrained top-k completion before activation.</td></tr>
       <tr><td>External Kullamagi examples</td><td class="pass">AUDIT COMPLETE — PARTIAL COVERAGE</td><td>132 unique 252-session episodes across 56 NASDAQ-source symbols. Causal top-5 label purity is 51.5% versus a 41.4% frequency baseline (within-query random-candidate p=0.001); causal minority-setup recovery remains weak.</td></tr>
       <tr><td>Yahoo-expanded Kullamagi examples</td><td class="fail">75% TARGET NOT REACHED</td><td>Yahoo expands coverage to 361 episodes across 129 symbols. With one match per candidate symbol, primary causal top-5 purity is 54.44% versus a 50.44% within-query random expectation (p=0.003): measurable but far below the target and concentrated in breakouts.</td></tr>
     </tbody>
@@ -75,6 +76,7 @@
       <tr><td>D-016</td><td>Add M02 as a non-breaking state layer with explicit masks.</td><td>The verified production representation is single-lookback and its coarse vector substitutes zero for missing values. Replacing it before a common verifier would invalidate Gate 12; a separate six-resolution layer can retain full channels and distinguish missing from neutral before M03 comparison.</td><td>Integrate a new distance only after M03 structural verification and later Gate 12 production-reference comparison pass.</td></tr>
       <tr><td>D-017</td><td>Retain the failed M03 v1 trial and require a new holdout for any correction.</td><td>The overall averages passed, but family 04 precision@5 and the total runtime failed their locked limits. Tuning or rerunning the same seeds would turn the verifier into a training set.</td><td>Develop from the generator contract and disjoint development seeds, preregister a changed distance and untouched validation seeds, then execute it once.</td></tr>
       <tr><td>D-018</td><td>Adopt the M03b topology blend for production comparison, not direct production promotion.</td><td>A minimal 20% multi-scale topology term corrects V1's rigid-shape confusion and passes a fresh synthetic holdout. Synthetic separation alone cannot prove full-universe nearest-neighbour recall on real charts.</td><td>M04 must compare it with every frozen Gate 12 exact authority and enforce diversity, temporal validity and resource budgets before integration.</td></tr>
+      <tr><td>D-019</td><td>Use certified composite top-1,000 as the non-displacing proposal core; component routes are additive seeds.</td><td>Compact-only proposal-v2 failed recall and a separate compact store violates the 11 GiB cap. The actual packed quantized bound retains all 240 development targets within rank 343. Component bounds already present in the pack add coverage without being mistaken for completeness certificates.</td><td>Change only after a common certified-completion bake-off proves a different proposal lowers end-to-end latency without changing any result or certificate.</td></tr>
     </tbody>
   </table>
 </section>
@@ -620,6 +622,17 @@
   <p><b>Verification and cleanup:</b> Final builder evidence digest is <code>43e7246ac20e35fe696fe816764e102e4f04472ba3eb3b36fa09615dee42662f</code>. The separate verifier re-hashes the 9.2 GB files and independently checks shadow state, all provenance, physical counts, all 12 authorities, worst-query selection, timing/RSS mathematics and retry output; it passes with digest <code>08a6f62fde5738dbfb14e46c9ee97faca87cad714f9e659110cc2ac02f11250a</code>. After passing, only the 8.7-GB rebuildable <code>packed-bound-full/work</code> checkpoint directory was deleted; generation and evidence remain. Free space returned to 24 GB.</p>
   <p><b>Boundary and next:</b> This is a verified shadow lower-bound store, not a production search replacement. M04R-07 must implement globally stable bounded proposal selection over it; M04R-08 must prove exact certified completion and final constrained top-k equality before activation. Forward outcomes remain untouched.</p>
 </section>
+
+<section class="entry" id="log-055">
+  <h2>L-055 — M04R-07 global bounded proposal integration</h2>
+  <p><b>Why:</b> The full shadow generation proved storage and score-only scanning, but it did not return episode identities or remove the old correctness-critical per-symbol truncation. M04R-07 needed a real globally bounded candidate handoff before exact completion could be designed.</p>
+  <p><b>What and how:</b> Added contract <code>m04r-global-bound-proposal-v1</code>, digest <code>059db6d78bbe62e7588e1fe2408fe244040b501d190bdf7b211a7ecd7aadb96c</code>. It applies tier, cutoff, exact query-ID and same-symbol overlap eligibility before scoring; reads fixed blocks with <code>pread</code>; maintains bounded deterministic selections with the complete 96-bit episode ID as the tie key; and preserves all metadata-only overflow rows at universal bound zero. The composite top-1,000 is the certified, non-displacing route. Seven 64-row coarse/component routes are unioned as optional exact-threshold seeds and can never evict a composite candidate.</p>
+  <p><b>Plan correction from evidence:</b> The original task named an exact-weighted compact and legacy topology route. M04R-05 rejected compact-only recall, and M04R-06B measured that the smallest valid separate compact row would push the store to 11.3952 GiB. Those rejected fields were not reintroduced. Only composite/coarse/stage/price/candle-volatility/volume-shock/market-context/structural values computed from the selected certified pack are routed; only composite carries all-authority recall evidence.</p>
+  <p><b>Adversarial verification:</b> Tests force physical order to disagree with 96-bit ID tie order, vary blocks from one row upward, reverse scan order, exercise IDs containing zero bytes, preserve exact-source overflow, reject future/query-overlap/wrong-tier rows before ranking, forbid composite quotas below 1,000 and reject unsupported routes. Results remain identical with more than 25 same-symbol decoys and tied near-clones.</p>
+  <p><b>Full result:</b> The preregistered M04R-06C worst query scans 3,786,156 physical rows and 3,786,118 eligible rows. Forward 2,048-row and reverse 4,097-row passes return the identical 1,170-candidate digest <code>c8f51e202205367bf3cfda6a62cd3bcbe0e29e32f5b809d7e88431a194692555</code>. Composite contains exactly 1,000 rows, retains all 20 selected exact neighbours, and reproduces earlier score digest <code>fc088e4c40cbff3b6d129951f16eb79abf7575a129d8fbc3cd7dfd835bc763fa</code>. All-12 sealed rank evidence independently places every 240 target within composite quota (maximum conservative rank 343).</p>
+  <p><b>Performance and verifier:</b> Full passes take 263.106 and 263.320 seconds at 279.73 MiB peak RSS, below 600 seconds and 768 MiB. Evidence digest is <code>5147c1a15419df196ccd1936c1cc43c29641461a91369cef6f824aa8e7d42d13</code>. The separate verifier re-hashes the 9.2 GB generation, checks shadow/provenance/build/rank bindings, recomputes row/target/route/gate logic and passes with digest <code>4f5db61b95c460126ef923fd1607de636837a1c87df43b435b6540a0d99cb635</code>.</p>
+  <p><b>Boundary and next:</b> Proposal recall on development authorities is now repaired, but lower-bound candidates are not final nearest neighbours. M04R-08 must native-exact-score seeds, scan every eligible lower bound, safely prune only above the live constrained threshold, group unresolved source reconstruction, reproduce exact authorities and emit a complete stopping/exhaustion certificate. The generation remains shadow-only and outcomes remain untouched.</p>
+</section>
 </main>
 
 <section id="reproduce">
@@ -649,6 +662,8 @@
 .venv/bin/market-analogues verify-m04r-packed-bound --config config/datasets.example.yaml
 .venv/bin/python experiments/m04r/packed_bound_1pct.py --config config/datasets.example.yaml --output-root config/data/analogues/poc/m04r/packed-bound-full --workers 8 --full-universe
 .venv/bin/market-analogues verify-m04r-full-pack --config config/datasets.example.yaml
+.venv/bin/python experiments/m04r/global_bound_proposal_gate.py --config config/datasets.example.yaml --full-root config/data/analogues/poc/m04r/packed-bound-full --output config/data/analogues/poc/m04r/global-bound-proposal-full.json --block-rows 2048
+.venv/bin/market-analogues verify-m04r-global-bound-proposal --config config/datasets.example.yaml
 .venv/bin/python experiments/m04r/distance_v1_bound_gate.py --pairs 1000000 --reference-pairs 2000 --output config/data/analogues/poc/m04r/distance-v1-bound-gate.json
 .venv/bin/market-analogues verify --config config/datasets.example.yaml
 .venv/bin/market-analogues verify-oracle --config config/datasets.example.yaml --dataset nse --symbols reliance tcs --instruments-per-stratum 4

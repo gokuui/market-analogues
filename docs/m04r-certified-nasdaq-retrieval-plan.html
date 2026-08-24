@@ -19,7 +19,7 @@
 <body>
 <header>
   <h1>M04R — certified NASDAQ analogue retrieval remediation</h1>
-  <p><b>Planning date:</b> 24 August 2026. <b>Status:</b> M04R-00 through M04R-06C are verified complete. Compact-only layouts were rejected; actual quantized-bound ranks pass; the full 11,584-symbol immutable shadow pack, exact-source overflow sidecar, authority row accounting and measured resource gates pass. M04R-07 integration is next. No production retrieval repair is claimed yet.</p>
+  <p><b>Planning date:</b> 24 August 2026. <b>Status:</b> M04R-00 through M04R-07 are verified complete. Compact-only layouts were rejected; actual quantized-bound ranks pass; the full 11,584-symbol immutable shadow pack and globally stable 1,170-candidate proposal union pass physical, authority, determinism and resource gates. M04R-08 certified exact completion is next. No production retrieval repair is claimed yet.</p>
   <p><b>Target outcome:</b> given a current 252-session NASDAQ chart state, return the historically eligible charts with the smallest frozen exact OHLCV/volume/market-context distance. Interactive mode must be fast and candid about approximation. Certified mode must prove that no eligible episode capable of beating the final constrained top-20 was discarded.</p>
   <p>This plan is outcome-blind. Forward returns, trader profits and setup names are not inputs to representation, retrieval, tuning or acceptance.</p>
 </header>
@@ -198,6 +198,8 @@
   <p><b>Routes:</b> Exact-weighted composite plus reserved global quotas for stage, price, candle/volatility, volume/shock, market, structural and a small legacy/M03b topology fallback. A route-selected candidate cannot be discarded by later fusion.</p>
   <p><b>Adversaries:</b> True neighbour at local rank 28, 25 same-symbol decoys, different decoys winning each view, poor equal-RRF rank, ties, shuffled packs, overlapping near-clones and future near-clones.</p>
   <p><b>Pass before next:</b> All planted neighbours survive; zero duplicates/temporal violations; exact row accounting; IDs invariant to block/order/worker count; ≤768 MiB proposal RSS.</p>
+  <p class="pass"><b>Verified 24 August 2026:</b> PASS. Production module <code>m04r-global-bound-proposal-v1</code> applies A/B, cutoff, query-ID and same-symbol overlap eligibility before scoring, scans the immutable pack through bounded positional reads and keeps stable 96-bit episode-ID tie order. The authority-certified composite top-1,000 is never displaced. Seven 64-row component routes derived from the same pack are additive seeds only; the rejected compact-v2 and unavailable legacy proxy fields were not smuggled back into the store. On preregistered worst query <code>cb2bdccd…1bd0</code>, forward 2,048-row and reverse 4,097-row scans return the identical 1,170-candidate digest <code>c8f51e20…2555</code>, retain 20/20 exact authority neighbours, and reproduce M04R-06C top-1,000 score digest <code>fc088e4c…63fa</code>. Runs take 263.11/263.32 seconds at 279.73 MiB RSS. Evidence/verifier digests are <code>5147c1a1…2d13</code>/<code>4f5db61b…b635</code>.</p>
+  <p><b>Architecture correction:</b> M04R-05 rejected a separate compact proposal store and M04R-06B showed even its smallest valid layout would exceed the 11 GiB cap. Therefore the original “exact-weighted plus legacy” wording is satisfied only where the selected pack contains proved fields: composite, coarse, stage, price, candle/volatility, volume/shock, market and structural. The composite route alone carries the recall evidence; component routes may improve the initial exact threshold but cannot certify omission or remove a composite candidate.</p>
 </section>
 
 <section class="task" id="m04r-08">
@@ -266,7 +268,7 @@
     <li>Commit a clean rollback point.</li>
     <li>Proceed only if the explicit gate passes. A failure creates a versioned redesign; it never lowers a frozen threshold.</li>
   </ol>
-  <p class="muted">M04R-00 through M04R-06C are complete. M04R-07 is next: integrate global bounded proposal selection against the verified shadow generation without activating a production pointer. M04R-08 must still prove certified exact completion before this can replace existing retrieval.</p>
+  <p class="muted">M04R-00 through M04R-07 are complete. M04R-08 is next: exact-score the deterministic proposal seed, scan every certified lower bound, safely prune only rows that cannot enter the constrained result, group native source materialization, and emit an exhaustion/stopping certificate. The shadow generation remains inactive until exact completion reproduces every authority.</p>
 </section>
 </body>
 </html>

@@ -75,6 +75,10 @@ from .m04r_packed_verification import (
 from .m04r_full_pack_verification import (
     verify_m04r_full_pack, write_m04r_full_pack_verification,
 )
+from .m04r_global_proposal_verification import (
+    verify_m04r_global_bound_proposal,
+    write_m04r_global_bound_proposal_verification,
+)
 from .multiresolution_verification import (
     verify_multiresolution_state, write_multiresolution_verification,
 )
@@ -758,6 +762,49 @@ def cmd_verify_m04r_full_pack(args: argparse.Namespace) -> int:
     print(json.dumps({
         "passed": result.passed, **result.metrics,
         "result_digest": result.result_digest, "failures": result.failures,
+    }, indent=2))
+    print(html)
+    return 0 if result.passed else 2
+
+
+def cmd_verify_m04r_global_bound_proposal(args: argparse.Namespace) -> int:
+    config = load_config(args.config)
+    poc_root = config.artifact_dir / "poc" / "m04r"
+    full_root = Path(args.full_root) if args.full_root else (
+        poc_root / "packed-bound-full"
+    )
+    evidence = Path(args.evidence) if args.evidence else (
+        poc_root / "global-bound-proposal-full.json"
+    )
+    rank_evidence = Path(args.rank_evidence) if args.rank_evidence else (
+        poc_root / "quantized-bound-rank-full.json"
+    )
+    result = verify_m04r_global_bound_proposal(
+        evidence, full_root / "store", full_root / "packed-bound-full.json",
+        rank_evidence,
+    )
+    output_dir = Path(args.output_dir) if args.output_dir else (
+        config.artifact_dir / "m04r-global-bound-proposal"
+    )
+    machine, html = write_m04r_global_bound_proposal_verification(
+        result, output_dir,
+    )
+    GateReport(
+        "m04r_global_bound_proposal", result.passed,
+        {
+            **result.metrics, "result_digest": result.result_digest,
+            "machine_artifact": str(machine.resolve()),
+            "html_artifact": str(html.resolve()),
+        },
+        list(result.failures), source_hashes={
+            "global_bound_proposal_contract": str(result.metrics["contract_digest"]),
+            "packed_generation": str(result.metrics["generation_id"]),
+        },
+    ).write(_gates(config))
+    print(json.dumps({
+        "passed": result.passed, **result.metrics,
+        "result_digest": result.result_digest,
+        "failures": result.failures,
     }, indent=2))
     print(html)
     return 0 if result.passed else 2
@@ -2097,6 +2144,13 @@ def build_parser() -> argparse.ArgumentParser:
     m04r_full_pack.add_argument("--one-percent-evidence")
     m04r_full_pack.add_argument("--output-dir")
     m04r_full_pack.set_defaults(func=cmd_verify_m04r_full_pack)
+    m04r_global_proposal = sub.add_parser("verify-m04r-global-bound-proposal")
+    m04r_global_proposal.add_argument("--config", required=True)
+    m04r_global_proposal.add_argument("--full-root")
+    m04r_global_proposal.add_argument("--evidence")
+    m04r_global_proposal.add_argument("--rank-evidence")
+    m04r_global_proposal.add_argument("--output-dir")
+    m04r_global_proposal.set_defaults(func=cmd_verify_m04r_global_bound_proposal)
     compare = sub.add_parser("compare-methods")
     compare.add_argument("--config", required=True)
     compare.add_argument("--seeds-per-family", type=int, default=5)

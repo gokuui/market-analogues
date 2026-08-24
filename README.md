@@ -40,6 +40,8 @@ market-analogues verify-m04r-proposal-v2 --config config/datasets.example.yaml
 market-analogues verify-m04r-quantized-ranks --config config/datasets.example.yaml
 market-analogues verify-m04r-packed-bound --config config/datasets.example.yaml
 market-analogues verify-m04r-full-pack --config config/datasets.example.yaml
+market-analogues verify-m04r-global-bound-proposal \
+  --config config/datasets.example.yaml
 market-analogues compare-methods --config config/datasets.example.yaml
 market-analogues build-view-store --config config/datasets.example.yaml \
   --dataset nse --lookbacks 252 --stride 5
@@ -105,6 +107,13 @@ market-analogues search --config config/datasets.example.yaml --dataset nse \
   --output-root config/data/analogues/poc/m04r/packed-bound-full \
   --workers 8 --full-universe
 .venv/bin/market-analogues verify-m04r-full-pack \
+  --config config/datasets.example.yaml
+.venv/bin/python experiments/m04r/global_bound_proposal_gate.py \
+  --config config/datasets.example.yaml \
+  --full-root config/data/analogues/poc/m04r/packed-bound-full \
+  --output config/data/analogues/poc/m04r/global-bound-proposal-full.json \
+  --block-rows 2048
+.venv/bin/market-analogues verify-m04r-global-bound-proposal \
   --config config/datasets.example.yaml
 ```
 
