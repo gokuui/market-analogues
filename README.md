@@ -36,6 +36,7 @@ market-analogues verify-m04r-distance-v1 --config config/datasets.example.yaml \
 market-analogues verify-m04r-feature-kernel --config config/datasets.example.yaml \
   --contract config/m04-candidate-recall-contract.yaml --dataset nasdaq
 market-analogues verify-m04r-quantized-bound --config config/datasets.example.yaml
+market-analogues verify-m04r-proposal-v2 --config config/datasets.example.yaml
 market-analogues compare-methods --config config/datasets.example.yaml
 market-analogues build-view-store --config config/datasets.example.yaml \
   --dataset nse --lookbacks 252 --stride 5
@@ -78,6 +79,13 @@ market-analogues search --config config/datasets.example.yaml --dataset nse \
 .venv/bin/python experiments/m04r/quantized_bound_authority_gate.py \
   --config config/datasets.example.yaml --symbols 64 \
   --output config/data/analogues/poc/m04r/quantized-bound-authority-gate.json
+.venv/bin/python experiments/m04r/proposal_v2_authority_gate.py \
+  --config config/datasets.example.yaml --symbols 0 --workers 8 \
+  --output config/data/analogues/poc/m04r/proposal-v2-full.json
+.venv/bin/python experiments/m04r/hybrid_route_gate.py \
+  --artifact-dir config/data/analogues \
+  --compact-evidence config/data/analogues/poc/m04r/proposal-v2-full.json \
+  --output config/data/analogues/poc/m04r/bound-assisted-route-gate.json
 ```
 
 Source datasets are always read-only. Derived manifests, vectors, indexes, outcomes, reports, and gate records are written beneath the configured artifact directory.

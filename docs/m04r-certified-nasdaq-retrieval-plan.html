@@ -19,7 +19,7 @@
 <body>
 <header>
   <h1>M04R — certified NASDAQ analogue retrieval remediation</h1>
-  <p><b>Planning date:</b> 24 August 2026. <b>Status:</b> final evidence-backed implementation plan, frozen after the research/POC preflight. M04R-00 through M04R-04 are verified complete; M04R-05 is next. No retrieval repair is claimed yet.</p>
+  <p><b>Planning date:</b> 24 August 2026. <b>Status:</b> M04R-00 through M04R-04 are verified complete. M04R-05's compact-only experiment is complete and correctly rejected all three layouts; M04R-05B's native-bound-assisted recall POC passed and M04R-06 quantized-rank/packed-performance validation is next. No retrieval repair is claimed yet.</p>
   <p><b>Target outcome:</b> given a current 252-session NASDAQ chart state, return the historically eligible charts with the smallest frozen exact OHLCV/volume/market-context distance. Interactive mode must be fast and candid about approximation. Certified mode must prove that no eligible episode capable of beating the final constrained top-20 was discarded.</p>
   <p>This plan is outcome-blind. Forward returns, trader profits and setup names are not inputs to representation, retrieval, tuning or acceptance.</p>
 </header>
@@ -168,14 +168,23 @@
   <p><b>Development evidence:</b> All 12 inspected NASDAQ authorities, synthetic morphology families and adversarial local-cap cases are development-only. Report recall curves at 1k/5k/10k/20k, route ranks, component correlations, scan time, bytes and quantization sensitivity.</p>
   <p><b>Selection rule:</b> Smallest layout with 20/20 inclusion on every development case at pool 20,000, at least 19/20 at pool 10,000, perfect planted synthetic retrieval and no per-query weights.</p>
   <p><b>Important:</b> This gate improves τ seeding. It does not certify completeness.</p>
+  <p class="fail"><b>Verified negative result 24 August 2026:</b> COMPLETE/REJECT. Contract <code>dcb44ebf…b969</code> was evaluated across all 11,584 A/B NASDAQ symbols and all 12 frozen authorities with exact eligible-row equality (2.575m–3.786m rows per case). Only historical CAKE failed: 192/240/320 retained respectively 13/15/17 of 20 at pool 10k and 16/18/20 at pool 20k; all other cases were 20/20 at both pools. Therefore no layout satisfies the frozen rule and no compact-v2 layout is selected. The sealed verifier fails for exactly that reason. Float16 is also rejected: 10–16 rows per layout overflow, with observed magnitudes up to 4.70m. Float32 projections would consume 2.74/3.43/4.56 GiB at 3.82m rows. Synthetic/local-cap gates passed and four/eight-process preflights produced identical deterministic evidence.</p>
+</section>
+
+<section class="task" id="m04r-05b">
+  <h2>M04R-05B — Bound-assisted routing decision POC</h2>
+  <p><b>Why added:</b> The compact-only result falsified the assumed seeder but the full certified native lower-bound frontiers already account for every eligible row. Test that evidence before inventing a larger compact store.</p>
+  <p><b>Frozen POC allocation:</b> At every pool reserve 10% for the native certified-bound route, 9% for each of seven compact component routes and 27% for compact composite. Recompute conservative target ranks from all 12 existing full frontiers; do not use outcomes.</p>
+  <p class="pass"><b>Recall POC 24 August 2026:</b> PASS FOR NEXT EXPERIMENT, NOT PRODUCTION. Every one of 240 authority targets has native-bound rank at most 56, so a top-100 bound route produces 20/20 in every case even at pool 1k. Evidence digest is <code>4e5369b6…59a45</code>. This establishes that bound-first routing is worth measuring; it does not establish quantized-rank equivalence, packed latency, overflow handling or a compact-only pass.</p>
 </section>
 
 <section class="task" id="m04r-06">
   <h2>M04R-06 — Packed immutable store generations</h2>
+  <p><b>New preflight from M04R-05/05B:</b> Before any store build, measure all-12 target ranks using the actual quantized/error-corrected bound, not the native frontier proxy. Specify a deterministic float32 sidecar or exact fallback for every full-universe float16 overflow and prove it cannot weaken the bound. Then compare bound-first, bound-assisted-192 and no-compact layouts on the same 1% pack. Compact-only v2 is not eligible.</p>
   <p><b>Build:</b> Replace 11,584 small-file opens with content-addressed packs containing fixed-width episode IDs, cutoff/session index, symbol dictionary ID, tier, masks, proposal fields and certified-bound fields. Activate a completed generation with one atomic manifest swap; daily updates append new immutable time segments.</p>
   <p><b>Precondition:</b> <code>free ≥ 30 GiB</code>, representing the 5 GiB reserve, active and shadow generations, metadata, 20% safety and atomic-write overhead. This may be lowered only by a passed measured packed-format projection; it may not be waived from an optimistic compression estimate.</p>
   <p><b>Tests:</b> Interrupted build/resume, truncated/corrupt/missing pack, manifest tamper, source-prefix revision, append-only incremental equivalence, serial/parallel digest equality and rollback.</p>
-  <p><b>Performance gate:</b> On a 1% real packed store, project ≤300 seconds warm / 600 seconds cold for the full quantile-aware bound scan, ≤1 GiB RSS and ≤11 GiB active NASDAQ store including metadata. Compare raw segmented mmap, Blosc2 if available, and a compiled NumPy/Numba/NumKong-style kernel. Only then build 100%.</p>
+  <p><b>Performance gate:</b> On a 1% real packed store, project ≤300 seconds warm / 600 seconds cold for the full quantile-aware bound scan, ≤1 GiB RSS and ≤11 GiB active NASDAQ store including metadata. Compare raw segmented mmap, Blosc2 if available, and a compiled NumPy/Numba/NumKong-style kernel. Report cold/warm bound-first time separately from optional compact τ seeding. Only then build 100%.</p>
 </section>
 
 <section class="task" id="m04r-07">

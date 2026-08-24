@@ -63,6 +63,9 @@ from .m04r_feature_verification import (
 from .m04r_quantized_verification import (
     verify_m04r_quantized_bound, write_m04r_quantized_verification,
 )
+from .m04r_proposal_verification import (
+    verify_m04r_proposal_v2, write_m04r_proposal_verification,
+)
 from .multiresolution_verification import (
     verify_multiresolution_state, write_multiresolution_verification,
 )
@@ -594,6 +597,40 @@ def cmd_verify_m04r_quantized_bound(args: argparse.Namespace) -> int:
         },
         list(result.failures), source_hashes={
             "quantized_bound_contract": str(result.contract["digest"]),
+        },
+    ).write(_gates(config))
+    print(json.dumps({
+        "passed": result.passed, **result.metrics,
+        "result_digest": result.result_digest, "failures": result.failures,
+    }, indent=2))
+    print(html)
+    return 0 if result.passed else 2
+
+
+def cmd_verify_m04r_proposal_v2(args: argparse.Namespace) -> int:
+    config = load_config(args.config)
+    evidence_path = Path(args.evidence) if args.evidence else (
+        config.artifact_dir / "poc" / "m04r" / "proposal-v2-full.json"
+    )
+    result = verify_m04r_proposal_v2(evidence_path)
+    output_dir = Path(args.output_dir) if args.output_dir else (
+        config.artifact_dir / "m04r-proposal-v2"
+    )
+    machine, html, contract = write_m04r_proposal_verification(
+        result, output_dir,
+    )
+    GateReport(
+        "m04r_proposal_v2", result.passed,
+        {
+            **result.metrics,
+            "result_digest": result.result_digest,
+            "machine_artifact": str(machine.resolve()),
+            "html_artifact": str(html.resolve()),
+            "contract_artifact": str(contract.resolve()),
+        },
+        list(result.failures), source_hashes={
+            "proposal_v2_contract": str(result.contract["digest"]),
+            "proposal_v2_evidence": str(result.metrics["evidence_digest"]),
         },
     ).write(_gates(config))
     print(json.dumps({
@@ -1914,6 +1951,11 @@ def build_parser() -> argparse.ArgumentParser:
     m04r_quantized.add_argument("--authority-evidence")
     m04r_quantized.add_argument("--output-dir")
     m04r_quantized.set_defaults(func=cmd_verify_m04r_quantized_bound)
+    m04r_proposal = sub.add_parser("verify-m04r-proposal-v2")
+    m04r_proposal.add_argument("--config", required=True)
+    m04r_proposal.add_argument("--evidence")
+    m04r_proposal.add_argument("--output-dir")
+    m04r_proposal.set_defaults(func=cmd_verify_m04r_proposal_v2)
     compare = sub.add_parser("compare-methods")
     compare.add_argument("--config", required=True)
     compare.add_argument("--seeds-per-family", type=int, default=5)
