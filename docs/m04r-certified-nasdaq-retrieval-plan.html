@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>M04R — certified NASDAQ analogue retrieval remediation plan</title>
+  <style>
+    :root{--ink:#17202a;--muted:#566573;--paper:#fff;--bg:#f4f6f7;--line:#d5d8dc;--green:#117864;--red:#b03a2e;--amber:#9a6700;--blue:#2471a3;--purple:#6c3483}
+    *{box-sizing:border-box}body{font-family:system-ui,sans-serif;max-width:1380px;margin:0 auto;padding:2rem;background:var(--bg);color:var(--ink);line-height:1.55}
+    header,section{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:1.4rem;margin:0 0 1rem}
+    table{border-collapse:collapse;width:100%}th,td{text-align:left;vertical-align:top;padding:.62rem;border-bottom:1px solid var(--line)}
+    code{background:#eef2f3;padding:.1rem .3rem;overflow-wrap:anywhere}.muted{color:var(--muted)}.pass{color:var(--green)}.fail{color:var(--red)}.open{color:var(--amber)}
+    .decision{border-left:6px solid var(--green)}.warning{border-left:6px solid var(--amber)}.task{border-left:6px solid var(--blue)}.research{border-left:6px solid var(--purple)}
+    .flow{display:grid;grid-template-columns:repeat(5,minmax(150px,1fr));gap:.7rem}.flow div{padding:.8rem;border:1px solid var(--line);border-radius:8px;background:#f8fafb}.flow b{display:block;color:var(--blue);margin-bottom:.25rem}
+    li{margin:.38rem 0}a{color:#1f618d}.small{font-size:.92rem}
+    @media(max-width:900px){.flow{grid-template-columns:1fr}body{padding:.8rem}table{display:block;overflow:auto}}
+  </style>
+</head>
+<body>
+<header>
+  <h1>M04R — certified NASDAQ analogue retrieval remediation</h1>
+  <p><b>Planning date:</b> 24 August 2026. <b>Status:</b> final evidence-backed implementation plan, frozen after the research/POC preflight; no remediation result is claimed yet.</p>
+  <p><b>Target outcome:</b> given a current 252-session NASDAQ chart state, return the historically eligible charts with the smallest frozen exact OHLCV/volume/market-context distance. Interactive mode must be fast and candid about approximation. Certified mode must prove that no eligible episode capable of beating the final constrained top-20 was discarded.</p>
+  <p>This plan is outcome-blind. Forward returns, trader profits and setup names are not inputs to representation, retrieval, tuning or acceptance.</p>
+</header>
+
+<section class="decision">
+  <h2>Decision</h2>
+  <p>Replace the fixed-pool correctness assumption with a <b>deterministic certified filter–refine engine</b>. An exact-aligned proposal supplies a good starting upper bound. A packed full float16 lower-bound representation, corrected by outward quantization-error radii, then accounts for every eligible episode. Native exact completion is performed only for candidates that remain capable of entering the top-20. Generic ANN may later seed the upper bound, but it can never decide that an episode is safe to exclude.</p>
+  <p>The current exact distance remains <code>distance-v1</code> while its mathematical contract and selected quantized lower bounds receive independent proof review. If the selected store fails proof, capacity or packed-performance gates, a separately versioned and preregistered <code>distance-v2</code> branch will use fixed causal scaling and a proof-friendly additive DTW contract. Gate 12 is never overwritten.</p>
+</section>
+
+<section class="decision">
+  <h2>Research and POC preflight is complete</h2>
+  <p>The detailed paper/repository audit, local-plan retrospective, POC methods, failures and measured results are in <a href="m04r-research-and-poc-report.html">M04R research audit and preflight POC evidence</a>. The preflight rejected fusion-only repair, compact PAA/moment authority layouts and DCT/SFA as the primary bound. It selected the full error-corrected float16 lower-bound row because it retained 99.83% of native pruning on the difficult CAKE sample while the compact candidates retained only 12–15%.</p>
+  <p>The selected lower-bound payload projects to 8.43 GiB for 3.82m NASDAQ rows before identifiers, masks and metadata. Current Python evidence is about 9,084 rows/second, so packed/native scan optimization is a mandatory gate rather than an assumed result. A full build is forbidden until the capacity and 1% packed-layout gates pass.</p>
+</section>
+
+<section>
+  <h2>What failed, precisely</h2>
+  <table>
+    <thead><tr><th>Query</th><th>Exact neighbours lost</th><th>Loss point</th><th>Measured evidence</th></tr></thead>
+    <tbody>
+      <tr><td>TVTX</td><td>HLIT rank 7; CDMO rank 19</td><td>Both passed the local union, then equal reciprocal-rank fusion placed them at 28,175 and 26,064.</td><td>Exact-weighted fusion moved them to 16,309 and 13,016 and recovered 20/20. This diagnoses weighting but is now development evidence.</td></tr>
+      <tr><td>CAKE</td><td>FIBK 6; MSCC 11; SHLM 14; DSGX 15; ESRX 20</td><td>FIBK was locally rank 28 and removed by the hard top-20 cap. The other four were globally ranked 23,708–102,220.</td><td>Exact-weighted fusion reached only 16/20. Raising the local cap to 40 created 909,516 intermediate rows; a pool near 125,000 was needed to include all five.</td></tr>
+    </tbody>
+  </table>
+  <p>The current candidate proxy is weakly related to the exact score on the difficult case: among CAKE's true top-20, exact-versus-proxy Spearman correlation was 0.660 for stage but only 0.122 for price, 0.011 for volume, 0.011 for structural, −0.076 for market and −0.198 for candle/volatility. The weighted proxy correlation with exact total distance was 0.017.</p>
+  <p><b>Conclusion:</b> the failure is neither missing data nor exact scorer error. It is caused by proxy mismatch, a correctness-critical local cap, equal view voting, and a fixed global pool.</p>
+</section>
+
+<section>
+  <h2>Measured local constraints</h2>
+  <table>
+    <thead><tr><th>Item</th><th>Current evidence</th><th>Design consequence</th></tr></thead>
+    <tbody>
+      <tr><td>NASDAQ universe</td><td>11,584 eligible view shards; about 3.82m persisted candidate rows; 2.58–3.79m eligible rows per query.</td><td>Use contiguous/chunked arrays and bounded heaps, not hundreds of thousands of Python dictionaries and a giant pandas fusion frame.</td></tr>
+      <tr><td>Current fast scan</td><td>54.6–111.0 seconds; 953–1,255 MiB RSS; 560k–810k local-union rows.</td><td>Streaming global selection must remove the local materialization bottleneck.</td></tr>
+      <tr><td>Exact authority</td><td>Only 460 TVTX and 5,560 CAKE episodes required exact completion out of millions, but per-query frontier construction took about 76–77 minutes.</td><td>The lower-bound idea is effective; regeneration of query-independent features is the operational problem.</td></tr>
+      <tr><td>Exact storage</td><td>4.88m combined rows project to 56.7 GB native, 29.1 GB float32 or 15.0 GB float16 with safety.</td><td>Do not persist the full 1,353-value native representation under the present budget.</td></tr>
+      <tr><td>Current disk</td><td>Free space changed externally during preflight (observed from 5.2 to 14 GiB); neither observation satisfies the frozen shadow-build requirement.</td><td>No full shadow store may start until at least 30 GiB is free or a measured packed projection formally lowers the gate.</td></tr>
+      <tr><td>Hardware</td><td>8 logical / 4 physical CPU cores, AVX2/AVX-512, no detected NVIDIA GPU.</td><td>Prioritize SIMD-friendly blocked CPU kernels and measured 1/2/4-worker scaling.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>Target query architecture</h2>
+  <div class="flow">
+    <div><b>1 · Eligibility</b>Dataset, quality, causal cutoff, history gap, same-symbol overlap and immutable data generation are applied before ranking.</div>
+    <div><b>2 · Proposal</b>Blockwise exact-aligned signature scan proposes plausible episodes and exact-scores a small deterministic seed set to establish upper bound τ.</div>
+    <div><b>3 · Safe bounds</b>Every eligible episode receives a proven composite lower bound from full exact-aligned float16 fields. Quantization error is subtracted and denominators are bounded conservatively.</div>
+    <div><b>4 · Exact refine</b>Only unresolved episodes are reconstructed by instrument, then passed through tighter DTW bounds and threshold-aware exact completion.</div>
+    <div><b>5 · Certificate</b>Return the top-20 plus eligible/scored/pruned accounting, final τ, next bound, tie/overlap state and all source/contract digests.</div>
+  </div>
+  <p><b>Interactive mode</b> may stop after a declared latency budget and reports that it is approximate. <b>Certified mode</b> finishes the bound scan and is the only mode permitted to claim complete top-20 retrieval.</p>
+</section>
+
+<section class="research">
+  <h2>Research incorporated</h2>
+  <table class="small">
+    <thead><tr><th>Work</th><th>Best result or idea</th><th>Use here</th></tr></thead>
+    <tbody>
+      <tr><td><a href="https://api.drum.lib.umd.edu/server/api/core/bitstreams/1fa1a4a0-1cdb-48b9-95e4-0c7fabb7c910/content">GEMINI, Faloutsos et al.</a></td><td>Lower-bounding feature-space filtering avoids false dismissals; original examples included stock-price movements.</td><td>Governing filter–refine architecture.</td></tr>
+      <tr><td><a href="https://www.cs.ucr.edu/~eamonn/vldb2002.pdf">Exact DTW indexing / LB_Keogh</a></td><td>Envelope bounds and PAA summaries support exact DTW k-NN search.</td><td>Candidate DTW envelope bound, only after proof for our distance.</td></tr>
+      <tr><td><a href="https://ciir.cs.umass.edu/pubfiles/mm-40.pdf">Multivariate LB_Keogh</a></td><td>Extends envelope bounds to multivariate series under compatible local norms.</td><td>Starting point for four-channel dependent DTW.</td></tr>
+      <tr><td><a href="https://arxiv.org/abs/0811.3301">LB_Improved</a> and <a href="https://arxiv.org/abs/2102.07076">LB_Petitjean/LB_Webb</a></td><td>Tighter linear-time bounds can reduce exact DTW work.</td><td>Benchmark as later cascade stages; never substitute without a proof.</td></tr>
+      <tr><td><a href="https://www.cs.ucr.edu/~eamonn/UCRsuite.html">UCR Suite</a></td><td>Cheap-bound cascades, early abandoning, reordered evaluation and tight best-so-far make exact search practical at very large scale.</td><td>Seed τ early, order work by prune benefit per cost, stop with a certificate.</td></tr>
+      <tr><td><a href="https://arxiv.org/abs/2010.05371">EAPrunedDTW</a></td><td>Threshold-aware pruning inside DTW can outperform separate-bound-heavy execution.</td><td>Prototype for exact completion; validate custom normalization and alignment path exactly.</td></tr>
+      <tr><td><a href="https://www.cs.ucr.edu/~eamonn/kais_2000.pdf">PAA</a> and <a href="https://www.cs.princeton.edu/courses/archive/spring05/cos598E/bib/chan99efficient.pdf">Haar summaries</a></td><td>Compact multiresolution Euclidean summaries can lower-bound compatible distances.</td><td>Pareto candidates for proof-aware compact fields.</td></tr>
+      <tr><td><a href="https://arxiv.org/abs/2009.00786">MESSI</a> and <a href="https://www.vldb.org/pvldb/vol15/p2005-echihabi.pdf">Hercules</a></td><td>Exact indexes benefit from contiguous layouts, SIMD, buffering, parallelism and careful disk scheduling.</td><td>Engineering model, not a drop-in distance implementation.</td></tr>
+      <tr><td><a href="https://www.cs.uoi.gr/~pvassil/supervision/diplomatikes/extraMaterial/Timeseries/2016_matrix_profile.pdf">Matrix Profile</a> / <a href="https://github.com/stumpy-dev/stumpy">STUMPY</a></td><td>Exact z-normalized Euclidean motif/subsequence discovery.</td><td>Auxiliary close/relative-path diagnostic route, not the composite authority.</td></tr>
+      <tr><td><a href="https://arxiv.org/abs/2401.08281">Faiss</a>, <a href="https://github.com/unum-cloud/USearch">USearch</a>, <a href="https://arxiv.org/abs/1603.09320">HNSW</a>, <a href="https://www.microsoft.com/en-us/research/?p=634449">DiskANN</a></td><td>Efficient exact/approximate vector scans, graph proposals, mmap layouts and bounded selection.</td><td>Optional τ seeders and implementation baselines; none can certify the custom non-metric score.</td></tr>
+      <tr><td><a href="https://arxiv.org/abs/1807.05614">ANN-Benchmarks</a></td><td>Evaluate recall against exact truth together with throughput and index cost.</td><td>Report per-query minimum recall and tail latency, never only the mean.</td></tr>
+      <tr><td><a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC5668684/">Dependent vs independent multivariate DTW</a></td><td>Neither multivariate formulation dominates universally.</td><td>Distance-v2 research must compare dependent, independent and hybrid alignment without outcomes.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>Alternatives and decisions</h2>
+  <table>
+    <thead><tr><th>Alternative</th><th>Decision</th><th>Reason</th></tr></thead>
+    <tbody>
+      <tr><td>Increase pool to 125,000 and local cap to 40</td><td class="fail">Reject as fix</td><td>Repairs the observed CAKE case by brute force, but offers no future guarantee and already creates 909k intermediate rows.</td></tr>
+      <tr><td>Exact-weighted RRF only</td><td class="open">Retain as proposal baseline</td><td>Recovered TVTX but only 16/20 CAKE; rank fusion is not an admissible bound.</td></tr>
+      <tr><td>HNSW/Faiss/USearch/ScaNN as authority</td><td class="fail">Reject</td><td>Approximate standard-vector geometry cannot certify this custom pair-scaled composite and its causal filters.</td></tr>
+      <tr><td>Matrix Profile, SAX/iSAX, MESSI or Hercules directly</td><td class="fail">Reject as drop-in</td><td>Excellent under their supported Euclidean/DTW contracts, but not the current seven-component distance.</td></tr>
+      <tr><td>Compact PAA/moment certified layouts</td><td class="fail">Reject as primary v1 bound</td><td>POCs were safe but retained only 12–15% of native pruning; DCT/SFA with a deployable denominator retained at most 23.6%.</td></tr>
+      <tr><td>Persist all native exact representations</td><td class="fail">Reject</td><td>Projected 56.7 GB plus reserve. Native precision is unnecessary for safe filtering when quantization error is carried explicitly.</td></tr>
+      <tr><td>Full float16 exact-aligned lower fields + error radii</td><td class="pass">Selected for distance-v1</td><td>POC retained 99.83% of native pruning with zero sampled violations; projected NASDAQ payload is 8.43 GiB before metadata.</td></tr>
+      <tr><td>Fixed-normalization distance-v2</td><td class="open">Research branch after v1</td><td>Could unlock much smaller standard bounds, but changes similarity semantics and therefore requires new synthetic/semantic gates and authorities.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="warning">
+  <h2>Critical mathematical warning</h2>
+  <p>Published DTW bounds cannot be copied mechanically. Current <code>distance-v1</code> uses four dependent channels, query–candidate joint robust scaling, root-mean-square local cost, Sakoe–Chiba restriction and cumulative-cost division by the realized alignment length. Most literature assumes a fixed norm and unnormalized accumulated cost. Every new bound must have a written derivation for this exact formula and then pass adversarial property tests. If the derivation fails, it is proposal-only.</p>
+</section>
+
+<section class="task" id="m04r-00">
+  <h2>M04R-00 — Freeze the incident and failure attribution</h2>
+  <p><b>Build:</b> Add a machine-readable/readable diagnostic that records each authority neighbour's eligibility, per-symbol view ranks, local admission, global fusion rank, exact components and final loss reason. Preserve M04-v1 artifacts unchanged and label the 11 NSE episodes <code>blocked_input_version</code>, not similarity failures.</p>
+  <p><b>Verify:</b> TVTX accounts for 18 included + 2 fusion losses; CAKE accounts for 15 included + 1 local loss + 4 fusion losses. Repeated digest must be identical, and the runner must prove it did not open outcome inputs.</p>
+  <p><b>Pass before next:</b> Complete accounting for all 23 holdouts and an immutable baseline digest.</p>
+</section>
+
+<section class="task" id="m04r-01">
+  <h2>M04R-01 — Canonical causal-prefix data revisions</h2>
+  <p><b>Build:</b> Retain the physical file SHA for audit, but bind experiments and stores to a canonical ordered OHLCV prefix digest through an explicit coverage cutoff. Stock and benchmark inputs use the same rule. Immutable index generations reference these prefix digests.</p>
+  <p><b>Synthetic tests:</b> Equivalent Parquet rewrite passes; future append passes for an older cutoff; historical insertion/deletion/revision fails; duplicate/reordered timestamps fail; benchmark mutation after cutoff passes; mutation at/before cutoff fails.</p>
+  <p><b>Real verifier:</b> Existing NASDAQ authorities revalidate against unchanged causal prefixes. A current query after an append receives a new episode/store generation rather than silently reusing stale evidence.</p>
+  <p><b>Pass before next:</b> Zero false invalidations from append-only data and zero accepted historical revisions.</p>
+</section>
+
+<section class="task" id="m04r-02">
+  <h2>M04R-02 — Freeze and independently audit distance-v1</h2>
+  <p><b>Build:</b> Write a mathematical contract for all channel transformations, masks, pair scaling, weights, DTW local cost/band/path normalization, tie-breaking, temporal eligibility, overlap suppression and per-instrument constraints. Implement a slow independent reference, not a wrapper around production functions.</p>
+  <p><b>Tests:</b> Identity/symmetry/triangle diagnostics; constants, zero volume, gaps, missing context, extreme finite values, ties and unequal alignment paths; scalar/batch component and path parity; future-data invariance.</p>
+  <p><b>Bound gate:</b> Prove every proposed bound algebraically. Then require <code>LB ≤ exact</code> on at least one million random/adversarial pairs with zero violation. Tests support the proof; they do not replace it.</p>
+  <p><b>Branch rule:</b> If v1 cannot produce useful bounds within the storage/runtime budget, preregister <code>distance-v2</code> with fixed causal normalization and proof-friendly DTW, then rebuild authorities under a new name.</p>
+</section>
+
+<section class="task" id="m04r-03">
+  <h2>M04R-03 — One shared exact-aligned feature kernel</h2>
+  <p><b>Build:</b> Refactor scalar query representation, sliding proposal signatures and exact batches to consume one pure, versioned channel kernel. Eliminate separately implemented proxy meanings for price, candle, volume, market and structure.</p>
+  <p><b>Tests:</b> Scalar/sliding equality for all fields and masks; price and volume unit invariance; benchmark and stock future mutation; ordinary/constant/zero-volume/missing-context/extreme fixtures; serial/chunked/parallel digest identity; zero non-finite output.</p>
+  <p><b>Pass before next:</b> Native parity within a preregistered practical tolerance, planted-clone recall 100%, and zero critical-negative inversion.</p>
+</section>
+
+<section class="task" id="m04r-04">
+  <h2>M04R-04 — Harden the selected full quantized bound contract</h2>
+  <p><b>Build:</b> Turn the preflight derivation into a reviewed mathematical contract for full float16 coarse/stage/structural/channel fields, masks, RMS/max quantization radii, quantile upper bounds and missing-channel accounting. Implement an independent slow interval reference.</p>
+  <p><b>Proof tests:</b> Exhaustive tiny arrays across float16 boundaries; at least one million randomized/adversarial pairs; constants, missing groups, extreme finite values and IQR/std branch changes. Require every component and total <code>LB ≤ native distance-v1 lower bound ≤ completed exact distance</code>.</p>
+  <p><b>Measured baseline:</b> Preflight produced zero violations and 99.83% pruning retention on the difficult sample, but is evidence rather than proof. Repeat across all 12 development authorities and easy/hard strata.</p>
+  <p><b>Pass before next:</b> Zero violation, independent implementation agreement, at least 99% native-pruning retention in every development case, and a frozen row-byte projection including IDs/masks/metadata/error fields.</p>
+</section>
+
+<section class="task" id="m04r-05">
+  <h2>M04R-05 — Proposal signature v2 Pareto experiment</h2>
+  <p><b>Layouts:</b> Evaluate 192, 240 and 320 dimensions derived from actual exact channels. Include exact stage and directional-event structure, masks, downsampled exact price/candle/volume/market groups and the frozen exact component weights.</p>
+  <p><b>Development evidence:</b> All 12 inspected NASDAQ authorities, synthetic morphology families and adversarial local-cap cases are development-only. Report recall curves at 1k/5k/10k/20k, route ranks, component correlations, scan time, bytes and quantization sensitivity.</p>
+  <p><b>Selection rule:</b> Smallest layout with 20/20 inclusion on every development case at pool 20,000, at least 19/20 at pool 10,000, perfect planted synthetic retrieval and no per-query weights.</p>
+  <p><b>Important:</b> This gate improves τ seeding. It does not certify completeness.</p>
+</section>
+
+<section class="task" id="m04r-06">
+  <h2>M04R-06 — Packed immutable store generations</h2>
+  <p><b>Build:</b> Replace 11,584 small-file opens with content-addressed packs containing fixed-width episode IDs, cutoff/session index, symbol dictionary ID, tier, masks, proposal fields and certified-bound fields. Activate a completed generation with one atomic manifest swap; daily updates append new immutable time segments.</p>
+  <p><b>Precondition:</b> <code>free ≥ 30 GiB</code>, representing the 5 GiB reserve, active and shadow generations, metadata, 20% safety and atomic-write overhead. This may be lowered only by a passed measured packed-format projection; it may not be waived from an optimistic compression estimate.</p>
+  <p><b>Tests:</b> Interrupted build/resume, truncated/corrupt/missing pack, manifest tamper, source-prefix revision, append-only incremental equivalence, serial/parallel digest equality and rollback.</p>
+  <p><b>Performance gate:</b> On a 1% real packed store, project ≤300 seconds warm / 600 seconds cold for the full quantile-aware bound scan, ≤1 GiB RSS and ≤11 GiB active NASDAQ store including metadata. Compare raw segmented mmap, Blosc2 if available, and a compiled NumPy/Numba/NumKong-style kernel. Only then build 100%.</p>
+</section>
+
+<section class="task" id="m04r-07">
+  <h2>M04R-07 — Global streaming proposal selection</h2>
+  <p><b>Build:</b> Scan every eligible row in blocks and maintain bounded stable heaps. Remove the correctness-critical per-symbol top-20 truncation and the 560k–900k pandas materialization. Eligibility is applied before ranking; diversity is applied after exact scoring.</p>
+  <p><b>Routes:</b> Exact-weighted composite plus reserved global quotas for stage, price, candle/volatility, volume/shock, market, structural and a small legacy/M03b topology fallback. A route-selected candidate cannot be discarded by later fusion.</p>
+  <p><b>Adversaries:</b> True neighbour at local rank 28, 25 same-symbol decoys, different decoys winning each view, poor equal-RRF rank, ties, shuffled packs, overlapping near-clones and future near-clones.</p>
+  <p><b>Pass before next:</b> All planted neighbours survive; zero duplicates/temporal violations; exact row accounting; IDs invariant to block/order/worker count; ≤768 MiB proposal RSS.</p>
+</section>
+
+<section class="task" id="m04r-08">
+  <h2>M04R-08 — Certified scan and grouped exact completion</h2>
+  <p><b>Upper bound:</b> Exact-score a small deterministic proposal seed to establish τ. A poor or empty proposal may slow the query but may never change the answer.</p>
+  <p><b>Safe cascade:</b> Metadata → cheap stage/structure/coarse partial sum → full quantile-aware error-corrected non-DTW bound → optional proved multivariate envelope bound → compiled threshold-aware DTW. Order fields by measured pruning benefit per bytes and CPU while preserving the identical total bound.</p>
+  <p><b>Materialization:</b> Group unresolved cutoffs by instrument, load each source once, and choose adaptively between sparse requested-window reconstruction and full sliding batch construction. Reconstruct DTW paths only for final results.</p>
+  <p><b>Batch mode:</b> Accept multiple current/news queries, read each packed block once, maintain a separate τ/certificate state per query and report per-query plus shared I/O time. One difficult query may not weaken another query's certificate.</p>
+  <p><b>Certificate:</b> Eligible = safely pruned + exact evaluated; final constrained top-k full; minimum unvisited bound strictly above the kth distance or literal exhaustion; stable episode-ID tie rule; all input/store/distance digests; per-stage prune counts.</p>
+  <p><b>Pass before next:</b> Exact IDs/order/totals/components/alignments equal brute force on small/medium universes and every existing authority; repeated certificate digest identical; single-query p95 ≤300 seconds, maximum ≤600 seconds, RSS ≤1,536 MiB; 24-query batch must materially reduce total elapsed time versus 24 independent scans without changing any result.</p>
+</section>
+
+<section class="task" id="m04r-09">
+  <h2>M04R-09 — Development bake-off and optional ANN</h2>
+  <p><b>Compare:</b> No proposer, proposal-v2 flat scan, weighted route union, Faiss flat/HNSW and USearch mmap/custom or aligned-L2 proposal. All share the identical certified fallback.</p>
+  <p><b>Judge:</b> End-to-end p50/p95/max latency, bytes read, RSS/disk, exact completions, determinism and worst-case query—not ANN recall alone.</p>
+  <p><b>Acceptance:</b> ANN is retained only if it materially lowers certified latency without changing one final result or certificate and without violating disk/RSS/reproducibility constraints. Otherwise deterministic scan remains the default.</p>
+</section>
+
+<section class="task" id="m04r-10">
+  <h2>M04R-10 — Freeze a new untouched NASDAQ authority contract</h2>
+  <p><b>Contamination rule:</b> All inspected Gate 09/Gate 12/M04 cases—including TVTX and CAKE—are development evidence forever. They cannot validate v2.</p>
+  <p><b>Selection:</b> Deterministically choose at least 24 new queries, preferably 50 if authority cost after M04R-08 permits. Cover A/B quality, low/middle/high liquidity, historical/current cutoffs, multiple benchmark regimes/eras, morphology strata defined without outcomes, sparse/full context and different universe sizes. Exclude development symbols and known identity aliases.</p>
+  <p><b>Freeze before search:</b> Query IDs, canonical stock/benchmark prefix digests, exact-distance digest, eligibility contract, proposal/store digests, route quotas, pool budgets, runtime/RSS limits and every authority build command. The authority root must be write-isolated from candidate results.</p>
+  <p><b>Outcome firewall:</b> Runner allow-lists OHLCV, benchmark, quality and sealed authority metadata; forward-outcome roots are forbidden and audited.</p>
+</section>
+
+<section class="task" id="m04r-11">
+  <h2>M04R-11 — Build truth first, then run the untouched matrix once</h2>
+  <p><b>Authority phase:</b> Build every exact certified authority and aggregate it before any proposal-v2 result is opened. Interrupted work resumes through validated shards; failures remain visible.</p>
+  <p><b>Single validation:</b> Run proposal and certified modes once against the frozen matrix.</p>
+  <p><b>Fast-mode pass:</b> ≥19/20 exact-authority inclusion in every case, target 20/20; mean ≥99%; zero temporal/overlap/tier/duplicate errors; repeated search digest; ≤60 seconds warm / 120 seconds cold and ≤1 GiB RSS.</p>
+  <p><b>Certified-mode pass:</b> 20/20 exact IDs and order by construction in every case, complete certificate accounting, p95 ≤300 seconds, max ≤600 seconds, RSS ≤1,536 MiB. One failed case fails the entire matrix; an average cannot override it.</p>
+</section>
+
+<section class="task" id="m04r-12">
+  <h2>M04R-12 — Fault injection, shadow operation and promotion</h2>
+  <p><b>Faults:</b> Equivalent rewrite, future append, historical revision, partial session, timezone/calendar shift, split/scale transform, missing benchmark, sparse/zero volume, delisted/renamed aliases, tie at kth distance, corrupt pack, disk full, interrupted build, worker crash and stale manifest.</p>
+  <p><b>Shadow:</b> Run daily NASDAQ queries without trading decisions. Compare interactive/certified route agreement, repeated-query stability, incremental versus clean-build digest, store coverage and drift telemetry.</p>
+  <p><b>Output contract:</b> Every result labels its mode; displays query/store coverage, final exact neighbours and components, exclusions/certificate, known data limitations and abstention reason when provenance or coverage is incomplete.</p>
+  <p><b>Promotion:</b> Default interactive mode only after M04R-11 and shadow gates pass. Certified mode remains available for audit and hard queries. Profitability/outcome evaluation is a later, separately preregistered phase.</p>
+</section>
+
+<section>
+  <h2>Artifact contracts</h2>
+  <ul>
+    <li><code>canonical-causal-prefix-v1</code></li>
+    <li><code>distance-mathematical-contract-v1</code></li>
+    <li><code>candidate-signature-contract-v2</code></li>
+    <li><code>certified-bound-layout-v1</code></li>
+    <li><code>candidate-store-manifest-v4</code></li>
+    <li><code>candidate-retrieval-contract-v2</code></li>
+    <li><code>certified-search-certificate-v1</code></li>
+    <li><code>candidate-recall-case-v2</code> and <code>candidate-recall-matrix-v2</code></li>
+  </ul>
+  <p>Every machine result records data/store/distance/config/code digests; eligible/read/proposed/pruned/refined/result counts; per-route and per-bound attribution; cutoff and overlap policy; timing/RSS/I/O; repeated digest; and <code>real_forward_outcomes_accessed: false</code>.</p>
+</section>
+
+<section>
+  <h2>Execution discipline</h2>
+  <ol>
+    <li>Implement one numbered task only.</li>
+    <li>Run its unit, adversarial, differential, determinism, provenance and resource verifier.</li>
+    <li>Write machine JSON and readable HTML evidence, including failed attempts.</li>
+    <li>Append what/why/how/results/limits to the development log.</li>
+    <li>Commit a clean rollback point.</li>
+    <li>Proceed only if the explicit gate passes. A failure creates a versioned redesign; it never lowers a frozen threshold.</li>
+  </ol>
+  <p class="muted">The first implementation task is M04R-00. The first storage-mutating full-universe task is M04R-06 and is blocked by the declared free-space precondition until capacity is safely available.</p>
+</section>
+</body>
+</html>

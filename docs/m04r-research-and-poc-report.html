@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>M04R research audit and preflight POC evidence</title>
+  <style>
+    :root{--ink:#17202a;--muted:#566573;--paper:#fff;--bg:#f4f6f7;--line:#d5d8dc;--green:#117864;--red:#b03a2e;--amber:#9a6700;--blue:#2471a3;--purple:#6c3483}
+    *{box-sizing:border-box}body{font-family:system-ui,sans-serif;max-width:1420px;margin:0 auto;padding:2rem;background:var(--bg);color:var(--ink);line-height:1.55}
+    header,section{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:1.4rem;margin:0 0 1rem}
+    table{border-collapse:collapse;width:100%;display:block;overflow:auto}th,td{text-align:left;vertical-align:top;padding:.62rem;border-bottom:1px solid var(--line)}
+    code{background:#eef2f3;padding:.1rem .3rem;overflow-wrap:anywhere}a{color:#1f618d}.pass{color:var(--green)}.fail{color:var(--red)}.open{color:var(--amber)}.muted{color:var(--muted)}
+    .decision{border-left:6px solid var(--green)}.warning{border-left:6px solid var(--amber)}.research{border-left:6px solid var(--purple)}.incident{border-left:6px solid var(--red)}
+    li{margin:.38rem 0}.small{font-size:.91rem}@media(max-width:800px){body{padding:.8rem}}
+  </style>
+</head>
+<body>
+<header>
+  <h1>M04R research audit and preflight POC evidence</h1>
+  <p><b>Evidence date:</b> 24 August 2026. <b>Scope:</b> exact or progressive historical OHLCV analogue retrieval over the complete NASDAQ archive under the frozen <code>distance-v1</code> score.</p>
+  <p><b>Purpose:</b> resolve the high-risk design questions before another large implementation cycle. This report separates published claims, repository capabilities, measured local evidence and remaining proof obligations. It does not claim trading profitability.</p>
+</header>
+
+<section class="incident">
+  <h2>Why the earlier plan reached this problem late</h2>
+  <p>The original plans correctly covered causal OHLCV representation, benchmark context, exact reranking, exhaustive reference authorities, provenance, resource limits and outcome isolation. Gate 12 also explicitly warned that the 240-value signature was not a mathematical lower bound and required exact full-universe authorities.</p>
+  <p>The process gap was the missing contract between the approximate candidate representation and the exact scorer. Sampled-real gates contained only 2,658 NASDAQ candidates, while production contains roughly 2.6–3.8 million eligible episodes per query. Synthetic gates did not include four million distractors, a true neighbour below local rank 20, or separate-view decoy swarms. Deterministic local top-20 selection and equal reciprocal-rank fusion were tested for reproducibility, not for preservation of exact rank.</p>
+  <p>The first sealed full-universe M04 comparison therefore found what earlier documents had left open: historical TVTX retained 18/20 exact neighbours and historical CAKE retained 15/20. The exact scorer and authority remained correct; the shortlist was incomplete. A stricter process would have run a small authority-versus-proposal bakeoff before completing all 24 authorities and would have retired the whole original registry after the first development scout.</p>
+</section>
+
+<section class="research">
+  <h2>Research method and coverage</h2>
+  <p>Three independent audits covered academic retrieval methods, open-source/production systems and the local architecture/history. Searches followed references through exact time-series indexes, elastic-distance lower bounds, multivariate and variable-length retrieval, motif/shape representations, financial-chart matching, progressive search, vector search, storage formats and evaluation leakage. Current project/repository documentation and licenses were inspected where available.</p>
+  <p>No finite search proves that every publication or private repository has been found. The control against endless rediscovery is a categorized evidence map, explicit rejection reasons, bounded POCs for material uncertainties and a frozen change process: new work enters only when it defeats a selected baseline under the same gate or a current gate fails.</p>
+</section>
+
+<section>
+  <h2>Academic evidence that changes the design</h2>
+  <table class="small">
+    <thead><tr><th>Work</th><th>Result or idea</th><th>Decision here</th></tr></thead>
+    <tbody>
+      <tr><td><a href="https://api.drum.lib.umd.edu/server/api/core/bitstreams/1fa1a4a0-1cdb-48b9-95e4-0c7fabb7c910/content">GEMINI</a></td><td>Feature filtering is exact only when feature distance lower-bounds object distance; the original examples included stock movements.</td><td>Adopt deterministic filter–refine as the governing correctness architecture.</td></tr>
+      <tr><td><a href="https://www.cs.ucr.edu/~eamonn/vldb2002.pdf">LB_Keogh / exact DTW indexing</a>, <a href="https://arxiv.org/abs/0811.3301">LB_Improved</a>, <a href="https://arxiv.org/abs/2102.07076">LB_Webb/Petitjean</a></td><td>Cheap envelope bounds, cascades and early abandon can avoid most conventional DTW evaluations without false dismissal.</td><td>Adopt the cascade idea only after a proof for our multivariate, pair-scaled, path-normalized formula.</td></tr>
+      <tr><td><a href="https://www.vldb.org/pvldb/vol16/p2019-paparrizos.pdf">Generalized lower bounds</a></td><td>Reusable candidate summaries can outperform tighter query-specific bounds after storage/build cost is included.</td><td>Motivates the immutable lower-bound store and pruning-per-byte experiments.</td></tr>
+      <tr><td><a href="https://arxiv.org/abs/2010.05371">EAPrunedDTW</a></td><td>Threshold-aware pruning inside exact DTW can outperform a large external-bound cascade.</td><td>Use for survivor completion; the POC validates a custom two-row kernel.</td></tr>
+      <tr><td><a href="https://www.cs.ucr.edu/~eamonn/kais_2000.pdf">PAA</a>, <a href="https://www.cs.princeton.edu/courses/archive/spring05/cos598E/bib/chan99efficient.pdf">Haar</a>, <a href="https://helios2.mi.parisdescartes.fr/~themisp/publications/icde25-sofa.pdf">SOFA/SFA</a></td><td>Partial orthogonal or aggregate representations lower-bound compatible Euclidean energy and can be indexed efficiently.</td><td>Test as compact bounds/proposals. Local POCs show aggressive compression is too loose for the present pair-scaled composite.</td></tr>
+      <tr><td><a href="https://arxiv.org/abs/2009.00786">MESSI</a>, <a href="https://www.vldb.org/pvldb/vol15/p2005-echihabi.pdf">Hercules</a>, <a href="https://users.ics.forth.gr/~kondylak/Coconut.html">Coconut</a>, <a href="https://helios2.mi.parisdescartes.fr/~themisp/publications/sigmod23-dumpy.pdf">Dumpy</a></td><td>Exact search depends heavily on contiguous layout, adaptive summaries, SIMD, parallelism, buffering and sequential I/O.</td><td>Adopt engineering patterns, not their distance-specific exactness claims.</td></tr>
+      <tr><td><a href="https://www.vldb.org/pvldb/vol11/p2236-linardi.pdf">ULISSE</a>, <a href="https://www.vldb.org/pvldb/vol17/p2123-he.pdf">CIVET</a>, <a href="https://helios2.mi.parisdescartes.fr/~themisp/publications/sigmod18-valmod.pdf">VALMOD</a></td><td>Variable-length exact search is possible under supported ED/DTW contracts and carefully normalized length comparison.</td><td>Defer until fixed 252-session retrieval is certified; later test a frozen 126/189/252 grid.</td></tr>
+      <tr><td><a href="https://www.cs.ucr.edu/~eamonn/Motif_Discovery_ICDM.pdf">Multidimensional matrix profile</a>, <a href="https://github.com/stumpy-dev/stumpy">STUMPY</a>, <a href="https://arxiv.org/abs/2009.07907">exact DTW motifs</a></td><td>Channel-subset motifs and hierarchical bounds expose repeated primitives at scale.</td><td>Use for diagnostics/proposal views; never silently select whichever channels happen to match.</td></tr>
+      <tr><td><a href="https://web.mit.edu/people/wangj/pap/LoMamayskyWang00.pdf">Lo, Mamaysky &amp; Wang</a>, <a href="https://www.sciencedirect.com/science/article/pii/S0952197606001278">PIP stock matching</a>, <a href="https://www.econstor.eu/bitstream/10419/48828/1/665293259.pdf">directional-change events</a></td><td>Extrema, perceptually important points and intrinsic event time resemble how traders compress chart development.</td><td>Retain as deterministic structural proposal routes and explanations, not named-pattern truth.</td></tr>
+      <tr><td><a href="https://ueaeprints.uea.ac.uk/id/eprint/69244/1/ICDM_2018_Shaghayegh.pdf">MPdist</a>, <a href="https://pubmed.ncbi.nlm.nih.gov/19110495/">TWED</a>, <a href="http://www.vldb.org/conf/2004/RS21P2.PDF">ERP</a></td><td>Alternative elastic measures can be more robust or metric-like than conventional DTW.</td><td>Distance-v2 research only; changing distance creates new truth and cannot overwrite Gate 12.</td></tr>
+      <tr><td><a href="https://www.vldb.org/pvldb/vol13/p403-echihabi.pdf">Similarity-search evaluation</a>, <a href="https://helios2.mi.parisdescartes.fr/~themisp/bends/edq/paper/workloads-kdd2015.pdf">query workload generation</a></td><td>Random queries hide hardness; exact, bounded approximate and unbounded approximate systems require full speed/recall curves.</td><td>Adopt worst-case strata, per-query recall and separate mode labels.</td></tr>
+      <tr><td><a href="https://escholarship.org/uc/item/4w1110bb">Backtest overfitting</a>, <a href="https://onlinelibrary.wiley.com/doi/pdf/10.1111/1468-0262.00152">White's Reality Check</a>, <a href="https://papers.ssrn.com/sol3/papers.cfm?abstract_id=2460551">Deflated Sharpe Ratio</a></td><td>Repeated method/parameter selection invalidates ordinary holdout claims.</td><td>Keep retrieval correctness separate from outcome usefulness; log every tried variant and preserve untouched eras.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>Open-source and production-system audit</h2>
+  <table class="small">
+    <thead><tr><th>System</th><th>Useful capability</th><th>Decision / boundary</th></tr></thead>
+    <tbody>
+      <tr><td><a href="https://github.com/karimaechihabi/hercules">Hercules</a> (Apache-2.0)</td><td>Disk-oriented exact Euclidean index, leaf-order raw file, buffering, SIMD and adaptive sequential fallback.</td><td>Port layout/scheduling ideas; old research stack and incompatible distance prevent dependency use.</td></tr>
+      <tr><td><a href="https://github.com/JdHondt/MS-Index">MS-Index</a> (MIT)</td><td>Recent exact multivariate Euclidean top-k with query-time channel selection.</td><td>Conceptual POC only; recent preprint and distance mismatch.</td></tr>
+      <tr><td><a href="https://github.com/cwida/PDX">PDX</a> (MIT)</td><td>Block-column layout places high-value dimensions first for early pruning.</td><td>Adopt SoA/AoSoA and pruning-value-per-byte ordering.</td></tr>
+      <tr><td><a href="https://github.com/ashvardanian/NumKong">NumKong</a> (Apache-2.0/BSD-3)</td><td>Portable SIMD f16/bf16/f32 widening distance kernels.</td><td>Benchmark for packed RMS blocks; it does not implement pair-IQR or custom DTW.</td></tr>
+      <tr><td><a href="https://github.com/lemire/lbimproved">LBImproved</a> (Apache-2.0), <a href="https://github.com/wannesm/dtaidistance">dtaidistance</a> (Apache-2.0), <a href="https://github.com/aeon-toolkit/aeon">aeon</a> (BSD-3)</td><td>Independent DTW/lower-bound implementations and optimized baselines.</td><td>Use as algorithm/oracle references after mapping distance semantics explicitly.</td></tr>
+      <tr><td><a href="https://github.com/unum-cloud/USearch">USearch</a> (Apache-2.0), <a href="https://github.com/facebookresearch/faiss">Faiss</a> (MIT)</td><td>Fast flat/graph/vector proposal search, custom metrics or standard L2/IP, mmap/SIMD options.</td><td>Optional τ seeders only. Graph/IVF membership cannot certify the custom nonmetric score.</td></tr>
+      <tr><td><a href="https://github.com/VectorDB-NTU/RaBitQ-Library">RaBitQ</a> (Apache-2.0), <a href="https://github.com/intel/ScalableVectorSearch">SVS</a> (Apache-2.0)</td><td>Very compact estimators and file-backed Vamana/flat vector search.</td><td>Proposal research only; probabilistic or standard-metric guarantees do not transfer.</td></tr>
+      <tr><td>HNSWlib, NMSLIB, ScaNN, DiskANN, Qdrant, Milvus</td><td>Strong ANN/server infrastructure.</td><td>Rejected as the core: added index/server cost with no completeness certificate for this score.</td></tr>
+      <tr><td><a href="https://github.com/Blosc/python-blosc2">Blosc2</a> (BSD-3), <a href="https://github.com/huggingface/safetensors">safetensors</a> (Apache-2.0), <a href="https://github.com/zarr-developers/zarr-python">Zarr</a> (MIT)</td><td>Chunked compression or immutable zero-copy arrays.</td><td>Bake off raw segmented mmap against Blosc2; use Parquet for metadata, not hot compressed vectors.</td></tr>
+      <tr><td><a href="https://github.com/stumpy-dev/stumpy">STUMPY</a>, <a href="https://github.com/matrix-profile-foundation/mass-ts">MASS</a>, <a href="https://github.com/patrickzib/SFA">SFA</a></td><td>Exact normalized-Euclidean motifs and symbolic/Fourier representations.</td><td>Diagnostics and proposal routes; not the composite authority.</td></tr>
+      <tr><td><a href="https://github.com/ktshen/screener">ktshen/screener</a> and the repositories in <a href="repository-comparison.html">the earlier audit</a></td><td>Practical price/MA/ATR/relative-strength/DTW workflows and visual reports.</td><td>Ideas reinforce multiview trader context; public stock matchers lack causal full-universe certification.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>Preflight POCs on local NASDAQ evidence</h2>
+  <p>All POCs are outcome-blind, write only small ignored JSON evidence under <code>config/data/analogues/poc/m04r</code>, and live outside the production package under <code>experiments/m04r</code>. Existing authorities and stores are read-only.</p>
+  <table>
+    <thead><tr><th>POC</th><th>Measured result</th><th>Decision</th></tr></thead>
+    <tbody>
+      <tr><td>Global current-signature ranks</td><td>TVTX raw exact-weighted recall@20k 18/20; historical CAKE 18/20; SLE control 20/20. CAKE MSCC/DSGX remained at ranks 95,033/120,819. Robust and percentile normalization were worse. 97–111 seconds/case.</td><td class="fail">Reject fusion/normalization/local-cap changes as the complete repair.</td></tr>
+      <tr><td>Native lower-bound ceiling</td><td>All three cases retained 20/20 by pool 1,000; worst target ranks TVTX 37, CAKE 56, SLE 26. Existing scalar frontier read/rank took 17–20 seconds/case.</td><td class="pass">Exact-aligned lower bounds are the correct target geometry.</td></tr>
+      <tr><td>90-value compact stage/structure/coarse-PAA bound</td><td>0 violations on 22,808 real + 100,000 random/adversarial pairs; 0.84 GiB projected at 5m rows. Retained only 14.90% of native pruning.</td><td class="fail">Safe but too weak as the primary bound.</td></tr>
+      <tr><td>Pair-scaled PAA/moment layouts</td><td>0 violations on 23,481 real + 300,000 random/adversarial channel pairs. 0.95–1.49 GiB projected for NASDAQ; only 12.37–13.64% native pruning retained.</td><td class="fail">Reject as the primary v1 authority layout.</td></tr>
+      <tr><td>DCT/SFA partial-energy layouts</td><td>With a deployable statistical denominator, 4–24 coefficients retained only 20.1–23.6% of native pruning. Even an unavailable oracle denominator reached only 36.8–69.3% while storage grew to 1.72–4.43 GiB.</td><td class="fail">Retain as proposal research, not certified v1 filtering.</td></tr>
+      <tr><td>Full float16 error-corrected lower-bound row</td><td>0 violations on 23,009 real and 50,000 pairs per denominator mode. Quantile-aware mode pruned 99.19% versus native 99.36%, retaining 99.83% of pruning. Projected NASDAQ payload is 8.43 GiB before IDs/masks/metadata.</td><td class="pass">Selected distance-v1 certified layout, subject to proof hardening and packed performance.</td></tr>
+      <tr><td>Full-bound Python scan</td><td>Quantile-aware prototype processed about 9,084 rows/s; naive extrapolation is roughly seven minutes for 3.82m rows before I/O/refinement. Statistical-only mode doubled speed but retained just 26.8% pruning.</td><td class="open">Optimize quantile selection/SIMD and packed I/O; current prototype is within offline scale but not interactive.</td></tr>
+      <tr><td>Compact arithmetic scan</td><td>Warm repeated-block NumPy microbenchmark processed 5m × 90 values in 2.46 seconds at 249 MiB RSS.</td><td class="pass">Arithmetic is not the compact-path bottleneck; cold packed I/O remains unmeasured.</td></tr>
+      <tr><td>Custom two-row DTW kernel</td><td>Exact equality and path-length parity on 2,000 reference pairs; zero unsafe abandons/mismatches on 100,000 threshold cases; compiled kernel was over 500× faster than the Python reference. Only 429/100,000 cases abandoned under the randomized thresholds.</td><td class="pass">Adopt compiled survivor completion; do not expect early abandon alone to solve universe scale.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="decision">
+  <h2>Architecture frozen by the evidence</h2>
+  <ol>
+    <li>Keep <code>distance-v1</code> as the historical reference contract. Do not relabel another metric as the same truth.</li>
+    <li>Build a packed immutable, query-independent, full float16 lower-bound store with masks and outward error radii. Quantization is part of the bound proof, never an unchecked approximation.</li>
+    <li>Use a deterministic exact-aligned proposal to seed the initial top-k threshold; it may affect speed but never exclusion correctness.</li>
+    <li>Scan every eligible lower-bound row in blocks. A row is either safely pruned or reconstructed and exact-scored. The certificate must close <code>eligible = pruned + exact_evaluated</code>.</li>
+    <li>Finish survivors with compiled threshold-aware DTW and reconstruct full alignment paths only for final displayed matches.</li>
+    <li>Expose <code>interactive-progressive</code> and <code>exact-certified</code> as distinct modes. Batch multiple news/current queries to amortize store I/O.</li>
+    <li>Research a separately versioned fixed-normalization <code>distance-v2</code> only after v1 is operational; it must win semantic/synthetic stability gates before gaining its own authorities.</li>
+  </ol>
+  <p><b>Capacity consequence:</b> the current store cannot be built safely until free capacity covers the 5 GiB reserve, active and shadow generations, metadata, 20% safety and atomic-write overhead. The final plan uses a 30 GiB free-space precondition unless a measured packed format lowers it.</p>
+</section>
+
+<section class="warning">
+  <h2>Claims deliberately not made</h2>
+  <ul>
+    <li>Zero sampled violations are not a mathematical proof; the derivation needs independent review and exhaustive tiny-domain/property testing.</li>
+    <li>The 8.43 GiB projection excludes identifiers, masks, manifests and shadow-build overhead.</li>
+    <li>The Python scan rate is not the final packed/native rate and the warm compact benchmark is not a cold-disk measurement.</li>
+    <li>Exact retrieval under <code>distance-v1</code> does not prove that the distance captures every professional trader judgement.</li>
+    <li>Neither similarity nor historical-neighbour outcomes prove a profitable trade. Outcome testing remains a later preregistered phase.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Change control that prevents another loop</h2>
+  <ol>
+    <li>The companion implementation plan, distance contract, store schema and acceptance thresholds are frozen before the full build.</li>
+    <li>One numbered task is implemented and verified at a time; a gate failure is preserved as evidence.</li>
+    <li>A new paper/repository idea enters only through a bounded POC against the selected baseline with the same correctness/resource metrics.</li>
+    <li>It replaces the baseline only if it passes correctness and materially improves a declared Pareto objective. Otherwise it is recorded and closed.</li>
+    <li>Any inspected authority registry is development data forever. Final validation uses a newly frozen untouched registry once.</li>
+  </ol>
+</section>
+</body>
+</html>

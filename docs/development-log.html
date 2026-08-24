@@ -502,6 +502,26 @@
   <p><b>Verification before holdout:</b> Focused M04/CLI tests pass 6/6; M00 passes with the new registration and the complete suite passes 162/162. The implementation and contract are committed before any of the 23 holdout cases run.</p>
   <p><b>Next:</b> Execute the 23 cases sequentially. Each writes an atomic result and can resume without rescanning a valid completed case. Preserve every failure and aggregate only when all locked cases are present.</p>
 </section>
+
+<section class="entry" id="log-044">
+  <h2>L-044 — M04 NASDAQ candidate-recall diagnosis and original-plan retrospective</h2>
+  <p><b>What happened:</b> The completed NASDAQ half of M04 found two material full-universe candidate failures: historical TVTX retained 18/20 exact authority neighbours and historical CAKE retained 15/20. A current SLE case retained 19/20 and the other inspected NASDAQ cases passed. The 11 NSE cases were not similarity failures; their sealed whole-file fingerprints were invalidated by append/update drift and are classified separately as blocked inputs.</p>
+  <p><b>Attribution:</b> TVTX lost HLIT/CDMO after local admission when equal RRF placed them at 28,175/26,064. CAKE lost FIBK at local rank 28 and four more through global ranks 23,708–102,220. Raising the local cap to 40 created 909,516 intermediate rows and still did not provide a guarantee. The difficult CAKE exact total has only 0.017 Spearman correlation with the current weighted proxy across its exact top-20.</p>
+  <p><b>Why earlier gates did not close this:</b> The original plans correctly left complete-universe recall open, built exact authorities and required a later per-case comparison. However, sampled-real gates used only 2,658 NASDAQ candidates and synthetic tests did not model millions of distractors, local-rank-28 positives or cross-view decoy swarms. The process omitted a pre-build candidate-to-authority alignment POC and allowed the expensive 24-authority build before testing production proxy geometry on a few exhaustive cases.</p>
+  <p><b>Control correction:</b> The old registry is development evidence after inspection. Every candidate route must now map to exact fields/weights and emit stage-level loss attribution. A new untouched registry is required after the repair; an old failed holdout cannot become independent validation again.</p>
+</section>
+
+<section class="entry" id="log-045">
+  <h2>L-045 — M04R second-pass research, bounded POCs and frozen remediation architecture</h2>
+  <p><b>Research:</b> Three independent audits reviewed the local plans/implementation plus exact/progressive time-series retrieval, elastic-distance bounds, multivariate/variable-length methods, motif/structural finance work, vector indexes, storage formats and current open-source systems. The decision record covers GEMINI, UCR/LB_Keogh/LB_Improved/GLB/EAPrunedDTW, PAA/Haar/SFA, MESSI/Hercules/Coconut/Dumpy, ULISSE/CIVET/VALMOD, Matrix Profile, PIP/directional change, Faiss/USearch/RaBitQ/SVS, packed/mmap/compressed stores and evaluation leakage. No repository is exact for the current pair-scaled, path-normalized composite.</p>
+  <p><b>Proposal POC:</b> Removing the local cap and globally applying exact component weights did not solve retrieval: TVTX remained 18/20 at pool 20,000 and CAKE improved only to 18/20, with MSCC/DSGX at ranks 95,033/120,819. Robust/percentile normalizations and a fixed route union were worse. In contrast, the existing query-specific native lower-bound frontier placed every exact top-20 within rank 56 across TVTX, CAKE and SLE.</p>
+  <p><b>Bound POCs:</b> A 90-value compact bound was safe on 22,808 real and 100,000 random/adversarial pairs but retained only 14.90% of native pruning. Pair-scaled PAA/moment layouts retained 12.37–13.64%; DCT/SFA with deployable denominators retained 20.1–23.6%. The selected full float16 error-corrected lower-bound row produced zero violations on 23,009 real windows and 50,000 pairs per denominator variant, pruned 99.19% versus native 99.36%, and retained 99.83% of native pruning. It projects to 8.43 GiB for 3.82m NASDAQ rows before IDs/masks/metadata.</p>
+  <p><b>Kernel POCs:</b> Warm compact arithmetic reached 2.03m rows/second at 249 MB, showing arithmetic is not the compact bottleneck. The Python full quantile-aware bound processed about 9,084 rows/second, projecting to roughly seven minutes before I/O/refinement and requiring optimization. A compiled two-row DTW kernel exactly matched 2,000 Python references and had zero unsafe abandons/mismatches on 100,000 threshold cases; early abandon triggered only 429 times, so it is a survivor optimization rather than the universe solution.</p>
+  <p><b>Failed harness attempts retained:</b> The compact random fixture initially tried to broadcast three scalars into three 128-value rows; the frontier-rank POC initially joined a manifest-relative query directory twice. Both failed before emitting evidence or changing production artifacts and were corrected in the experimental harnesses.</p>
+  <p><b>Evidence digests:</b> proposal <code>a9f361cf…d7c95</code>; native-frontier ranks <code>8622e20c…75582</code>; compact bound <code>fc6267cf…ed23c</code>; pair-scaled bound <code>e1537e62…47dc</code>; spectral bound <code>0af27675…ea82</code>; full quantized bound <code>d153d47e…92b0</code>; compact scan <code>701e8262…a106</code>; DTW kernel <code>7f49ab08…a7671</code>.</p>
+  <p><b>Decision:</b> Freeze a deterministic filter–refine architecture with an optional proposal τ seeder, a packed full float16/error-radius distance-v1 bound store, blockwise complete accounting, compiled exact survivor completion, separate progressive/certified modes and batched multi-query scans. A full store is blocked until a 1% packed performance gate passes and free space satisfies a 30 GiB shadow-build precondition. Distance-v2 remains a separately versioned later research branch.</p>
+  <p><b>Documents:</b> <code>docs/m04r-research-and-poc-report.html</code> contains the research/POC evidence and explicit rejected alternatives. <code>docs/m04r-certified-nasdaq-retrieval-plan.html</code> contains the final numbered, test-gated implementation sequence. Experimental code lives under <code>experiments/m04r</code>; generated 120-KiB JSON evidence remains under the ignored artifact root.</p>
+</section>
 </main>
 
 <section id="reproduce">
@@ -540,7 +560,15 @@
 .venv/bin/market-analogues aggregate-gate12-authorities --config config/datasets.example.yaml --dataset nse
 .venv/bin/market-analogues run-gate12-authority-matrix --config config/datasets.example.yaml --datasets nse nasdaq
 .venv/bin/market-analogues analyze-kullamagi-examples --config config/datasets.example.yaml --dataset nasdaq
-.venv/bin/market-analogues analyze-kullamagi-yfinance --config config/datasets.example.yaml --target-purity 0.75</code></pre>
+.venv/bin/market-analogues analyze-kullamagi-yfinance --config config/datasets.example.yaml --target-purity 0.75
+.venv/bin/python experiments/m04r/proposal_rank_poc.py --help
+.venv/bin/python experiments/m04r/frontier_rank_poc.py --help
+.venv/bin/python experiments/m04r/compact_bound_poc.py --help
+.venv/bin/python experiments/m04r/pair_scaled_bound_poc.py --help
+.venv/bin/python experiments/m04r/spectral_bound_poc.py --help
+.venv/bin/python experiments/m04r/full_quantized_bound_poc.py --help
+.venv/bin/python experiments/m04r/layout_scan_poc.py --help
+.venv/bin/python experiments/m04r/dtw_kernel_poc.py --help</code></pre>
   <p class="muted">Source datasets are read-only. Generated artifacts live under the configured artifact directory and are intentionally excluded from Git.</p>
 </section>
 </body>

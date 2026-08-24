@@ -92,6 +92,8 @@ missing benchmark context remains missing rather than becoming an observed zero.
 - [Current verification status and next implementation plan](docs/verification-status-and-next-plan.html)
 - [Gate 12 exhaustive reference and independent validation plan](docs/gate12-exhaustive-reference-plan.html)
 - [Case-based market memory: implementation and verification plan](docs/case-based-market-memory-plan.html)
+- [M04R research audit and preflight POC evidence](docs/m04r-research-and-poc-report.html)
+- [M04R certified NASDAQ retrieval remediation plan](docs/m04r-certified-nasdaq-retrieval-plan.html)
 - [Frozen M00 case-memory contract](config/case-memory-contract.yaml)
 - [Append-only case-memory trial ledger](config/case-memory-trials.yaml)
 - [Passing M03b topology verifier](config/structural-verifier-v2.yaml)
