@@ -19,7 +19,7 @@
 <body>
 <header>
   <h1>M04R — certified NASDAQ analogue retrieval remediation</h1>
-  <p><b>Planning date:</b> 24 August 2026. <b>Status:</b> final evidence-backed implementation plan, frozen after the research/POC preflight; no remediation result is claimed yet.</p>
+  <p><b>Planning date:</b> 24 August 2026. <b>Status:</b> final evidence-backed implementation plan, frozen after the research/POC preflight. M04R-00 is verified complete; M04R-01 is next. No retrieval repair is claimed yet.</p>
   <p><b>Target outcome:</b> given a current 252-session NASDAQ chart state, return the historically eligible charts with the smallest frozen exact OHLCV/volume/market-context distance. Interactive mode must be fast and candid about approximation. Certified mode must prove that no eligible episode capable of beating the final constrained top-20 was discarded.</p>
   <p>This plan is outcome-blind. Forward returns, trader profits and setup names are not inputs to representation, retrieval, tuning or acceptance.</p>
 </header>
@@ -124,6 +124,7 @@
   <p><b>Build:</b> Add a machine-readable/readable diagnostic that records each authority neighbour's eligibility, per-symbol view ranks, local admission, global fusion rank, exact components and final loss reason. Preserve M04-v1 artifacts unchanged and label the 11 NSE episodes <code>blocked_input_version</code>, not similarity failures.</p>
   <p><b>Verify:</b> TVTX accounts for 18 included + 2 fusion losses; CAKE accounts for 15 included + 1 local loss + 4 fusion losses. Repeated digest must be identical, and the runner must prove it did not open outcome inputs.</p>
   <p><b>Pass before next:</b> Complete accounting for all 23 holdouts and an immutable baseline digest.</p>
+  <p class="pass"><b>Verified 24 August 2026:</b> PASS. Three complete executions, including one after invariant hardening, produced identical baseline digest <code>5adcbd69…6a81f1</code> and byte-identical 708-KiB machine artifacts. All 23 holdouts and 460 authority neighbours are accounted; the 12 unchanged NASDAQ cases have zero preserved-rank parity errors, while all 11 NSE cases are explicitly <code>blocked_input_version</code>. TVTX is 18 included + 2 fusion losses; historical CAKE is 15 included + 1 local-cap loss + 4 fusion losses. No outcome input was opened.</p>
 </section>
 
 <section class="task" id="m04r-01">

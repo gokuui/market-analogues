@@ -50,6 +50,7 @@ from .m04_candidate_recall import (
     aggregate_m04_cases, load_m04_candidate_recall_spec,
     verify_m04_candidate_case, write_m04_case, write_m04_matrix,
 )
+from .m04r_incident import diagnose_m04r_incident, write_m04r_incident
 from .multiresolution_verification import (
     verify_multiresolution_state, write_multiresolution_verification,
 )
@@ -400,6 +401,50 @@ def cmd_aggregate_m04_candidate_recall(args: argparse.Namespace) -> int:
     print(json.dumps({"passed": passed, **metrics, "failures": failures}, indent=2))
     print(html)
     return 0 if passed else 2
+
+
+def cmd_diagnose_m04r_incident(args: argparse.Namespace) -> int:
+    config = load_config(args.config)
+    spec = load_m04_candidate_recall_spec(args.contract)
+    datasets = sorted({
+        path.parts[-3] for episode_id in spec.payload["holdout_episode_ids"]
+        for path in (config.artifact_dir / "gate12" / "authorities").glob(
+            f"*/cases/{episode_id}.json"
+        )
+    })
+    missing = sorted(set(datasets).difference(config.datasets))
+    if missing:
+        raise SystemExit(f"M04R authority datasets are not configured: {missing}")
+    sources = {
+        dataset_id: source_from_spec(config.datasets[dataset_id])
+        for dataset_id in datasets
+    }
+    result = diagnose_m04r_incident(spec, sources, config.artifact_dir)
+    output_dir = Path(args.output_dir) if args.output_dir else (
+        config.artifact_dir / "m04r-incident"
+    )
+    machine, html = write_m04r_incident(
+        result, output_dir / "m04r-incident.json", output_dir / "m04r-incident.html",
+    )
+    GateReport(
+        "m04r_incident_attribution", result.passed,
+        {
+            **result.metrics,
+            "baseline_digest": result.baseline_digest,
+            "machine_artifact": str(machine.resolve()),
+            "html_artifact": str(html.resolve()),
+        },
+        list(result.failures),
+        source_hashes={"m04_contract": spec.digest},
+    ).write(_gates(config))
+    print(json.dumps({
+        "passed": result.passed,
+        **result.metrics,
+        "baseline_digest": result.baseline_digest,
+        "failures": result.failures,
+    }, indent=2))
+    print(html)
+    return 0 if result.passed else 2
 
 
 def cmd_compare(args: argparse.Namespace) -> int:
@@ -1683,6 +1728,11 @@ def build_parser() -> argparse.ArgumentParser:
     m04_aggregate.add_argument("--contract", required=True)
     m04_aggregate.add_argument("--output-dir")
     m04_aggregate.set_defaults(func=cmd_aggregate_m04_candidate_recall)
+    m04r_incident = sub.add_parser("diagnose-m04r-incident")
+    m04r_incident.add_argument("--config", required=True)
+    m04r_incident.add_argument("--contract", required=True)
+    m04r_incident.add_argument("--output-dir")
+    m04r_incident.set_defaults(func=cmd_diagnose_m04r_incident)
     compare = sub.add_parser("compare-methods")
     compare.add_argument("--config", required=True)
     compare.add_argument("--seeds-per-family", type=int, default=5)
