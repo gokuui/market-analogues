@@ -19,7 +19,7 @@
 <body>
 <header>
   <h1>M04R — certified NASDAQ analogue retrieval remediation</h1>
-  <p><b>Planning date:</b> 24 August 2026. <b>Status:</b> M04R-00 through M04R-04 are verified complete. M04R-05's compact-only experiment is complete and correctly rejected all three layouts; M04R-05B's native-bound-assisted recall POC passed and M04R-06 quantized-rank/packed-performance validation is next. No retrieval repair is claimed yet.</p>
+  <p><b>Planning date:</b> 24 August 2026. <b>Status:</b> M04R-00 through M04R-04 are verified complete. M04R-05 correctly rejected all compact-only layouts; M04R-05B passed its native-bound recall POC; M04R-06A now independently verifies the actual quantized-bound rank census. M04R-06B's physical 1% packed-store test is next. No retrieval repair is claimed yet.</p>
   <p><b>Target outcome:</b> given a current 252-session NASDAQ chart state, return the historically eligible charts with the smallest frozen exact OHLCV/volume/market-context distance. Interactive mode must be fast and candid about approximation. Certified mode must prove that no eligible episode capable of beating the final constrained top-20 was discarded.</p>
   <p>This plan is outcome-blind. Forward returns, trader profits and setup names are not inputs to representation, retrieval, tuning or acceptance.</p>
 </header>
@@ -181,6 +181,7 @@
 <section class="task" id="m04r-06">
   <h2>M04R-06 — Packed immutable store generations</h2>
   <p><b>New preflight from M04R-05/05B:</b> Before any store build, measure all-12 target ranks using the actual quantized/error-corrected bound, not the native frontier proxy. Specify a deterministic float32 sidecar or exact fallback for every full-universe float16 overflow and prove it cannot weaken the bound. Then compare bound-first, bound-assisted-192 and no-compact layouts on the same 1% pack. Compact-only v2 is not eligible.</p>
+  <p class="pass"><b>M04R-06A verified 24 August 2026:</b> PASS. A resumable eight-process scan reconstructed all eligible rows from all 11,584 digest-bound causal stock prefixes plus the shared benchmark prefix and scored the actual error-corrected quantized bound against all 12 frozen authorities. Eligible-row totals match exactly, every target was encountered once, and all 240 targets are within conservative rank 343 (all within top 500/top 1,000); top-100 is explicitly false. Thirty-five rows cannot be safely represented by the frozen int16 quantizer. They are never clipped or omitted: their routing bound is the universal safe value zero and they require an exact/float32 sidecar. Full evidence digest is <code>95a17cdc…c179</code>; independent verifier digest is <code>847b2a96…c1b2</code>. The raw OHLCV reconstruction/scoring run took 2,069.33 seconds; this is not a packed-scan performance result.</p>
   <p><b>Build:</b> Replace 11,584 small-file opens with content-addressed packs containing fixed-width episode IDs, cutoff/session index, symbol dictionary ID, tier, masks, proposal fields and certified-bound fields. Activate a completed generation with one atomic manifest swap; daily updates append new immutable time segments.</p>
   <p><b>Precondition:</b> <code>free ≥ 30 GiB</code>, representing the 5 GiB reserve, active and shadow generations, metadata, 20% safety and atomic-write overhead. This may be lowered only by a passed measured packed-format projection; it may not be waived from an optimistic compression estimate.</p>
   <p><b>Tests:</b> Interrupted build/resume, truncated/corrupt/missing pack, manifest tamper, source-prefix revision, append-only incremental equivalence, serial/parallel digest equality and rollback.</p>
@@ -261,7 +262,7 @@
     <li>Commit a clean rollback point.</li>
     <li>Proceed only if the explicit gate passes. A failure creates a versioned redesign; it never lowers a frozen threshold.</li>
   </ol>
-  <p class="muted">M04R-00 through M04R-04 are complete. M04R-05 is next. The first storage-mutating full-universe task is M04R-06; its capacity and 1% packed-performance preconditions still apply even if currently observed free space exceeds 30 GiB.</p>
+  <p class="muted">M04R-00 through M04R-06A are complete. M04R-06B is the next gate: construct and attack the physical 1% pack before any full-universe store. Capacity, cold/warm latency, RSS, corruption, resume and atomic-generation preconditions still apply even if currently observed free space exceeds 30 GiB.</p>
 </section>
 </body>
 </html>
