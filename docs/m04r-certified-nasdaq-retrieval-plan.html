@@ -19,7 +19,7 @@
 <body>
 <header>
   <h1>M04R — certified NASDAQ analogue retrieval remediation</h1>
-  <p><b>Planning date:</b> 24 August 2026. <b>Status:</b> M04R-00 through M04R-04 are verified complete. M04R-05 correctly rejected all compact-only layouts; M04R-05B passed its native-bound recall POC; M04R-06A now independently verifies the actual quantized-bound rank census. M04R-06B's physical 1% packed-store test is next. No retrieval repair is claimed yet.</p>
+  <p><b>Planning date:</b> 24 August 2026. <b>Status:</b> M04R-00 through M04R-06B are verified complete. Compact-only layouts were rejected; actual quantized-bound ranks pass; the immutable 1% physical pack, exact-fallback sidecar, integrity tests and projected resource gates pass. M04R-06C's 100% generation is next. No retrieval repair is claimed yet.</p>
   <p><b>Target outcome:</b> given a current 252-session NASDAQ chart state, return the historically eligible charts with the smallest frozen exact OHLCV/volume/market-context distance. Interactive mode must be fast and candid about approximation. Certified mode must prove that no eligible episode capable of beating the final constrained top-20 was discarded.</p>
   <p>This plan is outcome-blind. Forward returns, trader profits and setup names are not inputs to representation, retrieval, tuning or acceptance.</p>
 </header>
@@ -186,6 +186,8 @@
   <p><b>Precondition:</b> <code>free ≥ 30 GiB</code>, representing the 5 GiB reserve, active and shadow generations, metadata, 20% safety and atomic-write overhead. This may be lowered only by a passed measured packed-format projection; it may not be waived from an optimistic compression estimate.</p>
   <p><b>Tests:</b> Interrupted build/resume, truncated/corrupt/missing pack, manifest tamper, source-prefix revision, append-only incremental equivalence, serial/parallel digest equality and rollback.</p>
   <p><b>Performance gate:</b> On a 1% real packed store, project ≤300 seconds warm / 600 seconds cold for the full quantile-aware bound scan, ≤1 GiB RSS and ≤11 GiB active NASDAQ store including metadata. Compare raw segmented mmap, Blosc2 if available, and a compiled NumPy/Numba/NumKong-style kernel. Report cold/warm bound-first time separately from optional compact τ seeding. Only then build 100%.</p>
+  <p class="pass"><b>M04R-06B verified 24 August 2026:</b> PASS. Contract <code>9af266e2…5dbf</code> freezes a 2,432-byte little-endian mmap row and 32-byte metadata-only exact-source overflow fallback. An overflow-stratified deterministic 116-symbol sample produced 37,083 quantized rows plus 22 real sidecar rows in 90,186,560 bytes. Serial and eight-process builds produced identical content-addressed generation <code>27ce3af2…0958b</code>. Query-specific scaling against each authority's actual eligible-row count projects 248.56 seconds worst warm, 227.94 seconds after <code>POSIX_FADV_DONTNEED</code>, 615.81 MB RSS and 8.6523 GiB active size. Repeated 12-query top-1,000 digests are identical. Independent verifier <code>ed1c9e59…b0a9f</code> passes physical hashes/layout, source provenance, rank-evidence binding, resume, sidecar, capacity and resource mathematics.</p>
+  <p><b>Architecture decision:</b> Select raw mmap plus the array-backed NumPy quantile kernel and no compact proposal store. Block sweeps at 1,024/2,048/4,096/8,192 rows produced identical results and no material improvement over 2,048. Blosc2 is unavailable in the environment. Adding the smallest valid float32 proposal-v2 row would project to 11.3952 GiB before extra metadata and violates the 11 GiB active-store limit; compact-only already failed M04R-05. Therefore it is not physically built or promoted.</p>
 </section>
 
 <section class="task" id="m04r-07">
@@ -262,7 +264,7 @@
     <li>Commit a clean rollback point.</li>
     <li>Proceed only if the explicit gate passes. A failure creates a versioned redesign; it never lowers a frozen threshold.</li>
   </ol>
-  <p class="muted">M04R-00 through M04R-06A are complete. M04R-06B is the next gate: construct and attack the physical 1% pack before any full-universe store. Capacity, cold/warm latency, RSS, corruption, resume and atomic-generation preconditions still apply even if currently observed free space exceeds 30 GiB.</p>
+  <p class="muted">M04R-00 through M04R-06B are complete. M04R-06C is the next gate: build, verify and scan the 100% immutable generation without replacing any existing production path. The ≥30 GiB free-space precondition must be checked immediately before construction; the full generation remains shadow-only until its own row accounting, source provenance, capacity and resource evidence passes.</p>
 </section>
 </body>
 </html>

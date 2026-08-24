@@ -38,6 +38,7 @@ market-analogues verify-m04r-feature-kernel --config config/datasets.example.yam
 market-analogues verify-m04r-quantized-bound --config config/datasets.example.yaml
 market-analogues verify-m04r-proposal-v2 --config config/datasets.example.yaml
 market-analogues verify-m04r-quantized-ranks --config config/datasets.example.yaml
+market-analogues verify-m04r-packed-bound --config config/datasets.example.yaml
 market-analogues compare-methods --config config/datasets.example.yaml
 market-analogues build-view-store --config config/datasets.example.yaml \
   --dataset nse --lookbacks 252 --stride 5
@@ -92,6 +93,11 @@ market-analogues search --config config/datasets.example.yaml --dataset nse \
   --checkpoint-every 128 \
   --output config/data/analogues/poc/m04r/quantized-bound-rank-full.json
 .venv/bin/market-analogues verify-m04r-quantized-ranks \
+  --config config/datasets.example.yaml
+.venv/bin/python experiments/m04r/packed_bound_1pct.py \
+  --config config/datasets.example.yaml \
+  --output-root config/data/analogues/poc/m04r/packed-bound-1pct --workers 8
+.venv/bin/market-analogues verify-m04r-packed-bound \
   --config config/datasets.example.yaml
 ```
 

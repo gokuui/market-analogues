@@ -258,8 +258,58 @@ def quantized_batch_lower_bounds(
     if not rows:
         empty = np.empty(0, dtype=np.float64)
         return QuantizedLowerBoundBatch(empty, {}, empty)
-    count = len(SAMPLES_48_NAMES)
     radii = np.stack([row.error_radii for row in rows]).astype(np.float64)
+    return quantized_array_lower_bounds(
+        query,
+        np.stack([row.coarse for row in rows]),
+        np.stack([row.samples_48 for row in rows]),
+        np.stack([row.presence for row in rows]),
+        np.stack([row.stage for row in rows]),
+        np.stack([row.structural for row in rows]),
+        radii,
+        config,
+    )
+
+
+def quantized_array_lower_bounds(
+    query: Representation,
+    coarse: np.ndarray,
+    samples: np.ndarray,
+    presence: np.ndarray,
+    stage: np.ndarray,
+    structural: np.ndarray,
+    radii: np.ndarray,
+    config: DistanceConfig | None = None,
+) -> QuantizedLowerBoundBatch:
+    """Vectorized bound kernel over array-backed rows, including mmap views."""
+    config = config or DistanceConfig()
+    coarse = np.asarray(coarse)
+    samples = np.asarray(samples)
+    presence = np.asarray(presence, dtype=bool)
+    stage = np.asarray(stage)
+    structural = np.asarray(structural)
+    radii = np.asarray(radii)
+    row_count = len(coarse)
+    count = len(SAMPLES_48_NAMES)
+    expected = {
+        "coarse": (coarse.shape, (row_count, 128)),
+        "samples": (samples.shape, (row_count, count, 48)),
+        "presence": (presence.shape, (row_count, count)),
+        "stage": (stage.shape, (row_count, 48)),
+        "structural": (structural.shape, (row_count, 9)),
+        "radii": (radii.shape, (row_count, ERROR_VALUE_COUNT)),
+    }
+    for name, (observed, required) in expected.items():
+        if observed != required:
+            raise QuantizedBoundError(f"{name} batch shape {observed} != {required}")
+    if not row_count:
+        empty = np.empty(0, dtype=np.float64)
+        return QuantizedLowerBoundBatch(empty, {}, empty)
+    if not all(np.isfinite(value).all() for value in (
+        coarse, samples, stage, structural, radii,
+    )) or np.any(radii < 0):
+        raise QuantizedBoundError("quantized array batch contains invalid values")
+    radii = radii.astype(np.float64)
 
     def numerator(query_values: np.ndarray, stored: np.ndarray, radius: np.ndarray) -> np.ndarray:
         observed = np.sqrt(np.mean(
@@ -268,7 +318,7 @@ def quantized_batch_lower_bounds(
         ))
         return np.maximum(observed - radius, 0.0)
 
-    coarse = np.stack([row.coarse for row in rows]).astype(np.float64)
+    coarse = coarse.astype(np.float64)
     coarse_error = radii[:, 0]
     coarse_joined = np.c_[coarse, np.broadcast_to(query.coarse, coarse.shape)]
     components: dict[str, np.ndarray] = {
@@ -276,14 +326,13 @@ def quantized_batch_lower_bounds(
             np.std(coarse_joined, axis=1) + coarse_error / np.sqrt(2.0), 1e-6,
         ),
     }
-    stage = np.stack([row.stage for row in rows]).astype(np.float64)
-    structural = np.stack([row.structural for row in rows]).astype(np.float64)
+    stage = stage.astype(np.float64)
+    structural = structural.astype(np.float64)
     components["stage"] = numerator(query.stage, stage, radii[:, -2])
     components["structural"] = numerator(
         query.structural, structural, radii[:, -1],
     )
-    presence = np.stack([row.presence for row in rows])
-    samples = np.stack([row.samples_48 for row in rows]).astype(np.float64)
+    samples = samples.astype(np.float64)
     rms_radii = radii[:, 1:1 + count]
     max_radii = radii[:, 1 + count:1 + 2 * count]
     index_by_name = {name: index for index, name in enumerate(SAMPLES_48_NAMES)}
@@ -305,16 +354,16 @@ def quantized_batch_lower_bounds(
                 - np.percentile(joined, 25, axis=1)
                 + 2.0 * max_radii[:, index],
                 np.std(joined, axis=1) + rms_radii[:, index] / np.sqrt(2.0),
-                np.full(len(rows), 1e-6),
+                np.full(row_count, 1e-6),
             ))
             value = numerator(query_values, stored, rms_radii[:, index]) / denominator
             value[~candidate_present] = 2.0
             distances.append(value)
-            included.append(np.ones(len(rows), dtype=bool))
+            included.append(np.ones(row_count, dtype=bool))
         included_count = np.sum(included, axis=0)
         components[group] = np.divide(
             np.sum(distances, axis=0), included_count,
-            out=np.zeros(len(rows), dtype=np.float64), where=included_count > 0,
+            out=np.zeros(row_count, dtype=np.float64), where=included_count > 0,
         )
     rigid_price = components["price"].copy()
     components["price"] = .55 * rigid_price

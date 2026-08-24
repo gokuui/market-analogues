@@ -69,6 +69,9 @@ from .m04r_proposal_verification import (
 from .m04r_quantized_rank_verification import (
     verify_m04r_quantized_ranks, write_m04r_quantized_rank_verification,
 )
+from .m04r_packed_verification import (
+    verify_m04r_packed_bound_poc, write_m04r_packed_bound_verification,
+)
 from .multiresolution_verification import (
     verify_multiresolution_state, write_multiresolution_verification,
 )
@@ -665,6 +668,47 @@ def cmd_verify_m04r_quantized_ranks(args: argparse.Namespace) -> int:
         list(result.failures), source_hashes={
             "quantized_bound_contract": str(result.metrics["contract_digest"]),
             "quantized_rank_evidence": str(result.metrics["evidence_digest"]),
+        },
+    ).write(_gates(config))
+    print(json.dumps({
+        "passed": result.passed, **result.metrics,
+        "result_digest": result.result_digest, "failures": result.failures,
+    }, indent=2))
+    print(html)
+    return 0 if result.passed else 2
+
+
+def cmd_verify_m04r_packed_bound(args: argparse.Namespace) -> int:
+    config = load_config(args.config)
+    root = config.artifact_dir / "poc" / "m04r"
+    parallel_root = Path(args.parallel_root) if args.parallel_root else (
+        root / "packed-bound-1pct"
+    )
+    serial_root = Path(args.serial_root) if args.serial_root else (
+        root / "packed-bound-1pct-serial"
+    )
+    rank_evidence = Path(args.rank_evidence) if args.rank_evidence else (
+        root / "quantized-bound-rank-full.json"
+    )
+    result = verify_m04r_packed_bound_poc(
+        parallel_root / "packed-bound-1pct.json",
+        serial_root / "packed-bound-1pct.json",
+        parallel_root / "store", serial_root / "store", rank_evidence,
+    )
+    output_dir = Path(args.output_dir) if args.output_dir else (
+        config.artifact_dir / "m04r-packed-bound-1pct"
+    )
+    machine, html = write_m04r_packed_bound_verification(result, output_dir)
+    GateReport(
+        "m04r_packed_bound_1pct", result.passed,
+        {
+            **result.metrics, "result_digest": result.result_digest,
+            "machine_artifact": str(machine.resolve()),
+            "html_artifact": str(html.resolve()),
+        },
+        list(result.failures), source_hashes={
+            "packed_bound_contract": str(result.metrics["pack_contract_digest"]),
+            "packed_generation": str(result.metrics["generation_id"]),
         },
     ).write(_gates(config))
     print(json.dumps({
@@ -1995,6 +2039,13 @@ def build_parser() -> argparse.ArgumentParser:
     m04r_quantized_ranks.add_argument("--evidence")
     m04r_quantized_ranks.add_argument("--output-dir")
     m04r_quantized_ranks.set_defaults(func=cmd_verify_m04r_quantized_ranks)
+    m04r_packed = sub.add_parser("verify-m04r-packed-bound")
+    m04r_packed.add_argument("--config", required=True)
+    m04r_packed.add_argument("--parallel-root")
+    m04r_packed.add_argument("--serial-root")
+    m04r_packed.add_argument("--rank-evidence")
+    m04r_packed.add_argument("--output-dir")
+    m04r_packed.set_defaults(func=cmd_verify_m04r_packed_bound)
     compare = sub.add_parser("compare-methods")
     compare.add_argument("--config", required=True)
     compare.add_argument("--seeds-per-family", type=int, default=5)
