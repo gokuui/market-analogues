@@ -19,7 +19,7 @@
 <body>
 <header>
   <h1>M04R — certified NASDAQ analogue retrieval remediation</h1>
-  <p><b>Planning date:</b> 24 August 2026. <b>Status:</b> final evidence-backed implementation plan, frozen after the research/POC preflight. M04R-00 through M04R-03 are verified complete; M04R-04 is next. No retrieval repair is claimed yet.</p>
+  <p><b>Planning date:</b> 24 August 2026. <b>Status:</b> final evidence-backed implementation plan, frozen after the research/POC preflight. M04R-00 through M04R-04 are verified complete; M04R-05 is next. No retrieval repair is claimed yet.</p>
   <p><b>Target outcome:</b> given a current 252-session NASDAQ chart state, return the historically eligible charts with the smallest frozen exact OHLCV/volume/market-context distance. Interactive mode must be fast and candid about approximation. Certified mode must prove that no eligible episode capable of beating the final constrained top-20 was discarded.</p>
   <p>This plan is outcome-blind. Forward returns, trader profits and setup names are not inputs to representation, retrieval, tuning or acceptance.</p>
 </header>
@@ -159,6 +159,7 @@
   <p><b>Proof tests:</b> Exhaustive tiny arrays across float16 boundaries; at least one million randomized/adversarial pairs; constants, missing groups, extreme finite values and IQR/std branch changes. Require every component and total <code>LB ≤ native distance-v1 lower bound ≤ completed exact distance</code>.</p>
   <p><b>Measured baseline:</b> Preflight produced zero violations and 99.83% pruning retention on the difficult sample, but is evidence rather than proof. Repeat across all 12 development authorities and easy/hard strata.</p>
   <p><b>Pass before next:</b> Zero violation, independent implementation agreement, at least 99% native-pruning retention in every development case, and a frozen row-byte projection including IDs/masks/metadata/error fields.</p>
+  <p class="pass"><b>Verified 24 August 2026:</b> PASS. Contract <code>692e5f40…690d1</code> freezes float16 fields, 41 outward-rounded float32 RMS/max radii, exact missingness bits, numerator/denominator/aggregation proofs and fail-closed non-finite/overflow behavior. Production scalar/batch implementations and an independently written slow reference agree. One million random/adversarial channel pairs plus 15,625 exhaustive length-three float16-boundary pairs have zero scaled or unscaled violations. Across all 12 frozen NASDAQ authorities and 368,915 source-fingerprint-bound real rows, total/component excess and overflow counts are zero; worst-case pruning retention is <code>99.5206%</code>. The complete 64-byte-aligned row is 2,432 bytes including episode ID, cutoff, symbol ID, tier and masks, projecting to <code>8.652 GiB</code> for 3.82m rows. Two sealed verifier executions are byte-identical. This proves the row mathematics and sampled retention, not packed scan performance or full-store construction.</p>
 </section>
 
 <section class="task" id="m04r-05">
@@ -251,7 +252,7 @@
     <li>Commit a clean rollback point.</li>
     <li>Proceed only if the explicit gate passes. A failure creates a versioned redesign; it never lowers a frozen threshold.</li>
   </ol>
-  <p class="muted">M04R-00 through M04R-03 are complete. M04R-04 is next. The first storage-mutating full-universe task is M04R-06 and is blocked by the declared free-space precondition until capacity is safely available.</p>
+  <p class="muted">M04R-00 through M04R-04 are complete. M04R-05 is next. The first storage-mutating full-universe task is M04R-06; its capacity and 1% packed-performance preconditions still apply even if currently observed free space exceeds 30 GiB.</p>
 </section>
 </body>
 </html>

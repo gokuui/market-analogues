@@ -35,6 +35,7 @@ market-analogues verify-m04r-distance-v1 --config config/datasets.example.yaml \
   --contract config/m04-candidate-recall-contract.yaml --dataset nasdaq
 market-analogues verify-m04r-feature-kernel --config config/datasets.example.yaml \
   --contract config/m04-candidate-recall-contract.yaml --dataset nasdaq
+market-analogues verify-m04r-quantized-bound --config config/datasets.example.yaml
 market-analogues compare-methods --config config/datasets.example.yaml
 market-analogues build-view-store --config config/datasets.example.yaml \
   --dataset nse --lookbacks 252 --stride 5
@@ -72,6 +73,11 @@ market-analogues search --config config/datasets.example.yaml --dataset nse \
 .venv/bin/python experiments/m04r/distance_v1_bound_gate.py \
   --pairs 1000000 --reference-pairs 2000 \
   --output config/data/analogues/poc/m04r/distance-v1-bound-gate.json
+.venv/bin/python experiments/m04r/quantized_bound_gate.py --pairs 1000000 \
+  --output config/data/analogues/poc/m04r/quantized-bound-million-gate.json
+.venv/bin/python experiments/m04r/quantized_bound_authority_gate.py \
+  --config config/datasets.example.yaml --symbols 64 \
+  --output config/data/analogues/poc/m04r/quantized-bound-authority-gate.json
 ```
 
 Source datasets are always read-only. Derived manifests, vectors, indexes, outcomes, reports, and gate records are written beneath the configured artifact directory.
