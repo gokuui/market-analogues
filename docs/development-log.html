@@ -493,6 +493,15 @@
   <p><b>Interpretation:</b> M03b's synthetic pass does not repair full-universe candidate generation. The existing signals can surface all 20 exact neighbors on this case, but only with a pool too large to assume cheap exact materialization. This is a candidate-fidelity/performance problem, not evidence that the topology distance failed.</p>
   <p><b>Next control:</b> Freeze pool 20,000 as a test cap derived from this one disclosed development case. The other 23 authorities must remain untouched until the M04 comparison contract binds their digests, causality checks, per-case 95% floor, diversity accounting, runtime/RSS limits and resumable outputs. A pass at candidate inclusion will still require exact/V2 rerank feasibility before production promotion.</p>
 </section>
+
+<section class="entry" id="log-043">
+  <h2>L-043 — M04 23-case candidate-recall holdout preregistered</h2>
+  <p><b>What:</b> Added a strict M04 candidate-inclusion contract, resumable digest-checked per-case runner, CLI case and aggregate commands, readable case/matrix reports, immutable gates and tests for contract drift, result tampering, resume and complete matrix accounting.</p>
+  <p><b>Frozen before execution:</b> Contract digest <code>02cd4b2a…63d494</code> binds all 24 sealed authority digests, both query-registry digests, both view-store manifest digests, the HOMEFIRST-current development case, the other 23 holdout episode IDs, pool 20,000, local view depth 20, 60-session gap, A/B tiers, per-case recall ≥95%, zero temporal/duplicate violations, ≤300 seconds and ≤1,536 MB.</p>
+  <p><b>Scope:</b> This subgate verifies only whether the persisted candidate search contains at least 19 of each exact authority's top 20. Exact reranking, M03b topology reranking, one-symbol/event diversity, novelty and forward outcomes remain explicitly false. The case-memory ledger records six events and no real forward outcome has been accessed.</p>
+  <p><b>Verification before holdout:</b> Focused M04/CLI tests pass 6/6; M00 passes with the new registration and the complete suite passes 162/162. The implementation and contract are committed before any of the 23 holdout cases run.</p>
+  <p><b>Next:</b> Execute the 23 cases sequentially. Each writes an atomic result and can resume without rescanning a valid completed case. Preserve every failure and aggregate only when all locked cases are present.</p>
+</section>
 </main>
 
 <section id="reproduce">
@@ -504,6 +513,8 @@
 .venv/bin/market-analogues verify-multiresolution-state --config config/datasets.example.yaml --datasets nse nasdaq
 .venv/bin/market-analogues verify-latent-structures --config config/datasets.example.yaml --verifier config/structural-verifier.yaml
 .venv/bin/market-analogues verify-latent-structures-v2 --config config/datasets.example.yaml --verifier config/structural-verifier-v2.yaml
+.venv/bin/market-analogues verify-m04-candidate-case --config config/datasets.example.yaml --contract config/m04-candidate-recall-contract.yaml --episode-id 1736f00c337dfa0b6cf60e10
+.venv/bin/market-analogues aggregate-m04-candidate-recall --config config/datasets.example.yaml --contract config/m04-candidate-recall-contract.yaml
 .venv/bin/market-analogues verify --config config/datasets.example.yaml
 .venv/bin/market-analogues verify-oracle --config config/datasets.example.yaml --dataset nse --symbols reliance tcs --instruments-per-stratum 4
 .venv/bin/market-analogues verify-oracle --config config/datasets.example.yaml --dataset nasdaq --symbols AAPL MSFT --instruments-per-stratum 3

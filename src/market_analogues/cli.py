@@ -46,6 +46,10 @@ from .gate12_registry import (
 )
 from .index import CoarseIndex
 from .matrix_runner import run_authority_matrix
+from .m04_candidate_recall import (
+    aggregate_m04_cases, load_m04_candidate_recall_spec,
+    verify_m04_candidate_case, write_m04_case, write_m04_matrix,
+)
 from .multiresolution_verification import (
     verify_multiresolution_state, write_multiresolution_verification,
 )
@@ -341,6 +345,61 @@ def cmd_verify_latent_structures_v2(args: argparse.Namespace) -> int:
     print(json.dumps({"passed": result.passed, **result.metrics, "failures": result.failures}, indent=2))
     print(html_path)
     return 0 if result.passed else 2
+
+
+def cmd_verify_m04_candidate_case(args: argparse.Namespace) -> int:
+    config = load_config(args.config)
+    spec = load_m04_candidate_recall_spec(args.contract)
+    authority_paths = list((config.artifact_dir / "gate12" / "authorities").glob(
+        f"*/cases/{args.episode_id}.json",
+    ))
+    if len(authority_paths) != 1:
+        raise SystemExit(f"cannot resolve authority case {args.episode_id}")
+    dataset_id = authority_paths[0].parts[-3]
+    if dataset_id not in config.datasets:
+        raise SystemExit(f"authority dataset {dataset_id!r} is not configured")
+    require_passed(_gates(config), f"12f_authority_matrix_full_{dataset_id}")
+    require_passed(_gates(config), f"11a_view_shards_{dataset_id}_252")
+    output_dir = Path(args.output_dir) if args.output_dir else (
+        config.artifact_dir / "m04-candidate-recall"
+    )
+    machine = output_dir / "cases" / f"{args.episode_id}.json"
+    html = output_dir / "cases" / f"{args.episode_id}.html"
+    source = source_from_spec(config.datasets[dataset_id])
+    result = verify_m04_candidate_case(
+        spec, args.episode_id, source, config.artifact_dir, output_path=machine,
+    )
+    write_m04_case(result, machine, html)
+    GateReport(
+        f"m04_candidate_recall_{dataset_id}_{args.episode_id}", result.passed,
+        {**result.metrics, "machine_artifact": str(machine.resolve()),
+         "html_artifact": str(html.resolve())},
+        list(result.failures), source_hashes={"contract": spec.digest},
+    ).write(_gates(config))
+    print(json.dumps({"passed": result.passed, **result.metrics, "failures": result.failures}, indent=2))
+    print(html)
+    return 0 if result.passed else 2
+
+
+def cmd_aggregate_m04_candidate_recall(args: argparse.Namespace) -> int:
+    config = load_config(args.config)
+    spec = load_m04_candidate_recall_spec(args.contract)
+    output_dir = Path(args.output_dir) if args.output_dir else (
+        config.artifact_dir / "m04-candidate-recall"
+    )
+    passed, metrics, failures = aggregate_m04_cases(spec, output_dir / "cases")
+    machine, html = write_m04_matrix(
+        passed, metrics, failures, output_dir / "matrix.json", output_dir / "matrix.html",
+    )
+    GateReport(
+        "m04_candidate_recall_matrix", passed,
+        {**metrics, "machine_artifact": str(machine.resolve()),
+         "html_artifact": str(html.resolve())},
+        list(failures), source_hashes={"contract": spec.digest},
+    ).write(_gates(config))
+    print(json.dumps({"passed": passed, **metrics, "failures": failures}, indent=2))
+    print(html)
+    return 0 if passed else 2
 
 
 def cmd_compare(args: argparse.Namespace) -> int:
@@ -1613,6 +1672,17 @@ def build_parser() -> argparse.ArgumentParser:
     latent_v2.add_argument("--verifier", required=True)
     latent_v2.add_argument("--output-dir")
     latent_v2.set_defaults(func=cmd_verify_latent_structures_v2)
+    m04_case = sub.add_parser("verify-m04-candidate-case")
+    m04_case.add_argument("--config", required=True)
+    m04_case.add_argument("--contract", required=True)
+    m04_case.add_argument("--episode-id", required=True)
+    m04_case.add_argument("--output-dir")
+    m04_case.set_defaults(func=cmd_verify_m04_candidate_case)
+    m04_aggregate = sub.add_parser("aggregate-m04-candidate-recall")
+    m04_aggregate.add_argument("--config", required=True)
+    m04_aggregate.add_argument("--contract", required=True)
+    m04_aggregate.add_argument("--output-dir")
+    m04_aggregate.set_defaults(func=cmd_aggregate_m04_candidate_recall)
     compare = sub.add_parser("compare-methods")
     compare.add_argument("--config", required=True)
     compare.add_argument("--seeds-per-family", type=int, default=5)

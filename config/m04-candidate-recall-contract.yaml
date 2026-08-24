@@ -1,0 +1,84 @@
+schema_version: m04-candidate-recall-contract-v1
+contract_id: m04-holdout-v1
+development_case:
+  dataset_id: nse
+  episode_id: 99fe49f51285b398361b7b13
+  observed_pool_recalls:
+    175: 0.25
+    1000: 0.45
+    5000: 0.90
+    20000: 1.00
+holdout_episode_ids:
+  - 1736f00c337dfa0b6cf60e10
+  - 3904624464f8a8d159554a01
+  - 445f8fa3bdf6df8b86178a7f
+  - 5e24a63466b1b06e3f42c012
+  - 8d88516b80c26c701226b3f4
+  - 9cd78f01a5e23a7481382f49
+  - a853731ea0dafe8ca683ee68
+  - b01aad8c553feacad34090a1
+  - bcb079979c9c2cd470e116fc
+  - d8d9c0ab05d852be68b9c8ee
+  - fb68ff4c3a0bddc9d239ab86
+  - 076c8996a5a99bd944f5c9bc
+  - 29b5078dfeacd72ab70c568d
+  - 6a2dba0cfa179f4a8d456d97
+  - 9158e964a522ca798ec7bd5f
+  - a3b3396c25b9f0c163caf143
+  - a61adfab3a0f2bef3ccc900d
+  - bd09947911a77a4e005a609e
+  - c0760287a6d10fe5d0cb1bd3
+  - cb2bdccd1386790ef8a16bd0
+  - e1a3deebf68aa5601e416b72
+  - e63ff40330d83953f1e6d467
+  - ee746d26e591a51298e1e7af
+authority_digests:
+  076c8996a5a99bd944f5c9bc: 7a79eab41f9dbc0a53277bf6bda3684942b5d8add76be0ba928c30d0686627f8
+  1736f00c337dfa0b6cf60e10: 218806d823b8f37c2771d856485f43c5f5d51ee4c0ef3c74f6a19c0dfee4c945
+  29b5078dfeacd72ab70c568d: a93c395941ba978e5916623bb875df3743ad042571f6e3181a215fd580b2c78e
+  3904624464f8a8d159554a01: a7b4cdf3590f875af4ee746083543b5115111a3efa60cd6b31492cb40f39bd3a
+  445f8fa3bdf6df8b86178a7f: 6ec039c5690bdc8b5738c80a5a6876b27d130baa6d6c956c0747163f362df89d
+  5e24a63466b1b06e3f42c012: 015cf7d53f64e9120d3dd15aba86be56eddf91aaec466d8579817b077203c8fa
+  6a2dba0cfa179f4a8d456d97: d792ae5ebc2dca2bd0421e4ed7409ebf46392a8b8ec94955cbc2733b0ea34edf
+  8d88516b80c26c701226b3f4: d6dac1d1df090d1141b96ff4a382af7bae6f3b103455d1b7be007da5821eb78c
+  9158e964a522ca798ec7bd5f: 03c4b7fe147afbdd4c7099fb6b893c545dc0c84431fd052f4fedd599fac8fcda
+  99fe49f51285b398361b7b13: 371e9c5c475962fffb535abe561683c041bc942d118d4644a769bf7535b89c13
+  9cd78f01a5e23a7481382f49: 5f46eafea7ca555c913ffdc695fcad78f874ed992afbac194027aaf4a554ed95
+  a3b3396c25b9f0c163caf143: 5536e1568204aeb6735a540f5026fb45717b0112b168b47ed1abc03c13d69ff7
+  a61adfab3a0f2bef3ccc900d: a3edc9e570b468a0e663c3caa778102ff40ff2c89891d94a99f2c24af55ea9a7
+  a853731ea0dafe8ca683ee68: 774dfc3529dd4cd232a737c8805776cf051913457a81740fc729bb7ac7853f57
+  b01aad8c553feacad34090a1: 37dce45dc53b3d73a05cc572941cd8bfdae173ff50c9e49a67c1889d8db62699
+  bcb079979c9c2cd470e116fc: c05daac0e362f65d273a1cb22ab2040e3fe74f2e91de057232357288f1f629f4
+  bd09947911a77a4e005a609e: 95bd3dd2fc2adff1f3141b6f49d4c4e9c7e9eda6c7fc3491d57b4ef01144cbdf
+  c0760287a6d10fe5d0cb1bd3: e66ca0bce62c384ba5dbe892e5b9d9687839efa702299238d594e6ec1c1f77d4
+  cb2bdccd1386790ef8a16bd0: 4d1777442727831ef4dd86b9a724445b68763f306e4ef06b3b482b6f630d8487
+  d8d9c0ab05d852be68b9c8ee: c090fc1400cafca99dbc7bd7011fcf73b673f7aff8e6c3de2e03428d8cab9641
+  e1a3deebf68aa5601e416b72: 983e9392d0fd9a26146d5b68a4605ba7f1a889edb8bf48e7620d1bef2e05115b
+  e63ff40330d83953f1e6d467: aa4cfc5ab776d5ee5f7109a4bcd68d75bfa72289f3653df1b05f5a15cfd6cfb8
+  ee746d26e591a51298e1e7af: ef85832ad7748e1c391fcb3fb672b9a7d75d99d684370317a5acd88ac7bc6adc
+  fb68ff4c3a0bddc9d239ab86: e55754e009e2b5a859f99f042f490f210db7356188a2a5b3f13afbdbfaf827a0
+registry_digests:
+  nse: 1d31b954f43f56b1883ba3f92d3195dc99e41fc3522587f9696c39302b7656dd
+  nasdaq: d2106561e356dadd38f35003cfed27cbd0a3a5990c77adb59b213fe8b55be43e
+view_manifest_digests:
+  nse: eee238cec7556a0894267e1ccbe6465b0ea01c8858b598e867d343cbe356c157
+  nasdaq: 760efe9c0f9e29d76670b44a035b95951155aca44c8234579a90beb4d4509891
+retrieval:
+  top_k: 20
+  candidate_pool: 20000
+  per_instrument_view: 20
+  minimum_history_gap_sessions: 60
+  quality_tiers: [A, B]
+acceptance:
+  minimum_authority_top20_recall_per_case: 0.95
+  maximum_case_seconds: 300.0
+  maximum_peak_rss_mb: 1536.0
+  require_zero_temporal_violations: true
+  require_zero_duplicate_candidate_ids: true
+scope:
+  candidate_inclusion_only: true
+  exact_reranking_verified: false
+  topology_reranking_verified: false
+  diversity_verified: false
+  novelty_verified: false
+  real_forward_outcomes_accessed: false

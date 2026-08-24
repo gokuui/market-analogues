@@ -172,4 +172,4 @@ def test_contract_cli_writes_artifacts_and_gate(tmp_path: Path) -> None:
     gate_payload = json.loads(gate.read_text())
     assert gate_payload["passed"] is True
     assert gate_payload["metrics"]["contract_digest"] == contract.digest
-    assert gate_payload["metrics"]["trial_count"] == 5
+    assert gate_payload["metrics"]["trial_count"] == 6

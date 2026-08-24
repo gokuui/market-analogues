@@ -23,6 +23,10 @@ market-analogues verify-latent-structures --config config/datasets.example.yaml 
   --verifier config/structural-verifier.yaml
 market-analogues verify-latent-structures-v2 --config config/datasets.example.yaml \
   --verifier config/structural-verifier-v2.yaml
+market-analogues verify-m04-candidate-case --config config/datasets.example.yaml \
+  --contract config/m04-candidate-recall-contract.yaml --episode-id 1736f00c337dfa0b6cf60e10
+market-analogues aggregate-m04-candidate-recall --config config/datasets.example.yaml \
+  --contract config/m04-candidate-recall-contract.yaml
 market-analogues compare-methods --config config/datasets.example.yaml
 market-analogues build-view-store --config config/datasets.example.yaml \
   --dataset nse --lookbacks 252 --stride 5
@@ -113,7 +117,7 @@ positives must beat reversed/context-contradictory negatives, future mutation mu
 have zero effect, and persisted coarse-index serialization must preserve neighbors.
 Gate JSON keeps an immutable history beneath `artifact_dir/gates/history`.
 
-The current regression record is 158 passing tests. M03's first locked unseen
+The current regression record is 162 passing tests. M03's first locked unseen
 trial failed and remains in the ledger. The separately preregistered M03b holdout
 passes all eight unnamed families at 100% top-1, 100% precision@5 and zero
 critical-negative errors in 33.71 seconds. This establishes a verified retrieval baseline, not trading

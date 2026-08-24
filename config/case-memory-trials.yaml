@@ -71,3 +71,17 @@ trials:
     peak_rss_mb: 215.8046875
     real_forward_outcomes_accessed: false
     note: All eight hidden families pass every locked acceptance threshold on the single official execution.
+  - trial_id: m04-candidate-recall-holdout-v1
+    event: registered
+    registered_at: "2026-08-24T12:10:10Z"
+    contract_digest: 02cd4b2acd5c5f945c847a66edc3da89ddd34c51c8e9fcda456d8e753063d494
+    contract_file_sha256: ebb6c9dfa3622867059e4ba4b363b6237ce9509cd75d0d983d513059352f0cb1
+    development_episode_id: 99fe49f51285b398361b7b13
+    holdout_cases: 23
+    candidate_pool: 20000
+    per_instrument_view: 20
+    minimum_authority_top20_recall_per_case: 0.95
+    maximum_case_seconds: 300.0
+    maximum_peak_rss_mb: 1536.0
+    real_forward_outcomes_accessed: false
+    note: Candidate-inclusion subgate only; all 23 holdout authority, registry and view-store digests were frozen before execution.
