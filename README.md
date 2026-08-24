@@ -31,6 +31,8 @@ market-analogues diagnose-m04r-incident --config config/datasets.example.yaml \
   --contract config/m04-candidate-recall-contract.yaml
 market-analogues verify-m04r-causal-prefixes --config config/datasets.example.yaml \
   --contract config/m04-candidate-recall-contract.yaml --dataset nasdaq
+market-analogues verify-m04r-distance-v1 --config config/datasets.example.yaml \
+  --contract config/m04-candidate-recall-contract.yaml --dataset nasdaq
 market-analogues compare-methods --config config/datasets.example.yaml
 market-analogues build-view-store --config config/datasets.example.yaml \
   --dataset nse --lookbacks 252 --stride 5
@@ -65,6 +67,9 @@ market-analogues analyze-kullamagi-yfinance --config config/datasets.example.yam
 market-analogues search --config config/datasets.example.yaml --dataset nse \
   --symbol reliance --cutoff 2026-02-11 --lookback 252 \
   --candidate-pool 175 --view-store
+.venv/bin/python experiments/m04r/distance_v1_bound_gate.py \
+  --pairs 1000000 --reference-pairs 2000 \
+  --output config/data/analogues/poc/m04r/distance-v1-bound-gate.json
 ```
 
 Source datasets are always read-only. Derived manifests, vectors, indexes, outcomes, reports, and gate records are written beneath the configured artifact directory.

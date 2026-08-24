@@ -202,8 +202,12 @@ def representation_distance_lower_bound(
 ) -> tuple[float, dict[str, float], float]:
     """Exact non-DTW work plus a safe zero lower bound for the DTW remainder."""
     config = config or DistanceConfig()
-    coarse_scale = max(float(np.std(np.r_[a.coarse, b.coarse])), 1e-6)
-    components = {"coarse": float(np.sqrt(np.mean(((a.coarse - b.coarse) / coarse_scale) ** 2)))}
+    # Coarse vectors are stored as float32. Promote before pair statistics and
+    # subtraction so the exact score is not dependent on storage arithmetic.
+    coarse_a = np.asarray(a.coarse, dtype=np.float64)
+    coarse_b = np.asarray(b.coarse, dtype=np.float64)
+    coarse_scale = max(float(np.std(np.r_[coarse_a, coarse_b])), 1e-6)
+    components = {"coarse": float(np.sqrt(np.mean(((coarse_a - coarse_b) / coarse_scale) ** 2)))}
     components["stage"] = float(np.sqrt(np.mean((a.stage - b.stage) ** 2)))
     for group, names in GROUPS.items():
         if config.samples_per_channel == 48:

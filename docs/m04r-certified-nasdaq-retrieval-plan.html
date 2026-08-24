@@ -19,7 +19,7 @@
 <body>
 <header>
   <h1>M04R — certified NASDAQ analogue retrieval remediation</h1>
-  <p><b>Planning date:</b> 24 August 2026. <b>Status:</b> final evidence-backed implementation plan, frozen after the research/POC preflight. M04R-00 and M04R-01 are verified complete; M04R-02 is next. No retrieval repair is claimed yet.</p>
+  <p><b>Planning date:</b> 24 August 2026. <b>Status:</b> final evidence-backed implementation plan, frozen after the research/POC preflight. M04R-00 through M04R-02 are verified complete; M04R-03 is next. No retrieval repair is claimed yet.</p>
   <p><b>Target outcome:</b> given a current 252-session NASDAQ chart state, return the historically eligible charts with the smallest frozen exact OHLCV/volume/market-context distance. Interactive mode must be fast and candid about approximation. Certified mode must prove that no eligible episode capable of beating the final constrained top-20 was discarded.</p>
   <p>This plan is outcome-blind. Forward returns, trader profits and setup names are not inputs to representation, retrieval, tuning or acceptance.</p>
 </header>
@@ -142,6 +142,7 @@
   <p><b>Tests:</b> Identity/symmetry/triangle diagnostics; constants, zero volume, gaps, missing context, extreme finite values, ties and unequal alignment paths; scalar/batch component and path parity; future-data invariance.</p>
   <p><b>Bound gate:</b> Prove every proposed bound algebraically. Then require <code>LB ≤ exact</code> on at least one million random/adversarial pairs with zero violation. Tests support the proof; they do not replace it.</p>
   <p><b>Branch rule:</b> If v1 cannot produce useful bounds within the storage/runtime budget, preregister <code>distance-v2</code> with fixed causal normalization and proof-friendly DTW, then rebuild authorities under a new name.</p>
+  <p class="pass"><b>Verified 24 August 2026:</b> PASS. A digest-bound contract freezes every component, mask, pair scale, weight, DTW band/local cost/path normalization/tie rule and retrieval constraint. A separate slow implementation matches production across synthetic, adversarial, sliding-batch and all 240 stored NASDAQ authority pairs: maximum total/component deltas are <code>4.44e-16</code>/<code>8.88e-16</code>, with zero alignment, symmetry, identity or finite-output failures. The audit exposed float32 coarse arithmetic, which was promoted to float64 in scalar and batch paths while remaining within <code>1e-6</code> of stored authorities. The native symmetric LB_Keogh proof is frozen in contract <code>458e4280…575a6</code>; a one-million-pair random/adversarial gate plus all 729 length-three ternary pairs found zero <code>LB &gt; exact + 1e-12</code> violations. Two real executions produced identical result digest <code>61a105f0…3be77</code> and machine SHA-256 <code>6bb0aabc…66e86</code>. The full quantized bound is explicitly deferred to M04R-04.</p>
 </section>
 
 <section class="task" id="m04r-03">
@@ -249,7 +250,7 @@
     <li>Commit a clean rollback point.</li>
     <li>Proceed only if the explicit gate passes. A failure creates a versioned redesign; it never lowers a frozen threshold.</li>
   </ol>
-  <p class="muted">The first implementation task is M04R-00. The first storage-mutating full-universe task is M04R-06 and is blocked by the declared free-space precondition until capacity is safely available.</p>
+  <p class="muted">M04R-00 through M04R-02 are complete. M04R-03 is next. The first storage-mutating full-universe task is M04R-06 and is blocked by the declared free-space precondition until capacity is safely available.</p>
 </section>
 </body>
 </html>

@@ -391,12 +391,15 @@ def batch_representation_lower_bounds(
     if not candidates:
         empty = np.empty(0, dtype=float)
         return LowerBoundBatch(empty, {}, empty)
-    coarse = np.stack([candidate.coarse for candidate in candidates])
-    joined = np.c_[coarse, np.broadcast_to(query.coarse, coarse.shape)]
+    coarse = np.stack([candidate.coarse for candidate in candidates]).astype(
+        np.float64, copy=False,
+    )
+    query_coarse = np.asarray(query.coarse, dtype=np.float64)
+    joined = np.c_[coarse, np.broadcast_to(query_coarse, coarse.shape)]
     coarse_scale = np.maximum(np.std(joined, axis=1), 1e-6)
     components: dict[str, np.ndarray] = {
         "coarse": np.sqrt(np.mean(
-            ((coarse - query.coarse) / coarse_scale[:, None]) ** 2,
+            ((coarse - query_coarse) / coarse_scale[:, None]) ** 2,
             axis=1,
         )),
         "stage": np.sqrt(np.mean(
