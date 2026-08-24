@@ -33,6 +33,8 @@ market-analogues verify-m04r-causal-prefixes --config config/datasets.example.ya
   --contract config/m04-candidate-recall-contract.yaml --dataset nasdaq
 market-analogues verify-m04r-distance-v1 --config config/datasets.example.yaml \
   --contract config/m04-candidate-recall-contract.yaml --dataset nasdaq
+market-analogues verify-m04r-feature-kernel --config config/datasets.example.yaml \
+  --contract config/m04-candidate-recall-contract.yaml --dataset nasdaq
 market-analogues compare-methods --config config/datasets.example.yaml
 market-analogues build-view-store --config config/datasets.example.yaml \
   --dataset nse --lookbacks 252 --stride 5

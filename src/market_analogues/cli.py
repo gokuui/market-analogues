@@ -57,6 +57,9 @@ from .m04r_prefix_verification import (
 from .m04r_distance_verification import (
     verify_m04r_distance_v1, write_m04r_distance_verification,
 )
+from .m04r_feature_verification import (
+    verify_m04r_feature_kernel, write_m04r_feature_verification,
+)
 from .multiresolution_verification import (
     verify_multiresolution_state, write_multiresolution_verification,
 )
@@ -514,6 +517,43 @@ def cmd_verify_m04r_distance_v1(args: argparse.Namespace) -> int:
         list(result.failures), source_hashes={
             "m04_contract": spec.digest,
             "distance_contract": str(result.contract["digest"]),
+        },
+    ).write(_gates(config))
+    print(json.dumps({
+        "passed": result.passed, **result.metrics,
+        "result_digest": result.result_digest, "failures": result.failures,
+    }, indent=2))
+    print(html)
+    return 0 if result.passed else 2
+
+
+def cmd_verify_m04r_feature_kernel(args: argparse.Namespace) -> int:
+    config = load_config(args.config)
+    spec = load_m04_candidate_recall_spec(args.contract)
+    if args.dataset not in config.datasets:
+        raise SystemExit(f"dataset {args.dataset!r} is not configured")
+    source = source_from_spec(config.datasets[args.dataset])
+    result = verify_m04r_feature_kernel(
+        spec, source, config.artifact_dir, dataset_id=args.dataset,
+    )
+    output_dir = Path(args.output_dir) if args.output_dir else (
+        config.artifact_dir / "m04r-exact-feature-kernel"
+    )
+    machine, html, feature_contract = write_m04r_feature_verification(
+        result, output_dir,
+    )
+    GateReport(
+        "m04r_exact_feature_kernel", result.passed,
+        {
+            **result.metrics,
+            "result_digest": result.result_digest,
+            "machine_artifact": str(machine.resolve()),
+            "html_artifact": str(html.resolve()),
+            "feature_contract_artifact": str(feature_contract.resolve()),
+        },
+        list(result.failures), source_hashes={
+            "m04_contract": spec.digest,
+            "feature_contract": str(result.contract["digest"]),
         },
     ).write(_gates(config))
     print(json.dumps({
@@ -1822,6 +1862,12 @@ def build_parser() -> argparse.ArgumentParser:
     m04r_distance.add_argument("--dataset", default="nasdaq")
     m04r_distance.add_argument("--output-dir")
     m04r_distance.set_defaults(func=cmd_verify_m04r_distance_v1)
+    m04r_features = sub.add_parser("verify-m04r-feature-kernel")
+    m04r_features.add_argument("--config", required=True)
+    m04r_features.add_argument("--contract", required=True)
+    m04r_features.add_argument("--dataset", default="nasdaq")
+    m04r_features.add_argument("--output-dir")
+    m04r_features.set_defaults(func=cmd_verify_m04r_feature_kernel)
     compare = sub.add_parser("compare-methods")
     compare.add_argument("--config", required=True)
     compare.add_argument("--seeds-per-family", type=int, default=5)

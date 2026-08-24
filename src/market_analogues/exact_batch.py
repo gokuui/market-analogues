@@ -126,7 +126,7 @@ def _benchmark_channels(
     }
 
 
-def _dense_channel_rows(
+def exact_channel_rows(
     frame: pd.DataFrame,
     benchmark: pd.DataFrame | None,
     *,
@@ -307,6 +307,52 @@ def _structural_rows(close_path: np.ndarray) -> np.ndarray:
     return np.concatenate(output, axis=1)
 
 
+def materialize_exact_representations(
+    channels: dict[str, np.ndarray],
+) -> tuple[Representation, ...]:
+    """Materialize distance-v1 fields from one canonical matrix of channels.
+
+    Scalar queries and sliding candidates both call this function.  Channel
+    matrices are shaped ``(episodes, sessions)`` and retain NaN as missingness.
+    """
+    if not channels:
+        return ()
+    row_counts = {len(rows) for rows in channels.values()}
+    widths = {rows.shape[1] for rows in channels.values()}
+    if len(row_counts) != 1 or len(widths) != 1:
+        raise ValueError("exact channel matrices disagree in shape")
+    names_48 = tuple(sorted(name for names in GROUPS.values() for name in names))
+    names_64 = ("atr_pct", "close_path", "relative_path", "volume_robust_z")
+    sampled_48: dict[str, tuple[np.ndarray, np.ndarray]] = {
+        name: _resample_rows(channels[name], 48, optional=True) for name in names_48
+    }
+    sampled_64: dict[str, tuple[np.ndarray, np.ndarray]] = {
+        name: _resample_rows(channels[name], 64, optional=True) for name in names_64
+    }
+    coarse_parts = []
+    for name, count in COARSE_LAYOUT.items():
+        sampled, _ = _resample_rows(channels[name], count, optional=False)
+        coarse_parts.append(sampled.astype(np.float32))
+    coarse = np.concatenate(coarse_parts, axis=1).astype(np.float32)
+    stage = _stage_rows(channels)
+    structural = _structural_rows(channels["close_path"])
+    representations = []
+    for row in range(next(iter(row_counts))):
+        representations.append(Representation(
+            pd.DataFrame(), coarse[row],
+            {
+                name: values[row].copy() if present[row] else None
+                for name, (values, present) in sampled_48.items()
+            },
+            {
+                name: values[row].copy() if present[row] else None
+                for name, (values, present) in sampled_64.items()
+            },
+            stage[row], structural[row],
+        ))
+    return tuple(representations)
+
+
 def sliding_exact_representations(
     bars: pd.DataFrame,
     benchmark: pd.DataFrame | None,
@@ -341,42 +387,14 @@ def sliding_exact_representations(
             np.concatenate(all_positions), tuple(all_representations),
             perf_counter() - started,
         )
-    positions, channels = _dense_channel_rows(
+    positions, channels = exact_channel_rows(
         frame, benchmark, lookback=lookback, stride=stride,
     )
     if not len(positions):
         return ExactBatch(positions, (), perf_counter() - started)
-    names_48 = tuple(sorted(name for names in GROUPS.values() for name in names))
-    names_64 = ("atr_pct", "close_path", "relative_path", "volume_robust_z")
-    sampled_48: dict[str, tuple[np.ndarray, np.ndarray]] = {
-        name: _resample_rows(channels[name], 48, optional=True) for name in names_48
-    }
-    sampled_64: dict[str, tuple[np.ndarray, np.ndarray]] = {
-        name: _resample_rows(channels[name], 64, optional=True) for name in names_64
-    }
-    coarse_parts = []
-    for name, count in COARSE_LAYOUT.items():
-        sampled, _ = _resample_rows(channels[name], count, optional=False)
-        coarse_parts.append(sampled.astype(np.float32))
-    coarse = np.concatenate(coarse_parts, axis=1).astype(np.float32)
-    stage = _stage_rows(channels)
-    structural = _structural_rows(channels["close_path"])
-    representations = []
-    for row in range(len(positions)):
-        representations.append(Representation(
-            pd.DataFrame(), coarse[row],
-            {
-                name: values[row].copy() if present[row] else None
-                for name, (values, present) in sampled_48.items()
-            },
-            {
-                name: values[row].copy() if present[row] else None
-                for name, (values, present) in sampled_64.items()
-            },
-            stage[row], structural[row],
-        ))
+    representations = materialize_exact_representations(channels)
     return ExactBatch(
-        positions, tuple(representations), perf_counter() - started,
+        positions, representations, perf_counter() - started,
     )
 
 

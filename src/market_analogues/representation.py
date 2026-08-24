@@ -151,18 +151,20 @@ class Representation:
 
 
 def represent(episode: Episode) -> Representation:
+    """Build distance-v1 through the shared scalar/sliding exact kernel."""
     channels = dense_channels(episode)
-    names_48 = {
-        "close_path", "return", "overnight", "intraday", "distance_high_63",
-        "distance_ma_20", "range_pct", "body_atr", "upper_wick_atr",
-        "lower_wick_atr", "atr_pct", "compression_ratio", "volume_robust_z",
-        "return_shock_z", "benchmark_path", "benchmark_return",
-        "benchmark_drawdown", "relative_path", "relative_return",
-    }
-    names_64 = {"close_path", "atr_pct", "volume_robust_z", "relative_path"}
+    # Local import prevents a module cycle: exact_batch owns the vectorized
+    # channel/materialization kernel and imports this module's data contract.
+    from .exact_batch import exact_channel_rows, materialize_exact_representations
+
+    positions, channel_rows = exact_channel_rows(
+        episode.bars.reset_index(drop=True), episode.benchmark,
+        lookback=len(episode.bars), stride=1,
+    )
+    if len(positions) != 1:
+        raise ValueError("distance-v1 requires a non-empty fixed episode")
+    exact = materialize_exact_representations(channel_rows)[0]
     return Representation(
-        channels, coarse_vector(channels),
-        {name: resample_optional(channels[name], 48) for name in names_48},
-        {name: resample_optional(channels[name], 64) for name in names_64},
-        stage_signature(channels), structural_signature(channels),
+        channels, exact.coarse, exact.samples_48, exact.samples_64,
+        exact.stage, exact.structural,
     )

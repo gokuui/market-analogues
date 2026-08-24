@@ -19,7 +19,7 @@
 <body>
 <header>
   <h1>M04R — certified NASDAQ analogue retrieval remediation</h1>
-  <p><b>Planning date:</b> 24 August 2026. <b>Status:</b> final evidence-backed implementation plan, frozen after the research/POC preflight. M04R-00 through M04R-02 are verified complete; M04R-03 is next. No retrieval repair is claimed yet.</p>
+  <p><b>Planning date:</b> 24 August 2026. <b>Status:</b> final evidence-backed implementation plan, frozen after the research/POC preflight. M04R-00 through M04R-03 are verified complete; M04R-04 is next. No retrieval repair is claimed yet.</p>
   <p><b>Target outcome:</b> given a current 252-session NASDAQ chart state, return the historically eligible charts with the smallest frozen exact OHLCV/volume/market-context distance. Interactive mode must be fast and candid about approximation. Certified mode must prove that no eligible episode capable of beating the final constrained top-20 was discarded.</p>
   <p>This plan is outcome-blind. Forward returns, trader profits and setup names are not inputs to representation, retrieval, tuning or acceptance.</p>
 </header>
@@ -150,6 +150,7 @@
   <p><b>Build:</b> Refactor scalar query representation, sliding proposal signatures and exact batches to consume one pure, versioned channel kernel. Eliminate separately implemented proxy meanings for price, candle, volume, market and structure.</p>
   <p><b>Tests:</b> Scalar/sliding equality for all fields and masks; price and volume unit invariance; benchmark and stock future mutation; ordinary/constant/zero-volume/missing-context/extreme fixtures; serial/chunked/parallel digest identity; zero non-finite output.</p>
   <p><b>Pass before next:</b> Native parity within a preregistered practical tolerance, planted-clone recall 100%, and zero critical-negative inversion.</p>
+  <p class="pass"><b>Verified 24 August 2026:</b> PASS. Scalar queries and sliding exact candidates now call one materialization function. A digest-bound, lossless 1,376-value exact-aligned row carries all native coarse, 48/64-sample, stage, structural and explicit missingness fields; it is the source interface for later compact proposal experiments, not itself a production store or bound. Across all 12 frozen NASDAQ authorities, 252 representations have exact scalar/sliding equality, zero mask mismatch, zero non-finite rows and zero round-trip mismatch; the pre-refactor pandas path differs by at most <code>3.55e-15</code>. Synthetic tests give planted-clone top rank for every family and zero positive/critical-negative inversion. A 600-window NASDAQ performance rerun retains minimum <code>31.14×</code> speedup and <code>353.64 MB</code> RSS. The old 240-value view signature remains explicitly labelled non-equivalent legacy proxy evidence and was not silently redefined; M04R-05 will select the compact exact-aligned proposal layout.</p>
 </section>
 
 <section class="task" id="m04r-04">
@@ -250,7 +251,7 @@
     <li>Commit a clean rollback point.</li>
     <li>Proceed only if the explicit gate passes. A failure creates a versioned redesign; it never lowers a frozen threshold.</li>
   </ol>
-  <p class="muted">M04R-00 through M04R-02 are complete. M04R-03 is next. The first storage-mutating full-universe task is M04R-06 and is blocked by the declared free-space precondition until capacity is safely available.</p>
+  <p class="muted">M04R-00 through M04R-03 are complete. M04R-04 is next. The first storage-mutating full-universe task is M04R-06 and is blocked by the declared free-space precondition until capacity is safely available.</p>
 </section>
 </body>
 </html>
