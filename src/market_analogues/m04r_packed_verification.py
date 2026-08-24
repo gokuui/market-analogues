@@ -19,7 +19,8 @@ from .types import stable_hash
 SCHEMA_VERSION = "m04r-packed-bound-1pct-verification-v1"
 EVIDENCE_OMITTED = {
     "created_at", "build_seconds", "generation_seconds",
-    "validation_seconds", "peak_rss_mb", "result_digest",
+    "validation_seconds", "peak_rss_mb", "scan_peak_rss_mb",
+    "validation_peak_rss_mb", "inherited_scan_ru_maxrss_mb", "result_digest",
 }
 
 

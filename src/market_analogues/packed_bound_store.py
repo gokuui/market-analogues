@@ -6,7 +6,7 @@ import json
 import os
 from pathlib import Path
 import shutil
-from typing import Any, Iterable
+from typing import Any, Iterable, Sequence
 from uuid import uuid4
 
 import numpy as np
@@ -217,6 +217,68 @@ def _validate_order(records: np.ndarray, label: str) -> None:
         )
 
 
+def _validate_unique_episode_ids(
+    rows: np.ndarray, overflow: np.ndarray, label: str,
+) -> None:
+    main_ids = np.asarray(rows["episode_id"])
+    overflow_ids = np.asarray(overflow["episode_id"])
+    if len(np.unique(main_ids)) != len(main_ids):
+        raise PackedBoundStoreError(f"{label} contains duplicate main episode IDs")
+    if len(np.unique(overflow_ids)) != len(overflow_ids):
+        raise PackedBoundStoreError(f"{label} contains duplicate overflow episode IDs")
+    if len(main_ids) and len(overflow_ids) and np.isin(overflow_ids, main_ids).any():
+        raise PackedBoundStoreError(f"{label} duplicates an episode across main/overflow")
+
+
+def _publish_generation(
+    root: Path,
+    build_root: Path,
+    row_count: int,
+    overflow_count: int,
+    symbol_tuple: tuple[str, ...],
+    provenance: dict[str, Any],
+    activate: bool,
+) -> str:
+    row_path = build_root / "bound-rows.bin"
+    overflow_path = build_root / "overflow-exact-fallback.bin"
+    deterministic = {
+        "schema_version": PACK_SCHEMA_VERSION,
+        "pack_contract_digest": packed_bound_store_contract()["digest"],
+        "quantized_bound_contract_digest": quantized_bound_contract()["digest"],
+        "row_count": row_count,
+        "overflow_count": overflow_count,
+        "eligible_row_count": row_count + overflow_count,
+        "row_bytes": PACK_DTYPE.itemsize,
+        "overflow_row_bytes": OVERFLOW_DTYPE.itemsize,
+        "rows_file": row_path.name,
+        "overflow_file": overflow_path.name,
+        "rows_bytes": row_path.stat().st_size,
+        "overflow_bytes": overflow_path.stat().st_size,
+        "rows_sha256": _file_sha256(row_path),
+        "overflow_sha256": _file_sha256(overflow_path),
+        "symbols": list(symbol_tuple),
+        "provenance": provenance,
+        "provenance_digest": stable_hash(provenance),
+        "overflow_policy": OVERFLOW_POLICY,
+        "real_forward_outcomes_accessed": False,
+    }
+    generation_id = stable_hash(deterministic)
+    manifest = {**deterministic, "manifest_digest": generation_id}
+    _atomic_json(build_root / "manifest.json", manifest)
+    generations = root / "generations"
+    generations.mkdir(parents=True, exist_ok=True)
+    final = generations / generation_id
+    if final.exists():
+        shutil.rmtree(build_root)
+    else:
+        os.replace(build_root, final)
+    if activate:
+        activate_packed_generation(root, generation_id)
+    else:
+        load_packed_generation(root, generation_id)
+    return generation_id
+
+
 def write_packed_generation(
     root: Path,
     rows: np.ndarray,
@@ -240,10 +302,7 @@ def write_packed_generation(
             raise PackedBoundStoreError(f"{label} symbol ID exceeds dictionary")
         if len(array) and not set(np.unique(array["quality_tier"])).issubset(TIER_NAMES):
             raise PackedBoundStoreError(f"{label} contains unsupported quality tier")
-    ids = [decode_episode_id(value) for value in rows["episode_id"]]
-    ids.extend(decode_episode_id(value) for value in overflow["episode_id"])
-    if len(ids) != len(set(ids)):
-        raise PackedBoundStoreError("generation contains duplicate episode IDs")
+    _validate_unique_episode_ids(rows, overflow, "generation")
 
     build_root = root / ".building" / uuid4().hex
     build_root.mkdir(parents=True, exist_ok=False)
@@ -255,41 +314,79 @@ def write_packed_generation(
         for path in (row_path, overflow_path):
             with path.open("rb") as handle:
                 os.fsync(handle.fileno())
-        deterministic = {
-            "schema_version": PACK_SCHEMA_VERSION,
-            "pack_contract_digest": packed_bound_store_contract()["digest"],
-            "quantized_bound_contract_digest": quantized_bound_contract()["digest"],
-            "row_count": len(rows),
-            "overflow_count": len(overflow),
-            "eligible_row_count": len(rows) + len(overflow),
-            "row_bytes": PACK_DTYPE.itemsize,
-            "overflow_row_bytes": OVERFLOW_DTYPE.itemsize,
-            "rows_file": row_path.name,
-            "overflow_file": overflow_path.name,
-            "rows_bytes": row_path.stat().st_size,
-            "overflow_bytes": overflow_path.stat().st_size,
-            "rows_sha256": _file_sha256(row_path),
-            "overflow_sha256": _file_sha256(overflow_path),
-            "symbols": list(symbol_tuple),
-            "provenance": provenance,
-            "provenance_digest": stable_hash(provenance),
-            "overflow_policy": OVERFLOW_POLICY,
-            "real_forward_outcomes_accessed": False,
-        }
-        generation_id = stable_hash(deterministic)
-        manifest = {**deterministic, "manifest_digest": generation_id}
-        _atomic_json(build_root / "manifest.json", manifest)
-        generations = root / "generations"
-        generations.mkdir(parents=True, exist_ok=True)
-        final = generations / generation_id
-        if final.exists():
+        return _publish_generation(
+            root, build_root, len(rows), len(overflow), symbol_tuple,
+            provenance, activate,
+        )
+    except Exception:
+        if build_root.exists():
             shutil.rmtree(build_root)
-            load_packed_generation(root, generation_id)
-        else:
-            os.replace(build_root, final)
-        if activate:
-            activate_packed_generation(root, generation_id)
-        return generation_id
+        raise
+
+
+def write_packed_generation_from_shards(
+    root: Path,
+    row_shards: Sequence[Path],
+    overflow_shards: Sequence[Path],
+    row_count: int,
+    overflow_count: int,
+    symbols: Iterable[str],
+    provenance: dict[str, Any],
+    *,
+    activate: bool = False,
+) -> str:
+    """Stream ordered shard bytes into one shadow generation without pack-sized RAM."""
+    if len(row_shards) != len(overflow_shards):
+        raise PackedBoundStoreError("main and overflow shard lists differ")
+    symbol_tuple = tuple(str(value) for value in symbols)
+    if len(symbol_tuple) != len(set(symbol_tuple)):
+        raise PackedBoundStoreError("symbol dictionary contains duplicates")
+    build_root = root / ".building" / uuid4().hex
+    build_root.mkdir(parents=True, exist_ok=False)
+    observed_rows = observed_overflow = 0
+    try:
+        destinations = (
+            (build_root / "bound-rows.bin", row_shards, PACK_DTYPE, "main"),
+            (build_root / "overflow-exact-fallback.bin", overflow_shards,
+             OVERFLOW_DTYPE, "overflow"),
+        )
+        for destination, paths, dtype, label in destinations:
+            prior_symbol = -1
+            prior_cutoff = -1
+            with destination.open("wb") as output:
+                for path in paths:
+                    if path.stat().st_size % dtype.itemsize:
+                        raise PackedBoundStoreError(f"{label} shard byte size differs")
+                    count = path.stat().st_size // dtype.itemsize
+                    if count:
+                        shard = np.memmap(path, dtype=dtype, mode="r")
+                        _validate_order(shard, label)
+                        first_symbol = int(shard["symbol_id"][0])
+                        first_cutoff = int(shard["cutoff_ns"][0])
+                        if (
+                            first_symbol < prior_symbol
+                            or first_symbol == prior_symbol and first_cutoff <= prior_cutoff
+                        ):
+                            raise PackedBoundStoreError(
+                                f"{label} shard boundaries are not ascending"
+                            )
+                        prior_symbol = int(shard["symbol_id"][-1])
+                        prior_cutoff = int(shard["cutoff_ns"][-1])
+                        del shard
+                    with path.open("rb") as source:
+                        shutil.copyfileobj(source, output, 8 * 1024 * 1024)
+                    if label == "main":
+                        observed_rows += count
+                    else:
+                        observed_overflow += count
+                output.flush()
+                os.fsync(output.fileno())
+        if observed_rows != row_count or observed_overflow != overflow_count:
+            raise PackedBoundStoreError("streamed shard row accounting differs")
+        return _publish_generation(
+            root, build_root, row_count, overflow_count, symbol_tuple,
+            provenance, activate,
+        )
     except Exception:
         if build_root.exists():
             shutil.rmtree(build_root)
@@ -318,6 +415,8 @@ def _load_manifest(root: Path, generation_id: str) -> tuple[Path, dict[str, Any]
 def load_packed_generation(
     root: Path, generation_id: str | None = None,
     *, expected_provenance_digest: str | None = None,
+    verify_content: bool = True,
+    validate_records: bool = True,
 ) -> LoadedPackedGeneration:
     if generation_id is None:
         active_path = root / "active.json"
@@ -362,7 +461,7 @@ def load_packed_generation(
     for path, size, digest in expected:
         if not path.is_file() or path.stat().st_size != size:
             raise PackedBoundStoreError(f"packed file size differs: {path.name}")
-        if _file_sha256(path) != digest:
+        if verify_content and _file_sha256(path) != digest:
             raise PackedBoundStoreError(f"packed file digest differs: {path.name}")
     if row_path.stat().st_size != int(manifest["row_count"]) * PACK_DTYPE.itemsize:
         raise PackedBoundStoreError("main packed row count differs")
@@ -379,17 +478,18 @@ def load_packed_generation(
     symbols = tuple(str(value) for value in manifest.get("symbols", []))
     if len(symbols) != len(set(symbols)):
         raise PackedBoundStoreError("packed symbol dictionary is invalid")
-    _validate_order(rows, "main")
-    _validate_order(overflow, "overflow")
-    for array, label in ((rows, "main"), (overflow, "overflow")):
-        if len(array) and int(np.max(array["symbol_id"])) >= len(symbols):
-            raise PackedBoundStoreError(f"{label} symbol ID exceeds dictionary")
-        if len(array) and not set(np.unique(array["quality_tier"])).issubset(TIER_NAMES):
-            raise PackedBoundStoreError(f"{label} quality tier differs")
-    ids = [decode_episode_id(value) for value in rows["episode_id"]]
-    ids.extend(decode_episode_id(value) for value in overflow["episode_id"])
-    if len(ids) != len(set(ids)):
-        raise PackedBoundStoreError("packed generation contains duplicate episode IDs")
+    if validate_records:
+        _validate_order(rows, "main")
+        _validate_order(overflow, "overflow")
+        for array, label in ((rows, "main"), (overflow, "overflow")):
+            if len(array) and int(np.max(array["symbol_id"])) >= len(symbols):
+                raise PackedBoundStoreError(f"{label} symbol ID exceeds dictionary")
+            if (
+                len(array)
+                and not set(np.unique(array["quality_tier"])).issubset(TIER_NAMES)
+            ):
+                raise PackedBoundStoreError(f"{label} quality tier differs")
+        _validate_unique_episode_ids(rows, overflow, "packed generation")
     return LoadedPackedGeneration(root, generation_id, manifest, rows, overflow, symbols)
 
 

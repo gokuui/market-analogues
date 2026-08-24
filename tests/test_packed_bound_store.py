@@ -12,6 +12,7 @@ from market_analogues.packed_bound_store import (
     make_overflow_record, make_packed_record, packed_bound_store_contract,
     packed_lower_bounds,
     unpack_quantized_rows, write_packed_generation,
+    write_packed_generation_from_shards,
 )
 from market_analogues.quantized_bound import (
     PACKED_ROW_BYTES, quantize_bound_row, quantized_representation_lower_bound,
@@ -140,11 +141,45 @@ def test_incremental_generation_equals_clean_rebuild(tmp_path: Path) -> None:
     )
 
 
+def test_streamed_shards_equal_array_generation(tmp_path: Path) -> None:
+    first, _ = _records(20, 0)
+    second, _ = _records(21, 1)
+    rows = np.concatenate((first, second))
+    overflow = make_overflow_record(f"{22:024x}", 22, 1, "A")
+    shard_root = tmp_path / "shards"
+    shard_root.mkdir()
+    row_paths, overflow_paths = [], []
+    for index, values in enumerate((first, second)):
+        row_path = shard_root / f"{index}.rows"
+        sidecar_path = shard_root / f"{index}.overflow"
+        values.tofile(row_path)
+        (overflow if index == 1 else np.empty(0, dtype=OVERFLOW_DTYPE)).tofile(
+            sidecar_path,
+        )
+        row_paths.append(row_path)
+        overflow_paths.append(sidecar_path)
+    provenance = {"source": "same"}
+    array_generation = write_packed_generation(
+        tmp_path / "array", rows, overflow, ("AAA", "BBB"), provenance,
+        activate=False,
+    )
+    stream_generation = write_packed_generation_from_shards(
+        tmp_path / "stream", row_paths, overflow_paths, len(rows), len(overflow),
+        ("AAA", "BBB"), provenance,
+    )
+    assert stream_generation == array_generation
+    assert load_packed_generation(
+        tmp_path / "stream", stream_generation,
+    ).manifest == load_packed_generation(
+        tmp_path / "array", array_generation,
+    ).manifest
+
+
 def test_generation_rejects_duplicates_and_noncanonical_order(tmp_path: Path) -> None:
     record, _ = _records(5)
     duplicate = record.copy()
     duplicate["cutoff_ns"][0] += 1
-    with pytest.raises(PackedBoundStoreError, match="duplicate episode"):
+    with pytest.raises(PackedBoundStoreError, match="duplicate main episode"):
         write_packed_generation(
             tmp_path, np.concatenate((record, duplicate)),
             np.empty(0, dtype=OVERFLOW_DTYPE), ("AAA",), {},
