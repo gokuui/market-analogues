@@ -1013,6 +1013,11 @@
   <p><b>Rejected compact tuning:</b> Warm scans at 8,192/16,384/32,768/65,536 rows took 108.12/113.72/120.09/137.77 seconds. Every variant preserved candidate/result digests exactly, but all were slower than the 4,093-row control, so block enlargement is rejected rather than assumed beneficial.</p>
   <p><b>Decision:</b> No untouched candidate pool has been generated and no sealed authority was opened. Preserve the failed preflight and redesign only execution mechanics on development data—such as a lossless verified sorted-sample/statistics sidecar or deterministic parallel reduction—while keeping the legacy v1 scores, routes, quotas and candidate digest unchanged. The 60-case one-shot remains unspent until a development preflight meets the original 120/60-second limits.</p>
 </section>
+<section class="entry">
+  <h2>L-103 — Preregistered lossless two-process legacy scan POC</h2>
+  <p><b>Hypothesis:</b> The rejected legacy scan is primarily CPU-bound while evaluating exact v1 lower-bound scores. Partition immutable 4,096-row blocks across two fresh processes, keep one Numba thread in each, retain an independent bounded heap per route and perform a deterministic top-quota reduction. This changes execution only: each row receives the same legacy kernel, and the final candidate/result digests must equal <code>c8f51e20…2555</code>/<code>bb36c3b7…b75b</code>.</p>
+  <p><b>Frozen development POC:</b> On already-used CAKE current, advise the same pack cold, then run cold-forward, warm-reverse and warm-forward scans through one persistent two-process pool. Require exact three-scan identity, cold ≤120 seconds, second warm ≤60 seconds and the conservative sum of parent current RSS plus worker peak RSS ≤1,024 MiB. If two processes fail latency, a separately recorded four-process diagnostic may run; no untouched query is permitted.</p>
+</section>
 </main>
 
 <section id="reproduce">
