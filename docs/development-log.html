@@ -685,6 +685,13 @@
   <p><b>How v3 differs:</b> Added a separately versioned <code>m04r-certified-packed-search-v3</code> contract: groups below the existing eight-proposal cutoff retain exact scalar reconstruction, while dense groups construct only their requested cutoffs. v1 and pure v2 remain unchanged and reproducible. The runner records mutually exclusive mode controls, rejects ambiguous combinations and binds checkpoints to the selected contract digest. Physical-pack differential tests prove v3 equality for IDs, totals, components, paths, input digest and exact-evaluation count; the full test suite passes.</p>
   <p><b>Next:</b> Run TVTX alone under v3. Continue to CAKE and TAIT only if TVTX stays exact and falls below 600 seconds. A credible all-12 rerun additionally requires a measured route toward the frozen 300-second p95; otherwise profile the remaining scan/exact split before changing another design variable.</p>
 </section>
+
+<section class="entry">
+  <h2>L-062 — Hybrid v3 rejected; sparse-path hypothesis corrected</h2>
+  <p><b>Measured result:</b> Historical TVTX under hybrid v3 is exactly equal to its authority—same ordered IDs, components within 1.12e−7, exact alignments, 9,309 evaluations and strict certificate—but takes 857.84 seconds at 696.49 MiB. It improves v1 by 126.44 seconds but is 79.08 seconds slower than pure requested-position v2. Therefore v3 fails the unchanged 600-second maximum and CAKE/TAIT were not launched.</p>
+  <p><b>Correction:</b> The prior attribution of v2's remaining time to sparse-group vector overhead is falsified. Across identical completion rounds, v2 is faster than the hybrid that restores scalar sparse reconstruction. All three variants certify only after two physical scans: frontier 8,192 cannot stop, then frontier 16,384 reaches the final 9,309 exact rows. The next isolated variable is scan duplication, not another reconstruction guess.</p>
+  <p><b>Next POC:</b> The runner now exposes and records <code>initial_frontier_rows</code>, validates its bounds, and refuses to resume a checkpoint whose complete controls differ from the requested run. Test pure v2 at an initial 16,384 frontier so TVTX performs one pack scan. The scoring contract is unchanged; certificate rounds and evidence controls capture the execution difference. Accept only exact authority equality and ≤600 seconds, then evaluate whether the result leaves a credible ≤300-second p95 route.</p>
+</section>
 </main>
 
 <section id="reproduce">

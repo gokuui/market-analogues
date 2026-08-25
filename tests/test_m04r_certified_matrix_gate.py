@@ -168,6 +168,9 @@ def test_matrix_checkpoint_validation_and_timing_free_digest() -> None:
     tampered["result_digest"] = stable_hash(_deterministic(tampered, CASE_OMITTED))
     _, authority, build = _case(expected[0])
     assert not _valid_checkpoint(tampered, authority, build)
+    assert not _valid_checkpoint(
+        cases[0], authority, build, {"block_rows": 1, "workers": 8},
+    )
 
 
 def test_independent_matrix_verifier_passes_and_rejects_tamper(

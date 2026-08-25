@@ -193,6 +193,7 @@ def _case_payload(
 
 def _valid_checkpoint(
     payload: dict[str, Any], authority: dict[str, Any], build: dict[str, Any],
+    expected_controls: dict[str, Any] | None = None,
 ) -> bool:
     requested_positions = bool(
         (payload.get("controls") or {}).get("requested_positions", False)
@@ -214,6 +215,7 @@ def _valid_checkpoint(
         payload.get("full_build_evidence_digest") == build.get("result_digest"),
         payload.get("query_episode_id") == authority.get("query_episode_id"),
         payload.get("authority_digest") == authority.get("authority_digest"),
+        expected_controls is None or payload.get("controls") == expected_controls,
         payload.get("result_digest") == stable_hash(
             _deterministic(payload, CASE_OMITTED)
         ),
@@ -343,6 +345,7 @@ def main() -> int:
     parser.add_argument("--output-root", type=Path, required=True)
     parser.add_argument("--workers", type=int, default=8)
     parser.add_argument("--block-rows", type=int, default=2_048)
+    parser.add_argument("--initial-frontier-rows", type=int, default=8_192)
     parser.add_argument("--case-limit", type=int)
     parser.add_argument("--query-ids", nargs="+")
     parser.add_argument("--requested-positions", action="store_true")
@@ -350,8 +353,12 @@ def main() -> int:
     args = parser.parse_args()
     if args.requested_positions and args.hybrid_requested_positions:
         raise ValueError("requested-position modes are mutually exclusive")
-    if args.workers < 1 or args.block_rows < 1:
-        raise ValueError("workers and block rows must be positive")
+    if (
+        args.workers < 1 or args.block_rows < 1
+        or args.initial_frontier_rows < 512
+        or args.initial_frontier_rows > 32_768
+    ):
+        raise ValueError("workers, block rows and frontier limits are invalid")
     if args.case_limit is not None and args.case_limit < 1:
         raise ValueError("case limit must be positive")
     config = load_config(args.config)
@@ -411,6 +418,13 @@ def main() -> int:
     started_at = datetime.now(timezone.utc).isoformat()
     completed: dict[str, dict[str, Any]] = {}
     failures: list[dict[str, Any]] = []
+    controls = {
+        "block_rows": args.block_rows,
+        "workers": args.workers,
+        "initial_frontier_rows": args.initial_frontier_rows,
+        "requested_positions": args.requested_positions,
+        "hybrid_requested_positions": args.hybrid_requested_positions,
+    }
 
     for authority in authorities:
         query_id = str(authority["query_episode_id"])
@@ -421,7 +435,7 @@ def main() -> int:
             payload = json.loads(checkpoint.read_text())
         except (OSError, json.JSONDecodeError):
             continue
-        if _valid_checkpoint(payload, authority, build):
+        if _valid_checkpoint(payload, authority, build, controls):
             completed[query_id] = payload
 
     for authority in selected:
@@ -447,7 +461,7 @@ def main() -> int:
             result = certified_packed_search(
                 query, source, request, args.full_root / "store",
                 str(build["generation_id"]), store_dataset_id="nasdaq",
-                initial_frontier_rows=8_192,
+                initial_frontier_rows=args.initial_frontier_rows,
                 maximum_frontier_rows=32_768,
                 seed_rows=512,
                 block_rows=args.block_rows,
@@ -459,14 +473,7 @@ def main() -> int:
             )
             payload = _case_payload(
                 result, authority, build,
-                {
-                    "block_rows": args.block_rows,
-                    "workers": args.workers,
-                    "requested_positions": args.requested_positions,
-                    "hybrid_requested_positions": (
-                        args.hybrid_requested_positions
-                    ),
-                },
+                controls,
                 args.requested_positions,
                 args.hybrid_requested_positions,
             )
