@@ -720,6 +720,13 @@
   <p><b>Performance rejection:</b> Shared elapsed is 626.34 seconds. Three scalar controls in the same process take 205.36, 180.79 and 255.55 seconds, totaling 641.70. The measured gain is only 1.0245×/2.39%, below the preregistered 10% material threshold, so evidence digest <code>2e042acf…a49</code> is a FAIL and the batch wrapper is not promoted into certified final search.</p>
   <p><b>Meaning and next:</b> Reading each block once is correct but physical I/O is not the dominant cost; query-specific quantized-bound statistics dominate. Preserve the batch primitive as tested infrastructure, but do not claim it repairs p95. Next decompose the real bound kernel on fixed pack rows, measuring eligibility, presence unpacking/conversion, coarse/stage/structure, each 48-sample group, quantile/std denominators and heap maintenance. Test compact alternatives against identical float results before changing the production kernel.</p>
 </section>
+
+<section class="entry">
+  <h2>L-067 — Quantized-kernel profile and combined-IQR POC</h2>
+  <p><b>Profile:</b> Five in-memory calls over the same 32,768 real TVTX-eligible packed rows take 11.227 seconds. NumPy percentile consumes 7.348 seconds/65.5% and its partition primitive alone 6.702 seconds; standard deviation is 1.261 seconds, dtype conversion 0.940 and presence unpacking negligible. This confirms the shared-read rejection: query-dependent denominator statistics, especially IQR, dominate.</p>
+  <p><b>Verified compact change:</b> The existing vector kernel separately called percentile at 25 and 75 for every present 48-sample channel, partitioning the same joined 96-value row twice. It now requests <code>(25, 75)</code> in one call and subtracts the returned quartiles. A call-count regression proves one combined request per present channel; all independent-reference, safety, missingness, float16-boundary, packed-store and proposal tests pass, followed by the full suite.</p>
+  <p><b>Measured result and next:</b> On the identical fixed rows, median kernel time falls from 2.2454 to 1.8246 seconds per call, a 1.2306×/18.7% elapsed reduction with unchanged checked outputs. This is an in-memory kernel POC, not yet a full-search performance pass. Commit it separately, then run a full TVTX composite scan and require the exact prior candidate digest/eligible accounting plus material elapsed reduction before rerunning certified completion.</p>
+</section>
 </main>
 
 <section id="reproduce">

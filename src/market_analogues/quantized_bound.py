@@ -318,6 +318,12 @@ def quantized_array_lower_bounds(
         ))
         return np.maximum(observed - radius, 0.0)
 
+    def interquartile_range(joined: np.ndarray) -> np.ndarray:
+        # One partition produces both quantiles.  Separate percentile calls
+        # partition the identical 96-value rows twice.
+        quartiles = np.percentile(joined, (25, 75), axis=1)
+        return quartiles[1] - quartiles[0]
+
     coarse = coarse.astype(np.float64)
     coarse_error = radii[:, 0]
     coarse_joined = np.c_[coarse, np.broadcast_to(query.coarse, coarse.shape)]
@@ -350,9 +356,7 @@ def quantized_array_lower_bounds(
             stored = samples[:, index]
             joined = np.c_[stored, np.broadcast_to(query_values, stored.shape)]
             denominator = np.maximum.reduce((
-                np.percentile(joined, 75, axis=1)
-                - np.percentile(joined, 25, axis=1)
-                + 2.0 * max_radii[:, index],
+                interquartile_range(joined) + 2.0 * max_radii[:, index],
                 np.std(joined, axis=1) + rms_radii[:, index] / np.sqrt(2.0),
                 np.full(row_count, 1e-6),
             ))
