@@ -870,6 +870,14 @@
   <p><b>Correctness and generalization:</b> The 12 existing cases exactly retain frozen authority IDs/order/alignments and tolerances under the current sorted-merge implementation. The 12 new cases have complete safe-bound accounting and strict certified stops. AOUT historical is the single new tail at 418.79 seconds/17,907 exact rows; one outlier does not break the 24-case p95, but it is the primary grouped-exact stress case.</p>
   <p><b>Next:</b> The batch target is now unambiguous: identical per-query matches/certificates versus these controls and total elapsed ≤3,356.3586 seconds (at least 10% below 3,729.2874), while RSS remains ≤1,536 MiB. Implement shared proposal state plus union/grouped exact representation materialization; measure phase times and fail closed on any query-specific threshold or certificate difference.</p>
 </section>
+
+<section class="entry">
+  <h2>L-087 — One-scan certified-prefix reuse and AOUT stress preflight PASS</h2>
+  <p><b>Implementation:</b> Certified completion can now consume a digest-validated precomputed proposal report. A maximum-frontier report is sliced to each scalar frontier, and the exact scalar candidate digest is reconstructed from that prefix; query/generation/quota coverage are validated before scoring. The v5 distance/certificate contract is unchanged.</p>
+  <p><b>Differential tests:</b> Physical-fixture internal-scan and precomputed-proposal executions return identical matches and certificate digests. Malformed or insufficient reports fail closed. The full suite passes.</p>
+  <p><b>Real stress result:</b> AOUT historical's single 32,769-candidate scan takes 92.6865 seconds; precomputed exact completion takes 223.3129. It exactly reproduces 20 matches, all four scalar rounds, 17,907 evaluations and certificate digest <code>43a04c4c…6f4f0</code>. Combined 315.9994 seconds saves 102.7953/24.5% versus its 418.7947-second scalar control by avoiding the second full scan.</p>
+  <p><b>Interpretation and next:</b> This validates the hardest multi-round case and accounts for 27.6% of the 372.93-second batch saving required. Build the complete runner: prepare all 24 queries, perform one shared 32,769-row proposal scan, feed each report through this verified completion path, compare canonical matches/certificates to every scalar checkpoint, and include shared scan plus all exact phases in the frozen elapsed/RSS gate.</p>
+</section>
 </main>
 
 <section id="reproduce">
