@@ -216,7 +216,8 @@
   <p class="fail"><b>Requested-position v2 rejected 25 August 2026:</b> Historical TVTX remains exactly correct with 9,309 evaluations and improves from 984.28 to 778.76 seconds, but still exceeds the frozen 600-second maximum. The remaining heavy cases were deliberately not run after the admission failure; the atomic TVTX checkpoint preserves the result.</p>
   <p class="fail"><b>Hybrid v3 rejected 25 August 2026:</b> Historical TVTX is again exact but takes 857.84 seconds at 696.49 MiB—faster than v1, slower than pure v2 and still above 600 seconds. This falsifies the claim that pure v2's sparse-group vector path caused its remaining delay. Every variant uses the same two 8,192/16,384 frontier scans and 9,309 exact rows.</p>
   <p class="pass"><b>One-scan v2 TVTX PASS 25 August 2026:</b> Starting pure v2 at frontier 16,384 removes the duplicate scan and retains exact authority equality. The certificate accounts for 9,309 exact and 3,003,508 safely pruned rows with strict stopping; runtime is 569.59 seconds and RSS 614.12 MiB. This saves 209.17 seconds versus old-frontier v2 and 414.69 seconds versus v1, passing the case maximum without weakening it.</p>
-  <p class="open"><b>Remaining M04R-08 boundary:</b> Run CAKE and TAIT under identical v2/16,384 controls to confirm all former maximum failures are repaired. TVTX remains too slow for the 300-second p95, so do not rerun all 12 or promote the store yet. Profile and implement shared pack I/O/multi-query completion next; it must preserve every per-query certificate and materially reduce total elapsed time. The shadow generation stays inactive.</p>
+  <p class="pass"><b>Three-heavy maximum gate PASS 25 August 2026:</b> Under identical one-scan pure-v2 controls, CAKE completes in 425.75 seconds/7,783 exact rows and TAIT in 560.92 seconds/7,419, both exactly matching their frozen authorities. With TVTX at 569.59 seconds, every former >600-second case now passes the unchanged maximum and RSS limits.</p>
+  <p class="open"><b>Remaining M04R-08 boundary:</b> The partial heavy-case p95 is 554.16 seconds, still far above 300; 2/12 cases are not an all-matrix pass. Implement shared block scanning and then shared multi-query completion, prove scalar-equivalent per-query proposals/results/certificates, and require material total-time reduction. Do not rerun all 12 or promote the shadow store before that POC passes.</p>
 </section>
 
 <section class="task" id="m04r-09">
@@ -275,7 +276,7 @@
     <li>Commit a clean rollback point.</li>
     <li>Proceed only if the explicit gate passes. A failure creates a versioned redesign; it never lowers a frozen threshold.</li>
   </ol>
-  <p class="muted">M04R-00 through M04R-07 and M04R-08A are complete. The M04R-08B v1 all-12 baseline, pure v2 at the old frontier and hybrid v3 are rejected despite exact correctness. One-scan pure v2 passes TVTX's 600-second maximum but not the 300-second p95 ambition. CAKE/TAIT verification and M04R-08C shared-I/O batching are next; the shadow generation stays inactive.</p>
+  <p class="muted">M04R-00 through M04R-07 and M04R-08A are complete. One-scan pure v2 repairs all three former >600-second cases but the heavy-case p95 remains 554.16 seconds. M04R-08C shared-I/O/multi-query batching is next; the all-12 rerun and shadow-store activation remain blocked.</p>
 </section>
 </body>
 </html>

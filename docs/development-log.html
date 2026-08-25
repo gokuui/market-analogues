@@ -699,6 +699,13 @@
   <p><b>Comparison:</b> Holding the pure-v2 scoring path fixed, removing the second full-pack scan saves 209.17 seconds versus the 8,192-start v2 run. It saves 414.69 seconds versus v1. The one-case aggregate correctly remains incomplete because the frozen matrix gate requires all 12 cases; this does not negate the individual TVTX PASS.</p>
   <p><b>Boundary and next:</b> The ≤600-second maximum now has a passing route, but 569.59 seconds is far above the ≤300-second p95 objective. Run historical CAKE and current TAIT under the same v2/16,384 controls to establish whether every former maximum failure is repaired. Do not promote or launch a full all-12 rerun yet; next profile shared pack I/O and multi-query completion using these results, because another single-query scalar tweak lacks evidence of reaching p95.</p>
 </section>
+
+<section class="entry">
+  <h2>L-064 — All three former maximum failures repaired; p95 remains rejected</h2>
+  <p><b>Heavy-case results:</b> Under identical pure-v2, initial-16,384, 2,048-block, eight-worker controls, historical CAKE completes in 425.75 seconds with 7,783 exact rows and current TAIT in 560.92 seconds with 7,419. Together with TVTX at 569.59 seconds/9,309 rows, all three exactly match their frozen authorities and pass the unchanged 600-second case maximum and 1,536-MiB RSS limit. CAKE improves by 282.47 seconds and TAIT by 126.56 seconds over v1.</p>
+  <p><b>Aggregate interpretation:</b> The intentionally partial CAKE/TAIT matrix is 2/12 and therefore not a matrix PASS. Its p95 is 554.16 seconds, which confirms that independent per-query scanning still violates the frozen 300-second p95 even after all former hard maximum failures are repaired. No full all-12 rerun is authorized from these partial results.</p>
+  <p><b>Next:</b> Implement M04R-08C as a bounded shared-I/O POC: read each physical pack block once for multiple queries, preserve query-specific eligibility, bounded heaps, τ, exact completion and certificates, and prove byte-identical proposal/certificate results against repeated scalar calls. Measure physical rows/bytes read, shared wall time, per-query completion time and RSS. Retain it only if total elapsed materially falls; otherwise profile/decompose the quantized-bound kernel before another design change.</p>
+</section>
 </main>
 
 <section id="reproduce">
