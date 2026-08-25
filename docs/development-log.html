@@ -763,6 +763,13 @@
   <p><b>Comparison:</b> v4 saves 39.67 seconds/7.8% versus optimized scalar-bound v2 at 508.08, and 515.87 seconds/52.4% versus rejected v1 at 984.28. The gain is real but smaller than isolated group benchmarks because TVTX has 3,809 sparse groups, including many size-one batches, plus concurrent memory pressure and unchanged representation/source work.</p>
   <p><b>Boundary and next:</b> TVTX remains 168.41 seconds above p95. The next measured costs are requested representation construction and source/prefix work. Benchmark exact-timestamp benchmark alignment and repeated full-frame conversion on fixed real symbol groups against exact-equal alternatives; do not optimize DTW or rerun other authorities without evidence.</p>
 </section>
+
+<section class="entry">
+  <h2>L-073 — Exact timestamp lookup retained; structural kernel isolated</h2>
+  <p><b>Alignment POC:</b> Replaced full pandas merge inside exact-batch benchmark-close extraction with indexed exact-timestamp lookup while preserving missing values and last-duplicate-wins semantics. Across 256 real NASDAQ frames/438,502 rows, lookup is bit-identical and 37.82× faster than merge. Across 112 real symbols/335 complete 252-bar requested representations, the full construction gain is only 1.051× with zero core-array delta, proving alignment is not the dominant representation cost.</p>
+  <p><b>Verification:</b> Added an independent merge-semantics regression covering duplicates and missing timestamps. Context, exact-batch, representation, view and certified physical-pack focused tests pass, followed by the full suite. The helper also keeps the public aligned context frame behavior unchanged.</p>
+  <p><b>Next hotspot:</b> A 50-repeat profile of seven real 252-bar positions attributes 0.938/1.822 seconds (51.5%) to <code>_structural_rows</code>, versus channel construction 0.345, resampling 0.160 and robust-z 0.158. The structural routine performs 756 sequential Python time-step iterations per symbol group while vectorizing only across its usually tiny row count. Build an exact-reference compiled/alternative POC, test threshold-boundary behavior and retain it only with exact or explicitly versioned practical parity plus material speed.</p>
+</section>
 </main>
 
 <section id="reproduce">

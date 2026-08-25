@@ -4,6 +4,24 @@ import numpy as np
 import pandas as pd
 
 
+def align_benchmark_close(
+    bars: pd.DataFrame, benchmark: pd.DataFrame | None,
+) -> np.ndarray:
+    """Return exact-timestamp benchmark closes without a full DataFrame merge."""
+    if benchmark is None or benchmark.empty:
+        return np.full(len(bars), np.nan)
+    right = benchmark[["timestamp", "close"]].drop_duplicates(
+        "timestamp", keep="last",
+    )
+    index = pd.Index(right["timestamp"])
+    positions = index.get_indexer(pd.Index(bars["timestamp"]))
+    values = pd.to_numeric(right["close"], errors="coerce").to_numpy(float)
+    output = np.full(len(bars), np.nan)
+    matched = positions >= 0
+    output[matched] = values[positions[matched]]
+    return output
+
+
 def align_benchmark(bars: pd.DataFrame, benchmark: pd.DataFrame | None) -> pd.DataFrame:
     """Exact-timestamp benchmark alignment; unknown bars remain missing."""
     result = pd.DataFrame({"timestamp": bars["timestamp"].to_numpy()})
@@ -12,9 +30,7 @@ def align_benchmark(bars: pd.DataFrame, benchmark: pd.DataFrame | None) -> pd.Da
                     "benchmark_volatility", "benchmark_drawdown"]:
             result[col] = np.nan
         return result
-    right = benchmark[["timestamp", "close"]].drop_duplicates("timestamp", keep="last")
-    right = right.rename(columns={"close": "benchmark_close"})
-    result = result.merge(right, on="timestamp", how="left", sort=False)
+    result["benchmark_close"] = align_benchmark_close(bars, benchmark)
     close = result["benchmark_close"]
     result["benchmark_return"] = np.log(close / close.shift(1))
     first = close.dropna()
@@ -34,4 +50,3 @@ def relative_channels(bars: pd.DataFrame, aligned: pd.DataFrame) -> pd.DataFrame
         "relative_return": excess,
         "relative_path": relative_path,
     }, index=bars.index)
-

@@ -7,7 +7,7 @@ import warnings
 import numpy as np
 import pandas as pd
 
-from .context import align_benchmark
+from .context import align_benchmark_close
 from .distance import GROUPS, DistanceConfig
 from .representation import COARSE_LAYOUT, Representation
 
@@ -124,8 +124,7 @@ def _benchmark_channels(
     lookback: int,
     stride: int,
 ) -> dict[str, np.ndarray]:
-    aligned = align_benchmark(frame, benchmark)
-    raw = pd.to_numeric(aligned.benchmark_close, errors="coerce").to_numpy(float)
+    raw = align_benchmark_close(frame, benchmark)
     market = np.lib.stride_tricks.sliding_window_view(raw, lookback)[::stride]
     return _benchmark_channel_rows(market)
 
@@ -218,10 +217,7 @@ def exact_channel_rows(
         window(values[name]) for name in ("open", "high", "low")
     )
     close_rows, volume_rows = window(values["close"]), window(values["volume"])
-    aligned = align_benchmark(frame, benchmark)
-    benchmark_values = pd.to_numeric(
-        aligned.benchmark_close, errors="coerce",
-    ).to_numpy(float)
+    benchmark_values = align_benchmark_close(frame, benchmark)
     benchmark_rows = window(benchmark_values)
     channels = _exact_channels_from_rows(
         open_rows, high_rows, low_rows, close_rows, volume_rows,
@@ -256,10 +252,7 @@ def exact_representations_at_positions(
     }
     offsets = np.arange(lookback, dtype=int)
     indices = requested[:, None] - lookback + 1 + offsets
-    aligned = align_benchmark(frame, benchmark)
-    benchmark_values = pd.to_numeric(
-        aligned.benchmark_close, errors="coerce",
-    ).to_numpy(float)
+    benchmark_values = align_benchmark_close(frame, benchmark)
     channels = _exact_channels_from_rows(
         values["open"][indices], values["high"][indices],
         values["low"][indices], values["close"][indices],
