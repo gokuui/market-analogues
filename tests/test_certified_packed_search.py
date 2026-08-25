@@ -10,7 +10,11 @@ import pandas as pd
 
 from market_analogues.adapters import DirectorySource
 from market_analogues.causal_prefix import causal_prefix_digest
-from market_analogues.certified_packed_search import certified_packed_search
+from market_analogues.certified_packed_search import (
+    CompactScoredCandidate,
+    _select_compact_scored,
+    certified_packed_search,
+)
 from market_analogues.config import BenchmarkSpec, DatasetSpec
 from market_analogues.episodes import build_episode
 from market_analogues.exact_batch import _stage_rows, sliding_exact_representations
@@ -22,8 +26,13 @@ from market_analogues.packed_bound_search import (
 )
 from market_analogues.quantized_bound import quantize_bound_row
 from market_analogues.representation import represent
-from market_analogues.search import SearchCandidate, exact_search, latest_eligible_cutoff
-from market_analogues.types import EpisodeKey, InstrumentKey, SearchQuery
+from market_analogues.search import (
+    ScoredCandidate, SearchCandidate, exact_search, latest_eligible_cutoff,
+    select_scored,
+)
+from market_analogues.types import (
+    AnalogueMatch, Episode, EpisodeKey, InstrumentKey, SearchQuery,
+)
 
 
 def test_certified_pack_exhaustion_matches_brute_force(
@@ -123,6 +132,14 @@ def test_certified_pack_exhaustion_matches_brute_force(
         sparse_cutoff=3, seed_rows=20, verify_content=False,
         requested_positions=True, vector_lower_bounds=True,
         deferred_alignments=True,
+    )
+    compact = certified_packed_search(
+        query, source, request, store_root, generation,
+        store_dataset_id="test", initial_frontier_rows=1_000,
+        maximum_frontier_rows=1_000, block_rows=21, workers=2,
+        sparse_cutoff=3, seed_rows=20, verify_content=False,
+        requested_positions=True, vector_lower_bounds=True,
+        deferred_alignments=True, compact_scored=True,
     )
     packed_query = PackedBoundQuery(
         query.key.id, query.key.instrument.source_symbol,
@@ -238,6 +255,22 @@ def test_certified_pack_exhaustion_matches_brute_force(
     }
     assert deferred.certificate.input_digest == certificate.input_digest
     assert deferred.certificate.exact_evaluated == certificate.exact_evaluated
+    assert [row.episode_key.id for row in compact.matches] == [
+        row.episode_key.id for row in deferred.matches
+    ]
+    np.testing.assert_allclose(
+        [row.total_distance for row in compact.matches],
+        [row.total_distance for row in deferred.matches], rtol=0, atol=1e-12,
+    )
+    assert [row.component_distances for row in compact.matches] == [
+        row.component_distances for row in deferred.matches
+    ]
+    assert [row.alignment for row in compact.matches] == [
+        row.alignment for row in deferred.matches
+    ]
+    assert compact.certificate.schema_version == "m04r-certified-packed-search-v6"
+    assert compact.certificate.exact_evaluated == deferred.certificate.exact_evaluated
+    assert compact.certificate.safely_pruned == deferred.certificate.safely_pruned
     assert precomputed.certificate.result_digest == deferred.certificate.result_digest
     assert [row.episode_key.id for row in precomputed.matches] == [
         row.episode_key.id for row in deferred.matches
@@ -259,6 +292,71 @@ def test_requested_position_modes_are_mutually_exclusive(
         certified_packed_search_contract(vector_lower_bounds=True)
     with np.testing.assert_raises(ValueError):
         certified_packed_search_contract(deferred_alignments=True)
+    with np.testing.assert_raises(ValueError):
+        certified_packed_search_contract(compact_scored=True)
+
+
+def test_compact_exact_state_is_selection_equivalent_with_overlap_and_ties() -> None:
+    query_key = EpisodeKey(
+        InstrumentKey("test", "QUERY"), pd.Timestamp("2024-12-31"), 10, "v1",
+    )
+    request = SearchQuery(
+        query_key, ("test",), ("A",), 20,
+        deduplicate_overlaps=True, max_per_instrument=3,
+    )
+    scored = []
+    for symbol_index in range(12):
+        instrument = InstrumentKey("test", f"S{symbol_index:02d}")
+        for row in range(30):
+            start = pd.Timestamp("2020-01-01") + pd.Timedelta(days=row * 3)
+            timestamps = pd.date_range(start, periods=10, freq="D")
+            key = EpisodeKey(instrument, timestamps[-1], 10, "v1")
+            # Repeated distances exercise stable episode-ID tie ordering.
+            distance = float((row * 7 + symbol_index * 3) % 17) / 10
+            episode = Episode(key, pd.DataFrame({"timestamp": timestamps}))
+            match = AnalogueMatch(key, distance, {"price": distance})
+            scored.append(ScoredCandidate(match, episode))
+    full = select_scored(scored, request)
+    compact = [
+        CompactScoredCandidate(
+            item.match, item.episode.key.instrument,
+            int(item.episode.bars.timestamp.iloc[0].value),
+            int(item.episode.bars.timestamp.iloc[-1].value),
+        )
+        for item in reversed(scored)
+    ]
+    reduced = _select_compact_scored(compact, request)
+    assert [row.episode_key.id for row in reduced] == [
+        row.episode_key.id for row in full
+    ]
+    assert len(compact) == len(scored)
+
+
+def test_compact_exact_state_retains_candidate_exposed_by_later_overlap() -> None:
+    instrument = InstrumentKey("test", "S")
+    query_key = EpisodeKey(
+        InstrumentKey("test", "QUERY"), pd.Timestamp("2024-12-31"), 252, "v1",
+    )
+    request = SearchQuery(query_key, ("test",), ("A",), 3, max_per_instrument=3)
+    rows = [
+        ("A", .20, 0, 251), ("B", .30, 252, 503),
+        ("C", .40, 504, 755), ("D", .50, 756, 1007),
+        ("X", .10, 126, 377),
+    ]
+    compact = []
+    labels = {}
+    for label, distance, start, cutoff in rows:
+        key = EpisodeKey(
+            instrument, pd.Timestamp("2020-01-01") + pd.Timedelta(days=cutoff),
+            252, f"v1-{label}",
+        )
+        labels[key.id] = label
+        compact.append(CompactScoredCandidate(
+            AnalogueMatch(key, distance, {"price": distance}),
+            instrument, start, cutoff,
+        ))
+    selected = _select_compact_scored(compact, request)
+    assert [labels[row.episode_key.id] for row in selected] == ["X", "C", "D"]
 
 
 def test_optional_empty_volume_stages_are_warning_free_across_threads() -> None:

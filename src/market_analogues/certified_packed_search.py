@@ -39,10 +39,29 @@ CERTIFIED_PACKED_SEARCH_REQUESTED_VERSION = "m04r-certified-packed-search-v2"
 CERTIFIED_PACKED_SEARCH_HYBRID_VERSION = "m04r-certified-packed-search-v3"
 CERTIFIED_PACKED_SEARCH_VECTOR_VERSION = "m04r-certified-packed-search-v4"
 CERTIFIED_PACKED_SEARCH_DEFERRED_VERSION = "m04r-certified-packed-search-v5"
+CERTIFIED_PACKED_SEARCH_COMPACT_VERSION = "m04r-certified-packed-search-v6"
 
 
 class CertifiedPackedSearchError(RuntimeError):
     pass
+
+
+class CertifiedFrontierOverflow(CertifiedPackedSearchError):
+    """Typed fail-closed state for a correct search needing a larger frontier."""
+
+    def __init__(
+        self, *, frontier_rows: int, eligible_candidates: int,
+        exact_evaluated: int, stop_threshold: float,
+        next_lower_bound: float | None,
+    ) -> None:
+        super().__init__(
+            "certified frontier exceeds configured maximum; no result emitted"
+        )
+        self.frontier_rows = frontier_rows
+        self.eligible_candidates = eligible_candidates
+        self.exact_evaluated = exact_evaluated
+        self.stop_threshold = stop_threshold
+        self.next_lower_bound = next_lower_bound
 
 
 @dataclass(frozen=True)
@@ -84,11 +103,21 @@ class CertifiedPackedSearchResult:
     certificate: PackedSearchCertificate
 
 
+@dataclass(frozen=True)
+class CompactScoredCandidate:
+    """Exact score without the candidate's heavyweight pandas episode frame."""
+    match: AnalogueMatch
+    instrument: InstrumentKey
+    start_ns: int
+    cutoff_ns: int
+
+
 def certified_packed_search_contract(
     *, requested_positions: bool = False,
     hybrid_requested_positions: bool = False,
     vector_lower_bounds: bool = False,
     deferred_alignments: bool = False,
+    compact_scored: bool = False,
 ) -> dict[str, Any]:
     if requested_positions and hybrid_requested_positions:
         raise ValueError("requested-position modes are mutually exclusive")
@@ -96,7 +125,11 @@ def certified_packed_search_contract(
         raise ValueError("vector lower bounds require requested positions")
     if deferred_alignments and not vector_lower_bounds:
         raise ValueError("deferred alignments require vector lower bounds")
-    if deferred_alignments:
+    if compact_scored and not deferred_alignments:
+        raise ValueError("compact scored state requires deferred alignments")
+    if compact_scored:
+        version = CERTIFIED_PACKED_SEARCH_COMPACT_VERSION
+    elif deferred_alignments:
         version = CERTIFIED_PACKED_SEARCH_DEFERRED_VERSION
     elif vector_lower_bounds:
         version = CERTIFIED_PACKED_SEARCH_VECTOR_VERSION
@@ -139,6 +172,13 @@ def certified_packed_search_contract(
         "quantized_check": "stored lower bound <= recomputed native lower bound + tolerance",
         "source_check": "every materialized stock and benchmark matches packed causal-prefix provenance",
         "tie_rule": "ascending exact distance then 24-hex episode ID; strict frontier stop",
+        "retained_exact_state": (
+            "retain every exact-scored candidate as its match plus instrument and "
+            "observed-window start/cutoff nanoseconds; discard no score; interval "
+            "overlap is exact for contiguous windows from one instrument; reconstruct "
+            "only final selected episodes for alignment"
+            if compact_scored else "retain every exact-scored episode"
+        ),
         "outcomes_or_labels_used": False,
     }
     payload["digest"] = stable_hash(payload)
@@ -305,7 +345,8 @@ def _score_new_proposals(
     hybrid_requested_positions: bool,
     vector_lower_bounds: bool,
     deferred_alignments: bool,
-) -> tuple[list[ScoredCandidate], float, int, int]:
+    compact_scored_records: bool = False,
+) -> tuple[list[ScoredCandidate | CompactScoredCandidate], float, int, int]:
     if workers < 1 or sparse_cutoff < 1:
         raise ValueError("workers and sparse cutoff must be positive")
     grouped: dict[str, list[BoundProposal]] = {}
@@ -346,12 +387,22 @@ def _score_new_proposals(
     else:
         executor = ThreadPoolExecutor(max_workers=workers)
         results = executor.map(one, items)
-    scored: list[ScoredCandidate] = []
+    scored: list[ScoredCandidate | CompactScoredCandidate] = []
     maximum_excess = 0.0
     sparse = batch = 0
     try:
         for values, excess, mode in results:
-            scored.extend(values)
+            if compact_scored_records:
+                scored.extend(
+                    CompactScoredCandidate(
+                        item.match, item.episode.key.instrument,
+                        int(pd.Timestamp(item.episode.bars.timestamp.iloc[0]).value),
+                        int(pd.Timestamp(item.episode.bars.timestamp.iloc[-1]).value),
+                    )
+                    for item in values
+                )
+            else:
+                scored.extend(values)
             maximum_excess = max(maximum_excess, excess)
             sparse += mode == "sparse"
             batch += mode == "batch"
@@ -359,6 +410,41 @@ def _score_new_proposals(
         if workers != 1:
             executor.shutdown(wait=True)
     return scored, maximum_excess, sparse, batch
+
+
+def _select_compact_scored(
+    scored: Iterable[CompactScoredCandidate], request: SearchQuery,
+) -> list[AnalogueMatch]:
+    ranked = sorted(
+        scored, key=lambda item: (item.match.total_distance, item.match.episode_key.id),
+    )
+    selected: list[CompactScoredCandidate] = []
+    per_instrument: dict[InstrumentKey, int] = {}
+    for item in ranked:
+        if per_instrument.get(item.instrument, 0) >= request.max_per_instrument:
+            continue
+        if request.deduplicate_overlaps and any(
+            item.instrument == chosen.instrument
+            and item.start_ns <= chosen.cutoff_ns
+            and chosen.start_ns <= item.cutoff_ns
+            for chosen in selected
+        ):
+            continue
+        selected.append(item)
+        per_instrument[item.instrument] = per_instrument.get(item.instrument, 0) + 1
+        if len(selected) >= request.top_k:
+            break
+    return [item.match for item in selected]
+
+
+def _select_retained_scored(
+    scored: Iterable[ScoredCandidate | CompactScoredCandidate],
+    request: SearchQuery, *, compact: bool,
+) -> list[AnalogueMatch]:
+    values = list(scored)
+    if compact:
+        return _select_compact_scored(values, request)  # type: ignore[arg-type]
+    return select_scored(values, request)  # type: ignore[arg-type]
 
 
 def certified_packed_search(
@@ -381,6 +467,7 @@ def certified_packed_search(
     hybrid_requested_positions: bool = False,
     vector_lower_bounds: bool = False,
     deferred_alignments: bool = False,
+    compact_scored: bool = False,
     precomputed_proposal: BoundProposalReport | None = None,
 ) -> CertifiedPackedSearchResult:
     if requested_positions and hybrid_requested_positions:
@@ -389,6 +476,8 @@ def certified_packed_search(
         raise ValueError("vector lower bounds require requested positions")
     if deferred_alignments and not vector_lower_bounds:
         raise ValueError("deferred alignments require vector lower bounds")
+    if compact_scored and not deferred_alignments:
+        raise ValueError("compact scored state requires deferred alignments")
     if (
         initial_frontier_rows < request.top_k
         or maximum_frontier_rows < initial_frontier_rows
@@ -404,6 +493,7 @@ def certified_packed_search(
         hybrid_requested_positions=hybrid_requested_positions,
         vector_lower_bounds=vector_lower_bounds,
         deferred_alignments=deferred_alignments,
+        compact_scored=compact_scored,
     )
     loaded = load_packed_generation(
         store_root, generation_id, verify_content=verify_content,
@@ -445,7 +535,8 @@ def certified_packed_search(
         == bound_proposal_candidate_digest(precomputed_proposal.candidates),
     )):
         raise CertifiedPackedSearchError("precomputed proposal report differs")
-    scored_by_id: dict[str, ScoredCandidate] = {}
+    scored_by_id: dict[str, ScoredCandidate | CompactScoredCandidate] = {}
+    evaluated_ids: set[str] = set()
     maximum_excess = 0.0
     sparse_symbols = batch_symbols = 0
     rounds: list[CompletionRound] = []
@@ -477,7 +568,7 @@ def certified_packed_search(
             proposal_candidates[frontier_rows].lower_bound
             if len(proposal_candidates) > frontier_rows else None
         )
-        if not scored_by_id:
+        if not evaluated_ids:
             pending = list(frontier[:seed_rows])
         else:
             pending = []
@@ -492,21 +583,25 @@ def certified_packed_search(
                     hybrid_requested_positions=hybrid_requested_positions,
                     vector_lower_bounds=vector_lower_bounds,
                     deferred_alignments=deferred_alignments,
+                    compact_scored_records=compact_scored,
                 )
+                evaluated_ids.update(row.episode_id for row in pending)
                 scored_by_id.update({
                     row.match.episode_key.id: row for row in newly_scored
                 })
                 maximum_excess = max(maximum_excess, excess)
                 sparse_symbols += sparse
                 batch_symbols += batch
-            selected = select_scored(list(scored_by_id.values()), request)
+            selected = _select_retained_scored(
+                scored_by_id.values(), request, compact=compact_scored,
+            )
             threshold = (
                 max(row.total_distance for row in selected)
                 if len(selected) >= request.top_k else float("inf")
             )
             pending = [
                 row for row in frontier
-                if row.episode_id not in scored_by_id
+                if row.episode_id not in evaluated_ids
                 and row.lower_bound <= threshold
             ]
             certified = (
@@ -514,7 +609,7 @@ def certified_packed_search(
                 and (next_lower is None or next_lower > threshold)
             )
             rounds.append(CompletionRound(
-                len(frontier), len(scored_by_id), next_lower, threshold,
+                len(frontier), len(evaluated_ids), next_lower, threshold,
                 len(selected), certified, proposal_digest,
             ))
             if certified or not pending:
@@ -526,17 +621,31 @@ def certified_packed_search(
                 raise CertifiedPackedSearchError("eligible universe cannot fill constrained top-k")
             break
         if frontier_rows >= maximum_frontier_rows:
-            raise CertifiedPackedSearchError(
-                "certified frontier exceeds configured maximum; no result emitted"
+            raise CertifiedFrontierOverflow(
+                frontier_rows=len(frontier), eligible_candidates=eligible_count,
+                exact_evaluated=len(evaluated_ids), stop_threshold=threshold,
+                next_lower_bound=next_lower,
             )
         frontier_rows = min(maximum_frontier_rows, frontier_rows * 2, eligible_count)
 
-    matches = tuple(select_scored(list(scored_by_id.values()), request))
+    matches = tuple(_select_retained_scored(
+        scored_by_id.values(), request, compact=compact_scored,
+    ))
     if deferred_alignments:
         query_representation = represent(query)
         for match in matches:
             candidate = scored_by_id[match.episode_key.id]
-            candidate_representation = represent(candidate.episode)
+            if compact_scored:
+                bars = source.load(match.episode_key.instrument)
+                frame = bars[bars.timestamp <= match.episode_key.cutoff]
+                window = frame.tail(query.key.lookback).reset_index(drop=True)
+                candidate_episode = Episode(
+                    match.episode_key, window, source.load_benchmark(),
+                    match.quality_tier, match.quality_issues,
+                )
+            else:
+                candidate_episode = candidate.episode  # type: ignore[union-attr]
+            candidate_representation = represent(candidate_episode)
             total, components, path = representation_distance(
                 query_representation, candidate_representation,
             )
@@ -562,8 +671,8 @@ def certified_packed_search(
         "query_episode_id": query.key.id,
         "input_digest": input_digest,
         "eligible_candidates": eligible_count,
-        "exact_evaluated": len(scored_by_id),
-        "safely_pruned": eligible_count - len(scored_by_id),
+        "exact_evaluated": len(evaluated_ids),
+        "safely_pruned": eligible_count - len(evaluated_ids),
         "stopped_early": stopped_early,
         "stop_threshold_hex": threshold.hex(),
         "next_lower_bound_hex": next_lower.hex() if next_lower is not None else None,
@@ -584,7 +693,7 @@ def certified_packed_search(
         contract["schema_version"],
         contract["digest"],
         generation_id, query.key.id, input_digest,
-        eligible_count, len(scored_by_id), eligible_count - len(scored_by_id),
+        eligible_count, len(evaluated_ids), eligible_count - len(evaluated_ids),
         stopped_early, threshold, next_lower, maximum_excess,
         sparse_symbols + batch_symbols, sparse_symbols, batch_symbols,
         tuple(rounds), digest, perf_counter() - started,
