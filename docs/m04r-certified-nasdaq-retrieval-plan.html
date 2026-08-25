@@ -19,7 +19,7 @@
 <body>
 <header>
   <h1>M04R — certified NASDAQ analogue retrieval remediation</h1>
-  <p><b>Planning date:</b> 24 August 2026. <b>Status:</b> M04R-00 through M04R-07 are verified complete. Compact-only layouts were rejected; actual quantized-bound ranks pass; the full 11,584-symbol immutable shadow pack and globally stable 1,170-candidate proposal union pass physical, authority, determinism and resource gates. M04R-08 certified exact completion is next. No production retrieval repair is claimed yet.</p>
+  <p><b>Planning date:</b> 24 August 2026. <b>Status updated 25 August 2026:</b> M04R-00 through M04R-08 are verified complete. The immutable shadow pack now supports exact certified 24-query batching with a 12.16% complete-pipeline reduction. M04R-09 performance bake-off is in progress; ANN's exact-phase ceiling is measured at only 1.69%, and certified bound-scan parallelism is next. The shadow generation remains inactive.</p>
   <p><b>Target outcome:</b> given a current 252-session NASDAQ chart state, return the historically eligible charts with the smallest frozen exact OHLCV/volume/market-context distance. Interactive mode must be fast and candid about approximation. Certified mode must prove that no eligible episode capable of beating the final constrained top-20 was discarded.</p>
   <p>This plan is outcome-blind. Forward returns, trader profits and setup names are not inputs to representation, retrieval, tuning or acceptance.</p>
 </header>
@@ -248,8 +248,11 @@
 <section class="task" id="m04r-09">
   <h2>M04R-09 — Development bake-off and optional ANN</h2>
   <p><b>Compare:</b> No proposer, proposal-v2 flat scan, weighted route union, Faiss flat/HNSW and USearch mmap/custom or aligned-L2 proposal. All share the identical certified fallback.</p>
-  <p><b>Judge:</b> End-to-end p50/p95/max latency, bytes read, RSS/disk, exact completions, determinism and worst-case query—not ANN recall alone.</p>
-  <p><b>Acceptance:</b> ANN is retained only if it materially lowers certified latency without changing one final result or certificate and without violating disk/RSS/reproducibility constraints. Otherwise deterministic scan remains the default.</p>
+  <p><b>Judge:</b> End-to-end p50/p95/max latency, bytes read, measured RSS/disk, exact completions, determinism and worst-case query—not ANN recall alone. From 25 August 2026, CPU and memory are optimization resources rather than fixed rejection limits: use them when they improve complete latency, while actual allocation failure, instability and irreproducibility still fail a variant.</p>
+  <p><b>Acceptance:</b> ANN is retained only if it lowers certified latency without changing any final result or invalidating its complete certificate. Memory, disk and cores are measured trade-offs, not hard caps, unless they prevent reliable operation. Otherwise deterministic scan remains the default.</p>
+  <p class="pass"><b>Perfect-proposer ceiling verified:</b> A complete outcome-blind scan recomputes all 24 sorted proposal prefixes and counts rows with admissible lower bound ≤ each frozen final τ. Of 71,745 current exact rows, 70,037/97.62% are mandatory. A perfect zero-cost proposer can remove at most 1,708 rows; even an optimistic linear model saves only 55.28 seconds/1.69% of the 3,275.88-second complete batch. Thirteen queries—including all heavy tails—have zero removable rows. Evidence digest is <code>70e30fcd…33af</code>.</p>
+  <p class="fail"><b>Fixed smaller seeds and oversized blocks rejected:</b> Seed 128 increases UONEK work from 4,181 to 4,781 because it initially establishes a looser threshold; seed 256 restores 4,181 but saves nothing. A 32,768-row block preserves exact UONEK results but takes 131.70 versus 102.15 seconds at 4,096 rows. More resource use is permitted, but neither variant improves latency.</p>
+  <p><b>Next:</b> Compare deterministic query-group/core parallelism at 1/2/4/8 logical workers, retaining byte-identical per-query proposal digests and complete certificates. ANN remains a later low-priority comparison or a candidate for a separately labelled non-certified interactive mode.</p>
 </section>
 
 <section class="task" id="m04r-10">
@@ -301,7 +304,7 @@
     <li>Commit a clean rollback point.</li>
     <li>Proceed only if the explicit gate passes. A failure creates a versioned redesign; it never lowers a frozen threshold.</li>
   </ol>
-  <p class="muted">M04R-00 through M04R-08 are complete. The certified engine passes all frozen single-query and 24-query exactness, performance, memory, provenance and no-outcome gates. M04R-09 development bake-off/optional ANN is next; the shadow generation remains inactive until later comparison, generalization and promotion tasks pass.</p>
+  <p class="muted">M04R-00 through M04R-08 are complete. M04R-09 is in progress: the perfect-proposer ceiling and block-size POCs are complete, and query/core parallelism is next. The certified engine remains exact and the shadow generation remains inactive until later comparison, generalization and promotion tasks pass.</p>
 </section>
 </body>
 </html>
