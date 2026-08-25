@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 import pandas as pd
+from numba import njit
 
 from .representation import Representation, resample_optional, stage_signature, structural_signature
 
@@ -106,6 +107,54 @@ def bounded_dtw(x: np.ndarray, y: np.ndarray, band_fraction: float = .12) -> tup
         cursor = parent[cursor]
     path.reverse()
     return float(costs[n, m] / max(len(path), 1)), path
+
+
+@njit(cache=True, nogil=True)
+def _bounded_dtw_distance_compiled(
+    x: np.ndarray, y: np.ndarray, band_fraction: float,
+) -> float:
+    n, m = len(x), len(y)
+    band = max(abs(n - m), int(max(n, m) * band_fraction), 1)
+    previous = np.full(m + 1, np.inf)
+    previous_length = np.zeros(m + 1, dtype=np.int64)
+    previous[0] = 0.0
+    for i in range(1, n + 1):
+        current = np.full(m + 1, np.inf)
+        current_length = np.zeros(m + 1, dtype=np.int64)
+        first = max(1, i - band)
+        last = min(m, i + band)
+        for j in range(first, last + 1):
+            # Preserve Python's stable predecessor order: vertical,
+            # horizontal, diagonal.  Equal values never replace the first.
+            value = previous[j]
+            length = previous_length[j]
+            if current[j - 1] < value:
+                value = current[j - 1]
+                length = current_length[j - 1]
+            if previous[j - 1] < value:
+                value = previous[j - 1]
+                length = previous_length[j - 1]
+            squared = 0.0
+            for channel in range(x.shape[1]):
+                delta = x[i - 1, channel] - y[j - 1, channel]
+                squared += delta * delta
+            current[j] = value + np.sqrt(squared / x.shape[1])
+            current_length[j] = length + 1
+        previous = current
+        previous_length = current_length
+    if not np.isfinite(previous[m]):
+        return np.inf
+    return previous[m] / max(previous_length[m], 1)
+
+
+def bounded_dtw_distance(
+    x: np.ndarray, y: np.ndarray, band_fraction: float = .12,
+) -> float:
+    """Exact normalized DTW distance without parent-matrix reconstruction."""
+    left, right = np.asarray(x, dtype=float), np.asarray(y, dtype=float)
+    if left.ndim == 1:
+        left, right = left[:, None], right[:, None]
+    return float(_bounded_dtw_distance_compiled(left, right, band_fraction))
 
 
 def _dtw_price(a: pd.DataFrame, b: pd.DataFrame, band_fraction: float) -> tuple[float, list[tuple[int, int]]]:
@@ -236,10 +285,20 @@ def complete_representation_distance(
     lower_components: dict[str, float],
     rigid_price: float,
     config: DistanceConfig | None = None,
+    *,
+    reconstruct_path: bool = True,
 ) -> tuple[float, dict[str, float], list[tuple[int, int]]]:
     """Complete a previously computed safe lower bound with exact bounded DTW."""
     config = config or DistanceConfig()
-    dtw, path = _dtw_representation(a, b, config.dtw_band_fraction)
+    if reconstruct_path:
+        dtw, path = _dtw_representation(a, b, config.dtw_band_fraction)
+    else:
+        left, right = _dtw_matrices(a, b)
+        dtw = (
+            bounded_dtw_distance(left, right, config.dtw_band_fraction)
+            if len(left) else 0.0
+        )
+        path = []
     components = dict(lower_components)
     dtw_lower_bound = max((components["price"] - .55 * rigid_price) / .45, 0.0)
     components["price"] = .55 * rigid_price + .45 * dtw

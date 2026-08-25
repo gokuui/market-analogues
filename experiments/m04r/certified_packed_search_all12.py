@@ -128,6 +128,7 @@ def _case_payload(
     requested_positions: bool,
     hybrid_requested_positions: bool,
     vector_lower_bounds: bool,
+    deferred_alignments: bool,
 ) -> dict[str, Any]:
     matches = [_match(value) for value in result.matches]
     comparison = _comparison(matches, authority["matches"])
@@ -171,6 +172,7 @@ def _case_payload(
             requested_positions=requested_positions,
             hybrid_requested_positions=hybrid_requested_positions,
             vector_lower_bounds=vector_lower_bounds,
+            deferred_alignments=deferred_alignments,
         )["digest"],
         "generation_id": build["generation_id"],
         "full_build_evidence_digest": build["result_digest"],
@@ -208,10 +210,14 @@ def _valid_checkpoint(
     vector_lower_bounds = bool(
         (payload.get("controls") or {}).get("vector_lower_bounds", False)
     )
+    deferred_alignments = bool(
+        (payload.get("controls") or {}).get("deferred_alignments", False)
+    )
     contract = certified_packed_search_contract(
         requested_positions=requested_positions,
         hybrid_requested_positions=hybrid_requested_positions,
         vector_lower_bounds=vector_lower_bounds,
+        deferred_alignments=deferred_alignments,
     )
     if not all((
         payload.get("schema_version") == CASE_SCHEMA,
@@ -292,6 +298,7 @@ def _aggregate(
     requested_positions: bool,
     hybrid_requested_positions: bool,
     vector_lower_bounds: bool,
+    deferred_alignments: bool,
 ) -> dict[str, Any]:
     seconds = [float(case["seconds"]) for case in cases]
     completed_ids = [str(case["query_episode_id"]) for case in cases]
@@ -324,6 +331,7 @@ def _aggregate(
             requested_positions=requested_positions,
             hybrid_requested_positions=hybrid_requested_positions,
             vector_lower_bounds=vector_lower_bounds,
+            deferred_alignments=deferred_alignments,
         )["digest"],
         "generation_id": build["generation_id"],
         "full_build_evidence_digest": build["result_digest"],
@@ -359,11 +367,14 @@ def main() -> int:
     parser.add_argument("--requested-positions", action="store_true")
     parser.add_argument("--hybrid-requested-positions", action="store_true")
     parser.add_argument("--vector-lower-bounds", action="store_true")
+    parser.add_argument("--deferred-alignments", action="store_true")
     args = parser.parse_args()
     if args.requested_positions and args.hybrid_requested_positions:
         raise ValueError("requested-position modes are mutually exclusive")
     if args.vector_lower_bounds and not args.requested_positions:
         raise ValueError("vector lower bounds require requested positions")
+    if args.deferred_alignments and not args.vector_lower_bounds:
+        raise ValueError("deferred alignments require vector lower bounds")
     if (
         args.workers < 1 or args.block_rows < 1
         or args.initial_frontier_rows < 512
@@ -436,6 +447,7 @@ def main() -> int:
         "requested_positions": args.requested_positions,
         "hybrid_requested_positions": args.hybrid_requested_positions,
         "vector_lower_bounds": args.vector_lower_bounds,
+        "deferred_alignments": args.deferred_alignments,
     }
 
     for authority in authorities:
@@ -483,6 +495,7 @@ def main() -> int:
                 requested_positions=args.requested_positions,
                 hybrid_requested_positions=args.hybrid_requested_positions,
                 vector_lower_bounds=args.vector_lower_bounds,
+                deferred_alignments=args.deferred_alignments,
             )
             payload = _case_payload(
                 result, authority, build,
@@ -490,6 +503,7 @@ def main() -> int:
                 args.requested_positions,
                 args.hybrid_requested_positions,
                 args.vector_lower_bounds,
+                args.deferred_alignments,
             )
             _write(cases_dir / f"{query_id}.json", payload)
             completed[query_id] = payload
@@ -516,6 +530,7 @@ def main() -> int:
             requested_positions=args.requested_positions,
             hybrid_requested_positions=args.hybrid_requested_positions,
             vector_lower_bounds=args.vector_lower_bounds,
+            deferred_alignments=args.deferred_alignments,
         )
         _write(matrix_path, matrix)
         _render(matrix_path.with_suffix(".html"), matrix)
@@ -527,6 +542,7 @@ def main() -> int:
         requested_positions=args.requested_positions,
         hybrid_requested_positions=args.hybrid_requested_positions,
         vector_lower_bounds=args.vector_lower_bounds,
+        deferred_alignments=args.deferred_alignments,
     )
     _write(matrix_path, matrix)
     _render(matrix_path.with_suffix(".html"), matrix)

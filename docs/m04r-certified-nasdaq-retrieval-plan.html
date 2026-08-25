@@ -228,7 +228,8 @@
   <p class="pass"><b>Exact timestamp lookup:</b> Indexed benchmark-close alignment is bit-identical to merge across 256 real frames and 37.82× faster in isolation; full requested representation construction improves a measured 5.1% with zero core delta. Full tests pass. Profiling then isolates structural event construction at 51.5% of representation time.</p>
   <p class="pass"><b>Compiled structural-row preflight:</b> A cached, GIL-free, no-fast-math Numba kernel is bit-identical to the retained reference on random, NaN, constant and exact threshold-boundary paths. Complete requested construction over 112 real symbols/335 windows improves 3.319× with zero core delta; focused and full suites pass.</p>
   <p class="pass"><b>Compiled structural TVTX PASS:</b> Exact v4 completion falls from 468.41 to 387.47 seconds at 774.64 MiB, 60.6% faster than v1, but remains 87.47 seconds above p95.</p>
-  <p class="open"><b>Remaining M04R-08 boundary:</b> Correct the missed written requirement to reconstruct DTW paths only for final results. The existing two-row compiled distance POC is 527.8× over 2,000 exact references; integrate it under v5, defer Python parent matrices to the final 20 and prove exact alignments/ranking. CAKE/TAIT, all-12 evidence and promotion stay blocked.</p>
+  <p class="pass"><b>Deferred-alignment v5 preflight:</b> Compiled exact DTW distance scores candidates without parents; only the final 20 use the original Python matrix and must reproduce totals/components within 1e−12 before exact paths are attached. Independent/random/tied DTW and physical-pack v4/v5 parity tests pass, as does the full suite.</p>
+  <p class="open"><b>Remaining M04R-08 boundary:</b> Run compiled-structure TVTX v5 and accept only exact authority/resource evidence. CAKE/TAIT, all-12 evidence and promotion stay blocked until the measured p95 result.</p>
 </section>
 
 <section class="task" id="m04r-09">

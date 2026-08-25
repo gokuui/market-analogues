@@ -6,7 +6,9 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from market_analogues.distance import bounded_dtw, representation_distance
+from market_analogues.distance import (
+    bounded_dtw, bounded_dtw_distance, representation_distance,
+)
 from market_analogues.distance_v1_reference import (
     distance_v1_contract, reference_bounded_dtw, reference_representation_distance,
 )
@@ -86,6 +88,19 @@ def test_independent_dtw_matches_cost_and_exact_tie_path(shape: tuple[int, int, 
     actual, actual_path = bounded_dtw(left, right)
     assert actual == pytest.approx(expected, abs=2e-15, rel=2e-15)
     assert tuple(actual_path) == expected_path
+    assert bounded_dtw_distance(left, right) == actual
+
+
+def test_compiled_dtw_distance_matches_tied_and_one_dimensional_paths() -> None:
+    rows = (
+        np.zeros(64),
+        np.r_[np.zeros(31), np.ones(33)],
+        np.tile(np.asarray([[0.0, 1.0], [1.0, 0.0]]), (32, 1)),
+    )
+    for left in rows:
+        right = np.roll(left, 3, axis=0)
+        expected, _ = bounded_dtw(left, right)
+        assert bounded_dtw_distance(left, right) == expected
 
 
 def test_reference_identity_symmetry_and_unit_invariance() -> None:

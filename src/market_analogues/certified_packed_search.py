@@ -13,7 +13,8 @@ import pandas as pd
 from .adapters import OHLCVSource
 from .causal_prefix import causal_prefix_digest
 from .distance import (
-    complete_representation_distance, representation_distance_lower_bound,
+    complete_representation_distance, representation_distance,
+    representation_distance_lower_bound,
 )
 from .exact_batch import (
     batch_representation_lower_bounds, exact_channel_rows,
@@ -36,6 +37,7 @@ CERTIFIED_PACKED_SEARCH_VERSION = "m04r-certified-packed-search-v1"
 CERTIFIED_PACKED_SEARCH_REQUESTED_VERSION = "m04r-certified-packed-search-v2"
 CERTIFIED_PACKED_SEARCH_HYBRID_VERSION = "m04r-certified-packed-search-v3"
 CERTIFIED_PACKED_SEARCH_VECTOR_VERSION = "m04r-certified-packed-search-v4"
+CERTIFIED_PACKED_SEARCH_DEFERRED_VERSION = "m04r-certified-packed-search-v5"
 
 
 class CertifiedPackedSearchError(RuntimeError):
@@ -85,12 +87,17 @@ def certified_packed_search_contract(
     *, requested_positions: bool = False,
     hybrid_requested_positions: bool = False,
     vector_lower_bounds: bool = False,
+    deferred_alignments: bool = False,
 ) -> dict[str, Any]:
     if requested_positions and hybrid_requested_positions:
         raise ValueError("requested-position modes are mutually exclusive")
     if vector_lower_bounds and not requested_positions:
         raise ValueError("vector lower bounds require requested positions")
-    if vector_lower_bounds:
+    if deferred_alignments and not vector_lower_bounds:
+        raise ValueError("deferred alignments require vector lower bounds")
+    if deferred_alignments:
+        version = CERTIFIED_PACKED_SEARCH_DEFERRED_VERSION
+    elif vector_lower_bounds:
         version = CERTIFIED_PACKED_SEARCH_VECTOR_VERSION
     elif hybrid_requested_positions:
         version = CERTIFIED_PACKED_SEARCH_HYBRID_VERSION
@@ -113,6 +120,10 @@ def certified_packed_search_contract(
             "incomplete selection has infinite threshold and cannot certify"
         ),
         "exact_scoring": (
+            "native distance-v1 with requested representations, vector non-DTW "
+            "bounds and compiled two-row exact DTW distance; Python parent paths "
+            "are reconstructed and parity-checked only for constrained final rows"
+            if deferred_alignments else
             "native distance-v1 with per-symbol requested-cutoff vector construction "
             "and vectorized exact non-DTW lower bounds before scalar DTW completion"
             if vector_lower_bounds else
@@ -154,6 +165,7 @@ def _score_group(
     requested_positions: bool,
     hybrid_requested_positions: bool,
     vector_lower_bounds: bool,
+    deferred_alignments: bool,
 ) -> tuple[list[ScoredCandidate], float, str]:
     key = InstrumentKey(store_dataset_id, symbol)
     bars = source.load(key)
@@ -268,6 +280,7 @@ def _score_group(
         total, exact_components, path = complete_representation_distance(
             query_representation, candidate_representation,
             native_lower, components, rigid,
+            reconstruct_path=not deferred_alignments,
         )
         output.append(ScoredCandidate(AnalogueMatch(
             episode.key, total, exact_components, path,
@@ -290,6 +303,7 @@ def _score_new_proposals(
     requested_positions: bool,
     hybrid_requested_positions: bool,
     vector_lower_bounds: bool,
+    deferred_alignments: bool,
 ) -> tuple[list[ScoredCandidate], float, int, int]:
     if workers < 1 or sparse_cutoff < 1:
         raise ValueError("workers and sparse cutoff must be positive")
@@ -322,6 +336,7 @@ def _score_new_proposals(
             requested_positions=requested_positions,
             hybrid_requested_positions=hybrid_requested_positions,
             vector_lower_bounds=vector_lower_bounds,
+            deferred_alignments=deferred_alignments,
         )
 
     items = sorted(grouped.items())
@@ -364,11 +379,14 @@ def certified_packed_search(
     requested_positions: bool = False,
     hybrid_requested_positions: bool = False,
     vector_lower_bounds: bool = False,
+    deferred_alignments: bool = False,
 ) -> CertifiedPackedSearchResult:
     if requested_positions and hybrid_requested_positions:
         raise ValueError("requested-position modes are mutually exclusive")
     if vector_lower_bounds and not requested_positions:
         raise ValueError("vector lower bounds require requested positions")
+    if deferred_alignments and not vector_lower_bounds:
+        raise ValueError("deferred alignments require vector lower bounds")
     if (
         initial_frontier_rows < request.top_k
         or maximum_frontier_rows < initial_frontier_rows
@@ -383,6 +401,7 @@ def certified_packed_search(
         requested_positions=requested_positions,
         hybrid_requested_positions=hybrid_requested_positions,
         vector_lower_bounds=vector_lower_bounds,
+        deferred_alignments=deferred_alignments,
     )
     loaded = load_packed_generation(
         store_root, generation_id, verify_content=verify_content,
@@ -447,6 +466,7 @@ def certified_packed_search(
                     requested_positions=requested_positions,
                     hybrid_requested_positions=hybrid_requested_positions,
                     vector_lower_bounds=vector_lower_bounds,
+                    deferred_alignments=deferred_alignments,
                 )
                 scored_by_id.update({
                     row.match.episode_key.id: row for row in newly_scored
@@ -487,6 +507,26 @@ def certified_packed_search(
         frontier_rows = min(maximum_frontier_rows, frontier_rows * 2, eligible_count)
 
     matches = tuple(select_scored(list(scored_by_id.values()), request))
+    if deferred_alignments:
+        query_representation = represent(query)
+        for match in matches:
+            candidate = scored_by_id[match.episode_key.id]
+            candidate_representation = represent(candidate.episode)
+            total, components, path = representation_distance(
+                query_representation, candidate_representation,
+            )
+            component_delta = max(
+                abs(components[name] - match.component_distances[name])
+                for name in components
+            )
+            if (
+                abs(total - match.total_distance) > 1e-12
+                or component_delta > 1e-12
+            ):
+                raise CertifiedPackedSearchError(
+                    "deferred alignment reconstruction changed exact distance"
+                )
+            match.alignment = path
     threshold = max(row.total_distance for row in matches)
     next_lower = rounds[-1].next_lower_bound
     stopped_early = next_lower is not None

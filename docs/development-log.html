@@ -785,6 +785,13 @@
   <p><b>Remaining gap:</b> TVTX is still 87.47 seconds above p95. Review found that M04R-08's written materialization rule says “reconstruct DTW paths only for final results,” but implementation calls Python full-matrix DTW and constructs a path for every one of 9,309 exact candidates. This was not a research omission—the existing frozen POC already shows a compiled two-row distance kernel exactly matching 2,000 references/path lengths at 527.8×, with zero unsafe/mismatch results on 100,000 threshold cases—but it was not wired into completion.</p>
   <p><b>Next correction:</b> Add a distinct v5 contract that uses compiled exact DTW distance without paths during candidate scoring, selects the constrained top-20, then recomputes only those 20 through the original full parent matrix to restore exact tie-order alignments. Require compiled/reference distance equality, final path equality, unchanged ranking/accounting and practical numeric gates. Preserve v1–v4.</p>
 </section>
+
+<section class="entry">
+  <h2>L-076 — Deferred-alignment v5 preflight</h2>
+  <p><b>Implementation:</b> Added a cached, GIL-free, no-fast-math two-row DTW distance kernel to production and explicit <code>m04r-certified-packed-search-v5</code>. v5 requires the v4 requested-position/vector-bound path, scores every exact candidate with normalized DTW distance but no parent matrix, performs the unchanged constrained selection, then rebuilds only the final 20 through the original Python scorer. It fails closed if any recomputed total/component differs by more than 1e−12 before attaching the original exact paths.</p>
+  <p><b>Verification:</b> The compiled kernel exactly matches Python and the independent reference on random unequal multivariate shapes, tied constant/step paths and one-dimensional cases while preserving stable predecessor/path-length normalization. On the physical packed fixture, v5 matches v4/brute-force IDs/order, totals/components within 1e−12, and final alignments exactly, with unchanged input/exact accounting and a distinct contract digest. Invalid mode combinations fail closed and the full suite passes.</p>
+  <p><b>Next:</b> Run only compiled-structure TVTX v5. Require exact frozen authority paths and unchanged 9,309 accounting/stopping/bound safety. This directly implements the original final-path-only plan; authorize other cases only from measured p95 evidence.</p>
+</section>
 </main>
 
 <section id="reproduce">
