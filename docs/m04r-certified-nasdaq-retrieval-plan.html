@@ -237,7 +237,8 @@
   <p class="pass"><b>Compiled-IQR TVTX PASS:</b> Exact TVTX falls from 328.03 to 260.40 seconds at 733.13 MiB with unchanged 9,309 rows and alignments. All three former heavy failures are now below 300, authorizing a fresh full matrix.</p>
   <p class="pass"><b>Independent verifier v5 preflight:</b> Only frozen legacy-v1 and selected-v5 control dictionaries are supported; contract/schema are derived and common controls required across all cases. Unsupported changes such as 16 workers fail closed. Legacy tamper tests and the full suite pass.</p>
   <p class="pass"><b>M04R-08B selected-v5 all-12 PASS:</b> A fresh run exactly passes all 12 frozen NASDAQ authorities under the selected controls. Aggregate p95 is 262.0011 seconds, maximum 265.6925 seconds, total 1,961.8827 seconds and peak RSS 755.9961 MiB, all within the unchanged gates. Matrix digest is <code>9bedcf7e…cb8</code>. The independent verifier re-hashes the physical generation and every authority/certificate, confirms no real forward-outcome access and reports no failures with digest <code>1d617a10…e0890</code>.</p>
-  <p class="open"><b>Remaining M04R-08 boundary:</b> Single-query correctness and performance are closed. The frozen 24-query batch requirement is not: the exact shared-read POC improved only 2.39%, below the 10% material threshold. Design and verify a stronger multi-query execution path before M04R-09 or activation; do not reinterpret the all-12 serial pass as a batch pass.</p>
+  <p class="pass"><b>M04R-08C shared-quartile proposal POC:</b> After rejecting prepared-only 2,048/4,096-row controls at 9.42%/1.91%, an exact sorted merge reuses once-prepared candidate quartiles across queries while giving scalar the same kernel. On the three former-heavy frozen authorities, shared proposal time is 211.0311 versus 243.8495 seconds, a 13.46% reduction at 543.67 MiB. All scalar/certificate candidate digests, eligibility and accounting remain exact; evidence digest is <code>2ba6bb05…ad1</code>.</p>
+  <p class="open"><b>Remaining M04R-08 boundary:</b> Single-query correctness/performance and the shared proposal mechanism are closed. The frozen 24-query complete-pipeline requirement is not. The original plan specified 24 but froze only 12 NASDAQ authorities; first preregister 24 legitimate outcome-blind current/news-style NASDAQ queries and scalar controls, then add grouped exact completion and require identical final matches/certificates plus ≥10% total elapsed reduction. Do not use duplicate queries or reinterpret the three-query proposal POC as the final batch pass.</p>
 </section>
 
 <section class="task" id="m04r-09">
@@ -296,7 +297,7 @@
     <li>Commit a clean rollback point.</li>
     <li>Proceed only if the explicit gate passes. A failure creates a versioned redesign; it never lowers a frozen threshold.</li>
   </ol>
-  <p class="muted">M04R-00 through M04R-07, M04R-08A and the M04R-08B selected-v5 single-query matrix are complete. All 12 frozen NASDAQ authorities pass independently verified correctness, p95, maximum and RSS gates. M04R-08 batch execution remains open because the exact shared-read POC saved only 2.39%, below the frozen 10% material threshold; M04R-09 and activation remain blocked.</p>
+  <p class="muted">M04R-00 through M04R-07, M04R-08A and the M04R-08B selected-v5 single-query matrix are complete. All 12 frozen NASDAQ authorities pass independently verified correctness, p95, maximum and RSS gates. The improved shared proposal POC passes at 13.46%, but M04R-08 batch execution remains open until a frozen 24-query registry and complete grouped-exact pipeline prove unchanged outputs and ≥10% total reduction; M04R-09 and activation remain blocked.</p>
 </section>
 </body>
 </html>
