@@ -17,7 +17,11 @@ from market_analogues.exact_batch import _stage_rows, sliding_exact_representati
 from market_analogues.packed_bound_store import (
     OVERFLOW_DTYPE, make_packed_record, write_packed_generation,
 )
+from market_analogues.packed_bound_search import (
+    PackedBoundQuery, scan_packed_bound_proposals,
+)
 from market_analogues.quantized_bound import quantize_bound_row
+from market_analogues.representation import represent
 from market_analogues.search import SearchCandidate, exact_search, latest_eligible_cutoff
 from market_analogues.types import EpisodeKey, InstrumentKey, SearchQuery
 
@@ -120,6 +124,27 @@ def test_certified_pack_exhaustion_matches_brute_force(
         requested_positions=True, vector_lower_bounds=True,
         deferred_alignments=True,
     )
+    packed_query = PackedBoundQuery(
+        query.key.id, query.key.instrument.source_symbol,
+        int(query.bars.timestamp.iloc[0].value),
+        int(latest_eligible_cutoff(
+            query, request.minimum_history_gap_bars,
+        ).value),
+        represent(query), request.quality_tiers,
+    )
+    proposal = scan_packed_bound_proposals(
+        store_root, generation, packed_query,
+        route_quotas={"composite": 1_001}, block_rows=19,
+        verify_content=False,
+    )
+    precomputed = certified_packed_search(
+        query, source, request, store_root, generation,
+        store_dataset_id="test", initial_frontier_rows=1_000,
+        maximum_frontier_rows=1_000, block_rows=23, workers=2,
+        sparse_cutoff=3, seed_rows=20, verify_content=False,
+        requested_positions=True, vector_lower_bounds=True,
+        deferred_alignments=True, precomputed_proposal=proposal,
+    )
     brute = exact_search(query, brute_candidates, request)
     assert [row.episode_key.id for row in result.matches] == [
         row.episode_key.id for row in brute
@@ -213,6 +238,10 @@ def test_certified_pack_exhaustion_matches_brute_force(
     }
     assert deferred.certificate.input_digest == certificate.input_digest
     assert deferred.certificate.exact_evaluated == certificate.exact_evaluated
+    assert precomputed.certificate.result_digest == deferred.certificate.result_digest
+    assert [row.episode_key.id for row in precomputed.matches] == [
+        row.episode_key.id for row in deferred.matches
+    ]
 
 
 def test_requested_position_modes_are_mutually_exclusive(

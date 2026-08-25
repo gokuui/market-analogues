@@ -23,7 +23,8 @@ from .exact_batch import (
     sliding_exact_representations,
 )
 from .packed_bound_search import (
-    BoundProposal, PackedBoundQuery, scan_packed_bound_proposals,
+    BoundProposal, BoundProposalReport, PackedBoundQuery,
+    bound_proposal_candidate_digest, scan_packed_bound_proposals,
 )
 from .packed_bound_store import load_packed_generation
 from .representation import Representation, represent
@@ -380,6 +381,7 @@ def certified_packed_search(
     hybrid_requested_positions: bool = False,
     vector_lower_bounds: bool = False,
     deferred_alignments: bool = False,
+    precomputed_proposal: BoundProposalReport | None = None,
 ) -> CertifiedPackedSearchResult:
     if requested_positions and hybrid_requested_positions:
         raise ValueError("requested-position modes are mutually exclusive")
@@ -434,6 +436,15 @@ def certified_packed_search(
         int(latest_eligible_cutoff(query, request.minimum_history_gap_bars).value),
         represent(query), request.quality_tiers,
     )
+    if precomputed_proposal is not None and not all((
+        precomputed_proposal.generation_id == generation_id,
+        precomputed_proposal.query_episode_id == query.key.id,
+        int(precomputed_proposal.route_quotas.get("composite", 0))
+        >= maximum_frontier_rows + 1,
+        precomputed_proposal.candidate_digest
+        == bound_proposal_candidate_digest(precomputed_proposal.candidates),
+    )):
+        raise CertifiedPackedSearchError("precomputed proposal report differs")
     scored_by_id: dict[str, ScoredCandidate] = {}
     maximum_excess = 0.0
     sparse_symbols = batch_symbols = 0
@@ -441,16 +452,30 @@ def certified_packed_search(
     frontier_rows = initial_frontier_rows
     eligible_count = -1
     while True:
-        proposal = scan_packed_bound_proposals(
-            store_root, generation_id, packed_query,
-            route_quotas={"composite": frontier_rows + 1},
-            block_rows=block_rows, verify_content=False,
-        )
-        eligible_count = proposal.eligible_rows
-        frontier = proposal.candidates[:frontier_rows]
+        if precomputed_proposal is None:
+            proposal = scan_packed_bound_proposals(
+                store_root, generation_id, packed_query,
+                route_quotas={"composite": frontier_rows + 1},
+                block_rows=block_rows, verify_content=False,
+            )
+            proposal_candidates = proposal.candidates
+            proposal_digest = proposal.candidate_digest
+            eligible_count = proposal.eligible_rows
+        else:
+            eligible_count = precomputed_proposal.eligible_rows
+            required = min(frontier_rows + 1, eligible_count)
+            if len(precomputed_proposal.candidates) < required:
+                raise CertifiedPackedSearchError(
+                    "precomputed proposal does not cover certified frontier"
+                )
+            proposal_candidates = precomputed_proposal.candidates[:required]
+            proposal_digest = bound_proposal_candidate_digest(
+                proposal_candidates,
+            )
+        frontier = proposal_candidates[:frontier_rows]
         next_lower = (
-            proposal.candidates[frontier_rows].lower_bound
-            if len(proposal.candidates) > frontier_rows else None
+            proposal_candidates[frontier_rows].lower_bound
+            if len(proposal_candidates) > frontier_rows else None
         )
         if not scored_by_id:
             pending = list(frontier[:seed_rows])
@@ -490,7 +515,7 @@ def certified_packed_search(
             )
             rounds.append(CompletionRound(
                 len(frontier), len(scored_by_id), next_lower, threshold,
-                len(selected), certified, proposal.candidate_digest,
+                len(selected), certified, proposal_digest,
             ))
             if certified or not pending:
                 break

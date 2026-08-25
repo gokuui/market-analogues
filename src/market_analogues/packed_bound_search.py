@@ -279,6 +279,12 @@ def _finalize(
             tuple(sorted(value["routes"])), value["overflow_fallback"],
         ) for value in by_id.values()
     ), key=lambda value: (value.lower_bound, value.episode_id)))
+    return candidates, route_counts, bound_proposal_candidate_digest(candidates)
+
+
+def bound_proposal_candidate_digest(
+    candidates: Iterable[BoundProposal],
+) -> str:
     digest_payload = [{
         "episode_id": value.episode_id,
         "symbol": value.symbol,
@@ -288,7 +294,7 @@ def _finalize(
         "routes": list(value.routes),
         "overflow_fallback": value.overflow_fallback,
     } for value in candidates]
-    return candidates, route_counts, stable_hash(digest_payload)
+    return stable_hash(digest_payload)
 
 
 def scan_packed_bound_proposals(
