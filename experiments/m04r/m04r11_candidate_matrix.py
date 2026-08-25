@@ -40,6 +40,8 @@ CASE_SCHEMA = "candidate-recall-case-v2-producer"
 MATRIX_SCHEMA = "candidate-recall-matrix-v2-producer"
 SEAL_SCHEMA = "candidate-recall-producer-seal-v1"
 CONTRACT_SCHEMA = "candidate-recall-producer-contract-v2"
+TERMINAL_FAILURE_SCHEMA = "candidate-recall-producer-terminal-failure-v1"
+FAILED_V1_PRODUCER_CONTRACT_DIGEST = "e6d971081f288375df3ad66baad0300eb2d452860b464d6d9c111a6c75d657ad"
 SCAN_THREADS = 4
 FROZEN_REGISTRY_DIGEST = "0a4da732f91375a091775cb04e6e77c8d136ade47d7f4d16508a2d9a6555361e"
 FROZEN_GENERATION_ID = "9fc6ae0ec4451133d8006897162f3443803fd30a3c44b78e80a476fbb18bb483"
@@ -87,6 +89,50 @@ def _seal_digest(payload: dict[str, Any]) -> str:
         key: value for key, value in payload.items()
         if key not in {"created_at", "seal_digest"}
     })
+
+
+def terminal_failure_failures(
+    payload: dict[str, Any], contract: dict[str, Any],
+) -> tuple[str, ...]:
+    failures: list[str] = []
+    deterministic = {
+        key: value for key, value in payload.items()
+        if key not in {"created_at", "failure_digest"}
+    }
+    if not all((
+        payload.get("schema_version") == TERMINAL_FAILURE_SCHEMA,
+        contract.get("contract_digest") == FAILED_V1_PRODUCER_CONTRACT_DIGEST,
+        contract.get("contract_digest") == stable_hash({
+            key: value for key, value in contract.items()
+            if key != "contract_digest"
+        }),
+        payload.get("registry_digest") == FROZEN_REGISTRY_DIGEST,
+        payload.get("producer_contract_digest") == contract.get("contract_digest"),
+        payload.get("generation_id") == FROZEN_GENERATION_ID,
+        payload.get("proposal_contract_digest") == FROZEN_PROPOSAL_CONTRACT_DIGEST,
+        payload.get("status") == "terminal_performance_failure_after_interruption",
+        payload.get("completed_cases") == 7,
+        payload.get("failed_case_id") == "nasdaq-GABC-current-252",
+        payload.get("failed_gates") == ["cold_scan_at_most_120_seconds"],
+        payload.get("candidate_pools_sealed") is False,
+        payload.get("authority_results_opened") is False,
+        payload.get("candidate_authority_comparison_opened") is False,
+        payload.get("resume_authorized") is False,
+        payload.get("failure_digest") == stable_hash(deterministic),
+    )):
+        failures.append("terminal candidate failure evidence differs")
+    return tuple(failures)
+
+
+def refuse_terminal_failure(output_root: Path, contract: dict[str, Any]) -> None:
+    failure_path = output_root / "FAILED.json"
+    if not failure_path.exists():
+        return
+    payload = json.loads(failure_path.read_text())
+    failures = terminal_failure_failures(payload, contract)
+    if failures:
+        raise ValueError(f"invalid terminal candidate failure:{failures}")
+    raise ValueError("candidate producer is terminally failed; resume is forbidden")
 
 
 def _write_success_seal(
@@ -382,6 +428,13 @@ def main() -> int:
         "authority-contract.json", "authority-matrix.json",
     )):
         raise ValueError("candidate output root contains authority artifacts")
+    contract_path = args.output_root / "candidate-contract.json"
+    if (args.output_root / "FAILED.json").exists():
+        if not contract_path.is_file():
+            raise ValueError("terminal failure exists without producer contract")
+        refuse_terminal_failure(
+            args.output_root, json.loads(contract_path.read_text()),
+        )
     config = preliminary_config
     source = source_from_spec(config.datasets["nasdaq"])
     failures = validate_m04r_validation_registry(source, args.registry.parent)
@@ -423,7 +476,6 @@ def main() -> int:
     producer_contract = _producer_contract(
         registry, manifest_path, len(loaded.rows) + len(loaded.overflow),
     )
-    contract_path = args.output_root / "candidate-contract.json"
     existing_seal_path = args.output_root / "SEALED.json"
     if contract_path.exists():
         if json.loads(contract_path.read_text()) != producer_contract:

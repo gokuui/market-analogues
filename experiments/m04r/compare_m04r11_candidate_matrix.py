@@ -85,6 +85,32 @@ def seal_digest(payload: dict[str, Any]) -> str:
     return stable_hash({key: value for key, value in payload.items() if key not in {"created_at", "seal_digest"}})
 
 
+def _refuse_failed_candidate_root(candidate_root: Path) -> None:
+    failure_path = candidate_root / "FAILED.json"
+    if not failure_path.exists():
+        return
+    payload = json.loads(failure_path.read_text())
+    deterministic = {
+        key: value for key, value in payload.items()
+        if key not in {"created_at", "failure_digest"}
+    }
+    if not all((
+        payload.get("schema_version")
+        == "candidate-recall-producer-terminal-failure-v1",
+        payload.get("status") == "terminal_performance_failure_after_interruption",
+        payload.get("registry_digest") == FROZEN_REGISTRY_DIGEST,
+        payload.get("producer_contract_digest")
+        == "e6d971081f288375df3ad66baad0300eb2d452860b464d6d9c111a6c75d657ad",
+        payload.get("candidate_pools_sealed") is False,
+        payload.get("authority_results_opened") is False,
+        payload.get("candidate_authority_comparison_opened") is False,
+        payload.get("resume_authorized") is False,
+        payload.get("failure_digest") == stable_hash(deterministic),
+    )):
+        raise ValueError("candidate root contains invalid terminal failure evidence")
+    raise ValueError("candidate root is terminally failed; truth comparison is forbidden")
+
+
 def checkpoint_integrity_digest(payload: dict[str, Any]) -> str:
     return candidate_checkpoint_integrity_digest(payload)
 
@@ -199,6 +225,7 @@ def main() -> int:
         args.output_root.resolve() == expected_output_root.resolve(),
     )):
         raise ValueError("one-shot candidate, authority or comparison path differs")
+    _refuse_failed_candidate_root(args.candidate_root)
     output_resolved = args.output_root.resolve()
     for protected in (
         args.registry.parent.resolve(), args.candidate_root.resolve(),
