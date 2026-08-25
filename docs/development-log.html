@@ -821,6 +821,13 @@
   <p><b>Comparison:</b> The complete case improves by 91.39 seconds/25.7% from prior v5 at 355.95 and by 423.91/61.6% from v1 at 687.48, crossing the 300-second line without changing one result or gate.</p>
   <p><b>Next:</b> TVTX's 328.03-second v5 checkpoint predates the compiled packed kernel. Rerun TVTX once with the new kernel; if exact and below 300, the formerly three heaviest cases all have a passing route and the complete checkpointed 12-case matrix becomes justified. CAKE need not be rerun before that decision because it was already 243.74 with the slower bound.</p>
 </section>
+
+<section class="entry">
+  <h2>L-081 — Compiled-IQR TVTX PASS; full v5 matrix authorized</h2>
+  <p><b>Result:</b> TVTX v5 with compiled packed quartiles exactly retains 9,309 evaluations, frozen authority IDs/order/alignments, strict stop and safe accounting/bounds in 260.40 seconds at 733.13 MiB. It improves 67.64 seconds/20.6% from precompiled-IQR v5 and 723.88/73.5% from v1.</p>
+  <p><b>Heavy-tail decision:</b> All formerly slow cases now have exact sub-300 evidence: CAKE 243.74 seconds on the slower prior bound kernel, TVTX 260.40 and TAIT 264.57. The optimization sequence therefore has a credible path to the frozen p95≤300/max≤600/RSS≤1,536 gates without weakening them.</p>
+  <p><b>Next:</b> Extend the independent matrix verifier to derive and validate the supported contract/control profile per evidence set, retaining rejected v1 verification and adding strict v5 controls/schema. Run all 12 from fresh checkpoints under current v5/eight-worker/frontier-16,384 settings, independently re-hash the 9.2-GB generation and every authority/certificate, and accept only the complete aggregate.</p>
+</section>
 </main>
 
 <section id="reproduce">
