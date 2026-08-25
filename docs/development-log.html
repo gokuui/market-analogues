@@ -991,6 +991,13 @@
   <p><b>Frozen experiment before execution:</b> Run each sealed query as its own complete branch-aware proposal scan plus exact certified completion, scheduling at most eight independent one-thread processes concurrently. Each result must reproduce the corresponding sealed authority semantic digest and certificate exactly. Per-task wall time begins before source/query setup and ends after the case artifact is written, so cold setup/JIT cost is included. Checkpoints bind case, authority, contract and timing and are resumable; outputs are isolated under <code>config/data/analogues/m04r12/scalar-certified-scheduler-p8</code>.</p>
   <p><b>Unchanged gates:</b> 60/60 semantic equality, p95 end-to-end ≤300 seconds, maximum ≤600 seconds and peak worker RSS ≤1,536 MiB. No outcome or candidate-label data is used. A failure remains visible; authority measurements are not rewritten, and production promotion remains unauthorized regardless of this experiment until subsequent comparison/generalization/shadow gates pass.</p>
 </section>
+
+<section class="entry">
+  <h2>L-100 — Scalar p8 result and preregistered p4 concurrency test</h2>
+  <p><b>P8 result:</b> All 60/60 independently scheduled queries reproduce their sealed authority semantic and certificate digests with zero failures. Maximum task wall time is 337.48 seconds and maximum worker RSS is 687.02 MiB, both passing. P95 is 307.61 seconds, failing the unchanged 300-second gate by 7.61 seconds. Result digest is <code>edb6bc0f…5dbd</code>. This failure remains preserved under <code>config/data/analogues/m04r12/scalar-certified-scheduler-p8</code>.</p>
+  <p><b>Diagnosis:</b> P8 reduces p95 by roughly 624 seconds versus assigning every query its complete group scan, but the first-wave and largest exact cases show memory-bandwidth contention when eight full 3.82-million-row scans run simultaneously. Adding cores is therefore not the next test. Four-way concurrency should trade aggregate throughput for lower per-query scan and exact latency.</p>
+  <p><b>P4 preregistration before execution:</b> Re-run the identical committed scalar scheduler, frozen 60-case registry, generation, authority digests and gates in a fresh <code>scalar-certified-scheduler-p4</code> root with <code>--processes 4</code>. Task wall still includes source/query setup and cold JIT. Require 60/60 semantic equality, p95 ≤300 seconds, maximum ≤600 seconds and RSS ≤1,536 MiB. No result from p8 is reused as a timing checkpoint, and no threshold is changed.</p>
+</section>
 </main>
 
 <section id="reproduce">
