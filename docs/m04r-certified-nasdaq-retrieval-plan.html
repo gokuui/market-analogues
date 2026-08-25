@@ -235,7 +235,8 @@
   <p class="pass"><b>Compiled joined-IQR preflight:</b> After rejecting a one-ULP interpolation mismatch, the compiled formula exactly mirrors NumPy. The complete bound kernel over 32,768 real TAIT rows improves 1.7837× (1.9649→1.1016 seconds), with bit-identical totals, zero component delta and full-suite PASS.</p>
   <p class="pass"><b>Compiled-IQR TAIT PASS:</b> Exact TAIT falls from 355.95 to 264.57 seconds at 709.39 MiB with unchanged 7,419 rows and authority equality. Certificate/case digests are <code>b7c606fd…5ea5</code>/<code>cab797bd…49ee</code>.</p>
   <p class="pass"><b>Compiled-IQR TVTX PASS:</b> Exact TVTX falls from 328.03 to 260.40 seconds at 733.13 MiB with unchanged 9,309 rows and alignments. All three former heavy failures are now below 300, authorizing a fresh full matrix.</p>
-  <p class="open"><b>Remaining M04R-08 boundary:</b> Upgrade the independent verifier for strict v5 controls while retaining v1 evidence support, then run and independently verify all 12. Promotion remains blocked until the complete p95/max/RSS matrix passes.</p>
+  <p class="pass"><b>Independent verifier v5 preflight:</b> Only frozen legacy-v1 and selected-v5 control dictionaries are supported; contract/schema are derived and common controls required across all cases. Unsupported changes such as 16 workers fail closed. Legacy tamper tests and the full suite pass.</p>
+  <p class="open"><b>Remaining M04R-08 boundary:</b> Run all 12 fresh under selected v5 controls, then independently verify the complete matrix and physical shadow generation. Promotion remains blocked until both pass.</p>
 </section>
 
 <section class="task" id="m04r-09">

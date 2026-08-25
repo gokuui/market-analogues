@@ -9,6 +9,7 @@ from types import SimpleNamespace
 from market_analogues.certified_packed_search import certified_packed_search_contract
 from market_analogues.m04r_certified_search_verification import _certificate_digest
 from market_analogues.m04r_certified_matrix_verification import (
+    V5_CONTROLS, _contract_for_controls,
     _matrix_deterministic as verifier_matrix_deterministic,
     verify_m04r_certified_matrix,
 )
@@ -36,6 +37,16 @@ _comparison = MODULE._comparison
 _deterministic = MODULE._deterministic
 _matrix_deterministic = MODULE._matrix_deterministic
 _valid_checkpoint = MODULE._valid_checkpoint
+
+
+def test_independent_verifier_recognizes_only_frozen_control_profiles() -> None:
+    legacy = _contract_for_controls({"block_rows": 2_048, "workers": 8})
+    vector = _contract_for_controls(dict(V5_CONTROLS))
+    assert legacy is not None
+    assert legacy["schema_version"] == "m04r-certified-packed-search-v1"
+    assert vector is not None
+    assert vector["schema_version"] == "m04r-certified-packed-search-v5"
+    assert _contract_for_controls({**V5_CONTROLS, "workers": 16}) is None
 
 
 def _case(query_id: str, seconds: float = 10.0) -> tuple[

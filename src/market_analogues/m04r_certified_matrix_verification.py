@@ -9,9 +9,7 @@ from typing import Any
 import numpy as np
 
 from .authority import AUTHORITY_SCHEMA_VERSION
-from .certified_packed_search import (
-    CERTIFIED_PACKED_SEARCH_VERSION, certified_packed_search_contract,
-)
+from .certified_packed_search import certified_packed_search_contract
 from .m04r_certified_search_verification import _certificate_digest
 from .m04r_full_pack_verification import EVIDENCE_OMITTED as FULL_BUILD_OMITTED
 from .packed_bound_store import load_packed_generation
@@ -29,6 +27,16 @@ MATRIX_OMITTED = {
 TOTAL_TOLERANCE = 1e-7
 COMPONENT_TOLERANCE = 1e-6
 BOUND_TOLERANCE = 1e-12
+LEGACY_CONTROLS = {"block_rows": 2_048, "workers": 8}
+V5_CONTROLS = {
+    "block_rows": 2_048,
+    "workers": 8,
+    "initial_frontier_rows": 16_384,
+    "requested_positions": True,
+    "hybrid_requested_positions": False,
+    "vector_lower_bounds": True,
+    "deferred_alignments": True,
+}
 
 
 @dataclass(frozen=True)
@@ -39,6 +47,19 @@ class CertifiedMatrixVerificationResult:
     failures: tuple[str, ...]
     performance_failures: tuple[str, ...]
     result_digest: str
+
+
+def _contract_for_controls(
+    controls: dict[str, Any],
+) -> dict[str, Any] | None:
+    if controls == LEGACY_CONTROLS:
+        return certified_packed_search_contract()
+    if controls == V5_CONTROLS:
+        return certified_packed_search_contract(
+            requested_positions=True, vector_lower_bounds=True,
+            deferred_alignments=True,
+        )
+    return None
 
 
 def _case_deterministic(case: dict[str, Any]) -> dict[str, Any]:
@@ -164,7 +185,15 @@ def verify_m04r_certified_matrix(
     build = json.loads(full_build_evidence_path.read_text())
     failures: list[str] = []
     performance_failures: list[str] = []
-    contract = certified_packed_search_contract()
+    cases = evidence.get("cases") or []
+    profile_controls = (
+        cases[0].get("controls") if cases
+        and isinstance(cases[0].get("controls"), dict) else {}
+    )
+    contract = _contract_for_controls(profile_controls)
+    if contract is None:
+        failures.append("certified matrix execution controls are unsupported")
+        contract = certified_packed_search_contract()
 
     if evidence.get("schema_version") != MATRIX_SCHEMA:
         failures.append("certified matrix evidence schema differs")
@@ -217,7 +246,6 @@ def verify_m04r_certified_matrix(
         str(authority.get("query_episode_id", "")): authority
         for authority in authorities
     }
-    cases = evidence.get("cases") or []
     case_ids = [str(case.get("query_episode_id", "")) for case in cases]
     if (
         evidence.get("expected_query_episode_ids") != expected_ids
@@ -255,8 +283,8 @@ def verify_m04r_certified_matrix(
                 case.get("full_build_evidence_digest") == build.get("result_digest"),
                 case.get("authority_digest") == authority.get("authority_digest"),
                 case.get("real_forward_outcomes_accessed") is False,
-                case.get("controls") == {"block_rows": 2_048, "workers": 8},
-                certificate.get("schema_version") == CERTIFIED_PACKED_SEARCH_VERSION,
+                case.get("controls") == profile_controls,
+                certificate.get("schema_version") == contract["schema_version"],
                 certificate.get("contract_digest") == contract["digest"],
                 certificate.get("generation_id") == generation_id,
                 certificate.get("query_episode_id") == query_id,

@@ -828,6 +828,13 @@
   <p><b>Heavy-tail decision:</b> All formerly slow cases now have exact sub-300 evidence: CAKE 243.74 seconds on the slower prior bound kernel, TVTX 260.40 and TAIT 264.57. The optimization sequence therefore has a credible path to the frozen p95≤300/max≤600/RSS≤1,536 gates without weakening them.</p>
   <p><b>Next:</b> Extend the independent matrix verifier to derive and validate the supported contract/control profile per evidence set, retaining rejected v1 verification and adding strict v5 controls/schema. Run all 12 from fresh checkpoints under current v5/eight-worker/frontier-16,384 settings, independently re-hash the 9.2-GB generation and every authority/certificate, and accept only the complete aggregate.</p>
 </section>
+
+<section class="entry">
+  <h2>L-082 — Independent v5 matrix-verifier preflight</h2>
+  <p><b>Verifier change:</b> The independent all-12 verifier now recognizes exactly two frozen execution profiles: the legacy v1 <code>{block_rows:2048, workers:8}</code> evidence and selected v5 with block 2,048, workers 8, frontier 16,384, requested positions, vector bounds, deferred alignments and hybrid disabled. It derives the contract/schema from the common case controls, requires every case to use that identical dictionary and rejects unsupported variants, including 16 workers.</p>
+  <p><b>Compatibility and tests:</b> Existing authentic rejected-v1 evidence/tamper tests continue to pass. New tests require v1/v5 schema selection and unsupported-profile rejection, followed by the full suite. The verifier still independently checks physical generation content, inactive shadow state, 12 authority digests, every certificate reconstruction, numeric/path/accounting/stopping/resource gate and aggregate timing.</p>
+  <p><b>Next:</b> Commit this verifier boundary, run all 12 from a fresh directory with selected v5 controls, then execute the independent verifier over the completed matrix. No activation occurs as part of either step.</p>
+</section>
 </main>
 
 <section id="reproduce">
