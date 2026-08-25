@@ -799,6 +799,13 @@
   <p><b>Comparison:</b> Deferred paths save 59.44 seconds/15.3% versus compiled-structure v4, 140.38/30.0% versus precompiled v4 and 656.25/66.7% versus v1. TVTX misses a standalone 300 seconds by 28.03, while still passing the separate ≤600 maximum.</p>
   <p><b>Matrix interpretation and next:</b> The frozen p95 is computed over 12 cases and is not a requirement that every case be ≤300; one 328-second maximum may pass if the second-slowest case is sufficiently lower. First test TVTX at 16 workers as a single execution-control change: earlier 8-vs-4 evidence showed material scaling, the compiled kernels release the GIL, and current RSS leaves ~785 MiB headroom. Then run CAKE/TAIT only under the selected worker control to estimate the upper-tail distribution.</p>
 </section>
+
+<section class="entry">
+  <h2>L-078 — Sixteen-worker TVTX control rejected</h2>
+  <p><b>Controlled result:</b> Holding v5 contract, store, frontier 16,384, block size 2,048 and TVTX fixed, 16 workers complete exactly in 333.97 seconds at 780.57 MiB. Eight workers take 328.03 seconds at 751.00 MiB. Doubling workers is 5.94 seconds/1.8% slower and uses 29.57 MiB more RSS, so eight remains selected.</p>
+  <p><b>Why:</b> The pack scan is single-threaded and unchanged; remaining per-group work is already small enough that scheduling/memory-bandwidth overhead offsets extra concurrency. This falsifies the last simple worker-scaling alternative without weakening any gate.</p>
+  <p><b>Next:</b> Run historical CAKE and current TAIT sequentially under the selected v5/eight-worker controls. Their timings, together with TVTX 328.03, determine whether the projected 12-case p95 is credible enough to authorize the full checkpointed matrix.</p>
+</section>
 </main>
 
 <section id="reproduce">

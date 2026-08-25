@@ -230,7 +230,8 @@
   <p class="pass"><b>Compiled structural TVTX PASS:</b> Exact v4 completion falls from 468.41 to 387.47 seconds at 774.64 MiB, 60.6% faster than v1, but remains 87.47 seconds above p95.</p>
   <p class="pass"><b>Deferred-alignment v5 preflight:</b> Compiled exact DTW distance scores candidates without parents; only the final 20 use the original Python matrix and must reproduce totals/components within 1e−12 before exact paths are attached. Independent/random/tied DTW and physical-pack v4/v5 parity tests pass, as does the full suite.</p>
   <p class="pass"><b>Deferred-alignment v5 TVTX PASS:</b> Exact authority completion falls from 387.47 to 328.03 seconds at 751.00 MiB, 66.7% faster than v1. Certificate/case digests are <code>7c610635…9050</code>/<code>16808a75…9b3e</code>. It passes maximum but is 28.03 seconds above a standalone p95 target.</p>
-  <p class="open"><b>Remaining M04R-08 boundary:</b> Test 16-worker TVTX because compiled kernels are GIL-free and RSS has headroom, then measure CAKE/TAIT under the selected control. Matrix p95 depends on the top two of 12, not TVTX alone. Full all-12 evidence and promotion remain blocked.</p>
+  <p class="fail"><b>Sixteen-worker control rejected:</b> Exact TVTX takes 333.97 seconds/780.57 MiB versus 328.03/751.00 at eight workers. Extra scheduling/memory pressure does not improve the single-threaded scan plus already compact group work; eight remains selected.</p>
+  <p class="open"><b>Remaining M04R-08 boundary:</b> Measure CAKE/TAIT under selected v5/eight-worker controls. Matrix p95 depends on the top two of 12, not TVTX alone. Full all-12 evidence and promotion remain blocked pending that upper-tail result.</p>
 </section>
 
 <section class="task" id="m04r-09">
