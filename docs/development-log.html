@@ -734,6 +734,13 @@
   <p><b>Performance:</b> Elapsed is 162.76 seconds versus 205.36 seconds for the same-process scalar control recorded immediately before the change, a 42.59-second/20.74% reduction. This materially confirms the fixed-row 1.2306× kernel result at complete-pack scale without altering proposal identity or eligibility.</p>
   <p><b>Next:</b> Rerun one-scan pure-v2 certified TVTX from a fresh checkpoint. Require exact authority IDs/order/totals/components/alignments, 9,309 exact evaluations, strict stopping and unchanged resource gates. This scan improvement alone cannot be assumed to reach the 300-second p95 because source reconstruction/exact distance remains outside the optimized kernel.</p>
 </section>
+
+<section class="entry">
+  <h2>L-069 — Combined-IQR certified TVTX PASS; exact completion now dominates</h2>
+  <p><b>End-to-end result:</b> One-scan pure-v2 TVTX with the combined-IQR bound kernel exactly reproduces the frozen authority and prior deterministic evidence: 9,309 exact rows, 3,003,508 safely pruned, unchanged IDs/order/totals/components/alignments, strict stopping and all case gates PASS. Runtime is 508.08 seconds at 607.06 MiB.</p>
+  <p><b>Comparison:</b> The optimized run saves 61.50 seconds/10.8% versus one-scan pre-change v2 at 569.59 seconds and 476.20 seconds/48.4% versus v1 at 984.28. The deterministic partial-matrix digest remains <code>7e613120…372</code> because timing fields are deliberately excluded and results/certificates are unchanged. The one-case matrix remains incomplete by design.</p>
+  <p><b>Boundary and next:</b> TVTX still exceeds the 300-second p95 target by 208.08 seconds. Its full bound scan is now 162.76 seconds, leaving roughly 345 seconds in source validation, requested-position reconstruction, exact distance/DTW, selection and overhead. Profile that exact-completion path by phase and group density on the frozen 9,309 proposals before changing it. Do not rerun CAKE/TAIT or all 12 yet.</p>
+</section>
 </main>
 
 <section id="reproduce">
