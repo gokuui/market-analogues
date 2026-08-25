@@ -51,6 +51,10 @@ from .m04_candidate_recall import (
     verify_m04_candidate_case, write_m04_case, write_m04_matrix,
 )
 from .m04r_incident import diagnose_m04r_incident, write_m04r_incident
+from .m04r_batch_registry import (
+    build_m04r_batch_registry, validate_m04r_batch_registry,
+    write_m04r_batch_registry,
+)
 from .m04r_prefix_verification import (
     verify_m04r_causal_prefixes, write_m04r_prefix_verification,
 )
@@ -1197,6 +1201,45 @@ def cmd_build_gate12_registry(args: argparse.Namespace) -> int:
     }, indent=2))
     print(html_path)
     return 0 if result.passed else 2
+
+
+def cmd_build_m04r_batch_registry(args: argparse.Namespace) -> int:
+    config, source = _load(args)
+    require_passed(_gates(config), f"09_exhaustive_oracle_{args.dataset}")
+    oracle_directory = Path(args.oracle_dir) if args.oracle_dir else (
+        config.artifact_dir / "oracles" / args.dataset
+    )
+    quality_path = config.artifact_dir / "quality" / f"{args.dataset}.parquet"
+    if not quality_path.exists():
+        raise SystemExit(f"missing quality audit: {quality_path}")
+    quality = pd.read_parquet(quality_path)
+    result = build_m04r_batch_registry(
+        source, oracle_directory, quality, seed=args.seed,
+        lookback=args.lookback, historical_quantile=args.historical_quantile,
+        minimum_rows=args.minimum_rows,
+        minimum_future_sessions=args.minimum_future_sessions,
+        representation_version=config.representation_version,
+        maximum_staleness_days=args.maximum_staleness_days,
+    )
+    output_directory = Path(args.output_dir) if args.output_dir else (
+        config.artifact_dir / "poc" / "m04r" / "batch-query-registry"
+    )
+    json_path, parquet_path, html_path = write_m04r_batch_registry(
+        result, output_directory,
+    )
+    validation_failures = validate_m04r_batch_registry(
+        source, json_path, quality, oracle_directory,
+    )
+    passed = result.passed and not validation_failures
+    print(json.dumps({
+        "passed": passed,
+        **result.metrics,
+        "json": str(json_path),
+        "parquet": str(parquet_path),
+        "failures": [*result.failures, *validation_failures],
+    }, indent=2))
+    print(html_path)
+    return 0 if passed else 2
 
 
 def _validated_view_manifest_rows(
@@ -2370,6 +2413,18 @@ def build_parser() -> argparse.ArgumentParser:
     registry.add_argument("--maximum-staleness-days", type=int, default=120)
     registry.add_argument("--output-dir")
     registry.set_defaults(func=cmd_build_gate12_registry)
+    m04r_batch_registry = sub.add_parser("build-m04r-batch-registry")
+    m04r_batch_registry.add_argument("--config", required=True)
+    m04r_batch_registry.add_argument("--dataset", default="nasdaq")
+    m04r_batch_registry.add_argument("--oracle-dir")
+    m04r_batch_registry.add_argument("--seed", default="gate12-query-v1")
+    m04r_batch_registry.add_argument("--lookback", type=int, default=252)
+    m04r_batch_registry.add_argument("--historical-quantile", type=float, default=.70)
+    m04r_batch_registry.add_argument("--minimum-rows", type=int, default=1000)
+    m04r_batch_registry.add_argument("--minimum-future-sessions", type=int, default=60)
+    m04r_batch_registry.add_argument("--maximum-staleness-days", type=int, default=120)
+    m04r_batch_registry.add_argument("--output-dir")
+    m04r_batch_registry.set_defaults(func=cmd_build_m04r_batch_registry)
     storage = sub.add_parser("verify-exact-storage")
     storage.add_argument("--config", required=True)
     storage.add_argument("--datasets", nargs="+", default=["nse", "nasdaq"])
