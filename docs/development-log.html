@@ -1017,6 +1017,12 @@
   <h2>L-103 — Preregistered lossless two-process legacy scan POC</h2>
   <p><b>Hypothesis:</b> The rejected legacy scan is primarily CPU-bound while evaluating exact v1 lower-bound scores. Partition immutable 4,096-row blocks across two fresh processes, keep one Numba thread in each, retain an independent bounded heap per route and perform a deterministic top-quota reduction. This changes execution only: each row receives the same legacy kernel, and the final candidate/result digests must equal <code>c8f51e20…2555</code>/<code>bb36c3b7…b75b</code>.</p>
   <p><b>Frozen development POC:</b> On already-used CAKE current, advise the same pack cold, then run cold-forward, warm-reverse and warm-forward scans through one persistent two-process pool. Require exact three-scan identity, cold ≤120 seconds, second warm ≤60 seconds and the conservative sum of parent current RSS plus worker peak RSS ≤1,024 MiB. If two processes fail latency, a separately recorded four-process diagnostic may run; no untouched query is permitted.</p>
+  <p class="fail"><b>Result:</b> REJECTED. Both legacy digests and all three scans remain exact, but cold 132.32 seconds, second warm 61.90 seconds and conservative aggregate process RSS exceed their limits. Evidence digest is <code>2465111f…32e</code>. Four processes are ruled out because duplication would further worsen RSS.</p>
+</section>
+<section class="entry">
+  <h2>L-104 — Preregistered bounded four-thread legacy scan POC</h2>
+  <p><b>Development evidence:</b> A 32,768-row real CAKE microbenchmark with Numba fixed to one thread projected 1/2/4/8 outer threads at 102.9/54.8/29.6/28.7 seconds for a full warm scan. Checksums were identical. Eight threads reached about 1,228 MiB and are rejected; four retained an intentionally conservative 874 MiB.</p>
+  <p><b>Frozen POC before execution:</b> Use one process, four worker threads, unchanged 4,096-row physical blocks and the exact legacy kernel. Keep at most four blocks in flight; consume completed futures strictly in requested physical order into the unchanged stable route heaps; add overflow only after the main rows. Run advised-cold forward, warm reverse and warm forward scans. Require the frozen candidate/result digests, complete three-scan invariance, cold ≤120 seconds, second warm ≤60 seconds and whole-process high-water RSS ≤1,024 MiB. No untouched query is permitted.</p>
 </section>
 </main>
 
