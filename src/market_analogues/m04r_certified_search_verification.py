@@ -321,7 +321,7 @@ def verify_m04r_certified_packed_search(
     }
     if evidence.get("gates") != expected_gates:
         failures.append("certified-search reported gate flags differ")
-    if evidence.get("gate_passed") is not all(expected_gates.values()):
+    if evidence.get("gate_passed") != all(expected_gates.values()):
         failures.append("certified-search overall gate flag differs")
     if not all(expected_gates.values()):
         failures.append("one or more certified-search gates fail")
