@@ -233,7 +233,8 @@
   <p class="fail"><b>Sixteen-worker control rejected:</b> Exact TVTX takes 333.97 seconds/780.57 MiB versus 328.03/751.00 at eight workers. Extra scheduling/memory pressure does not improve the single-threaded scan plus already compact group work; eight remains selected.</p>
   <p class="fail"><b>v5 heavy-tail check:</b> CAKE passes at 243.74 seconds, but TAIT takes 355.95; with TVTX 328.03, the upper tail is not credible for p95 ≤300. The remaining nine were not run.</p>
   <p class="pass"><b>Compiled joined-IQR preflight:</b> After rejecting a one-ULP interpolation mismatch, the compiled formula exactly mirrors NumPy. The complete bound kernel over 32,768 real TAIT rows improves 1.7837× (1.9649→1.1016 seconds), with bit-identical totals, zero component delta and full-suite PASS.</p>
-  <p class="open"><b>Remaining M04R-08 boundary:</b> Rerun TAIT alone under unchanged v5 controls and recompute the heavy-tail projection only from exact evidence. Full all-12 and promotion remain blocked.</p>
+  <p class="pass"><b>Compiled-IQR TAIT PASS:</b> Exact TAIT falls from 355.95 to 264.57 seconds at 709.39 MiB with unchanged 7,419 rows and authority equality. Certificate/case digests are <code>b7c606fd…5ea5</code>/<code>cab797bd…49ee</code>.</p>
+  <p class="open"><b>Remaining M04R-08 boundary:</b> Rerun TVTX because its 328.03-second v5 evidence predates compiled IQR. If exact and below 300, authorize the complete checkpointed 12-case matrix; promotion remains blocked until independent matrix verification.</p>
 </section>
 
 <section class="task" id="m04r-09">

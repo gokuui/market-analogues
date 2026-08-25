@@ -814,6 +814,13 @@
   <p><b>Measured complete-kernel result:</b> Across fixed 32,768 real TAIT-eligible packed rows, the full quantized bound—not just quartiles—improves from median 1.9649 to 1.1016 seconds, 1.7837×, with totals bit-identical and zero component delta. Focused bound/store/proposal/certified tests and the full suite pass.</p>
   <p><b>Next:</b> Commit this kernel, then rerun TAIT alone under unchanged v5 controls. Require exact candidate/final authority evidence and a material end-to-end reduction before recomputing the heavy-tail projection.</p>
 </section>
+
+<section class="entry">
+  <h2>L-080 — Compiled-IQR TAIT certified PASS below 300 seconds</h2>
+  <p><b>Result:</b> TAIT v5 with the bit-exact compiled packed quartile kernel retains exact authority IDs/order/alignments, 7,419 exact evaluations, strict stopping and safe bound/accounting in 264.57 seconds at 709.39 MiB. Authority total/component deltas remain 6.99e−9/8.74e−8. Certificate/case digests are <code>b7c606fd…5ea5</code>/<code>cab797bd…49ee</code>.</p>
+  <p><b>Comparison:</b> The complete case improves by 91.39 seconds/25.7% from prior v5 at 355.95 and by 423.91/61.6% from v1 at 687.48, crossing the 300-second line without changing one result or gate.</p>
+  <p><b>Next:</b> TVTX's 328.03-second v5 checkpoint predates the compiled packed kernel. Rerun TVTX once with the new kernel; if exact and below 300, the formerly three heaviest cases all have a passing route and the complete checkpointed 12-case matrix becomes justified. CAKE need not be rerun before that decision because it was already 243.74 with the slower bound.</p>
+</section>
 </main>
 
 <section id="reproduce">
