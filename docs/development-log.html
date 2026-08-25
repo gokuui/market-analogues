@@ -692,6 +692,13 @@
   <p><b>Correction:</b> The prior attribution of v2's remaining time to sparse-group vector overhead is falsified. Across identical completion rounds, v2 is faster than the hybrid that restores scalar sparse reconstruction. All three variants certify only after two physical scans: frontier 8,192 cannot stop, then frontier 16,384 reaches the final 9,309 exact rows. The next isolated variable is scan duplication, not another reconstruction guess.</p>
   <p><b>Next POC:</b> The runner now exposes and records <code>initial_frontier_rows</code>, validates its bounds, and refuses to resume a checkpoint whose complete controls differ from the requested run. Test pure v2 at an initial 16,384 frontier so TVTX performs one pack scan. The scoring contract is unchanged; certificate rounds and evidence controls capture the execution difference. Accept only exact authority equality and ≤600 seconds, then evaluate whether the result leaves a credible ≤300-second p95 route.</p>
 </section>
+
+<section class="entry">
+  <h2>L-063 — One-scan pure v2 passes TVTX maximum gate</h2>
+  <p><b>Result:</b> Pure requested-position v2 with initial frontier 16,384 completes historical TVTX in one physical scan and passes every case gate. It returns the exact frozen 20 IDs/order and alignments, maximum total/component deltas 8.91e−9/1.12e−7, 9,309 exact + 3,003,508 safely pruned = 3,012,817 eligible, and strict <code>next bound 1.0719771 &gt; τ 1.0523244</code>. Runtime is 569.59 seconds and peak RSS 614.12 MiB. Case/certificate digests are <code>d80b10d4…6ad5</code>/<code>4521cc73…8488</code>.</p>
+  <p><b>Comparison:</b> Holding the pure-v2 scoring path fixed, removing the second full-pack scan saves 209.17 seconds versus the 8,192-start v2 run. It saves 414.69 seconds versus v1. The one-case aggregate correctly remains incomplete because the frozen matrix gate requires all 12 cases; this does not negate the individual TVTX PASS.</p>
+  <p><b>Boundary and next:</b> The ≤600-second maximum now has a passing route, but 569.59 seconds is far above the ≤300-second p95 objective. Run historical CAKE and current TAIT under the same v2/16,384 controls to establish whether every former maximum failure is repaired. Do not promote or launch a full all-12 rerun yet; next profile shared pack I/O and multi-query completion using these results, because another single-query scalar tweak lacks evidence of reaching p95.</p>
+</section>
 </main>
 
 <section id="reproduce">
