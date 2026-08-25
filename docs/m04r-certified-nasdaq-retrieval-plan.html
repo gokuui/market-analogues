@@ -241,7 +241,8 @@
   <p class="pass"><b>M04R-08C 24-query registry:</b> A separate outcome-blind registry selects two symbols per A/B × liquidity cell and historical/current cutoffs, producing 24 distinct episodes across 12 symbols. Twelve overlap existing authorities and twelve are new. Independent deterministic reconstruction, fingerprints, exclusions, identities, strata and no-outcome checks pass; registry digest is <code>b8216808…ade2c</code>.</p>
   <p class="pass"><b>M04R-08C 24 optimized scalar controls:</b> All 24 cases pass under current v5/sorted-merge/eight-worker/4,096-row controls. p95 is 252.4311 seconds, maximum 418.7947, total 3,729.2874 and peak RSS 997.1836 MiB. Existing 12 authorities remain exact; new 12 have strict certified stops. Full resume verifies 24/24 checkpoints and repeats digest <code>59963a99…efcd</code>.</p>
   <p class="pass"><b>M04R-08C maximum-prefix reuse preflight:</b> A digest-validated 32,769-candidate report reconstructs exact scalar prefix digests for each frontier. AOUT historical reproduces all matches, four rounds, 17,907 evaluations and certificate digest <code>43a04c4c…6f4f0</code>; one scan plus exact work is 315.9994 seconds versus 418.7947 scalar, saving 24.5%. Physical differential tests and the full suite pass.</p>
-  <p class="open"><b>Remaining M04R-08 boundary:</b> Implement shared proposal plus union/grouped exact completion and preserve each scalar match/certificate. The frozen performance threshold is total elapsed ≤3,356.3586 seconds (≥10% below the optimized 3,729.2874-second scalar baseline), with RSS ≤1,536 MiB. AOUT historical at 17,907 exact rows is the primary stress case.</p>
+  <p class="pass"><b>M04R-08C complete 24-query batch PASS:</b> One shared maximum-prefix scan plus query-isolated certified exact completion takes 3,275.8811 seconds versus 3,729.2874 scalar, a 12.16% reduction/1.1384× speedup at 1,281.7539 MiB. All 24 canonical matches and complete certificates exactly equal scalar; no failures or outcomes occur. Evidence/verifier digests are <code>1bbef7fa…21c1d</code>/<code>0a100f34…a382</code>.</p>
+  <p class="pass"><b>M04R-08 COMPLETE:</b> Every frozen correctness, deterministic certificate, single-query p95/maximum, RSS and material 24-query batch requirement passes. This closes certified retrieval repair but does not activate the shadow generation or claim predictive/profit validity.</p>
 </section>
 
 <section class="task" id="m04r-09">
@@ -300,7 +301,7 @@
     <li>Commit a clean rollback point.</li>
     <li>Proceed only if the explicit gate passes. A failure creates a versioned redesign; it never lowers a frozen threshold.</li>
   </ol>
-  <p class="muted">M04R-00 through M04R-07, M04R-08A, the M04R-08B selected-v5 matrix, shared-proposal POC, outcome-blind 24-query registry and all optimized scalar controls are complete. M04R-08 batch execution remains open until the complete grouped-exact pipeline proves identical outputs and total ≤3,356.3586 seconds; M04R-09 and activation remain blocked.</p>
+  <p class="muted">M04R-00 through M04R-08 are complete. The certified engine passes all frozen single-query and 24-query exactness, performance, memory, provenance and no-outcome gates. M04R-09 development bake-off/optional ANN is next; the shadow generation remains inactive until later comparison, generalization and promotion tasks pass.</p>
 </section>
 </body>
 </html>
