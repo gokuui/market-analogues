@@ -98,6 +98,13 @@ def test_certified_pack_exhaustion_matches_brute_force(
         sparse_cutoff=3, seed_rows=20, verify_content=False,
         requested_positions=True,
     )
+    hybrid = certified_packed_search(
+        query, source, request, store_root, generation,
+        store_dataset_id="test", initial_frontier_rows=1_000,
+        maximum_frontier_rows=1_000, block_rows=9, workers=2,
+        sparse_cutoff=3, seed_rows=20, verify_content=False,
+        hybrid_requested_positions=True,
+    )
     brute = exact_search(query, brute_candidates, request)
     assert [row.episode_key.id for row in result.matches] == [
         row.episode_key.id for row in brute
@@ -131,6 +138,37 @@ def test_certified_pack_exhaustion_matches_brute_force(
     assert requested.certificate.schema_version == "m04r-certified-packed-search-v2"
     assert requested.certificate.input_digest == certificate.input_digest
     assert requested.certificate.exact_evaluated == certificate.exact_evaluated
+    assert [row.episode_key.id for row in hybrid.matches] == [
+        row.episode_key.id for row in result.matches
+    ]
+    assert [row.total_distance for row in hybrid.matches] == [
+        row.total_distance for row in result.matches
+    ]
+    assert [row.component_distances for row in hybrid.matches] == [
+        row.component_distances for row in result.matches
+    ]
+    assert [row.alignment for row in hybrid.matches] == [
+        row.alignment for row in result.matches
+    ]
+    assert hybrid.certificate.schema_version == "m04r-certified-packed-search-v3"
+    assert hybrid.certificate.contract_digest not in {
+        certificate.contract_digest, requested.certificate.contract_digest,
+    }
+    assert hybrid.certificate.input_digest == certificate.input_digest
+    assert hybrid.certificate.exact_evaluated == certificate.exact_evaluated
+
+
+def test_requested_position_modes_are_mutually_exclusive(
+    directory_dataset: Path, bars: pd.DataFrame, tmp_path: Path,
+) -> None:
+    from market_analogues.certified_packed_search import (
+        certified_packed_search_contract,
+    )
+
+    with np.testing.assert_raises(ValueError):
+        certified_packed_search_contract(
+            requested_positions=True, hybrid_requested_positions=True,
+        )
 
 
 def test_optional_empty_volume_stages_are_warning_free_across_threads() -> None:

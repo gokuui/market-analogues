@@ -33,6 +33,7 @@ from .types import (
 
 CERTIFIED_PACKED_SEARCH_VERSION = "m04r-certified-packed-search-v1"
 CERTIFIED_PACKED_SEARCH_REQUESTED_VERSION = "m04r-certified-packed-search-v2"
+CERTIFIED_PACKED_SEARCH_HYBRID_VERSION = "m04r-certified-packed-search-v3"
 
 
 class CertifiedPackedSearchError(RuntimeError):
@@ -80,11 +81,16 @@ class CertifiedPackedSearchResult:
 
 def certified_packed_search_contract(
     *, requested_positions: bool = False,
+    hybrid_requested_positions: bool = False,
 ) -> dict[str, Any]:
-    version = (
-        CERTIFIED_PACKED_SEARCH_REQUESTED_VERSION
-        if requested_positions else CERTIFIED_PACKED_SEARCH_VERSION
-    )
+    if requested_positions and hybrid_requested_positions:
+        raise ValueError("requested-position modes are mutually exclusive")
+    if hybrid_requested_positions:
+        version = CERTIFIED_PACKED_SEARCH_HYBRID_VERSION
+    elif requested_positions:
+        version = CERTIFIED_PACKED_SEARCH_REQUESTED_VERSION
+    else:
+        version = CERTIFIED_PACKED_SEARCH_VERSION
     payload: dict[str, Any] = {
         "schema_version": version,
         "frontier": (
@@ -100,6 +106,9 @@ def certified_packed_search_contract(
             "incomplete selection has infinite threshold and cannot certify"
         ),
         "exact_scoring": (
+            "native distance-v1 with scalar reconstruction for sparse symbol groups "
+            "and requested-cutoff vector construction for dense symbol groups"
+            if hybrid_requested_positions else
             "native distance-v1 with per-symbol vector construction of only requested "
             "cutoff positions"
             if requested_positions else
@@ -133,6 +142,7 @@ def _score_group(
     sparse_cutoff: int,
     tolerance: float,
     requested_positions: bool,
+    hybrid_requested_positions: bool,
 ) -> tuple[list[ScoredCandidate], float, str]:
     key = InstrumentKey(store_dataset_id, symbol)
     bars = source.load(key)
@@ -148,8 +158,11 @@ def _score_group(
         for index, value in enumerate(frame.timestamp)
     }
     use_batch = len(proposals) >= sparse_cutoff
+    use_requested_batch = requested_positions or (
+        hybrid_requested_positions and use_batch
+    )
     representations: dict[int, Representation] = {}
-    if requested_positions:
+    if use_requested_batch:
         requested = []
         for proposal in proposals:
             position = cutoff_to_position.get(proposal.cutoff_ns)
@@ -197,7 +210,7 @@ def _score_group(
             raise CertifiedPackedSearchError("packed episode identity changed during reconstruction")
         if not eligible(query, episode, request):
             raise CertifiedPackedSearchError(f"packed proposal is ineligible: {proposal.episode_id}")
-        if requested_positions or use_batch:
+        if use_requested_batch or use_batch:
             candidate_representation = representations.get(proposal.cutoff_ns)
         else:
             positions, channels = exact_channel_rows(
@@ -244,6 +257,7 @@ def _score_new_proposals(
     sparse_cutoff: int,
     tolerance: float,
     requested_positions: bool,
+    hybrid_requested_positions: bool,
 ) -> tuple[list[ScoredCandidate], float, int, int]:
     if workers < 1 or sparse_cutoff < 1:
         raise ValueError("workers and sparse cutoff must be positive")
@@ -274,6 +288,7 @@ def _score_new_proposals(
             maximum_candidate_cutoff=maximum_cutoff,
             sparse_cutoff=sparse_cutoff, tolerance=tolerance,
             requested_positions=requested_positions,
+            hybrid_requested_positions=hybrid_requested_positions,
         )
 
     items = sorted(grouped.items())
@@ -314,7 +329,10 @@ def certified_packed_search(
     tolerance: float = 1e-12,
     verify_content: bool = True,
     requested_positions: bool = False,
+    hybrid_requested_positions: bool = False,
 ) -> CertifiedPackedSearchResult:
+    if requested_positions and hybrid_requested_positions:
+        raise ValueError("requested-position modes are mutually exclusive")
     if (
         initial_frontier_rows < request.top_k
         or maximum_frontier_rows < initial_frontier_rows
@@ -327,6 +345,7 @@ def certified_packed_search(
     started = perf_counter()
     contract = certified_packed_search_contract(
         requested_positions=requested_positions,
+        hybrid_requested_positions=hybrid_requested_positions,
     )
     loaded = load_packed_generation(
         store_root, generation_id, verify_content=verify_content,
@@ -389,6 +408,7 @@ def certified_packed_search(
                     workers=workers, sparse_cutoff=sparse_cutoff,
                     tolerance=tolerance,
                     requested_positions=requested_positions,
+                    hybrid_requested_positions=hybrid_requested_positions,
                 )
                 scored_by_id.update({
                     row.match.episode_key.id: row for row in newly_scored

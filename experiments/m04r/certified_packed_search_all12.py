@@ -126,6 +126,7 @@ def _case_payload(
     build: dict[str, Any],
     controls: dict[str, Any],
     requested_positions: bool,
+    hybrid_requested_positions: bool,
 ) -> dict[str, Any]:
     matches = [_match(value) for value in result.matches]
     comparison = _comparison(matches, authority["matches"])
@@ -167,6 +168,7 @@ def _case_payload(
         "schema_version": CASE_SCHEMA,
         "contract_digest": certified_packed_search_contract(
             requested_positions=requested_positions,
+            hybrid_requested_positions=hybrid_requested_positions,
         )["digest"],
         "generation_id": build["generation_id"],
         "full_build_evidence_digest": build["result_digest"],
@@ -195,8 +197,14 @@ def _valid_checkpoint(
     requested_positions = bool(
         (payload.get("controls") or {}).get("requested_positions", False)
     )
+    hybrid_requested_positions = bool(
+        (payload.get("controls") or {}).get(
+            "hybrid_requested_positions", False,
+        )
+    )
     contract = certified_packed_search_contract(
         requested_positions=requested_positions,
+        hybrid_requested_positions=hybrid_requested_positions,
     )
     if not all((
         payload.get("schema_version") == CASE_SCHEMA,
@@ -274,6 +282,7 @@ def _aggregate(
     expected_ids: list[str],
     started_at: str,
     requested_positions: bool,
+    hybrid_requested_positions: bool,
 ) -> dict[str, Any]:
     seconds = [float(case["seconds"]) for case in cases]
     completed_ids = [str(case["query_episode_id"]) for case in cases]
@@ -304,6 +313,7 @@ def _aggregate(
         "schema_version": MATRIX_SCHEMA,
         "contract_digest": certified_packed_search_contract(
             requested_positions=requested_positions,
+            hybrid_requested_positions=hybrid_requested_positions,
         )["digest"],
         "generation_id": build["generation_id"],
         "full_build_evidence_digest": build["result_digest"],
@@ -336,7 +346,10 @@ def main() -> int:
     parser.add_argument("--case-limit", type=int)
     parser.add_argument("--query-ids", nargs="+")
     parser.add_argument("--requested-positions", action="store_true")
+    parser.add_argument("--hybrid-requested-positions", action="store_true")
     args = parser.parse_args()
+    if args.requested_positions and args.hybrid_requested_positions:
+        raise ValueError("requested-position modes are mutually exclusive")
     if args.workers < 1 or args.block_rows < 1:
         raise ValueError("workers and block rows must be positive")
     if args.case_limit is not None and args.case_limit < 1:
@@ -442,6 +455,7 @@ def main() -> int:
                 sparse_cutoff=8,
                 verify_content=False,
                 requested_positions=args.requested_positions,
+                hybrid_requested_positions=args.hybrid_requested_positions,
             )
             payload = _case_payload(
                 result, authority, build,
@@ -449,8 +463,12 @@ def main() -> int:
                     "block_rows": args.block_rows,
                     "workers": args.workers,
                     "requested_positions": args.requested_positions,
+                    "hybrid_requested_positions": (
+                        args.hybrid_requested_positions
+                    ),
                 },
                 args.requested_positions,
+                args.hybrid_requested_positions,
             )
             _write(cases_dir / f"{query_id}.json", payload)
             completed[query_id] = payload
@@ -475,6 +493,7 @@ def main() -> int:
             ordered, failures, build=build, expected_ids=expected_ids,
             started_at=started_at,
             requested_positions=args.requested_positions,
+            hybrid_requested_positions=args.hybrid_requested_positions,
         )
         _write(matrix_path, matrix)
         _render(matrix_path.with_suffix(".html"), matrix)
@@ -484,6 +503,7 @@ def main() -> int:
         ordered, failures, build=build, expected_ids=expected_ids,
         started_at=started_at,
         requested_positions=args.requested_positions,
+        hybrid_requested_positions=args.hybrid_requested_positions,
     )
     _write(matrix_path, matrix)
     _render(matrix_path.with_suffix(".html"), matrix)

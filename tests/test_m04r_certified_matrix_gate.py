@@ -150,6 +150,7 @@ def test_matrix_checkpoint_validation_and_timing_free_digest() -> None:
     matrix = _aggregate(
         cases, [], build=build, expected_ids=expected, started_at="one",
         requested_positions=False,
+        hybrid_requested_positions=False,
     )
     assert matrix["gate_passed"] is True
     original_digest = matrix["result_digest"]
@@ -189,6 +190,7 @@ def test_independent_matrix_verifier_passes_and_rejects_tamper(
     matrix = _aggregate(
         cases, [], build=build, expected_ids=expected, started_at="one",
         requested_positions=False,
+        hybrid_requested_positions=False,
     )
     evidence_path = tmp_path / "matrix.json"
     evidence_path.write_text(json.dumps(matrix))
