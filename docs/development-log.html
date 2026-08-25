@@ -727,6 +727,13 @@
   <p><b>Verified compact change:</b> The existing vector kernel separately called percentile at 25 and 75 for every present 48-sample channel, partitioning the same joined 96-value row twice. It now requests <code>(25, 75)</code> in one call and subtracts the returned quartiles. A call-count regression proves one combined request per present channel; all independent-reference, safety, missingness, float16-boundary, packed-store and proposal tests pass, followed by the full suite.</p>
   <p><b>Measured result and next:</b> On the identical fixed rows, median kernel time falls from 2.2454 to 1.8246 seconds per call, a 1.2306×/18.7% elapsed reduction with unchanged checked outputs. This is an in-memory kernel POC, not yet a full-search performance pass. Commit it separately, then run a full TVTX composite scan and require the exact prior candidate digest/eligible accounting plus material elapsed reduction before rerunning certified completion.</p>
 </section>
+
+<section class="entry">
+  <h2>L-068 — Combined-IQR full TVTX proposal scan PASS</h2>
+  <p><b>Full-pack result:</b> The optimized kernel scans all 3,786,156 physical rows for historical TVTX with composite quota 16,385 and returns the exact frozen candidate digest <code>2444aac7…5ed7</code>, 3,012,817 eligible rows and 16,385 candidates. Result digest is <code>dfd7f7c3…8aa1</code>; peak RSS is 219.35 MiB.</p>
+  <p><b>Performance:</b> Elapsed is 162.76 seconds versus 205.36 seconds for the same-process scalar control recorded immediately before the change, a 42.59-second/20.74% reduction. This materially confirms the fixed-row 1.2306× kernel result at complete-pack scale without altering proposal identity or eligibility.</p>
+  <p><b>Next:</b> Rerun one-scan pure-v2 certified TVTX from a fresh checkpoint. Require exact authority IDs/order/totals/components/alignments, 9,309 exact evaluations, strict stopping and unchanged resource gates. This scan improvement alone cannot be assumed to reach the 300-second p95 because source reconstruction/exact distance remains outside the optimized kernel.</p>
+</section>
 </main>
 
 <section id="reproduce">
