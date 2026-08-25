@@ -10,7 +10,9 @@ from time import perf_counter
 
 import numpy as np
 
-from market_analogues.quantized_bound import quantized_bound_contract
+from market_analogues.quantized_bound import (
+    branch_aware_quantized_bound_contract, quantized_bound_contract,
+)
 from market_analogues.types import stable_hash
 
 
@@ -24,7 +26,10 @@ def _outward32(values: np.ndarray) -> np.ndarray:
     ).astype(np.float64)
 
 
-def _evaluate(query: np.ndarray, candidate: np.ndarray, tolerance: float) -> dict[str, float | int]:
+def _evaluate(
+    query: np.ndarray, candidate: np.ndarray, tolerance: float,
+    *, branch_aware: bool = False,
+) -> dict[str, float | int]:
     stored = candidate.astype(np.float16).astype(np.float64)
     error = candidate - stored
     error_rms = _outward32(np.sqrt(np.mean(error * error, axis=1)))
@@ -32,12 +37,31 @@ def _evaluate(query: np.ndarray, candidate: np.ndarray, tolerance: float) -> dic
     observed = np.sqrt(np.mean((stored - query) ** 2, axis=1))
     numerator = np.maximum(observed - error_rms, 0.0)
     approximate = np.c_[stored, query]
-    denominator = np.maximum.reduce((
+    observed_iqr = (
         np.percentile(approximate, 75, axis=1)
-        - np.percentile(approximate, 25, axis=1) + 2.0 * error_max,
-        np.std(approximate, axis=1) + error_rms / np.sqrt(2.0),
-        np.full(len(query), 1e-6),
-    ))
+        - np.percentile(approximate, 25, axis=1)
+    )
+    raw_iqr_upper = observed_iqr + 2.0 * error_max
+    raw_std_upper = np.std(approximate, axis=1) + error_rms / np.sqrt(2.0)
+    if branch_aware:
+        iqr_lower = np.nextafter(observed_iqr - 2.0 * error_max, -np.inf)
+        iqr_upper = np.nextafter(raw_iqr_upper, np.inf)
+        std_upper = np.nextafter(raw_std_upper, np.inf)
+        denominator = np.where(
+            iqr_lower >= 1e-8,
+            np.maximum(iqr_upper, 1e-6),
+            np.where(
+                iqr_upper < 1e-8,
+                np.maximum(std_upper, 1e-6),
+                np.maximum.reduce((
+                    iqr_upper, std_upper, np.full(len(query), 1e-6),
+                )),
+            ),
+        )
+    else:
+        denominator = np.maximum.reduce((
+            raw_iqr_upper, raw_std_upper, np.full(len(query), 1e-6),
+        ))
     lower = numerator / denominator
     exact_joined = np.c_[candidate, query]
     exact_scale = (
@@ -95,6 +119,7 @@ def main() -> int:
     parser.add_argument("--seed", type=int, default=20260824)
     parser.add_argument("--tolerance", type=float, default=1e-12)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--branch-aware", action="store_true")
     args = parser.parse_args()
     if args.pairs < 1_000_000:
         raise ValueError("formal gate requires at least 1,000,000 pairs")
@@ -109,7 +134,10 @@ def main() -> int:
     while tested < args.pairs:
         count = min(args.batch_size, args.pairs - tested)
         query, candidate = _batch(rng, count, batch_index % 5)
-        result = _evaluate(query, candidate, args.tolerance)
+        result = _evaluate(
+            query, candidate, args.tolerance,
+            branch_aware=args.branch_aware,
+        )
         for name in ("violations", "unscaled_violations", "positive"):
             totals[name] += int(result[name])
         for name in ("maximum_excess", "maximum_unscaled_excess", "maximum_ratio"):
@@ -125,11 +153,19 @@ def main() -> int:
     expanded = np.tile(sequences, (1, 16))
     left = np.repeat(expanded, len(expanded), axis=0)
     right = np.tile(expanded, (len(expanded), 1))
-    boundary = _evaluate(left, right, args.tolerance)
+    boundary = _evaluate(
+        left, right, args.tolerance, branch_aware=args.branch_aware,
+    )
     elapsed = perf_counter() - started
     deterministic = {
-        "schema_version": "m04r-quantized-bound-million-gate-v1",
-        "contract_digest": quantized_bound_contract()["digest"],
+        "schema_version": (
+            "m04r-quantized-bound-million-gate-v2"
+            if args.branch_aware else "m04r-quantized-bound-million-gate-v1"
+        ),
+        "contract_digest": (
+            branch_aware_quantized_bound_contract()["digest"]
+            if args.branch_aware else quantized_bound_contract()["digest"]
+        ),
         "seed": args.seed,
         "pairs": tested,
         "tolerance": args.tolerance,

@@ -6,11 +6,17 @@ import json
 from pathlib import Path
 from typing import Any
 
-from .quantized_bound import PACKED_ROW_BYTES, quantized_bound_contract
+from .quantized_bound import (
+    PACKED_ROW_BYTES, branch_aware_quantized_bound_contract,
+    quantized_bound_contract,
+)
 from .types import stable_hash
 
 
 M04R_QUANTIZED_VERIFIER_SCHEMA = "m04r-quantized-bound-verification-v1"
+M04R_BRANCH_AWARE_QUANTIZED_VERIFIER_SCHEMA = (
+    "m04r-quantized-bound-verification-v2"
+)
 
 
 @dataclass(frozen=True)
@@ -30,10 +36,19 @@ def _verified_digest(payload: dict[str, Any], omitted: set[str]) -> bool:
 def verify_m04r_quantized_bound(
     million_path: Path,
     authority_path: Path,
+    *,
+    branch_aware: bool = False,
 ) -> M04RQuantizedVerificationResult:
     million = json.loads(million_path.read_text())
     authority = json.loads(authority_path.read_text())
-    contract = quantized_bound_contract()
+    contract = (
+        branch_aware_quantized_bound_contract()
+        if branch_aware else quantized_bound_contract()
+    )
+    verifier_schema = (
+        M04R_BRANCH_AWARE_QUANTIZED_VERIFIER_SCHEMA
+        if branch_aware else M04R_QUANTIZED_VERIFIER_SCHEMA
+    )
     failures: list[str] = []
     if not _verified_digest(
         million, {"elapsed_seconds", "pairs_per_second", "result_digest", "proof_boundary"},
@@ -48,6 +63,19 @@ def verify_m04r_quantized_bound(
             failures.append(f"{name} contract digest differs")
         if payload.get("outcomes_or_labels_used", payload.get("real_forward_outcomes_accessed")):
             failures.append(f"{name} evidence accessed outcomes or labels")
+    expected_schemas = (
+        (
+            "m04r-quantized-bound-million-gate-v2",
+            "m04r-quantized-bound-authority-gate-v2",
+        ) if branch_aware else (
+            "m04r-quantized-bound-million-gate-v1",
+            "m04r-quantized-bound-authority-gate-v1",
+        )
+    )
+    if million.get("schema_version") != expected_schemas[0]:
+        failures.append("million evidence schema differs")
+    if authority.get("schema_version") != expected_schemas[1]:
+        failures.append("authority evidence schema differs")
     if int(million.get("pairs", 0)) < 1_000_000:
         failures.append("fewer than one million randomized pairs")
     if int(million.get("boundary_pairs", 0)) < 15_625:
@@ -85,7 +113,7 @@ def verify_m04r_quantized_bound(
     ):
         failures.append("authority source provenance is incomplete")
     metrics = {
-        "schema_version": M04R_QUANTIZED_VERIFIER_SCHEMA,
+        "schema_version": verifier_schema,
         "contract_digest": contract["digest"],
         "million_pairs": int(million.get("pairs", 0)),
         "boundary_pairs": int(million.get("boundary_pairs", 0)),
@@ -107,7 +135,7 @@ def verify_m04r_quantized_bound(
         "real_forward_outcomes_accessed": False,
     }
     deterministic = {
-        "schema_version": M04R_QUANTIZED_VERIFIER_SCHEMA,
+        "schema_version": verifier_schema,
         "metrics": metrics,
         "failures": sorted(failures),
         "contract": contract,
@@ -127,7 +155,7 @@ def write_m04r_quantized_verification(
     html = output_dir / "m04r-quantized-bound.html"
     contract = output_dir / "quantized-bound-contract.json"
     payload = {
-        "schema_version": M04R_QUANTIZED_VERIFIER_SCHEMA,
+        "schema_version": result.metrics["schema_version"],
         "passed": result.passed,
         "metrics": result.metrics,
         "failures": list(result.failures),

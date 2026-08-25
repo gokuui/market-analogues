@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
 
 from market_analogues.packed_bound_search import (
     PackedBoundQuery, PackedBoundSearchError, scan_packed_bound_proposals,
-    scan_packed_bound_proposals_many,
+    scan_packed_bound_proposals_many, scan_packed_bound_threshold,
 )
 from market_analogues.packed_bound_store import (
     OVERFLOW_DTYPE, make_overflow_record, make_packed_record,
@@ -154,6 +155,43 @@ def test_shared_scan_is_scalar_equivalent_and_order_stable(tmp_path: Path) -> No
             assert shared.eligible_rows == independent.eligible_rows
             assert shared.route_counts == independent.route_counts
 
+    branch_scalar = tuple(scan_packed_bound_proposals(
+        root, generation, query, block_rows=23, branch_aware=True,
+        verify_content=False,
+    ) for query in queries)
+    branch_batch = scan_packed_bound_proposals_many(
+        root, generation, queries, block_rows=19, block_order="reverse",
+        branch_aware=True, verify_content=False,
+    )
+    assert branch_batch.schema_version == "m04r-global-bound-proposal-batch-v2"
+    for shared, independent in zip(branch_batch.reports, branch_scalar):
+        assert shared.schema_version == "m04r-global-bound-proposal-v2"
+        assert shared.candidates == independent.candidates
+        assert shared.result_digest == independent.result_digest
+        assert shared.contract_digest == independent.contract_digest
+        assert shared.input_digest == independent.input_digest
+        assert shared.contract_digest is not None
+        assert shared.input_digest is not None
+    assert all(report.contract_digest is None for report in scalar)
+    assert all(report.input_digest is None for report in scalar)
+
+    changed_samples = dict(representation.samples_48)
+    changed_samples["close_path"] = changed_samples["close_path"].copy()
+    changed_samples["close_path"][0] += 1.0
+    changed_representation = type(representation)(
+        representation.channels, representation.coarse, changed_samples,
+        representation.samples_64, representation.stage,
+        representation.structural,
+    )
+    changed_report = scan_packed_bound_proposals(
+        root, generation, _query(
+            changed_representation, episode_id=queries[0].episode_id,
+        ),
+        block_rows=23, branch_aware=True, verify_content=False,
+    )
+    assert changed_report.input_digest != branch_scalar[0].input_digest
+    assert changed_report.result_digest != branch_scalar[0].result_digest
+
 
 def test_shared_scan_rejects_empty_and_duplicate_queries(tmp_path: Path) -> None:
     root, generation, representation = _store(tmp_path, count=8)
@@ -165,4 +203,96 @@ def test_shared_scan_rejects_empty_and_duplicate_queries(tmp_path: Path) -> None
     with pytest.raises(PackedBoundSearchError, match="unique"):
         scan_packed_bound_proposals_many(
             root, generation, (query, query), verify_content=False,
+        )
+
+
+def test_threshold_scan_streams_complete_tied_bands_and_is_order_independent(
+    tmp_path: Path,
+) -> None:
+    query_representation = represent(generate_case("rounded_base", 900).episode)
+    rows = []
+    kinds = (
+        "rounded_base", "trend_contraction_breakout",
+        "failed_breakout", "volatile_reversal",
+    )
+    for index in range(48):
+        candidate = represent(generate_case(kinds[index % len(kinds)], 2_000 + index).episode)
+        rows.append(make_packed_record(
+            f"{index + 100:024x}", index + 1, 0, "A",
+            quantize_bound_row(candidate),
+        ))
+    overflow_id = f"{1:024x}"
+    root = tmp_path / "threshold-store"
+    generation = write_packed_generation(
+        root, np.concatenate(rows),
+        make_overflow_record(overflow_id, 1, 1, "B"),
+        ("AAA", "BBB"), {"purpose": "threshold-scan-test"}, activate=False,
+    )
+    query = _query(query_representation)
+    ranked = scan_packed_bound_proposals(
+        root, generation, query, verify_content=False,
+    ).candidates
+    boundary = ranked[len(ranked) // 2].lower_bound
+    prefix_id = ranked[0].episode_id
+    expected_first = {
+        row.episode_id for row in ranked
+        if row.lower_bound <= boundary and row.episode_id != prefix_id
+    }
+
+    reports = []
+    admitted_sets = []
+    for block_rows, order in ((7, "forward"), (11, "reverse")):
+        admitted = []
+        reports.append(scan_packed_bound_threshold(
+            root, generation, query, upper_inclusive=boundary,
+            excluded_episode_ids=frozenset({prefix_id}),
+            block_rows=block_rows, block_order=order, verify_content=False,
+            consume=lambda batch, output=admitted: output.extend(batch),
+        ))
+        admitted_sets.append({row.episode_id for row in admitted})
+    assert admitted_sets == [expected_first, expected_first]
+    assert reports[0].result_digest == reports[1].result_digest
+    assert reports[0].admitted_set_digest == reports[1].admitted_set_digest
+    assert reports[0].minimum_above_upper is not None
+    assert reports[0].minimum_above_upper > boundary
+
+    second = []
+    second_report = scan_packed_bound_threshold(
+        root, generation, query, lower_exclusive=boundary,
+        upper_inclusive=float("inf"), block_rows=9, verify_content=False,
+        consume=lambda batch: second.extend(batch),
+    )
+    assert second_report.minimum_above_upper is None
+    assert {row.episode_id for row in second} == {
+        row.episode_id for row in ranked if row.lower_bound > boundary
+    }
+    assert expected_first | {prefix_id} | {row.episode_id for row in second} == {
+        row.episode_id for row in ranked
+    }
+
+
+def test_threshold_scan_fails_closed_on_invalid_bounds_and_exclusions(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import market_analogues.packed_bound_search as packed_search
+
+    root, generation, representation = _store(tmp_path, count=8)
+    query = _query(representation)
+    for invalid in (float("nan"), -1.0, float("inf")):
+        monkeypatch.setattr(
+            packed_search, "packed_lower_bounds",
+            lambda _query_representation, records, value=invalid: SimpleNamespace(
+                totals=np.full(len(records), value),
+            ),
+        )
+        with pytest.raises(PackedBoundSearchError, match="invalid packed lower bound"):
+            scan_packed_bound_threshold(
+                root, generation, query, upper_inclusive=float("inf"),
+                consume=lambda _: None, verify_content=False,
+            )
+    with pytest.raises(PackedBoundSearchError, match="invalid episode ID"):
+        scan_packed_bound_threshold(
+            root, generation, query, upper_inclusive=1.0,
+            excluded_episode_ids=frozenset({"g" * 24}),
+            consume=lambda _: None, verify_content=False,
         )

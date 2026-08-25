@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from hashlib import sha256
 from html import escape
 import json
+from math import isfinite
 import multiprocessing
 from pathlib import Path
 import resource
@@ -21,30 +22,33 @@ import pandas as pd
 
 from market_analogues.adapters import file_fingerprint, source_from_spec
 from market_analogues.certified_packed_search import (
-    CertifiedFrontierOverflow,
     certified_packed_search,
     certified_packed_search_contract,
 )
 from market_analogues.config import load_config
 from market_analogues.episodes import build_episode
 from market_analogues.m04r_certified_search_verification import _certificate_digest
+from market_analogues.m04r_branch_bound_evidence import (
+    validated_branch_bound_evidence,
+)
 from market_analogues.m04r_full_pack_verification import EVIDENCE_OMITTED as BUILD_OMITTED
 from market_analogues.m04r_validation_registry import validate_m04r_validation_registry
-from market_analogues.packed_bound_search import PackedBoundQuery, scan_packed_bound_proposals_many
+from market_analogues.packed_bound_search import (
+    PackedBoundQuery, packed_bound_search_contract,
+    packed_bound_threshold_scan_contract, scan_packed_bound_proposals_many,
+)
 from market_analogues.packed_bound_store import load_packed_generation
 from market_analogues.representation import represent
 from market_analogues.search import latest_eligible_cutoff
 from market_analogues.types import InstrumentKey, SearchQuery, stable_hash
 
 
-CONTRACT_SCHEMA = "m04r11-authority-build-contract-v2"
-CASE_SCHEMA = "m04r11-certified-authority-case-v2"
-MATRIX_SCHEMA = "m04r11-certified-authority-matrix-v2"
-SEAL_SCHEMA = "m04r11-authority-seal-v2"
-FRONTIER_OVERFLOW_MESSAGE = (
-    "certified frontier exceeds configured maximum; no result emitted"
-)
-OVERFLOW_POLICY_SCHEMA = "m04r11-frontier-overflow-recovery-v1"
+CONTRACT_SCHEMA = "m04r11-authority-build-contract-v4"
+CASE_SCHEMA = "m04r11-certified-authority-case-v4"
+MATRIX_SCHEMA = "m04r11-certified-authority-matrix-v4"
+SEAL_SCHEMA = "m04r11-authority-seal-v4"
+OVERFLOW_POLICY_SCHEMA = "m04r11-streaming-threshold-closure-v1"
+BOUND_TOLERANCE = 1e-12
 CASE_RESULT_OMITTED = {
     "created_at", "proposal_seconds", "amortized_proposal_seconds",
     "exact_seconds", "final_exact_seconds", "frontier_attempt_measurements",
@@ -130,14 +134,16 @@ def _implementation_manifest() -> dict[str, Any]:
 def _overflow_policy(primary_limit: int) -> dict[str, Any]:
     return {
         "schema_version": OVERFLOW_POLICY_SCHEMA,
-        "trigger": FRONTIER_OVERFLOW_MESSAGE,
-        "first_recovery_frontier_rows": int(primary_limit) * 2,
-        "growth_factor": 2,
-        "terminal_frontier": "eligible-universe exhaustion",
+        "sorted_prefix_rows": int(primary_limit),
+        "trigger": "sorted prefix cannot certify the constrained top-k",
+        "terminal_frontier": "strict streamed threshold closure or eligible exhaustion",
         "scope": "authority construction only",
         "semantics": (
-            "retry the unchanged exact certified search over monotonically larger "
-            "bound-sorted frontiers; never emit an approximate result"
+            "retain all prefix classifications, stream inclusive packed-bound bands, "
+            "apply exact native non-DTW deferral with threshold reopening, and never "
+            "emit an approximate result or repeat exact DTW work; native "
+            "materialization may repeat only when a raised constrained threshold "
+            "reopens a deferred row"
         ),
     }
 
@@ -152,17 +158,14 @@ def _frontier_execution_valid(
     if not final_frontiers or not attempts or min(final_frontiers) < 1:
         return False
     primary_limit = int(contract["controls"]["maximum_frontier_rows"])
-    eligible = int(certificate.get("eligible_candidates", -1))
-    expected_limits = [primary_limit]
-    while expected_limits[-1] < eligible:
-        expected_limits.append(min(eligible, expected_limits[-1] * 2))
     limits = [int(row.get("maximum_frontier_rows", -1)) for row in attempts]
-    if limits != expected_limits[:len(limits)] or len(limits) > len(expected_limits):
+    if limits != [primary_limit]:
         return False
     statuses = [row.get("status") for row in attempts]
-    if statuses[-1] != "certified" or any(value != "overflow" for value in statuses[:-1]):
+    if statuses != ["certified"]:
         return False
-    if payload.get("frontier_overflow_recovery") is not (len(attempts) > 1):
+    closure = certificate.get("threshold_closure_passes") or []
+    if payload.get("streaming_threshold_closure_used") is not bool(closure):
         return False
     if payload.get("frontier_limit_rows") != limits[-1]:
         return False
@@ -171,15 +174,65 @@ def _frontier_execution_valid(
     proposal_digests = [row.get("proposal_result_digest") for row in attempts]
     if not all(isinstance(value, str) and value for value in proposal_digests):
         return False
-    for row, limit in zip(attempts[:-1], limits[:-1], strict=True):
-        next_hex = row.get("next_lower_bound_hex")
-        threshold_hex = row.get("stop_threshold_hex")
+    previous_upper = None
+    previous_resulting_threshold = None
+    previous_native = primary_limit
+    previous_exact = int(rounds[-1].get("exact_rows", -1))
+    for index, row in enumerate(closure):
+        lower = row.get("lower_exclusive")
+        upper = float(row.get("upper_inclusive"))
+        native = int(row.get("cumulative_native_bound_evaluated", -1))
+        exact = int(row.get("cumulative_exact_dtw_evaluated", -1))
+        resulting = float(row.get("resulting_threshold"))
+        packed_minimum = row.get("minimum_packed_unclassified_bound")
+        native_minimum = row.get("minimum_native_pruned_bound")
         if not all((
-            int(row.get("exact_evaluated", -1)) == limit,
-            isinstance(next_hex, str), isinstance(threshold_hex, str),
-            float.fromhex(next_hex) <= float.fromhex(threshold_hex),
+            lower == previous_upper,
+            upper >= 0,
+            index != 0 or upper == (
+                float(rounds[-1].get("constrained_threshold")) + BOUND_TOLERANCE
+            ),
+            index == 0 or upper > float(previous_upper),
+            index == 0 or upper == previous_resulting_threshold + BOUND_TOLERANCE,
+            int(row.get("admitted_rows", -1)) >= 0,
+            native - previous_native == int(row.get("admitted_rows", -1)),
+            previous_exact <= exact <= native,
+            int(row.get("selected_rows", -1)) == 20,
+            isinstance(row.get("certified"), bool),
+            index == len(closure) - 1 or row.get("certified") is False,
+            isfinite(resulting) and resulting >= 0,
+            not row.get("certified") or all(
+                value is None or float(value) > resulting + BOUND_TOLERANCE
+                for value in (packed_minimum, native_minimum)
+            ),
+            isinstance(row.get("excluded_prefix_digest"), str),
+            isinstance(row.get("admitted_set_digest"), str),
+            isinstance(row.get("scan_result_digest"), str),
         )):
             return False
+        previous_upper = upper
+        previous_resulting_threshold = resulting
+        previous_native = native
+        previous_exact = exact
+    if closure and closure[-1].get("certified") is not True:
+        return False
+    accounting = certificate.get("native_bound_accounting") or {}
+    final_minima = (
+        [
+            float(value) for value in (
+                closure[-1].get("minimum_packed_unclassified_bound"),
+                closure[-1].get("minimum_native_pruned_bound"),
+            ) if value is not None
+        ] if closure else []
+    )
+    expected_next = min(final_minima) if final_minima else None
+    if closure and not all((
+        previous_native == int(accounting.get("native_bound_evaluated", -1)),
+        previous_exact == int(accounting.get("exact_dtw_evaluated", -1)),
+        previous_resulting_threshold == float(certificate.get("stop_threshold")),
+        expected_next == certificate.get("next_lower_bound"),
+    )):
+        return False
     final = attempts[-1]
     certificate_next = certificate.get("next_lower_bound")
     return all((
@@ -209,7 +262,9 @@ def _case_gates(
     stopped_early = bool(certificate.get("stopped_early"))
     stopping = (
         stopped_early and next_bound is not None
-        and float(next_bound) > float(certificate.get("stop_threshold"))
+        and float(next_bound) > (
+            float(certificate.get("stop_threshold")) + BOUND_TOLERANCE
+        )
     ) or (
         not stopped_early and int(certificate.get("safely_pruned", -1)) == 0
     )
@@ -295,13 +350,8 @@ def _certified_with_overflow_recovery(
     generation_id: str, controls: dict[str, Any], packed_query: PackedBoundQuery,
     primary_proposal: Any,
 ) -> tuple[Any, list[dict[str, Any]], float, Any, list[dict[str, Any]]]:
-    """Escalate only the operational frontier; exact semantics stay unchanged."""
+    """Use one retained prefix followed by exact streamed threshold closure."""
     primary_limit = int(controls["maximum_frontier_rows"])
-    frontier_limit = primary_limit
-    proposal = primary_proposal
-    recovery_proposal_seconds = 0.0
-    attempts: list[dict[str, Any]] = []
-    attempt_measurements: list[dict[str, Any]] = []
     common = {
         "store_dataset_id": "nasdaq",
         "seed_rows": int(controls["seed_rows"]),
@@ -313,66 +363,35 @@ def _certified_with_overflow_recovery(
         "vector_lower_bounds": True,
         "deferred_alignments": True,
         "compact_scored": True,
+        "native_bound_deferral": True,
+        "streaming_threshold_closure": True,
+        "branch_aware_packed_bounds": True,
     }
-    while True:
-        initial = int(controls["initial_frontier_rows"])
-        attempt_started = perf_counter()
-        try:
-            result = certified_packed_search(
-                episode, source, request, full_root / "store", generation_id,
-                initial_frontier_rows=initial,
-                maximum_frontier_rows=frontier_limit,
-                precomputed_proposal=proposal,
-                **common,
-            )
-        except CertifiedFrontierOverflow as exc:
-            attempt_measurements.append({
-                "maximum_frontier_rows": frontier_limit,
-                "elapsed_seconds": perf_counter() - attempt_started,
-                "status": "overflow",
-            })
-            attempts.append({
-                "maximum_frontier_rows": frontier_limit,
-                "proposal_result_digest": proposal.result_digest,
-                "exact_evaluated": exc.exact_evaluated,
-                "stop_threshold_hex": exc.stop_threshold.hex(),
-                "next_lower_bound_hex": (
-                    exc.next_lower_bound.hex()
-                    if exc.next_lower_bound is not None else None
-                ),
-                "status": "overflow",
-            })
-            eligible = int(proposal.eligible_rows)
-            if frontier_limit >= eligible:
-                raise RuntimeError(
-                    "certified search reported frontier overflow at eligible exhaustion"
-                ) from exc
-            frontier_limit = min(eligible, frontier_limit * 2)
-            recovery = scan_packed_bound_proposals_many(
-                full_root / "store", generation_id, [packed_query],
-                route_quotas={"composite": frontier_limit + 1},
-                block_rows=int(controls["block_rows"]), verify_content=False,
-            )
-            recovery_proposal_seconds += float(recovery.elapsed_seconds)
-            proposal = recovery.reports[0]
-            continue
-        attempts.append({
-            "maximum_frontier_rows": frontier_limit,
-            "proposal_result_digest": proposal.result_digest,
-            "exact_evaluated": result.certificate.exact_evaluated,
-            "stop_threshold_hex": result.certificate.stop_threshold.hex(),
-            "next_lower_bound_hex": (
-                result.certificate.next_lower_bound.hex()
-                if result.certificate.next_lower_bound is not None else None
-            ),
-            "status": "certified",
-        })
-        attempt_measurements.append({
-            "maximum_frontier_rows": frontier_limit,
-            "elapsed_seconds": perf_counter() - attempt_started,
-            "status": "certified",
-        })
-        return result, attempts, recovery_proposal_seconds, proposal, attempt_measurements
+    attempt_started = perf_counter()
+    result = certified_packed_search(
+        episode, source, request, full_root / "store", generation_id,
+        initial_frontier_rows=int(controls["initial_frontier_rows"]),
+        maximum_frontier_rows=primary_limit,
+        precomputed_proposal=primary_proposal,
+        **common,
+    )
+    attempts = [{
+        "maximum_frontier_rows": primary_limit,
+        "proposal_result_digest": primary_proposal.result_digest,
+        "exact_evaluated": result.certificate.exact_evaluated,
+        "stop_threshold_hex": result.certificate.stop_threshold.hex(),
+        "next_lower_bound_hex": (
+            result.certificate.next_lower_bound.hex()
+            if result.certificate.next_lower_bound is not None else None
+        ),
+        "status": "certified",
+    }]
+    measurements = [{
+        "maximum_frontier_rows": primary_limit,
+        "elapsed_seconds": perf_counter() - attempt_started,
+        "status": "certified",
+    }]
+    return result, attempts, 0.0, primary_proposal, measurements
 
 
 def _worker(
@@ -413,7 +432,8 @@ def _worker(
     proposal = scan_packed_bound_proposals_many(
         Path(full_root) / "store", generation_id, packed_queries,
         route_quotas={"composite": int(controls["maximum_frontier_rows"]) + 1},
-        block_rows=int(controls["block_rows"]), verify_content=False,
+        block_rows=int(controls["block_rows"]), branch_aware=True,
+        verify_content=False,
     )
     completed = []
     for case, episode, request, packed_query, query_proposal in zip(
@@ -452,7 +472,9 @@ def _worker(
                 float(proposal.elapsed_seconds) / len(cases) + recovery_seconds
             ),
             "frontier_attempts": attempts,
-            "frontier_overflow_recovery": len(attempts) > 1,
+            "streaming_threshold_closure_used": bool(
+                certificate.get("threshold_closure_passes")
+            ),
             "frontier_limit_rows": attempts[-1]["maximum_frontier_rows"],
             "frontier_attempt_measurements": attempt_measurements,
             "matches": matches, "certificate": certificate,
@@ -476,7 +498,7 @@ def _worker(
             f"[authority:{case['case_id']}] "
             f"{'PASS' if payload['gate_passed'] else 'FAIL'} "
             f"exact={exact_seconds:.2f}s rows={certificate['exact_evaluated']} "
-            f"recovery={len(attempts) > 1}",
+            f"closure={bool(certificate.get('threshold_closure_passes'))}",
             flush=True,
         )
         if not payload["gate_passed"]:
@@ -528,6 +550,7 @@ def main() -> int:
     parser.add_argument("--registry", type=Path, required=True)
     parser.add_argument("--full-root", type=Path, required=True)
     parser.add_argument("--authority-root", type=Path, required=True)
+    parser.add_argument("--branch-bound-root", type=Path, required=True)
     parser.add_argument("--processes", type=int, default=8)
     args = parser.parse_args()
     config = load_config(args.config)
@@ -560,6 +583,9 @@ def main() -> int:
         args.full_root / "store", generation_id,
         verify_content=True, validate_records=False,
     )
+    branch_bound_evidence = validated_branch_bound_evidence(
+        args.branch_bound_root,
+    )
     controls = dict(registry["search_contract"]["controls"])
     if args.processes != int(controls["processes"]):
         raise ValueError("authority process count differs from frozen execution control")
@@ -567,6 +593,8 @@ def main() -> int:
     execution_search_contract = certified_packed_search_contract(
         requested_positions=True, vector_lower_bounds=True,
         deferred_alignments=True, compact_scored=True,
+        native_bound_deferral=True, streaming_threshold_closure=True,
+        branch_aware_packed_bounds=True,
     )
     contract: dict[str, Any] = {
         "schema_version": CONTRACT_SCHEMA,
@@ -575,6 +603,13 @@ def main() -> int:
         "full_build_evidence_digest": build["result_digest"],
         "search_contract": registry["search_contract"],
         "certified_execution_contract": execution_search_contract,
+        "branch_bound_evidence": branch_bound_evidence,
+        "primary_proposal_contract": packed_bound_search_contract(
+            branch_aware=True,
+        ),
+        "threshold_scan_contract": packed_bound_threshold_scan_contract(
+            branch_aware=True,
+        ),
         "controls": controls,
         "frontier_overflow_policy": _overflow_policy(
             int(controls["maximum_frontier_rows"]),
@@ -617,9 +652,13 @@ def main() -> int:
             matrix.get("contract_digest") == contract["contract_digest"],
             matrix.get("registry_digest") == contract["registry_digest"],
             matrix.get("generation_id") == contract["generation_id"],
+            matrix.get("branch_bound_evidence_digest")
+            == contract["branch_bound_evidence"]["digest"],
             matrix.get("completed_cases") == 60,
             matrix.get("gate_passed") is True,
             seal.get("authority_cases") == 60,
+            seal.get("branch_bound_evidence_digest")
+            == contract["branch_bound_evidence"]["digest"],
             seal.get("authority_correctness_sealed") is True,
             seal.get("seal_scope") == "exact authority correctness only",
             seal.get("performance_gate_passed")
@@ -706,6 +745,7 @@ def main() -> int:
         "contract_digest": contract["contract_digest"],
         "registry_digest": registry["registry_digest"],
         "generation_id": generation_id,
+        "branch_bound_evidence_digest": branch_bound_evidence["digest"],
         "cases": [{
             "registry_case_id": case["registry_case_id"],
             "query_episode_id": case["query_episode_id"],
@@ -736,8 +776,8 @@ def main() -> int:
             [float(case["peak_rss_mb"]) for case in ordered],
             default=0.0,
         ),
-        "frontier_overflow_recovery_cases": sum(
-            bool(case.get("frontier_overflow_recovery")) for case in ordered
+        "streaming_threshold_closure_cases": sum(
+            bool(case.get("streaming_threshold_closure_used")) for case in ordered
         ),
         "worker_failures": worker_failures,
         "elapsed_seconds": perf_counter() - started,
@@ -777,6 +817,7 @@ def main() -> int:
             "schema_version": SEAL_SCHEMA,
             "contract_digest": contract["contract_digest"],
             "registry_digest": registry["registry_digest"],
+            "branch_bound_evidence_digest": branch_bound_evidence["digest"],
             "authority_matrix_digest": matrix["result_digest"],
             "measurement_integrity_digest": matrix["measurement_integrity_digest"],
             "authority_cases": 60,

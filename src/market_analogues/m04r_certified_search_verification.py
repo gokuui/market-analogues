@@ -80,6 +80,17 @@ def _certificate_digest(run: dict[str, Any]) -> str:
         } for match in matches],
         "real_forward_outcomes_accessed": False,
     }
+    if certificate.get("native_bound_accounting") is not None:
+        deterministic["native_bound_accounting"] = certificate.get(
+            "native_bound_accounting"
+        )
+        minimum_native = certificate.get("minimum_native_pruned_bound")
+        deterministic["minimum_native_pruned_bound_hex"] = (
+            float(minimum_native).hex() if minimum_native is not None else None
+        )
+        deterministic["threshold_closure_passes"] = certificate.get(
+            "threshold_closure_passes"
+        ) or []
     return stable_hash(deterministic)
 
 
@@ -252,7 +263,8 @@ def verify_m04r_certified_packed_search(
         stopping &= all((
             len(matches) == 20,
             certificate.get("stopped_early") is True,
-            next_bound is not None and float(next_bound) > threshold,
+            next_bound is not None
+            and float(next_bound) > threshold + BOUND_TOLERANCE,
             bool(rounds) and rounds[-1].get("certified") is True,
             int(rounds[-1].get("selected_rows", -1)) == len(matches),
             float(rounds[-1].get("constrained_threshold", float("inf")))

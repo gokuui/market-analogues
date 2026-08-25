@@ -41,7 +41,7 @@ def _fixture(module):
         "alignment": [[0, 0]], "quality_tier": "A",
     } for index in range(20)]
     certificate = {
-        "schema_version": "m04r-certified-packed-search-v5",
+        "schema_version": "m04r-certified-packed-search-v8",
         "contract_digest": "certified-contract", "generation_id": "generation",
         "query_episode_id": case["episode_id"], "input_digest": "input",
         "eligible_candidates": 100, "exact_evaluated": 20, "safely_pruned": 80,
@@ -54,6 +54,12 @@ def _fixture(module):
             "selected_rows": 20, "certified": True,
             "proposal_digest": "prefix",
         }],
+        "native_bound_accounting": {
+            "native_bound_evaluated": 20, "exact_dtw_evaluated": 20,
+            "native_bound_pruned": 0, "packed_bound_pruned": 80,
+        },
+        "minimum_native_pruned_bound": None,
+        "threshold_closure_passes": [],
     }
     certificate["result_digest"] = _certificate_digest({
         "certificate": certificate, "matches": matches,
@@ -89,7 +95,7 @@ def _fixture(module):
             "stop_threshold_hex": (.5).hex(),
             "next_lower_bound_hex": (.6).hex(), "status": "certified",
         }],
-        "frontier_overflow_recovery": False,
+        "streaming_threshold_closure_used": False,
         "frontier_limit_rows": 32_768,
     }
     payload["gates"]["frontier_execution_policy"] = module._frontier_execution_valid(
@@ -143,53 +149,66 @@ def test_frontier_execution_policy_rejects_skipped_or_rebound_attempts() -> None
     module = _module()
     _, _, _, contract, payload = _fixture(module)
     assert module._frontier_execution_valid(payload, contract)
-    payload["certificate"]["eligible_candidates"] = 100_000
     payload["frontier_attempts"] = [{
         "maximum_frontier_rows": 65_536,
         "proposal_result_digest": "recovery", "exact_evaluated": 20,
         "stop_threshold_hex": (.5).hex(),
         "next_lower_bound_hex": (.6).hex(), "status": "certified",
     }]
-    payload["frontier_overflow_recovery"] = True
     payload["frontier_limit_rows"] = 65_536
     assert not module._frontier_execution_valid(payload, contract)
-    payload["frontier_attempts"].insert(0, {
+    payload["frontier_attempts"] = [{
         "maximum_frontier_rows": 32_768,
-        "proposal_result_digest": "proposal", "exact_evaluated": 32_768,
-        "stop_threshold_hex": (.7).hex(),
-        "next_lower_bound_hex": (.6).hex(), "status": "overflow",
-    })
-    payload["certificate"]["rounds"][0]["frontier_rows"] = 65_536
+        "proposal_result_digest": "proposal", "exact_evaluated": 20,
+        "stop_threshold_hex": (.5).hex(),
+        "next_lower_bound_hex": (.6).hex(), "status": "certified",
+    }]
+    payload["frontier_limit_rows"] = 32_768
+    payload["certificate"]["rounds"][-1]["frontier_rows"] = 32_768
+    payload["certificate"]["eligible_candidates"] = 40_000
+    payload["certificate"]["safely_pruned"] = 39_980
+    payload["certificate"]["native_bound_accounting"] = {
+        "native_bound_evaluated": 32_778, "exact_dtw_evaluated": 20,
+        "native_bound_pruned": 32_758, "packed_bound_pruned": 7_222,
+    }
+    payload["certificate"]["threshold_closure_passes"] = [{
+        "lower_exclusive": None, "upper_inclusive": .5 + module.BOUND_TOLERANCE,
+        "admitted_rows": 10, "cumulative_native_bound_evaluated": 32_778,
+        "cumulative_exact_dtw_evaluated": 20, "selected_rows": 20,
+        "resulting_threshold": .5,
+        "minimum_packed_unclassified_bound": .6,
+        "minimum_native_pruned_bound": None,
+        "excluded_prefix_digest": "prefix-set",
+        "admitted_set_digest": "set", "scan_result_digest": "scan",
+        "certified": True,
+    }]
+    payload["streaming_threshold_closure_used"] = True
     assert module._frontier_execution_valid(payload, contract)
-    payload["frontier_attempts"][0]["status"] = "certified"
+    payload["certificate"]["threshold_closure_passes"][0]["resulting_threshold"] = .55
+    assert not module._frontier_execution_valid(payload, contract)
+    payload["certificate"]["threshold_closure_passes"][0]["resulting_threshold"] = .5
+    payload["certificate"]["threshold_closure_passes"][0]["upper_inclusive"] = .4
+    assert not module._frontier_execution_valid(payload, contract)
+    payload["certificate"]["threshold_closure_passes"][0]["upper_inclusive"] = (
+        .5 + module.BOUND_TOLERANCE
+    )
+    payload["certificate"]["threshold_closure_passes"][0]["certified"] = False
     assert not module._frontier_execution_valid(payload, contract)
 
 
-def test_overflow_recovery_doubles_and_preserves_exact_search(monkeypatch) -> None:
+def test_streaming_closure_runs_once_and_preserves_exact_search(monkeypatch) -> None:
     module = _module()
     primary = SimpleNamespace(result_digest="primary", eligible_rows=100_000)
-    recovered = SimpleNamespace(result_digest="recovered", eligible_rows=100_000)
     calls = []
 
     def search(*args, **kwargs):
-        calls.append(kwargs["maximum_frontier_rows"])
-        if kwargs["maximum_frontier_rows"] == 32_768:
-            raise module.CertifiedFrontierOverflow(
-                frontier_rows=32_768, eligible_candidates=100_000,
-                exact_evaluated=32_768, stop_threshold=.7,
-                next_lower_bound=.6,
-            )
+        calls.append(kwargs)
         certificate = SimpleNamespace(
             exact_evaluated=40_000, stop_threshold=.5, next_lower_bound=.6,
         )
         return SimpleNamespace(name="exact-result", certificate=certificate)
 
-    def scan(*args, **kwargs):
-        assert kwargs["route_quotas"] == {"composite": 65_537}
-        return SimpleNamespace(reports=[recovered], elapsed_seconds=3.5)
-
     monkeypatch.setattr(module, "certified_packed_search", search)
-    monkeypatch.setattr(module, "scan_packed_bound_proposals_many", scan)
     controls = {
         "initial_frontier_rows": 16_384, "maximum_frontier_rows": 32_768,
         "seed_rows": 512, "block_rows": 4_096,
@@ -202,32 +221,28 @@ def test_overflow_recovery_doubles_and_preserves_exact_search(monkeypatch) -> No
         )
     )
     assert result.name == "exact-result"
-    assert proposal is recovered
-    assert seconds == 3.5
-    assert calls == [32_768, 65_536]
-    assert [row["status"] for row in measurements] == ["overflow", "certified"]
+    assert proposal is primary
+    assert seconds == 0.0
+    assert len(calls) == 1
+    assert calls[0]["maximum_frontier_rows"] == 32_768
+    assert calls[0]["native_bound_deferral"] is True
+    assert calls[0]["streaming_threshold_closure"] is True
+    assert calls[0]["branch_aware_packed_bounds"] is True
+    assert [row["status"] for row in measurements] == ["certified"]
     assert attempts == [
         {"maximum_frontier_rows": 32_768,
-         "proposal_result_digest": "primary", "exact_evaluated": 32_768,
-         "stop_threshold_hex": (.7).hex(), "next_lower_bound_hex": (.6).hex(),
-         "status": "overflow"},
-        {"maximum_frontier_rows": 65_536,
-         "proposal_result_digest": "recovered", "exact_evaluated": 40_000,
+         "proposal_result_digest": "primary", "exact_evaluated": 40_000,
          "stop_threshold_hex": (.5).hex(), "next_lower_bound_hex": (.6).hex(),
          "status": "certified"},
     ]
 
 
-def test_overflow_at_eligible_exhaustion_fails_closed(monkeypatch) -> None:
+def test_streaming_closure_failure_propagates_closed(monkeypatch) -> None:
     module = _module()
     proposal = SimpleNamespace(result_digest="primary", eligible_rows=32_768)
 
     def search(*args, **kwargs):
-        raise module.CertifiedFrontierOverflow(
-            frontier_rows=32_768, eligible_candidates=32_768,
-            exact_evaluated=32_768, stop_threshold=.7,
-            next_lower_bound=None,
-        )
+        raise RuntimeError("streaming closure failed closed")
 
     monkeypatch.setattr(module, "certified_packed_search", search)
     controls = {
@@ -241,9 +256,9 @@ def test_overflow_at_eligible_exhaustion_fails_closed(monkeypatch) -> None:
             controls, object(), proposal,
         )
     except RuntimeError as exc:
-        assert "eligible exhaustion" in str(exc)
+        assert "failed closed" in str(exc)
     else:
-        raise AssertionError("eligible-exhaustion overflow must fail closed")
+        raise AssertionError("streaming closure failure must propagate")
 
 
 def test_independent_verifier_agrees_on_manifest_and_frontier_policy() -> None:

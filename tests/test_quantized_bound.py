@@ -14,13 +14,23 @@ from market_analogues.exact_aligned_features import SAMPLES_48_NAMES
 from market_analogues.quantized_bound import (
     ERROR_VALUE_COUNT, FLOAT16_MAX, PACKED_ROW_BYTES, QuantizedBoundError,
     _joined_iqr_compiled, _joined_iqr_sorted_compiled,
+    branch_aware_prepared_quantized_array_lower_bounds,
+    branch_aware_quantized_batch_lower_bounds,
+    branch_aware_quantized_bound_contract,
+    branch_aware_quantized_representation_lower_bound,
     prepare_quantized_bound_arrays, prepared_quantized_array_lower_bounds,
     quantize_bound_row, quantized_batch_lower_bounds, quantized_bound_contract,
     quantized_representation_lower_bound,
 )
-from market_analogues.quantized_bound_reference import reference_quantized_lower_bound
+from market_analogues.quantized_bound_reference import (
+    reference_branch_aware_quantized_lower_bound,
+    reference_quantized_lower_bound,
+)
 from market_analogues.m04r_quantized_verification import (
     verify_m04r_quantized_bound, write_m04r_quantized_verification,
+)
+from market_analogues.m04r_branch_bound_evidence import (
+    validated_branch_bound_evidence,
 )
 from market_analogues.representation import Representation, represent
 from market_analogues.synthetic import FAMILIES, generate_case
@@ -31,6 +41,8 @@ def _assert_safe(query: Representation, candidate: Representation) -> None:
     row = quantize_bound_row(candidate)
     production = quantized_representation_lower_bound(query, row)
     reference = reference_quantized_lower_bound(query, row)
+    branch = branch_aware_quantized_representation_lower_bound(query, row)
+    branch_reference = reference_branch_aware_quantized_lower_bound(query, row)
     native_total, native_components, _ = representation_distance_lower_bound(
         query, candidate,
     )
@@ -45,6 +57,17 @@ def _assert_safe(query: Representation, candidate: Representation) -> None:
         assert native_components[name] <= exact_components[name] + 1e-12
     assert production.total <= native_total + 1e-12
     assert native_total <= exact_total + 1e-12
+    assert branch.total == pytest.approx(
+        branch_reference.total, abs=2e-12, rel=2e-12,
+    )
+    assert branch.total + 1e-12 >= production.total
+    assert branch.total <= native_total + 1e-12
+    for name in branch.components:
+        assert branch.components[name] == pytest.approx(
+            branch_reference.components[name], abs=2e-12, rel=2e-12,
+        )
+        assert branch.components[name] + 1e-12 >= production.components[name]
+        assert branch.components[name] <= native_components[name] + 1e-12
 
 
 def test_quantized_bound_contract_and_complete_row_projection_are_frozen() -> None:
@@ -53,6 +76,9 @@ def test_quantized_bound_contract_and_complete_row_projection_are_frozen() -> No
     assert contract["stored_fields"]["error_radii"][0] == ERROR_VALUE_COUNT == 41
     assert contract["outcomes_or_labels_used"] is False
     assert contract["digest"] == "692e5f40b79397245d65604268c314790347fd0db124ddf985e8367ad36690d1"
+    branch = branch_aware_quantized_bound_contract()
+    assert branch["stored_row_contract_digest"] == contract["digest"]
+    assert branch["outcomes_or_labels_used"] is False
 
 
 def test_quantized_bound_matches_independent_reference_and_is_safe_for_all_families() -> None:
@@ -66,13 +92,23 @@ def test_quantized_bound_matches_independent_reference_and_is_safe_for_all_famil
     query = representations[0]
     rows = [quantize_bound_row(candidate) for candidate in representations]
     batch = quantized_batch_lower_bounds(query, rows)
+    branch_batch = branch_aware_quantized_batch_lower_bounds(query, rows)
     for index, row in enumerate(rows):
         scalar = quantized_representation_lower_bound(query, row)
+        branch_scalar = branch_aware_quantized_representation_lower_bound(
+            query, row,
+        )
         assert batch.totals[index] == pytest.approx(scalar.total, abs=2e-12)
         for name in scalar.components:
             assert batch.components[name][index] == pytest.approx(
                 scalar.components[name], abs=2e-12,
             )
+            assert branch_batch.components[name][index] == pytest.approx(
+                branch_scalar.components[name], abs=2e-12,
+            )
+        assert branch_batch.totals[index] == pytest.approx(
+            branch_scalar.total, abs=2e-12,
+        )
 
 
 def test_compiled_joined_iqr_exactly_matches_combined_percentiles() -> None:
@@ -128,6 +164,11 @@ def test_prepared_candidate_arrays_are_query_reusable_and_exact() -> None:
             query, prepared.select(np.asarray([True, False, True, False])),
         )
         np.testing.assert_array_equal(selected.totals, expected.totals[[0, 2]])
+        branch_expected = branch_aware_quantized_batch_lower_bounds(query, rows)
+        branch_actual = branch_aware_prepared_quantized_array_lower_bounds(
+            query, prepared,
+        )
+        np.testing.assert_array_equal(branch_actual.totals, branch_expected.totals)
     with pytest.raises(QuantizedBoundError, match="selection shape differs"):
         prepared.select(np.asarray([True, False]))
 
@@ -252,6 +293,45 @@ def test_evidence_verifier_is_digest_bound_and_writes_deterministically(
     first = [path.read_bytes() for path in paths]
     write_m04r_quantized_verification(result, output)
     assert [path.read_bytes() for path in paths] == first
+
+    branch_contract_digest = branch_aware_quantized_bound_contract()["digest"]
+    million["schema_version"] = "m04r-quantized-bound-million-gate-v2"
+    million["contract_digest"] = branch_contract_digest
+    million.pop("result_digest")
+    million["result_digest"] = stable_hash(million)
+    authority["schema_version"] = "m04r-quantized-bound-authority-gate-v2"
+    authority["contract_digest"] = branch_contract_digest
+    authority.pop("result_digest")
+    authority["result_digest"] = stable_hash(authority)
+    million_path.write_text(json.dumps(million))
+    authority_path.write_text(json.dumps(authority))
+    branch_result = verify_m04r_quantized_bound(
+        million_path, authority_path, branch_aware=True,
+    )
+    assert branch_result.passed
+    assert branch_result.metrics["schema_version"].endswith("v2")
+
+    prerequisite = tmp_path / "prerequisite"
+    prerequisite.mkdir()
+    prerequisite_million = prerequisite / "million-pair-gate.json"
+    prerequisite_authority = prerequisite / "authority-gate.json"
+    prerequisite_million.write_text(json.dumps(million))
+    prerequisite_authority.write_text(json.dumps(authority))
+    write_m04r_quantized_verification(
+        branch_result, prerequisite / "verification",
+    )
+    bound = validated_branch_bound_evidence(prerequisite)
+    assert bound["million_result_digest"] == million["result_digest"]
+    assert bound["authority_result_digest"] == authority["result_digest"]
+    assert bound["real_forward_outcomes_accessed"] is False
+    verification_path = (
+        prerequisite / "verification" / "m04r-quantized-bound.json"
+    )
+    verification = json.loads(verification_path.read_text())
+    verification["passed"] = False
+    verification_path.write_text(json.dumps(verification))
+    with pytest.raises(ValueError, match="verification differs"):
+        validated_branch_bound_evidence(prerequisite)
 
     million["violations"] = 1
     million_path.write_text(json.dumps(million))

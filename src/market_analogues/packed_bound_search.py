@@ -1,24 +1,32 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from hashlib import sha256
 import os
 from pathlib import Path
 import resource
 from time import perf_counter
-from typing import Any, Iterable, Mapping
+from typing import AbstractSet, Any, Callable, Iterable, Mapping
 
 import numpy as np
 
 from .packed_bound_store import (
-    PACK_DTYPE, TIER_CODES, load_packed_generation, packed_lower_bounds,
-    prepare_packed_lower_bound_records, prepared_packed_lower_bounds,
+    PACK_DTYPE, TIER_CODES, TIER_NAMES, load_packed_generation, packed_lower_bounds,
+    packed_branch_aware_lower_bounds,
+    packed_bound_store_contract, prepare_packed_lower_bound_records,
+    prepared_packed_branch_aware_lower_bounds, prepared_packed_lower_bounds,
 )
+from .quantized_bound import branch_aware_quantized_bound_contract
 from .representation import Representation
 from .types import stable_hash
 
 
 SEARCH_SCHEMA_VERSION = "m04r-global-bound-proposal-v1"
+BRANCH_AWARE_SEARCH_SCHEMA_VERSION = "m04r-global-bound-proposal-v2"
 BATCH_SEARCH_SCHEMA_VERSION = "m04r-global-bound-proposal-batch-v1"
+BATCH_BRANCH_AWARE_SEARCH_SCHEMA_VERSION = "m04r-global-bound-proposal-batch-v2"
+THRESHOLD_SCAN_SCHEMA_VERSION = "m04r-packed-bound-threshold-scan-v1"
+BRANCH_AWARE_THRESHOLD_SCAN_SCHEMA_VERSION = "m04r-packed-bound-threshold-scan-v2"
 DEFAULT_ROUTE_QUOTAS: dict[str, int] = {
     # The composite route is the only authority-certified recall route.  The
     # component routes are additive proposal seeds and never replace it.
@@ -94,6 +102,8 @@ class BoundProposalReport:
     peak_rss_mb: float
     candidate_digest: str
     result_digest: str
+    contract_digest: str | None = None
+    input_digest: str | None = None
 
 
 @dataclass(frozen=True)
@@ -104,6 +114,33 @@ class BoundProposalBatchReport:
     reports: tuple[BoundProposalReport, ...]
     physical_rows_scanned: int
     logical_rows_evaluated: int
+    block_rows: int
+    block_order: str
+    elapsed_seconds: float
+    peak_rss_mb: float
+    result_digest: str
+
+
+@dataclass(frozen=True)
+class BoundThresholdScanReport:
+    """Evidence for one streamed inclusive packed-bound admission band."""
+
+    schema_version: str
+    contract_digest: str
+    generation_id: str
+    query_episode_id: str
+    input_digest: str
+    exclusions_digest: str
+    lower_exclusive: float | None
+    upper_inclusive: float
+    rows_scanned: int
+    eligible_rows: int
+    eligible_main_rows: int
+    eligible_overflow_rows: int
+    excluded_eligible_rows: int
+    admitted_rows: int
+    minimum_above_upper: float | None
+    admitted_set_digest: str
     block_rows: int
     block_order: str
     elapsed_seconds: float
@@ -122,9 +159,12 @@ _ENTRY_DTYPE = np.dtype([
 ])
 
 
-def packed_bound_search_contract() -> dict[str, Any]:
+def packed_bound_search_contract(*, branch_aware: bool = False) -> dict[str, Any]:
     payload: dict[str, Any] = {
-        "schema_version": SEARCH_SCHEMA_VERSION,
+        "schema_version": (
+            BRANCH_AWARE_SEARCH_SCHEMA_VERSION
+            if branch_aware else SEARCH_SCHEMA_VERSION
+        ),
         "eligibility": (
             "quality tier before scoring; cutoff <= latest eligible cutoff; "
             "same-symbol windows intersecting the query are excluded; query ID excluded"
@@ -146,14 +186,27 @@ def packed_bound_search_contract() -> dict[str, Any]:
         "default_route_quotas": DEFAULT_ROUTE_QUOTAS,
         "outcomes_or_labels_used": False,
     }
+    if branch_aware:
+        payload["branch_aware_bound_contract_digest"] = (
+            branch_aware_quantized_bound_contract()["digest"]
+        )
+        payload["query_binding"] = (
+            "result report binds the complete packed-query identity, eligibility "
+            "range, tiers and exact representation arrays"
+        )
     payload["digest"] = stable_hash(payload)
     return payload
 
 
-def packed_bound_batch_search_contract() -> dict[str, Any]:
+def packed_bound_batch_search_contract(*, branch_aware: bool = False) -> dict[str, Any]:
     payload: dict[str, Any] = {
-        "schema_version": BATCH_SEARCH_SCHEMA_VERSION,
-        "scalar_contract_digest": packed_bound_search_contract()["digest"],
+        "schema_version": (
+            BATCH_BRANCH_AWARE_SEARCH_SCHEMA_VERSION
+            if branch_aware else BATCH_SEARCH_SCHEMA_VERSION
+        ),
+        "scalar_contract_digest": packed_bound_search_contract(
+            branch_aware=branch_aware,
+        )["digest"],
         "io": "each physical pack block is read once and offered to every query",
         "query_isolation": (
             "eligibility, bounded route heaps, row accounting, candidate ordering "
@@ -164,6 +217,60 @@ def packed_bound_batch_search_contract() -> dict[str, Any]:
     }
     payload["digest"] = stable_hash(payload)
     return payload
+
+
+def packed_bound_threshold_scan_contract(*, branch_aware: bool = False) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "schema_version": (
+            BRANCH_AWARE_THRESHOLD_SCAN_SCHEMA_VERSION
+            if branch_aware else THRESHOLD_SCAN_SCHEMA_VERSION
+        ),
+        "packed_store_contract_digest": packed_bound_store_contract()["digest"],
+        "eligibility": packed_bound_search_contract(
+            branch_aware=branch_aware,
+        )["eligibility"],
+        "band": "strict lower-exclusive and inclusive upper; all upper ties admitted",
+        "overflow": "universal bound zero; streamed in bounded blocks",
+        "set_commitment": (
+            "count plus xor and modular sum of unique SHA-256 row commitments; "
+            "generation integrity independently guarantees unique episode IDs"
+        ),
+        "outcomes_or_labels_used": False,
+    }
+    if branch_aware:
+        payload["branch_aware_bound_contract_digest"] = (
+            branch_aware_quantized_bound_contract()["digest"]
+        )
+    payload["digest"] = stable_hash(payload)
+    return payload
+
+
+def _packed_query_input_digest(query: PackedBoundQuery) -> str:
+    digest = sha256()
+    representation = query.representation
+    for name, values in (
+        ("coarse", representation.coarse),
+        ("stage", representation.stage),
+        ("structural", representation.structural),
+    ):
+        digest.update(name.encode())
+        digest.update(np.asarray(values, dtype="<f8").tobytes())
+    for name in sorted(representation.samples_48):
+        digest.update(name.encode())
+        values = representation.samples_48[name]
+        if values is None:
+            digest.update(b"\0")
+        else:
+            digest.update(b"\1")
+            digest.update(np.asarray(values, dtype="<f8").tobytes())
+    return stable_hash({
+        "episode_id": query.episode_id,
+        "symbol": query.symbol,
+        "query_start_ns": query.query_start_ns,
+        "latest_eligible_ns": query.latest_eligible_ns,
+        "quality_tiers": query.quality_tiers,
+        "packed_bound_representation_sha256": digest.hexdigest(),
+    })
 
 
 def _current_rss_mb() -> float:
@@ -305,6 +412,7 @@ def scan_packed_bound_proposals(
     route_quotas: Mapping[str, int] | None = None,
     block_rows: int = 2_048,
     block_order: str = "forward",
+    branch_aware: bool = False,
     verify_content: bool = True,
     expected_provenance_digest: str | None = None,
 ) -> BoundProposalReport:
@@ -350,7 +458,13 @@ def scan_packed_bound_proposals(
             selected = block[_eligible_mask(block, query, symbol_id)]
             eligible_main += len(selected)
             if len(selected):
-                bounded = packed_lower_bounds(query.representation, selected)
+                bounded = (
+                    packed_branch_aware_lower_bounds(
+                        query.representation, selected,
+                    )
+                    if branch_aware else
+                    packed_lower_bounds(query.representation, selected)
+                )
                 route_values = {"composite": bounded.totals, **bounded.components}
                 for route, quota in quotas.items():
                     incoming = _entries(
@@ -371,9 +485,17 @@ def scan_packed_bound_proposals(
             heaps[route] = _stable_bounded(heaps[route], incoming, quota)
     candidates, route_counts, candidate_digest = _finalize(heaps, loaded.symbols)
     elapsed = perf_counter() - started
+    schema_version = (
+        BRANCH_AWARE_SEARCH_SCHEMA_VERSION
+        if branch_aware else SEARCH_SCHEMA_VERSION
+    )
+    contract_digest = packed_bound_search_contract(
+        branch_aware=branch_aware,
+    )["digest"]
+    input_digest = _packed_query_input_digest(query) if branch_aware else None
     deterministic = {
-        "schema_version": SEARCH_SCHEMA_VERSION,
-        "contract_digest": packed_bound_search_contract()["digest"],
+        "schema_version": schema_version,
+        "contract_digest": contract_digest,
         "generation_id": loaded.generation_id,
         "query_episode_id": query.episode_id,
         "rows_scanned": len(loaded.rows) + len(loaded.overflow),
@@ -385,11 +507,221 @@ def scan_packed_bound_proposals(
         "candidate_digest": candidate_digest,
         "real_forward_outcomes_accessed": False,
     }
+    if branch_aware:
+        deterministic["input_digest"] = input_digest
     return BoundProposalReport(
-        SEARCH_SCHEMA_VERSION, loaded.generation_id, query.episode_id,
+        schema_version, loaded.generation_id, query.episode_id,
         candidates, deterministic["rows_scanned"], deterministic["eligible_rows"],
         eligible_main, eligible_overflow, route_counts, quotas, block_rows,
         block_order, elapsed, peak, candidate_digest, stable_hash(deterministic),
+        contract_digest if branch_aware else None, input_digest,
+    )
+
+
+def scan_packed_bound_threshold(
+    store_root: Path,
+    generation_id: str,
+    query: PackedBoundQuery,
+    *,
+    upper_inclusive: float,
+    consume: Callable[[tuple[BoundProposal, ...]], None],
+    lower_exclusive: float | None = None,
+    excluded_episode_ids: AbstractSet[str] = frozenset(),
+    block_rows: int = 2_048,
+    block_order: str = "forward",
+    branch_aware: bool = False,
+    verify_content: bool = True,
+    expected_provenance_digest: str | None = None,
+) -> BoundThresholdScanReport:
+    """Stream every eligible row in ``(lower, upper]`` without a global heap.
+
+    The callback bounds live proposal memory to one physical pack block.  The
+    admitted-set digest is deliberately independent of block size and scan
+    direction so a verifier can classify the same immutable generation through
+    a different traversal.  ``excluded_episode_ids`` is intended only for a
+    previously certified prefix; later closure bands use ``lower_exclusive``.
+    """
+    if block_rows < 1:
+        raise PackedBoundSearchError("block rows must be positive")
+    if block_order not in {"forward", "reverse"}:
+        raise PackedBoundSearchError("block order must be forward or reverse")
+    if not callable(consume):
+        raise PackedBoundSearchError("threshold consumer must be callable")
+    upper = float(upper_inclusive)
+    lower = None if lower_exclusive is None else float(lower_exclusive)
+    if np.isnan(upper) or upper < 0 or lower is not None and (
+        not np.isfinite(lower) or lower < 0 or lower >= upper
+    ):
+        raise PackedBoundSearchError("threshold scan bounds are invalid")
+    try:
+        if any(
+            len(value) != 24 or value.lower() != value
+            or len(bytes.fromhex(value)) != 12
+            for value in excluded_episode_ids
+        ):
+            raise ValueError
+    except ValueError as exc:
+        raise PackedBoundSearchError(
+            "threshold exclusions contain an invalid episode ID"
+        ) from exc
+
+    loaded = load_packed_generation(
+        store_root, generation_id,
+        expected_provenance_digest=expected_provenance_digest,
+        verify_content=verify_content, validate_records=False,
+    )
+    symbol_id = loaded.symbols.index(query.symbol) if query.symbol in loaded.symbols else None
+    started = perf_counter()
+    peak = _current_rss_mb()
+    eligible_main = eligible_overflow = excluded_eligible = admitted_rows = 0
+    minimum_above = float("inf")
+    digest_xor = 0
+    digest_sum = 0
+    modulus = 1 << 256
+
+    def fresh_records(records: np.ndarray) -> np.ndarray:
+        nonlocal excluded_eligible
+        if not len(records) or not excluded_episode_ids:
+            return records
+        keep = np.fromiter(
+            (
+                bytes(record["episode_id"]).hex() not in excluded_episode_ids
+                for record in records
+            ),
+            dtype=bool, count=len(records),
+        )
+        excluded_eligible += int((~keep).sum())
+        return records[keep]
+
+    def emit(records: np.ndarray, totals: np.ndarray, *, overflow: bool) -> None:
+        nonlocal admitted_rows, digest_xor, digest_sum
+        proposals: list[BoundProposal] = []
+        for record, total_value in zip(records, totals, strict=True):
+            episode_id = bytes(record["episode_id"]).hex()
+            numeric_symbol_id = int(record["symbol_id"])
+            if numeric_symbol_id >= len(loaded.symbols):
+                raise PackedBoundSearchError("candidate symbol ID exceeds dictionary")
+            quality_code = int(record["quality_tier"])
+            if quality_code not in TIER_NAMES:
+                raise PackedBoundSearchError("candidate quality tier differs")
+            proposal = BoundProposal(
+                episode_id, loaded.symbols[numeric_symbol_id],
+                int(record["cutoff_ns"]), TIER_NAMES[quality_code],
+                float(total_value), ("composite",), overflow,
+            )
+            proposals.append(proposal)
+            row_hash = int(stable_hash({
+                "episode_id": proposal.episode_id,
+                "symbol": proposal.symbol,
+                "cutoff_ns": proposal.cutoff_ns,
+                "quality_tier": proposal.quality_tier,
+                "lower_bound_hex": proposal.lower_bound.hex(),
+                "overflow_fallback": proposal.overflow_fallback,
+            }), 16)
+            digest_xor ^= row_hash
+            digest_sum = (digest_sum + row_hash) % modulus
+        if proposals:
+            admitted_rows += len(proposals)
+            consume(tuple(proposals))
+
+    pack_path = (
+        loaded.root / "generations" / loaded.generation_id
+        / str(loaded.manifest["rows_file"])
+    )
+    offsets: Iterable[int] = range(0, len(loaded.rows), block_rows)
+    if block_order == "reverse":
+        offsets = reversed(offsets)
+    with pack_path.open("rb") as handle:
+        for first in offsets:
+            count = min(block_rows, len(loaded.rows) - first)
+            raw = os.pread(
+                handle.fileno(), count * PACK_DTYPE.itemsize,
+                first * PACK_DTYPE.itemsize,
+            )
+            if len(raw) != count * PACK_DTYPE.itemsize:
+                raise PackedBoundSearchError("short positional read from packed generation")
+            block = np.frombuffer(raw, dtype=PACK_DTYPE, count=count)
+            selected = block[_eligible_mask(block, query, symbol_id)]
+            eligible_main += len(selected)
+            fresh = fresh_records(selected)
+            if len(fresh):
+                totals = np.asarray((
+                    packed_branch_aware_lower_bounds(
+                        query.representation, fresh,
+                    ).totals
+                    if branch_aware else
+                    packed_lower_bounds(query.representation, fresh).totals
+                ), dtype=np.float64)
+                if not np.isfinite(totals).all() or np.any(totals < 0):
+                    raise PackedBoundSearchError(
+                        "threshold scan produced an invalid packed lower bound"
+                    )
+                above = totals > upper
+                if np.any(above):
+                    minimum_above = min(minimum_above, float(np.min(totals[above])))
+                admitted = totals <= upper
+                if lower is not None:
+                    admitted &= totals > lower
+                if np.any(admitted):
+                    emit(fresh[admitted], totals[admitted], overflow=False)
+            peak = max(peak, _current_rss_mb())
+
+    overflow_offsets: Iterable[int] = range(0, len(loaded.overflow), block_rows)
+    if block_order == "reverse":
+        overflow_offsets = reversed(overflow_offsets)
+    overflow_admitted = lower is None
+    for first in overflow_offsets:
+        block = loaded.overflow[first:first + block_rows]
+        selected = block[_eligible_mask(block, query, symbol_id)]
+        eligible_overflow += len(selected)
+        fresh = fresh_records(selected)
+        if len(fresh) and overflow_admitted:
+            emit(
+                fresh, np.zeros(len(fresh), dtype=np.float64), overflow=True,
+            )
+        peak = max(peak, _current_rss_mb())
+    admitted_set_digest = stable_hash({
+        "rows": admitted_rows,
+        "xor": f"{digest_xor:064x}",
+        "sum": f"{digest_sum:064x}",
+    })
+    minimum = None if not np.isfinite(minimum_above) else minimum_above
+    schema_version = (
+        BRANCH_AWARE_THRESHOLD_SCAN_SCHEMA_VERSION
+        if branch_aware else THRESHOLD_SCAN_SCHEMA_VERSION
+    )
+    contract_digest = packed_bound_threshold_scan_contract(
+        branch_aware=branch_aware,
+    )["digest"]
+    input_digest = _packed_query_input_digest(query)
+    exclusions_digest = stable_hash(sorted(excluded_episode_ids))
+    eligible_rows = eligible_main + eligible_overflow
+    deterministic = {
+        "schema_version": schema_version,
+        "contract_digest": contract_digest,
+        "generation_id": loaded.generation_id,
+        "query_episode_id": query.episode_id,
+        "input_digest": input_digest,
+        "exclusions_digest": exclusions_digest,
+        "lower_exclusive_hex": lower.hex() if lower is not None else None,
+        "upper_inclusive_hex": upper.hex(),
+        "rows_scanned": len(loaded.rows) + len(loaded.overflow),
+        "eligible_rows": eligible_rows,
+        "eligible_main_rows": eligible_main,
+        "eligible_overflow_rows": eligible_overflow,
+        "excluded_eligible_rows": excluded_eligible,
+        "admitted_rows": admitted_rows,
+        "minimum_above_upper_hex": minimum.hex() if minimum is not None else None,
+        "admitted_set_digest": admitted_set_digest,
+        "real_forward_outcomes_accessed": False,
+    }
+    return BoundThresholdScanReport(
+        schema_version, contract_digest, loaded.generation_id,
+        query.episode_id, input_digest, exclusions_digest, lower, upper,
+        deterministic["rows_scanned"], eligible_rows, eligible_main,
+        eligible_overflow, excluded_eligible, admitted_rows, minimum,
+        admitted_set_digest, block_rows, block_order, perf_counter() - started,
+        peak, stable_hash(deterministic),
     )
 
 
@@ -401,6 +733,7 @@ def scan_packed_bound_proposals_many(
     route_quotas: Mapping[str, int] | None = None,
     block_rows: int = 2_048,
     block_order: str = "forward",
+    branch_aware: bool = False,
     verify_content: bool = True,
     expected_provenance_digest: str | None = None,
 ) -> BoundProposalBatchReport:
@@ -470,8 +803,14 @@ def scan_packed_bound_proposals_many(
                 state["eligible_main"] += len(selected)
                 if not len(selected):
                     continue
-                bounded = prepared_packed_lower_bounds(
-                    query.representation, prepared, eligible_mask,
+                bounded = (
+                    prepared_packed_branch_aware_lower_bounds(
+                        query.representation, prepared, eligible_mask,
+                    )
+                    if branch_aware else
+                    prepared_packed_lower_bounds(
+                        query.representation, prepared, eligible_mask,
+                    )
                 )
                 route_values = {"composite": bounded.totals, **bounded.components}
                 for route, quota in quotas.items():
@@ -504,9 +843,19 @@ def scan_packed_bound_proposals_many(
             state["heaps"], loaded.symbols,
         )
         eligible_main = int(state["eligible_main"])
+        scalar_schema = (
+            BRANCH_AWARE_SEARCH_SCHEMA_VERSION
+            if branch_aware else SEARCH_SCHEMA_VERSION
+        )
+        scalar_contract_digest = packed_bound_search_contract(
+            branch_aware=branch_aware,
+        )["digest"]
+        input_digest = (
+            _packed_query_input_digest(query) if branch_aware else None
+        )
         deterministic = {
-            "schema_version": SEARCH_SCHEMA_VERSION,
-            "contract_digest": packed_bound_search_contract()["digest"],
+            "schema_version": scalar_schema,
+            "contract_digest": scalar_contract_digest,
             "generation_id": loaded.generation_id,
             "query_episode_id": query.episode_id,
             "rows_scanned": len(loaded.rows) + len(loaded.overflow),
@@ -518,25 +867,38 @@ def scan_packed_bound_proposals_many(
             "candidate_digest": candidate_digest,
             "real_forward_outcomes_accessed": False,
         }
+        if branch_aware:
+            deterministic["input_digest"] = input_digest
         report_values.append((
             query, candidates, eligible_main, eligible_overflow,
             route_counts, candidate_digest, stable_hash(deterministic),
+            scalar_contract_digest if branch_aware else None, input_digest,
         ))
     elapsed = perf_counter() - started
     reports = tuple(BoundProposalReport(
-        SEARCH_SCHEMA_VERSION, loaded.generation_id, query.episode_id,
+        (
+            BRANCH_AWARE_SEARCH_SCHEMA_VERSION
+            if branch_aware else SEARCH_SCHEMA_VERSION
+        ), loaded.generation_id, query.episode_id,
         candidates, len(loaded.rows) + len(loaded.overflow),
         eligible_main + eligible_overflow, eligible_main, eligible_overflow,
         route_counts, quotas, block_rows, block_order, elapsed, peak,
-        candidate_digest, result_digest,
+        candidate_digest, result_digest, contract_digest, input_digest,
     ) for (
         query, candidates, eligible_main, eligible_overflow,
-        route_counts, candidate_digest, result_digest,
+        route_counts, candidate_digest, result_digest, contract_digest,
+        input_digest,
     ) in report_values)
     physical_rows = len(loaded.rows) + len(loaded.overflow)
+    batch_schema = (
+        BATCH_BRANCH_AWARE_SEARCH_SCHEMA_VERSION
+        if branch_aware else BATCH_SEARCH_SCHEMA_VERSION
+    )
     deterministic = {
-        "schema_version": BATCH_SEARCH_SCHEMA_VERSION,
-        "contract_digest": packed_bound_batch_search_contract()["digest"],
+        "schema_version": batch_schema,
+        "contract_digest": packed_bound_batch_search_contract(
+            branch_aware=branch_aware,
+        )["digest"],
         "generation_id": loaded.generation_id,
         "query_episode_ids": query_ids,
         "per_query_result_digests": [report.result_digest for report in reports],
@@ -545,7 +907,7 @@ def scan_packed_bound_proposals_many(
         "real_forward_outcomes_accessed": False,
     }
     return BoundProposalBatchReport(
-        BATCH_SEARCH_SCHEMA_VERSION, loaded.generation_id, query_ids, reports,
+        batch_schema, loaded.generation_id, query_ids, reports,
         physical_rows, physical_rows * len(query_rows), block_rows, block_order,
         elapsed, peak, stable_hash(deterministic),
     )

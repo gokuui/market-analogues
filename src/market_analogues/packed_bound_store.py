@@ -15,6 +15,7 @@ from .exact_aligned_features import SAMPLES_48_NAMES
 from .quantized_bound import (
     ERROR_VALUE_COUNT, PACKED_ROW_BYTES, PreparedQuantizedBoundArrays,
     QuantizedBoundRow, QuantizedLowerBoundBatch,
+    branch_aware_prepared_quantized_array_lower_bounds,
     prepare_quantized_bound_arrays, prepared_quantized_array_lower_bounds,
     quantized_bound_contract,
 )
@@ -179,6 +180,14 @@ def packed_lower_bounds(
     )
 
 
+def packed_branch_aware_lower_bounds(
+    query: Representation, records: np.ndarray,
+) -> QuantizedLowerBoundBatch:
+    return prepared_packed_branch_aware_lower_bounds(
+        query, prepare_packed_lower_bound_records(records),
+    )
+
+
 def prepare_packed_lower_bound_records(
     records: np.ndarray,
 ) -> PreparedQuantizedBoundArrays:
@@ -203,6 +212,15 @@ def prepared_packed_lower_bounds(
 ) -> QuantizedLowerBoundBatch:
     selected = prepared if mask is None else prepared.select(mask)
     return prepared_quantized_array_lower_bounds(query, selected)
+
+
+def prepared_packed_branch_aware_lower_bounds(
+    query: Representation,
+    prepared: PreparedQuantizedBoundArrays,
+    mask: np.ndarray | None = None,
+) -> QuantizedLowerBoundBatch:
+    selected = prepared if mask is None else prepared.select(mask)
+    return branch_aware_prepared_quantized_array_lower_bounds(query, selected)
 
 
 def _file_sha256(path: Path, block_bytes: int = 8 * 1024 * 1024) -> str:

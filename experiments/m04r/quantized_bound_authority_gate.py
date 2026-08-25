@@ -21,6 +21,8 @@ from market_analogues.exact_batch import (
 )
 from market_analogues.quantized_bound import (
     PACKED_ROW_BYTES, QuantizedBoundError, quantize_bound_row,
+    branch_aware_quantized_batch_lower_bounds,
+    branch_aware_quantized_bound_contract,
     quantized_batch_lower_bounds, quantized_bound_contract,
 )
 from market_analogues.representation import represent
@@ -36,6 +38,7 @@ def main() -> int:
     parser.add_argument("--tolerance", type=float, default=1e-12)
     parser.add_argument("--minimum-retention", type=float, default=.99)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--branch-aware", action="store_true")
     args = parser.parse_args()
     config = load_config(args.config)
     source = source_from_spec(config.datasets["nasdaq"])
@@ -108,7 +111,13 @@ def main() -> int:
             native = batch_representation_lower_bounds(
                 query_representation, batch.representations,
             )
-            quantized = quantized_batch_lower_bounds(query_representation, packed)
+            quantized = (
+                branch_aware_quantized_batch_lower_bounds(
+                    query_representation, packed,
+                )
+                if args.branch_aware else
+                quantized_batch_lower_bounds(query_representation, packed)
+            )
             maximum_total_excess = max(
                 maximum_total_excess,
                 max(float(np.max(quantized.totals - native.totals)), 0.0),
@@ -150,8 +159,14 @@ def main() -> int:
         })
     total_rows = sum(row["rows"] for row in cases)
     deterministic = {
-        "schema_version": "m04r-quantized-bound-authority-gate-v1",
-        "contract_digest": quantized_bound_contract()["digest"],
+        "schema_version": (
+            "m04r-quantized-bound-authority-gate-v2"
+            if args.branch_aware else "m04r-quantized-bound-authority-gate-v1"
+        ),
+        "contract_digest": (
+            branch_aware_quantized_bound_contract()["digest"]
+            if args.branch_aware else quantized_bound_contract()["digest"]
+        ),
         "authority_cases": cases,
         "case_count": len(cases),
         "total_rows": total_rows,

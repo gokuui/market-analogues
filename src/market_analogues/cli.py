@@ -609,9 +609,14 @@ def cmd_verify_m04r_quantized_bound(args: argparse.Namespace) -> int:
     authority_path = Path(args.authority_evidence) if args.authority_evidence else (
         evidence_root / "quantized-bound-authority-gate.json"
     )
-    result = verify_m04r_quantized_bound(million_path, authority_path)
+    result = verify_m04r_quantized_bound(
+        million_path, authority_path, branch_aware=args.branch_aware,
+    )
     output_dir = Path(args.output_dir) if args.output_dir else (
-        config.artifact_dir / "m04r-quantized-bound"
+        config.artifact_dir / (
+            "m04r-branch-aware-quantized-bound"
+            if args.branch_aware else "m04r-quantized-bound"
+        )
     )
     machine, html, contract = write_m04r_quantized_verification(
         result, output_dir,
@@ -2304,6 +2309,7 @@ def build_parser() -> argparse.ArgumentParser:
     m04r_quantized.add_argument("--million-evidence")
     m04r_quantized.add_argument("--authority-evidence")
     m04r_quantized.add_argument("--output-dir")
+    m04r_quantized.add_argument("--branch-aware", action="store_true")
     m04r_quantized.set_defaults(func=cmd_verify_m04r_quantized_bound)
     m04r_proposal = sub.add_parser("verify-m04r-proposal-v2")
     m04r_proposal.add_argument("--config", required=True)

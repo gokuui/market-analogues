@@ -7,6 +7,7 @@ from dataclasses import asdict
 from datetime import datetime, timezone
 from html import escape
 import json
+from math import isfinite
 from pathlib import Path
 from typing import Any
 
@@ -14,25 +15,35 @@ import pandas as pd
 
 from market_analogues.adapters import file_fingerprint, source_from_spec
 from market_analogues.causal_prefix import causal_prefix_digest
-from market_analogues.certified_packed_search import certified_packed_search_contract
+from market_analogues.certified_packed_search import (
+    certified_packed_search, certified_packed_search_contract,
+)
 from market_analogues.config import load_config
 from market_analogues.distance import representation_distance
 from market_analogues.episodes import build_episode
 from market_analogues.m04r_certified_search_verification import _certificate_digest
+from market_analogues.m04r_branch_bound_evidence import (
+    validated_branch_bound_evidence,
+)
 from market_analogues.m04r_full_pack_verification import EVIDENCE_OMITTED as BUILD_OMITTED
 from market_analogues.m04r_validation_registry import validate_m04r_validation_registry
 from market_analogues.packed_bound_search import (
     PackedBoundQuery,
     bound_proposal_candidate_digest,
-    scan_packed_bound_proposals,
+    packed_bound_search_contract,
+    packed_bound_threshold_scan_contract,
     scan_packed_bound_proposals_many,
+    scan_packed_bound_threshold,
 )
 from market_analogues.packed_bound_store import load_packed_generation
-from market_analogues.representation import represent
-from market_analogues.types import EpisodeKey, InstrumentKey, stable_hash
+from market_analogues.representation import represent, representation_input_digest
+from market_analogues.types import (
+    EpisodeKey, InstrumentKey, SearchQuery, stable_hash,
+)
 
 
-SCHEMA_VERSION = "m04r11-certified-authority-verification-v2"
+SCHEMA_VERSION = "m04r11-certified-authority-verification-v4"
+BOUND_TOLERANCE = 1e-12
 CASE_OMITTED = {
     "created_at", "proposal_seconds", "amortized_proposal_seconds",
     "exact_seconds", "final_exact_seconds", "frontier_attempt_measurements",
@@ -81,26 +92,12 @@ def _frontier_execution_failure(
         return "authority frontier evidence is missing"
     policy = contract.get("frontier_overflow_policy") or {}
     primary = int(contract["controls"]["maximum_frontier_rows"])
-    eligible = int(certificate.get("eligible_candidates", -1))
-    expected = [primary]
-    while expected[-1] < eligible:
-        expected.append(min(eligible, expected[-1] * int(policy.get("growth_factor", -1))))
     limits = [int(row.get("maximum_frontier_rows", -1)) for row in attempts]
     statuses = [row.get("status") for row in attempts]
     proposal_digests = [row.get("proposal_result_digest") for row in attempts]
-    attempt_details_valid = True
-    for row, limit in zip(attempts[:-1], limits[:-1], strict=True):
-        try:
-            attempt_details_valid = attempt_details_valid and all((
-                int(row.get("exact_evaluated", -1)) == limit,
-                float.fromhex(str(row.get("next_lower_bound_hex")))
-                <= float.fromhex(str(row.get("stop_threshold_hex"))),
-            ))
-        except ValueError:
-            attempt_details_valid = False
     final = attempts[-1]
     certificate_next = certificate.get("next_lower_bound")
-    attempt_details_valid = attempt_details_valid and all((
+    attempt_details_valid = all((
         int(final.get("exact_evaluated", -1))
         == int(certificate.get("exact_evaluated", -2)),
         final.get("stop_threshold_hex")
@@ -108,20 +105,89 @@ def _frontier_execution_failure(
         final.get("next_lower_bound_hex")
         == (float(certificate_next).hex() if certificate_next is not None else None),
     ))
+    closure = certificate.get("threshold_closure_passes") or []
+    previous_upper = None
+    previous_resulting_threshold = None
+    previous_native = primary
+    previous_exact = int(rounds[-1].get("exact_rows", -1))
+    closure_valid = True
+    for index, row in enumerate(closure):
+        try:
+            lower = row.get("lower_exclusive")
+            upper = float(row.get("upper_inclusive"))
+            native = int(row.get("cumulative_native_bound_evaluated", -1))
+            exact = int(row.get("cumulative_exact_dtw_evaluated", -1))
+            resulting = float(row.get("resulting_threshold"))
+            closure_valid = closure_valid and all((
+                lower == previous_upper,
+                upper >= 0,
+                index != 0 or upper == (
+                    float(rounds[-1].get("constrained_threshold"))
+                    + BOUND_TOLERANCE
+                ),
+                index == 0 or upper > float(previous_upper),
+                index == 0 or upper == (
+                    previous_resulting_threshold + BOUND_TOLERANCE
+                ),
+                int(row.get("admitted_rows", -1)) >= 0,
+                native - previous_native == int(row.get("admitted_rows", -1)),
+                previous_exact <= exact <= native,
+                int(row.get("selected_rows", -1)) == 20,
+                isinstance(row.get("certified"), bool),
+                index == len(closure) - 1 or row.get("certified") is False,
+                isfinite(resulting) and resulting >= 0,
+                not row.get("certified") or all(
+                    value is None or float(value) > resulting + BOUND_TOLERANCE
+                    for value in (
+                        row.get("minimum_packed_unclassified_bound"),
+                        row.get("minimum_native_pruned_bound"),
+                    )
+                ),
+                isinstance(row.get("excluded_prefix_digest"), str),
+                isinstance(row.get("admitted_set_digest"), str),
+                isinstance(row.get("scan_result_digest"), str),
+            ))
+            previous_upper = upper
+            previous_resulting_threshold = resulting
+            previous_native = native
+            previous_exact = exact
+        except (TypeError, ValueError):
+            closure_valid = False
+    closure_valid = closure_valid and (
+        not closure or closure[-1].get("certified") is True
+    )
+    accounting = certificate.get("native_bound_accounting") or {}
+    final_minima = (
+        [
+            float(value) for value in (
+                closure[-1].get("minimum_packed_unclassified_bound"),
+                closure[-1].get("minimum_native_pruned_bound"),
+            ) if value is not None
+        ] if closure else []
+    )
+    expected_next = min(final_minima) if final_minima else None
+    closure_valid = closure_valid and (
+        not closure or all((
+            previous_native == int(accounting.get("native_bound_evaluated", -1)),
+            previous_exact == int(accounting.get("exact_dtw_evaluated", -1)),
+            previous_resulting_threshold
+            == float(certificate.get("stop_threshold")),
+            expected_next == certificate.get("next_lower_bound"),
+        ))
+    )
     if not all((
-        policy.get("schema_version") == "m04r11-frontier-overflow-recovery-v1",
-        policy.get("trigger")
-        == "certified frontier exceeds configured maximum; no result emitted",
-        policy.get("terminal_frontier") == "eligible-universe exhaustion",
-        limits == expected[:len(limits)],
-        len(limits) <= len(expected),
-        statuses[-1] == "certified",
-        all(value == "overflow" for value in statuses[:-1]),
-        payload.get("frontier_overflow_recovery") is (len(attempts) > 1),
+        policy.get("schema_version") == "m04r11-streaming-threshold-closure-v1",
+        policy.get("sorted_prefix_rows") == primary,
+        policy.get("terminal_frontier")
+        == "strict streamed threshold closure or eligible exhaustion",
+        limits == [primary],
+        statuses == ["certified"],
+        payload.get("streaming_threshold_closure_used") is bool(closure),
         payload.get("frontier_limit_rows") == limits[-1],
         max(frontiers) <= limits[-1],
         all(isinstance(value, str) and value for value in proposal_digests),
         attempt_details_valid,
+        closure_valid,
     )):
         return "authority frontier execution policy differs"
     return None
@@ -142,10 +208,11 @@ def _packed_query(source: Any, case: dict[str, Any]) -> PackedBoundQuery:
 
 def _proposal_evidence_failures(
     source: Any, cases: list[dict[str, Any]], payloads: list[dict[str, Any]],
-    store_root: Path, generation_id: str, primary_limit: int,
+    store_root: Path, generation_id: str, controls: dict[str, Any],
 ) -> tuple[list[str], int]:
-    """Independently rescan every primary prefix and every recovery tier."""
+    """Independently rescan every primary prefix and streamed closure band."""
     failures: list[str] = []
+    primary_limit = int(controls["maximum_frontier_rows"])
     by_id = {str(row["query_episode_id"]): row for row in payloads}
     queries = [(case, _packed_query(source, case)) for case in cases]
     primary_reports: dict[str, Any] = {}
@@ -154,7 +221,7 @@ def _proposal_evidence_failures(
         batch = scan_packed_bound_proposals_many(
             store_root, generation_id, [query for _, query in chunk],
             route_quotas={"composite": primary_limit + 1}, block_rows=8_192,
-            block_order="reverse", verify_content=False,
+            block_order="reverse", branch_aware=True, verify_content=False,
         )
         primary_reports.update({
             report.query_episode_id: report for report in batch.reports
@@ -167,15 +234,7 @@ def _proposal_evidence_failures(
             continue
         attempts = payload.get("frontier_attempts") or []
         reports = [primary_reports[query.episode_id]]
-        for attempt in attempts[1:]:
-            limit = int(attempt["maximum_frontier_rows"])
-            reports.append(scan_packed_bound_proposals(
-                store_root, generation_id, query,
-                route_quotas={"composite": limit + 1}, block_rows=8_192,
-                block_order="reverse", verify_content=False,
-            ))
-            scans += 1
-        if len(reports) != len(attempts):
+        if len(attempts) != 1:
             failures.append(f"proposal attempt count differs:{case['case_id']}")
             continue
         for attempt, report in zip(attempts, reports, strict=True):
@@ -193,6 +252,77 @@ def _proposal_evidence_failures(
             if digest != round_row.get("proposal_digest"):
                 failures.append(f"proposal round digest differs:{case['case_id']}")
                 break
+        prefix_ids = frozenset(
+            row.episode_id for row in final.candidates[:primary_limit]
+        )
+        for closure in certificate.get("threshold_closure_passes") or []:
+            report = scan_packed_bound_threshold(
+                store_root, generation_id, query,
+                lower_exclusive=closure.get("lower_exclusive"),
+                upper_inclusive=float(closure["upper_inclusive"]),
+                excluded_episode_ids=prefix_ids,
+                block_rows=8_192, block_order="reverse", verify_content=False,
+                branch_aware=True,
+                consume=lambda _: None,
+            )
+            scans += 1
+            expected_minimum = closure.get(
+                "minimum_packed_unclassified_bound"
+            )
+            if not all((
+                report.result_digest == closure.get("scan_result_digest"),
+                report.exclusions_digest == closure.get("excluded_prefix_digest"),
+                report.admitted_set_digest == closure.get("admitted_set_digest"),
+                report.admitted_rows == int(closure.get("admitted_rows", -1)),
+                report.eligible_rows
+                == int(certificate.get("eligible_candidates", -1)),
+                report.minimum_above_upper == expected_minimum,
+            )):
+                failures.append(
+                    f"streamed closure classification differs:{case['case_id']}"
+                )
+                break
+        if certificate.get("threshold_closure_passes"):
+            episode = build_episode(
+                source, InstrumentKey("nasdaq", str(case["symbol"])),
+                str(case["cutoff"]), int(case["lookback"]),
+                str(case["representation_version"]),
+            )
+            request = SearchQuery(
+                episode.key, ("nasdaq",), ("A", "B"), 20,
+                False, True, 3, 60,
+            )
+            repeated = certified_packed_search(
+                episode, source, request, store_root, generation_id,
+                store_dataset_id="nasdaq",
+                initial_frontier_rows=int(controls["initial_frontier_rows"]),
+                maximum_frontier_rows=primary_limit,
+                seed_rows=int(controls["seed_rows"]),
+                block_rows=int(controls["block_rows"]),
+                workers=int(controls["exact_workers_per_process"]),
+                sparse_cutoff=8, verify_content=False,
+                requested_positions=True, vector_lower_bounds=True,
+                deferred_alignments=True, compact_scored=True,
+                native_bound_deferral=True, streaming_threshold_closure=True,
+                branch_aware_packed_bounds=True,
+                threshold_scan_block_order="reverse",
+                precomputed_proposal=final,
+            )
+            scans += 1
+            repeated_ids = [row.episode_key.id for row in repeated.matches]
+            expected_ids = [str(row["episode_id"]) for row in payload.get("matches", [])]
+            if not all((
+                repeated_ids == expected_ids,
+                repeated.certificate.result_digest
+                == certificate.get("result_digest"),
+                asdict(repeated.certificate).get("native_bound_accounting")
+                == certificate.get("native_bound_accounting"),
+                stable_hash(asdict(repeated.certificate).get("threshold_closure_passes"))
+                == stable_hash(certificate.get("threshold_closure_passes")),
+            )):
+                failures.append(
+                    f"reverse exact threshold closure differs:{case['case_id']}"
+                )
     return failures, scans
 
 
@@ -203,7 +333,7 @@ def _independent_case_failures(
     failures: list[str] = []
     query_id = str(case["episode_id"])
     if not all((
-        payload.get("schema_version") == "m04r11-certified-authority-case-v2",
+        payload.get("schema_version") == "m04r11-certified-authority-case-v4",
         payload.get("status") == "completed",
         payload.get("contract_digest") == contract.get("contract_digest"),
         payload.get("registry_digest") == contract.get("registry_digest"),
@@ -253,12 +383,15 @@ def _independent_case_failures(
             "minimum_history_gap_bars": request["minimum_history_gap_bars"],
         },
         "packed_provenance_digest": packed_provenance_digest,
+        "query_representation_digest": representation_input_digest(
+            query_representation,
+        ),
     })
     certificate = payload.get("certificate") or {}
     matches = payload.get("matches") or []
     if certificate.get("input_digest") != input_digest:
         failures.append("certificate input digest differs")
-    if certificate.get("schema_version") != "m04r-certified-packed-search-v6":
+    if certificate.get("schema_version") != "m04r-certified-packed-search-v8":
         failures.append("certificate execution schema differs")
     if certificate.get("generation_id") != contract["generation_id"]:
         failures.append("certificate generation differs")
@@ -318,11 +451,29 @@ def _independent_case_failures(
     eligible = int(certificate.get("eligible_candidates", -2))
     if exact + pruned != eligible:
         failures.append("certificate candidate accounting differs")
+    native = certificate.get("native_bound_accounting") or {}
+    native_evaluated = int(native.get("native_bound_evaluated", -1))
+    exact_dtw = int(native.get("exact_dtw_evaluated", -1))
+    native_pruned = int(native.get("native_bound_pruned", -1))
+    packed_pruned = int(native.get("packed_bound_pruned", -1))
+    minimum_native = certificate.get("minimum_native_pruned_bound")
+    if not all((
+        native_evaluated == exact_dtw + native_pruned,
+        eligible == exact_dtw + native_pruned + packed_pruned,
+        exact == exact_dtw,
+        pruned == native_pruned + packed_pruned,
+        native_pruned == 0 and minimum_native is None
+        or native_pruned > 0 and minimum_native is not None
+        and float(minimum_native) > float(certificate.get("stop_threshold")),
+    )):
+        failures.append("certificate native-bound accounting differs")
     next_bound = certificate.get("next_lower_bound")
     stopped = bool(certificate.get("stopped_early"))
     if not (
         (stopped and next_bound is not None
-         and float(next_bound) > float(certificate.get("stop_threshold")))
+         and float(next_bound) > (
+             float(certificate.get("stop_threshold")) + BOUND_TOLERANCE
+         ))
         or (not stopped and pruned == 0)
     ):
         failures.append("certificate has no strict stop or literal exhaustion")
@@ -392,9 +543,13 @@ def main() -> int:
     parser.add_argument("--full-root", type=Path, required=True)
     parser.add_argument("--authority-root", type=Path, required=True)
     parser.add_argument("--output-root", type=Path, required=True)
+    parser.add_argument("--branch-bound-root", type=Path, required=True)
     args = parser.parse_args()
     config = load_config(args.config)
     source = source_from_spec(config.datasets["nasdaq"])
+    branch_bound_evidence = validated_branch_bound_evidence(
+        args.branch_bound_root,
+    )
     failures = list(validate_m04r_validation_registry(source, args.registry.parent))
     registry = json.loads(args.registry.read_text())
     contract_path = args.authority_root / "authority-contract.json"
@@ -408,7 +563,7 @@ def main() -> int:
     contract_without_digest = {key: value for key, value in contract.items() if key != "contract_digest"}
     if stable_hash(contract_without_digest) != contract.get("contract_digest"):
         failures.append("authority contract digest differs")
-    if contract.get("schema_version") != "m04r11-authority-build-contract-v2":
+    if contract.get("schema_version") != "m04r11-authority-build-contract-v4":
         failures.append("authority contract schema differs")
     runner_path = Path(__file__).with_name("m04r11_build_authorities.py")
     if file_fingerprint(runner_path) != contract.get("runner_sha256"):
@@ -418,20 +573,34 @@ def main() -> int:
     expected_execution_contract = certified_packed_search_contract(
         requested_positions=True, vector_lower_bounds=True,
         deferred_alignments=True, compact_scored=True,
+        native_bound_deferral=True, streaming_threshold_closure=True,
+        branch_aware_packed_bounds=True,
     )
     if contract.get("certified_execution_contract") != expected_execution_contract:
         failures.append("authority certified execution contract differs")
+    if contract.get("branch_bound_evidence") != branch_bound_evidence:
+        failures.append("authority branch-bound evidence differs")
+    if contract.get("primary_proposal_contract") != packed_bound_search_contract(
+        branch_aware=True,
+    ):
+        failures.append("authority primary proposal contract differs")
+    if contract.get("threshold_scan_contract") != packed_bound_threshold_scan_contract(
+        branch_aware=True,
+    ):
+        failures.append("authority threshold scan contract differs")
     controls = dict(registry["search_contract"]["controls"])
     expected_overflow_policy = {
-        "schema_version": "m04r11-frontier-overflow-recovery-v1",
-        "trigger": "certified frontier exceeds configured maximum; no result emitted",
-        "first_recovery_frontier_rows": int(controls["maximum_frontier_rows"]) * 2,
-        "growth_factor": 2,
-        "terminal_frontier": "eligible-universe exhaustion",
+        "schema_version": "m04r11-streaming-threshold-closure-v1",
+        "sorted_prefix_rows": int(controls["maximum_frontier_rows"]),
+        "trigger": "sorted prefix cannot certify the constrained top-k",
+        "terminal_frontier": "strict streamed threshold closure or eligible exhaustion",
         "scope": "authority construction only",
         "semantics": (
-            "retry the unchanged exact certified search over monotonically larger "
-            "bound-sorted frontiers; never emit an approximate result"
+            "retain all prefix classifications, stream inclusive packed-bound bands, "
+            "apply exact native non-DTW deferral with threshold reopening, and never "
+            "emit an approximate result or repeat exact DTW work; native "
+            "materialization may repeat only when a raised constrained threshold "
+            "reopens a deferred row"
         ),
     }
     build = json.loads((args.full_root / "packed-bound-full.json").read_text())
@@ -490,7 +659,7 @@ def main() -> int:
         proposal_failures, proposal_scans = _proposal_evidence_failures(
             source, cases, verified, args.full_root / "store",
             str(contract["generation_id"]),
-            int(contract["controls"]["maximum_frontier_rows"]),
+            dict(contract["controls"]),
         )
         failures.extend(proposal_failures)
     matrix_without = {key: value for key, value in matrix.items() if key not in MATRIX_OMITTED}
@@ -506,6 +675,10 @@ def main() -> int:
     } for case in verified]
     if matrix.get("cases") != expected_rows:
         failures.append("authority matrix case bindings differ")
+    if matrix.get("streaming_threshold_closure_cases") != sum(
+        bool(case.get("streaming_threshold_closure_used")) for case in verified
+    ):
+        failures.append("authority matrix closure count differs")
     expected_measurements = [{
         "registry_case_id": case["registry_case_id"],
         "proposal_seconds": case["proposal_seconds"],
@@ -566,7 +739,9 @@ def main() -> int:
     if matrix.get("measurement_integrity_digest") != expected_measurement_digest:
         failures.append("authority measurement integrity digest differs")
     if not all((
-        matrix.get("schema_version") == "m04r11-certified-authority-matrix-v2",
+        matrix.get("schema_version") == "m04r11-certified-authority-matrix-v4",
+        matrix.get("branch_bound_evidence_digest")
+        == branch_bound_evidence["digest"],
         matrix.get("gate_passed") is True,
         matrix.get("completed_cases") == 60,
         not matrix.get("invalid_cases"),
@@ -587,7 +762,9 @@ def main() -> int:
     ):
         failures.append("authority seal does not bind measurements")
     if not all((
-        seal.get("schema_version") == "m04r11-authority-seal-v2",
+        seal.get("schema_version") == "m04r11-authority-seal-v4",
+        seal.get("branch_bound_evidence_digest")
+        == branch_bound_evidence["digest"],
         seal.get("authority_cases") == 60,
         seal.get("contract_digest") == contract.get("contract_digest"),
         seal.get("registry_digest") == registry.get("registry_digest"),

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from hashlib import sha256
 
 import numpy as np
 import pandas as pd
@@ -148,6 +149,32 @@ class Representation:
     samples_64: dict[str, np.ndarray | None]
     stage: np.ndarray
     structural: np.ndarray
+
+
+def representation_input_digest(representation: Representation) -> str:
+    """Commit every exact distance-v1 input in a platform-stable byte order."""
+    digest = sha256()
+    for collection_name, collection in (
+        ("arrays", {
+            "coarse": representation.coarse,
+            "stage": representation.stage,
+            "structural": representation.structural,
+        }),
+        ("samples_48", representation.samples_48),
+        ("samples_64", representation.samples_64),
+    ):
+        digest.update(collection_name.encode())
+        for name in sorted(collection):
+            digest.update(name.encode())
+            values = collection[name]
+            if values is None:
+                digest.update(b"\0")
+                continue
+            array = np.asarray(values, dtype="<f8")
+            digest.update(b"\1")
+            digest.update(np.asarray(array.shape, dtype="<i8").tobytes())
+            digest.update(array.tobytes())
+    return digest.hexdigest()
 
 
 def represent(episode: Episode) -> Representation:

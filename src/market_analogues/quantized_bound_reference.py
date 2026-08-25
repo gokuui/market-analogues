@@ -69,6 +69,22 @@ def reference_quantized_lower_bound(
     query: Representation,
     row: QuantizedBoundRow,
 ) -> ReferenceQuantizedLowerBound:
+    return _reference_quantized_lower_bound(query, row, branch_aware=False)
+
+
+def reference_branch_aware_quantized_lower_bound(
+    query: Representation,
+    row: QuantizedBoundRow,
+) -> ReferenceQuantizedLowerBound:
+    return _reference_quantized_lower_bound(query, row, branch_aware=True)
+
+
+def _reference_quantized_lower_bound(
+    query: Representation,
+    row: QuantizedBoundRow,
+    *,
+    branch_aware: bool,
+) -> ReferenceQuantizedLowerBound:
     radii = _values(row.error_radii)
     count = len(SAMPLES_48_NAMES)
     rms_radii = radii[1:1 + count]
@@ -97,12 +113,25 @@ def reference_quantized_lower_bound(
                 continue
             stored = row.samples_48[index].astype(np.float64)
             joined = _values(stored) + _values(query_values)
-            denominator = max(
+            observed_iqr = (
                 _percentile(joined, .75) - _percentile(joined, .25)
-                + 2.0 * max_radii[index],
-                _std(joined) + rms_radii[index] / math.sqrt(2.0),
-                1e-6,
             )
+            raw_iqr_upper = observed_iqr + 2.0 * max_radii[index]
+            raw_std_upper = _std(joined) + rms_radii[index] / math.sqrt(2.0)
+            if branch_aware:
+                iqr_lower = math.nextafter(
+                    observed_iqr - 2.0 * max_radii[index], -math.inf,
+                )
+                iqr_upper = math.nextafter(raw_iqr_upper, math.inf)
+                std_upper = math.nextafter(raw_std_upper, math.inf)
+                if iqr_lower >= 1e-8:
+                    denominator = max(iqr_upper, 1e-6)
+                elif iqr_upper < 1e-8:
+                    denominator = max(std_upper, 1e-6)
+                else:
+                    denominator = max(iqr_upper, std_upper, 1e-6)
+            else:
+                denominator = max(raw_iqr_upper, raw_std_upper, 1e-6)
             group_values.append(
                 _numerator(query_values, stored, rms_radii[index]) / denominator
             )

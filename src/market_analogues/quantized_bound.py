@@ -13,6 +13,7 @@ from .types import stable_hash
 
 
 QUANTIZED_BOUND_VERSION = "distance-v1-full-f16-bound-v1"
+BRANCH_AWARE_QUANTIZED_BOUND_VERSION = "distance-v1-full-f16-bound-v2"
 FLOAT16_MAX = float(np.finfo(np.float16).max)
 ERROR_NAMES = (
     "coarse_rms",
@@ -231,6 +232,29 @@ def quantized_bound_contract() -> dict[str, Any]:
     return payload
 
 
+def branch_aware_quantized_bound_contract() -> dict[str, Any]:
+    """A tighter admissible scorer over the unchanged v1 packed row layout."""
+    payload = {
+        "schema_version": BRANCH_AWARE_QUANTIZED_BOUND_VERSION,
+        "stored_row_contract_digest": quantized_bound_contract()["digest"],
+        "distance_contract": "market-analogue-distance-v1-contract",
+        "denominator": (
+            "outward joined-IQR interval [observed-2*max_error, "
+            "observed+2*max_error]; use IQR upper when lower >= 1e-8, "
+            "std upper when upper < 1e-8, otherwise max of both; every "
+            "branch retains the 1e-6 floor"
+        ),
+        "boundary_rule": (
+            "native IQR exactly 1e-8 uses the IQR branch; uncertain interval "
+            "boundaries use the conservative maximum"
+        ),
+        "numerator_aggregation_and_layout": "identical to stored-row v1",
+        "outcomes_or_labels_used": False,
+    }
+    payload["digest"] = stable_hash(payload)
+    return payload
+
+
 def _outward_float32(value: float) -> np.float32:
     if not np.isfinite(value) or value < 0:
         raise QuantizedBoundError("invalid error radius")
@@ -294,6 +318,28 @@ def quantized_representation_lower_bound(
     row: QuantizedBoundRow,
     config: DistanceConfig | None = None,
 ) -> QuantizedLowerBound:
+    return _quantized_representation_lower_bound(
+        query, row, config, branch_aware=False,
+    )
+
+
+def branch_aware_quantized_representation_lower_bound(
+    query: Representation,
+    row: QuantizedBoundRow,
+    config: DistanceConfig | None = None,
+) -> QuantizedLowerBound:
+    return _quantized_representation_lower_bound(
+        query, row, config, branch_aware=True,
+    )
+
+
+def _quantized_representation_lower_bound(
+    query: Representation,
+    row: QuantizedBoundRow,
+    config: DistanceConfig | None,
+    *,
+    branch_aware: bool,
+) -> QuantizedLowerBound:
     config = config or DistanceConfig()
     radii = row.error_radii.astype(np.float64)
     sample_rms = radii[1:1 + len(SAMPLES_48_NAMES)]
@@ -325,12 +371,28 @@ def quantized_representation_lower_bound(
             stored = row.samples_48[index].astype(np.float64)
             query_array = np.asarray(query_values, dtype=np.float64)
             joined = np.r_[stored, query_array]
-            denominator = max(
-                float(np.percentile(joined, 75) - np.percentile(joined, 25))
-                + 2.0 * float(sample_max[index]),
-                float(np.std(joined)) + float(sample_rms[index]) / np.sqrt(2.0),
-                1e-6,
+            observed_iqr = float(
+                np.percentile(joined, 75) - np.percentile(joined, 25)
             )
+            raw_iqr_upper = observed_iqr + 2.0 * float(sample_max[index])
+            raw_std_upper = (
+                float(np.std(joined))
+                + float(sample_rms[index]) / np.sqrt(2.0)
+            )
+            if branch_aware:
+                iqr_upper = float(np.nextafter(raw_iqr_upper, np.inf))
+                std_upper = float(np.nextafter(raw_std_upper, np.inf))
+                iqr_lower = float(np.nextafter(
+                    observed_iqr - 2.0 * float(sample_max[index]), -np.inf,
+                ))
+                if iqr_lower >= 1e-8:
+                    denominator = max(iqr_upper, 1e-6)
+                elif iqr_upper < 1e-8:
+                    denominator = max(std_upper, 1e-6)
+                else:
+                    denominator = max(iqr_upper, std_upper, 1e-6)
+            else:
+                denominator = max(raw_iqr_upper, raw_std_upper, 1e-6)
             distances.append(
                 _numerator(query_array, stored, float(sample_rms[index])) / denominator
             )
@@ -362,6 +424,28 @@ def quantized_batch_lower_bounds(
         np.stack([row.structural for row in rows]),
         radii,
         config,
+    )
+
+
+def branch_aware_quantized_batch_lower_bounds(
+    query: Representation,
+    rows: tuple[QuantizedBoundRow, ...] | list[QuantizedBoundRow],
+    config: DistanceConfig | None = None,
+) -> QuantizedLowerBoundBatch:
+    config = config or DistanceConfig()
+    if not rows:
+        empty = np.empty(0, dtype=np.float64)
+        return QuantizedLowerBoundBatch(empty, {}, empty)
+    prepared = prepare_quantized_bound_arrays(
+        np.stack([row.coarse for row in rows]),
+        np.stack([row.samples_48 for row in rows]),
+        np.stack([row.presence for row in rows]),
+        np.stack([row.stage for row in rows]),
+        np.stack([row.structural for row in rows]),
+        np.stack([row.error_radii for row in rows]).astype(np.float64),
+    )
+    return branch_aware_prepared_quantized_array_lower_bounds(
+        query, prepared, config,
     )
 
 
@@ -430,6 +514,28 @@ def prepared_quantized_array_lower_bounds(
     prepared: PreparedQuantizedBoundArrays,
     config: DistanceConfig | None = None,
 ) -> QuantizedLowerBoundBatch:
+    return _prepared_quantized_array_lower_bounds(
+        query, prepared, config, branch_aware=False,
+    )
+
+
+def branch_aware_prepared_quantized_array_lower_bounds(
+    query: Representation,
+    prepared: PreparedQuantizedBoundArrays,
+    config: DistanceConfig | None = None,
+) -> QuantizedLowerBoundBatch:
+    return _prepared_quantized_array_lower_bounds(
+        query, prepared, config, branch_aware=True,
+    )
+
+
+def _prepared_quantized_array_lower_bounds(
+    query: Representation,
+    prepared: PreparedQuantizedBoundArrays,
+    config: DistanceConfig | None,
+    *,
+    branch_aware: bool,
+) -> QuantizedLowerBoundBatch:
     """Evaluate a query against already validated and converted candidates."""
     config = config or DistanceConfig()
     coarse = prepared.coarse
@@ -489,12 +595,46 @@ def prepared_quantized_array_lower_bounds(
                 included.append(candidate_present)
                 continue
             stored = samples[:, index]
-            joined = np.c_[stored, np.broadcast_to(query_values, stored.shape)]
-            denominator = np.maximum.reduce((
-                joined_iqr[:, index] + 2.0 * max_radii[:, index],
-                np.std(joined, axis=1) + rms_radii[:, index] / np.sqrt(2.0),
-                np.full(row_count, 1e-6),
-            ))
+            raw_iqr_upper = (
+                joined_iqr[:, index] + 2.0 * max_radii[:, index]
+            )
+            if branch_aware:
+                iqr_upper = np.nextafter(raw_iqr_upper, np.inf)
+                iqr_lower = np.nextafter(
+                    joined_iqr[:, index] - 2.0 * max_radii[:, index], -np.inf,
+                )
+                iqr_certain = iqr_lower >= 1e-8
+                denominator = np.maximum(iqr_upper, 1e-6)
+                needs_std = ~iqr_certain
+                if np.any(needs_std):
+                    joined = np.c_[
+                        stored[needs_std],
+                        np.broadcast_to(query_values, stored.shape)[needs_std],
+                    ]
+                    std_upper = np.nextafter(
+                        np.std(joined, axis=1)
+                        + rms_radii[needs_std, index] / np.sqrt(2.0),
+                        np.inf,
+                    )
+                    fallback_certain = iqr_upper[needs_std] < 1e-8
+                    denominator[needs_std] = np.where(
+                        fallback_certain,
+                        np.maximum(std_upper, 1e-6),
+                        np.maximum.reduce((
+                            iqr_upper[needs_std], std_upper,
+                            np.full(np.sum(needs_std), 1e-6),
+                        )),
+                    )
+            else:
+                joined = np.c_[
+                    stored, np.broadcast_to(query_values, stored.shape),
+                ]
+                denominator = np.maximum.reduce((
+                    raw_iqr_upper,
+                    np.std(joined, axis=1)
+                    + rms_radii[:, index] / np.sqrt(2.0),
+                    np.full(row_count, 1e-6),
+                ))
             value = numerator(query_values, stored, rms_radii[:, index]) / denominator
             value[~candidate_present] = 2.0
             distances.append(value)
