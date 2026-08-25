@@ -254,7 +254,9 @@
   <p class="fail"><b>Fixed smaller seeds and oversized blocks rejected:</b> Seed 128 increases UONEK work from 4,181 to 4,781 because it initially establishes a looser threshold; seed 256 restores 4,181 but saves nothing. A 32,768-row block preserves exact UONEK results but takes 131.70 versus 102.15 seconds at 4,096 rows. More resource use is permitted, but neither variant improves latency.</p>
   <p><b>Next:</b> Compare deterministic query-group/core parallelism at 1/2/4/8 logical workers, retaining byte-identical per-query proposal digests and complete certificates. ANN remains a later low-priority comparison or a candidate for a separately labelled non-certified interactive mode.</p>
   <p class="pass"><b>Query-parallel POCs pass:</b> Four spawned processes × two Numba threads reproduce all 24 proposal digests in 622.83 seconds/2.6544× versus serial. Eight processes × one thread improve this to 515.77 seconds/3.2054× and are selected. Extending worker-local proposals through exact completion preserves all 24 final matches and complete certificates while reducing full batch wall time from 3,275.88 to 790.70 seconds, a 4.1430×/75.86% improvement. Maximum worker RSS is 874.39 MiB; summed peaks are 5.32 GiB. POC digest is <code>a96791dc…c3909</code>.</p>
-  <p><b>Robustness work:</b> Before M04R-09 closes, add atomic deterministic group checkpoints/resume and an independent verifier over the physical generation, baseline, every result/certificate, accounting, timing arithmetic and outcome firewall.</p>
+  <p class="pass"><b>Resumable selected gate PASS:</b> Eight schema-v2 group checkpoints bind registry, generation, baseline, controls, membership, complete retrieval content and actual timing/RSS integrity separately. A fresh run returns all 24 exact results with maximum group wall 806.8174 seconds, a 4.0602×/75.37% improvement over 3,275.8811 serial. Immediate resume validates all eight checkpoints in 25.73 seconds without worker launch. Timing and semantic corruption tests fail closed.</p>
+  <p class="pass"><b>Independent verifier PASS:</b> The verifier re-hashes the 9.2-GB generation and serial baseline, independently reconstructs schedule/group IDs, both checkpoint digest layers, all proposals/matches/certificates and performance/outcome arithmetic. It reports zero failures with digest <code>8c790155…5e507</code>.</p>
+  <p class="pass"><b>M04R-09 COMPLETE:</b> The selected certified batch uses eight spawned one-thread groups and retains the serial engine as its reference fallback. Perfect-proposer evidence rejects ANN construction for this certified path; ANN remains optional only for a separately labelled non-certified interactive mode. M04R-10 is next.</p>
 </section>
 
 <section class="task" id="m04r-10">
@@ -306,7 +308,7 @@
     <li>Commit a clean rollback point.</li>
     <li>Proceed only if the explicit gate passes. A failure creates a versioned redesign; it never lowers a frozen threshold.</li>
   </ol>
-  <p class="muted">M04R-00 through M04R-08 are complete. M04R-09 is in progress: ANN ceiling, block-size and query-parallel POCs are complete; resumable execution and independent verification remain. The certified engine remains exact and the shadow generation remains inactive until later comparison, generalization and promotion tasks pass.</p>
+  <p class="muted">M04R-00 through M04R-09 are complete. M04R-10's genuinely new untouched NASDAQ authority contract is next. The certified engine remains exact and the shadow generation remains inactive until later comparison, generalization and promotion tasks pass.</p>
 </section>
 </body>
 </html>
