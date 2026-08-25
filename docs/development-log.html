@@ -806,6 +806,14 @@
   <p><b>Why:</b> The pack scan is single-threaded and unchanged; remaining per-group work is already small enough that scheduling/memory-bandwidth overhead offsets extra concurrency. This falsifies the last simple worker-scaling alternative without weakening any gate.</p>
   <p><b>Next:</b> Run historical CAKE and current TAIT sequentially under the selected v5/eight-worker controls. Their timings, together with TVTX 328.03, determine whether the projected 12-case p95 is credible enough to authorize the full checkpointed matrix.</p>
 </section>
+
+<section class="entry">
+  <h2>L-079 — v5 heavy-tail check fails p95; compiled quantile kernel prepared</h2>
+  <p><b>Heavy results:</b> Under selected v5/eight-worker controls, historical CAKE passes in 243.74 seconds with unchanged 7,783 exact rows, but current TAIT takes 355.95 seconds with 7,419. The partial two-case p95 is 350.34 seconds. Together with TVTX at 328.03, the upper tail is not credible for the 300-second full-matrix gate, so the remaining nine cases were not run.</p>
+  <p><b>Bound-kernel POC:</b> TAIT is eligible for essentially the complete pack, making query-specific bound math dominant. Added a parallel, GIL-free compiled exact joined-IQR primitive over already-converted float64 samples. The first formula differed by one ULP in 1/4,883 values and was rejected; matching NumPy's endpoint-sensitive interpolation order yields bit-exact quartiles on random, constant and adjacent-float cases.</p>
+  <p><b>Measured complete-kernel result:</b> Across fixed 32,768 real TAIT-eligible packed rows, the full quantized bound—not just quartiles—improves from median 1.9649 to 1.1016 seconds, 1.7837×, with totals bit-identical and zero component delta. Focused bound/store/proposal/certified tests and the full suite pass.</p>
+  <p><b>Next:</b> Commit this kernel, then rerun TAIT alone under unchanged v5 controls. Require exact candidate/final authority evidence and a material end-to-end reduction before recomputing the heavy-tail projection.</p>
+</section>
 </main>
 
 <section id="reproduce">

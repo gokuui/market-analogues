@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from numba import njit, prange
 import numpy as np
 
 from .distance import DistanceConfig, GROUPS, representation_distance_lower_bound
@@ -32,6 +33,26 @@ PACKED_ROW_BYTES = ((UNALIGNED_ROW_BYTES + 63) // 64) * 64
 
 class QuantizedBoundError(ValueError):
     pass
+
+
+@njit(cache=True, nogil=True, parallel=True)
+def _joined_iqr_compiled(
+    samples: np.ndarray, query_samples: np.ndarray,
+) -> np.ndarray:
+    """Exact linear 25/75 percentiles over each joined 48+48 row."""
+    rows, channels, width = samples.shape
+    output = np.empty((rows, channels), dtype=np.float64)
+    for row in prange(rows):
+        joined = np.empty(width * 2, dtype=np.float64)
+        for channel in range(channels):
+            for index in range(width):
+                joined[index] = samples[row, channel, index]
+                joined[width + index] = query_samples[channel, index]
+            joined.sort()
+            lower = joined[24] - (joined[24] - joined[23]) * .25
+            upper = joined[71] + (joined[72] - joined[71]) * .25
+            output[row, channel] = upper - lower
+    return output
 
 
 @dataclass(frozen=True)
@@ -318,12 +339,6 @@ def quantized_array_lower_bounds(
         ))
         return np.maximum(observed - radius, 0.0)
 
-    def interquartile_range(joined: np.ndarray) -> np.ndarray:
-        # One partition produces both quantiles.  Separate percentile calls
-        # partition the identical 96-value rows twice.
-        quartiles = np.percentile(joined, (25, 75), axis=1)
-        return quartiles[1] - quartiles[0]
-
     coarse = coarse.astype(np.float64)
     coarse_error = radii[:, 0]
     coarse_joined = np.c_[coarse, np.broadcast_to(query.coarse, coarse.shape)]
@@ -339,6 +354,12 @@ def quantized_array_lower_bounds(
         query.structural, structural, radii[:, -1],
     )
     samples = samples.astype(np.float64)
+    query_samples = np.zeros((count, 48), dtype=np.float64)
+    for index, name in enumerate(SAMPLES_48_NAMES):
+        values = query.samples_48.get(name)
+        if values is not None:
+            query_samples[index] = values
+    joined_iqr = _joined_iqr_compiled(samples, query_samples)
     rms_radii = radii[:, 1:1 + count]
     max_radii = radii[:, 1 + count:1 + 2 * count]
     index_by_name = {name: index for index, name in enumerate(SAMPLES_48_NAMES)}
@@ -356,7 +377,7 @@ def quantized_array_lower_bounds(
             stored = samples[:, index]
             joined = np.c_[stored, np.broadcast_to(query_values, stored.shape)]
             denominator = np.maximum.reduce((
-                interquartile_range(joined) + 2.0 * max_radii[:, index],
+                joined_iqr[:, index] + 2.0 * max_radii[:, index],
                 np.std(joined, axis=1) + rms_radii[:, index] / np.sqrt(2.0),
                 np.full(row_count, 1e-6),
             ))

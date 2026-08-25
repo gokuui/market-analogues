@@ -13,6 +13,7 @@ from market_analogues.distance import (
 from market_analogues.exact_aligned_features import SAMPLES_48_NAMES
 from market_analogues.quantized_bound import (
     ERROR_VALUE_COUNT, FLOAT16_MAX, PACKED_ROW_BYTES, QuantizedBoundError,
+    _joined_iqr_compiled,
     quantize_bound_row, quantized_batch_lower_bounds, quantized_bound_contract,
     quantized_representation_lower_bound,
 )
@@ -73,31 +74,22 @@ def test_quantized_bound_matches_independent_reference_and_is_safe_for_all_famil
             )
 
 
-def test_batch_iqr_uses_one_combined_percentile_call(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    query = represent(generate_case("steady_trend", 311).episode)
-    candidates = [
-        represent(generate_case(name, 312 + index).episode)
-        for index, name in enumerate(sorted(FAMILIES))
-    ]
-    rows = [quantize_bound_row(candidate) for candidate in candidates]
-    original = np.percentile
-    calls: list[object] = []
-
-    def counted(values: np.ndarray, q: object, **kwargs: object) -> np.ndarray:
-        calls.append(q)
-        return original(values, q, **kwargs)
-
-    monkeypatch.setattr(np, "percentile", counted)
-    combined = quantized_batch_lower_bounds(query, rows)
-    assert len(calls) == sum(
-        query.samples_48.get(name) is not None for name in SAMPLES_48_NAMES
+def test_compiled_joined_iqr_exactly_matches_combined_percentiles() -> None:
+    rng = np.random.default_rng(20260825)
+    samples = rng.normal(size=(257, len(SAMPLES_48_NAMES), 48))
+    samples[0] = 0
+    samples[1, :, ::2] = np.nextafter(1.0, 2.0)
+    query = rng.normal(size=(len(SAMPLES_48_NAMES), 48))
+    expected = np.empty((len(samples), len(SAMPLES_48_NAMES)))
+    for index in range(len(SAMPLES_48_NAMES)):
+        joined = np.c_[
+            samples[:, index], np.broadcast_to(query[index], (len(samples), 48)),
+        ]
+        quartiles = np.percentile(joined, (25, 75), axis=1)
+        expected[:, index] = quartiles[1] - quartiles[0]
+    np.testing.assert_array_equal(
+        _joined_iqr_compiled(samples, query), expected,
     )
-    assert all(tuple(value) == (25, 75) for value in calls)
-    for index, row in enumerate(rows):
-        scalar = quantized_representation_lower_bound(query, row)
-        assert combined.totals[index] == pytest.approx(scalar.total, abs=2e-12)
 
 
 def test_error_radii_are_outward_and_cover_every_stored_field() -> None:
