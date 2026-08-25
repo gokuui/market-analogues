@@ -19,7 +19,7 @@
 <body>
 <header>
   <h1>M04R — certified NASDAQ analogue retrieval remediation</h1>
-  <p><b>Planning date:</b> 24 August 2026. <b>Status updated 25 August 2026:</b> M04R-00 through M04R-10 are verified complete. The immutable shadow pack supports exact certified batching, an eight-process gate reduces the measured 24-query critical path by 75.37%, and a new 60-case untouched NASDAQ authority contract is sealed. M04R-11 truth construction is next. The shadow generation remains inactive.</p>
+  <p><b>Planning date:</b> 24 August 2026. <b>Status updated 25 August 2026:</b> M04R-00 through M04R-10 are verified complete, and M04R-11 authority correctness is sealed and independently verified across all 60 untouched NASDAQ cases. The exact-stage performance and memory gates pass; the separately bound end-to-end latency gate fails because full shared-scan latency is charged to every query. Production promotion remains unauthorized and the shadow generation remains inactive.</p>
   <p><b>Target outcome:</b> given a current 252-session NASDAQ chart state, return the historically eligible charts with the smallest frozen exact OHLCV/volume/market-context distance. Interactive mode must be fast and candid about approximation. Certified mode must prove that no eligible episode capable of beating the final constrained top-20 was discarded.</p>
   <p>This plan is outcome-blind. Forward returns, trader profits and setup names are not inputs to representation, retrieval, tuning or acceptance.</p>
 </header>
@@ -278,7 +278,8 @@
   <p><b>Single validation:</b> Run proposal and certified modes once against the frozen matrix.</p>
   <p><b>Fast-mode pass:</b> ≥19/20 exact-authority inclusion in every case, target 20/20; mean ≥99%; zero temporal/overlap/tier/duplicate errors; repeated search digest; ≤60 seconds warm / 120 seconds cold and ≤1 GiB RSS.</p>
   <p><b>Certified-mode pass:</b> 20/20 exact IDs and order by construction in every case, complete certificate accounting, p95 ≤300 seconds, max ≤600 seconds, RSS ≤1,536 MiB. One failed case fails the entire matrix; an average cannot override it.</p>
-  <p class="open"><b>V1 failed closed; branch-aware v4 hard-case recovery fully reproduced 25 August 2026:</b> V1 preserved 44 valid checkpoints but GBNY exceeded its 32,768-row frontier. Geometric v2 and streamed v3 remained too slow; the latter was stopped after roughly 32 minutes and retained only as a fail-closed fallback. A newly proved branch-aware denominator uses the quantization interval to choose IQR or std only when that native branch is certain, without changing distance-v1 or the immutable store. It has zero violations on one million adversarial pairs, 15,625 boundary pairs and 368,915 real rows across all 12 authorities. Query/proof/implementation commitments are now sealed into v4. Independent forward and reverse GBNY runs produce identical proposals, 20 matches, exact accounting and certificates in 100.05/100.52 seconds, pruning 3,784,935/3,786,118 rows in the packed stage and evaluating 1,114 DTWs. The complete repository suite passes. A fresh 60/60 v4 matrix and independent verification remain required before sealing; performance stays separately reported.</p>
+  <p class="pass"><b>Authority correctness complete 25 August 2026:</b> Branch-aware v4 built and sealed all 60/60 frozen NASDAQ authorities with zero invalid cases, worker failures, closure fallbacks or outcome access. Independent reconstruction rehashed the physical generation, rebuilt all 1,200 final distances/alignments, reverse-rescanned all eight proposal groups and reproduced every case, certificate, matrix and seal digest with zero failures. Matrix/seal/verifier digests are <code>ae60b7cd…b29</code>, <code>83501b4c…e2c9</code> and <code>99d11756…b190</code>. Exact completion p95/max are 155.15/169.26 seconds and peak worker RSS is 680.46 MiB.</p>
+  <p class="open"><b>Performance remains blocked:</b> The separately bound end-to-end gate fails because each case is charged its group's full 699–814 second shared proposal scan, producing p95/max 931.48/957.40 seconds. The correctness seal remains valid, but production promotion is explicitly unauthorized. Next work must improve grouped proposal latency or preregister and verify a separate amortized-throughput contract before any candidate comparison or promotion.</p>
 </section>
 
 <section class="task" id="m04r-12">
@@ -314,7 +315,7 @@
     <li>Commit a clean rollback point.</li>
     <li>Proceed only if the explicit gate passes. A failure creates a versioned redesign; it never lowers a frozen threshold.</li>
   </ol>
-  <p class="muted">M04R-00 through M04R-10 are complete. M04R-11 exact truth construction over the sealed 60-case registry is next. The certified engine remains exact and the shadow generation remains inactive until later comparison, generalization and promotion tasks pass.</p>
+  <p class="muted">M04R-00 through M04R-11 authority correctness are complete. The certified engine remains exact; end-to-end performance remediation, untouched candidate comparison, generalization and promotion tasks remain, and the shadow generation stays inactive.</p>
 </section>
 </body>
 </html>

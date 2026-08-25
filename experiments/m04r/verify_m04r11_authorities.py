@@ -3,15 +3,18 @@
 from __future__ import annotations
 
 import argparse
+from concurrent.futures import ProcessPoolExecutor
 from dataclasses import asdict
 from datetime import datetime, timezone
 from html import escape
 import json
 from math import isfinite
+import multiprocessing
 from pathlib import Path
 from typing import Any
 
 import pandas as pd
+import numba
 
 from market_analogues.adapters import file_fingerprint, source_from_spec
 from market_analogues.causal_prefix import causal_prefix_digest
@@ -206,27 +209,24 @@ def _packed_query(source: Any, case: dict[str, Any]) -> PackedBoundQuery:
     )
 
 
-def _proposal_evidence_failures(
+def _proposal_chunk_evidence_failures(
     source: Any, cases: list[dict[str, Any]], payloads: list[dict[str, Any]],
     store_root: Path, generation_id: str, controls: dict[str, Any],
 ) -> tuple[list[str], int]:
-    """Independently rescan every primary prefix and streamed closure band."""
+    """Independently rescan one bounded primary-prefix group and its closures."""
     failures: list[str] = []
     primary_limit = int(controls["maximum_frontier_rows"])
     by_id = {str(row["query_episode_id"]): row for row in payloads}
     queries = [(case, _packed_query(source, case)) for case in cases]
-    primary_reports: dict[str, Any] = {}
-    for first in range(0, len(queries), 8):
-        chunk = queries[first:first + 8]
-        batch = scan_packed_bound_proposals_many(
-            store_root, generation_id, [query for _, query in chunk],
-            route_quotas={"composite": primary_limit + 1}, block_rows=8_192,
-            block_order="reverse", branch_aware=True, verify_content=False,
-        )
-        primary_reports.update({
-            report.query_episode_id: report for report in batch.reports
-        })
-    scans = len(range(0, len(queries), 8))
+    batch = scan_packed_bound_proposals_many(
+        store_root, generation_id, [query for _, query in queries],
+        route_quotas={"composite": primary_limit + 1}, block_rows=8_192,
+        block_order="reverse", branch_aware=True, verify_content=False,
+    )
+    primary_reports = {
+        report.query_episode_id: report for report in batch.reports
+    }
+    scans = 1
     for case, query in queries:
         payload = by_id.get(str(case["episode_id"]))
         if payload is None:
@@ -323,6 +323,46 @@ def _proposal_evidence_failures(
                 failures.append(
                     f"reverse exact threshold closure differs:{case['case_id']}"
                 )
+    return failures, scans
+
+
+def _proposal_chunk_worker(
+    config_path: str, cases: tuple[dict[str, Any], ...],
+    payloads: tuple[dict[str, Any], ...], store_root: str,
+    generation_id: str, controls: dict[str, Any],
+) -> tuple[list[str], int]:
+    numba.set_num_threads(1)
+    config = load_config(Path(config_path))
+    source = source_from_spec(config.datasets["nasdaq"])
+    return _proposal_chunk_evidence_failures(
+        source, list(cases), list(payloads), Path(store_root),
+        generation_id, controls,
+    )
+
+
+def _proposal_evidence_failures(
+    config_path: Path, cases: list[dict[str, Any]], payloads: list[dict[str, Any]],
+    store_root: Path, generation_id: str, controls: dict[str, Any],
+) -> tuple[list[str], int]:
+    """Rescan all primary prefixes in eight independent reverse-order workers."""
+    by_id = {str(row["query_episode_id"]): row for row in payloads}
+    chunks = [tuple(cases[first:first + 8]) for first in range(0, len(cases), 8)]
+    payload_chunks = [tuple(by_id[str(case["episode_id"])] for case in chunk)
+                      for chunk in chunks]
+    context = multiprocessing.get_context("spawn")
+    failures: list[str] = []
+    scans = 0
+    with ProcessPoolExecutor(
+        max_workers=len(chunks), mp_context=context,
+    ) as executor:
+        futures = [executor.submit(
+            _proposal_chunk_worker, str(config_path), chunk, payload_chunk,
+            str(store_root), generation_id, controls,
+        ) for chunk, payload_chunk in zip(chunks, payload_chunks, strict=True)]
+        for future in futures:
+            observed, count = future.result()
+            failures.extend(observed)
+            scans += count
     return failures, scans
 
 
@@ -657,7 +697,7 @@ def main() -> int:
     proposal_scans = 0
     if len(verified) == 60:
         proposal_failures, proposal_scans = _proposal_evidence_failures(
-            source, cases, verified, args.full_root / "store",
+            args.config, cases, verified, args.full_root / "store",
             str(contract["generation_id"]),
             dict(contract["controls"]),
         )
