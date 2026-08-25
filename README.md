@@ -42,6 +42,8 @@ market-analogues verify-m04r-packed-bound --config config/datasets.example.yaml
 market-analogues verify-m04r-full-pack --config config/datasets.example.yaml
 market-analogues verify-m04r-global-bound-proposal \
   --config config/datasets.example.yaml
+market-analogues build-m04r-validation-registry \
+  --config config/datasets.example.yaml --dataset nasdaq
 market-analogues compare-methods --config config/datasets.example.yaml
 market-analogues build-view-store --config config/datasets.example.yaml \
   --dataset nse --lookbacks 252 --stride 5

@@ -1,0 +1,78 @@
+schema_version: m04r10-design-exclusions-v1
+created_at: 2026-08-25
+reason: >-
+  These symbols were exposed while the M04R-10 benchmark-regime selection
+  schedule was designed. They are development evidence and cannot be used by
+  the final untouched authority registry, even though no forward outcomes were
+  used by the selection algorithm.
+symbols:
+  - AMAL
+  - AOUT
+  - AURA
+  - BCOW
+  - BCRX
+  - BITF
+  - BRNS
+  - BRQSF
+  - CGNX
+  - CHR
+  - CULL
+  - CYRX
+  - DCOY
+  - DHCNL
+  - DOO
+  - ESHA
+  - FFAI
+  - FWDI
+  - FVCB
+  - GEG
+  - GEVO
+  - GIGM
+  - GPACU
+  - GRCE
+  - GRDX
+  - GWAV
+  - HFBL
+  - HOUR
+  - HUBG
+  - HURA
+  - HYPD
+  - IBEX
+  - IDN
+  - IHRT
+  - INTZ
+  - JWEL
+  - KITT
+  - LCFY
+  - LFAC
+  - LFCR
+  - LTRYW
+  - MNTSW
+  - MNSB
+  - MOLN
+  - NBST
+  - NRXP
+  - NYXH
+  - OVID
+  - OXSQ
+  - RDGT
+  - RGP
+  - RSVR
+  - SOHU
+  - SYBX
+  - TLF
+  - TOUR
+  - TRS
+  - UONEK
+  - VIRC
+  - VRCA
+  - WFCF
+  - WILC
+  - WLFC
+  - XTLB
+  - ZYXI
+known_identity_alias_groups: []
+alias_limit: >-
+  No authoritative historical NASDAQ rename/identity map is available in the
+  local inputs. Any subsequently discovered alias is contamination and fails
+  closed before M04R-11 opens candidate-system results.

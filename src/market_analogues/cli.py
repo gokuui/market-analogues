@@ -55,6 +55,11 @@ from .m04r_batch_registry import (
     build_m04r_batch_registry, validate_m04r_batch_registry,
     write_m04r_batch_registry,
 )
+from .m04r_validation_registry import (
+    build_contamination_ledger, build_m04r_validation_registry,
+    default_search_contract, validate_m04r_validation_registry,
+    write_m04r_validation_registry,
+)
 from .m04r_prefix_verification import (
     verify_m04r_causal_prefixes, write_m04r_prefix_verification,
 )
@@ -1242,6 +1247,39 @@ def cmd_build_m04r_batch_registry(args: argparse.Namespace) -> int:
     return 0 if passed else 2
 
 
+def cmd_build_m04r_validation_registry(args: argparse.Namespace) -> int:
+    config, source = _load(args)
+    if args.dataset != "nasdaq":
+        raise SystemExit("M04R-10 untouched authority registry is NASDAQ-only")
+    quality_path = config.artifact_dir / "quality" / "nasdaq.parquet"
+    liquidity_path = config.artifact_dir / "oracles" / "nasdaq" / "liquidity-strata.parquet"
+    if not quality_path.exists() or not liquidity_path.exists():
+        raise SystemExit("NASDAQ quality or liquidity audit is missing")
+    design_path = Path(args.design_exclusions).resolve()
+    ledger = build_contamination_ledger(config.artifact_dir, design_path)
+    result = build_m04r_validation_registry(
+        source, pd.read_parquet(quality_path), pd.read_parquet(liquidity_path),
+        ledger, default_search_contract(config.artifact_dir), seed=args.seed,
+        lookback=args.lookback, minimum_rows=args.minimum_rows,
+        minimum_future_sessions=args.minimum_future_sessions,
+        maximum_staleness_days=args.maximum_staleness_days,
+        regime_threshold=args.regime_threshold,
+        representation_version=config.representation_version,
+    )
+    output_directory = Path(args.output_dir) if args.output_dir else (
+        config.artifact_dir / "m04r10" / "nasdaq-untouched-authority-registry"
+    )
+    json_path, html_path = write_m04r_validation_registry(result, output_directory)
+    validation_failures = validate_m04r_validation_registry(source, output_directory)
+    passed = result.passed and not validation_failures
+    print(json.dumps({
+        "passed": passed, **result.metrics, "json": str(json_path),
+        "html": str(html_path),
+        "failures": [*result.failures, *validation_failures],
+    }, indent=2))
+    return 0 if passed else 2
+
+
 def _validated_view_manifest_rows(
     config: AppConfig,
     dataset_id: str,
@@ -2425,6 +2463,20 @@ def build_parser() -> argparse.ArgumentParser:
     m04r_batch_registry.add_argument("--maximum-staleness-days", type=int, default=120)
     m04r_batch_registry.add_argument("--output-dir")
     m04r_batch_registry.set_defaults(func=cmd_build_m04r_batch_registry)
+    m04r_validation_registry = sub.add_parser("build-m04r-validation-registry")
+    m04r_validation_registry.add_argument("--config", required=True)
+    m04r_validation_registry.add_argument("--dataset", default="nasdaq")
+    m04r_validation_registry.add_argument(
+        "--design-exclusions", default="config/m04r10-design-exclusions.yaml",
+    )
+    m04r_validation_registry.add_argument("--seed", default="m04r10-authority-v1")
+    m04r_validation_registry.add_argument("--lookback", type=int, default=252)
+    m04r_validation_registry.add_argument("--minimum-rows", type=int, default=1000)
+    m04r_validation_registry.add_argument("--minimum-future-sessions", type=int, default=60)
+    m04r_validation_registry.add_argument("--maximum-staleness-days", type=int, default=120)
+    m04r_validation_registry.add_argument("--regime-threshold", type=float, default=.10)
+    m04r_validation_registry.add_argument("--output-dir")
+    m04r_validation_registry.set_defaults(func=cmd_build_m04r_validation_registry)
     storage = sub.add_parser("verify-exact-storage")
     storage.add_argument("--config", required=True)
     storage.add_argument("--datasets", nargs="+", default=["nse", "nasdaq"])

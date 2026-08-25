@@ -19,7 +19,7 @@
 <body>
 <header>
   <h1>M04R — certified NASDAQ analogue retrieval remediation</h1>
-  <p><b>Planning date:</b> 24 August 2026. <b>Status updated 25 August 2026:</b> M04R-00 through M04R-08 are verified complete. The immutable shadow pack now supports exact certified 24-query batching with a 12.16% complete-pipeline reduction. M04R-09 performance bake-off is in progress; ANN's exact-phase ceiling is measured at only 1.69%, and certified bound-scan parallelism is next. The shadow generation remains inactive.</p>
+  <p><b>Planning date:</b> 24 August 2026. <b>Status updated 25 August 2026:</b> M04R-00 through M04R-10 are verified complete. The immutable shadow pack supports exact certified batching, an eight-process gate reduces the measured 24-query critical path by 75.37%, and a new 60-case untouched NASDAQ authority contract is sealed. M04R-11 truth construction is next. The shadow generation remains inactive.</p>
   <p><b>Target outcome:</b> given a current 252-session NASDAQ chart state, return the historically eligible charts with the smallest frozen exact OHLCV/volume/market-context distance. Interactive mode must be fast and candid about approximation. Certified mode must prove that no eligible episode capable of beating the final constrained top-20 was discarded.</p>
   <p>This plan is outcome-blind. Forward returns, trader profits and setup names are not inputs to representation, retrieval, tuning or acceptance.</p>
 </header>
@@ -265,6 +265,10 @@
   <p><b>Selection:</b> Deterministically choose at least 24 new queries, preferably 50 if authority cost after M04R-08 permits. Cover A/B quality, low/middle/high liquidity, historical/current cutoffs, multiple benchmark regimes/eras, morphology strata defined without outcomes, sparse/full context and different universe sizes. Exclude development symbols and known identity aliases.</p>
   <p><b>Freeze before search:</b> Query IDs, canonical stock/benchmark prefix digests, exact-distance digest, eligibility contract, proposal/store digests, route quotas, pool budgets, runtime/RSS limits and every authority build command. The authority root must be write-isolated from candidate results.</p>
   <p><b>Outcome firewall:</b> Runner allow-lists OHLCV, benchmark, quality and sealed authority metadata; forward-outcome roots are forbidden and audited.</p>
+  <p class="pass"><b>COMPLETE 25 August 2026:</b> The first final outcome-blind run froze 60 cases across 30 symbols—five symbols in each A/B quality × low/middle/high liquidity cell. Every symbol has paired historical/current 252-session cutoffs. Historical selection uses only a preregistered benchmark regime/era schedule: down/sideways/up in the 2010s and down/sideways in the 2020s.</p>
+  <p class="pass"><b>Coverage:</b> 30 A/30 B; 20 cases per liquidity stratum; 12 down/12 sideways/36 up; 18 2010s/42 2020s; 9 advance/29 decline/22 range morphologies; 52 full/8 sparse contexts; multiple universe-size bands; all three volatility and drawdown bands. These morphology/context summaries describe frozen query prefixes and did not choose symbols or cutoffs.</p>
+  <p class="pass"><b>Provenance and synthetic verification:</b> A sealed ledger excludes 270 symbols from Gate 09, Gate 12, M04R development, both Kullamägi inputs and M04R-10 design probes. A 2,446-row eligible-universe snapshot and 48-row first-eligible transcript prove deterministic selection. Causal stock/benchmark prefixes accept future appends and reject historical revisions. The independent verifier reconstructs ledger, universe, transcript, case encodings, coverage and search/store/distance contracts with zero failures; registry/verifier digests are <code>0a4da732…5361e</code>/<code>ea916e6c…07391</code>.</p>
+  <p><b>Known limit:</b> Local inputs contain no authoritative historical NASDAQ rename/identity map. Known aliases are explicitly ledgered; a subsequently discovered alias fails closed before M04R-11 candidate results are opened.</p>
 </section>
 
 <section class="task" id="m04r-11">
@@ -308,7 +312,7 @@
     <li>Commit a clean rollback point.</li>
     <li>Proceed only if the explicit gate passes. A failure creates a versioned redesign; it never lowers a frozen threshold.</li>
   </ol>
-  <p class="muted">M04R-00 through M04R-09 are complete. M04R-10's genuinely new untouched NASDAQ authority contract is next. The certified engine remains exact and the shadow generation remains inactive until later comparison, generalization and promotion tasks pass.</p>
+  <p class="muted">M04R-00 through M04R-10 are complete. M04R-11 exact truth construction over the sealed 60-case registry is next. The certified engine remains exact and the shadow generation remains inactive until later comparison, generalization and promotion tasks pass.</p>
 </section>
 </body>
 </html>
