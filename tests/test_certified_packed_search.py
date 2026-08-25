@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict
 from pathlib import Path
+import warnings
 
 import numpy as np
 import pandas as pd
@@ -11,7 +13,7 @@ from market_analogues.causal_prefix import causal_prefix_digest
 from market_analogues.certified_packed_search import certified_packed_search
 from market_analogues.config import BenchmarkSpec, DatasetSpec
 from market_analogues.episodes import build_episode
-from market_analogues.exact_batch import sliding_exact_representations
+from market_analogues.exact_batch import _stage_rows, sliding_exact_representations
 from market_analogues.packed_bound_store import (
     OVERFLOW_DTYPE, make_packed_record, write_packed_generation,
 )
@@ -106,3 +108,25 @@ def test_certified_pack_exhaustion_matches_brute_force(
     assert certificate.maximum_quantized_bound_excess <= 1e-12
     assert repeated.certificate.result_digest == certificate.result_digest
     assert repeated.certificate.input_digest == certificate.input_digest
+
+
+def test_optional_empty_volume_stages_are_warning_free_across_threads() -> None:
+    rows = 16
+    width = 252
+    channels = {
+        "close_path": np.zeros((rows, width)),
+        "return": np.zeros((rows, width)),
+        "relative_return": np.zeros((rows, width)),
+        "volume_robust_z": np.full((rows, width), np.nan),
+    }
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            output = list(executor.map(
+                lambda _: _stage_rows(channels), range(64),
+            ))
+    runtime = [
+        item for item in caught if issubclass(item.category, RuntimeWarning)
+    ]
+    assert not runtime
+    assert all(np.isfinite(value).all() for value in output)

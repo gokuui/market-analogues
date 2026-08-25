@@ -79,6 +79,10 @@ from .m04r_global_proposal_verification import (
     verify_m04r_global_bound_proposal,
     write_m04r_global_bound_proposal_verification,
 )
+from .m04r_certified_search_verification import (
+    verify_m04r_certified_packed_search,
+    write_m04r_certified_search_verification,
+)
 from .multiresolution_verification import (
     verify_multiresolution_state, write_multiresolution_verification,
 )
@@ -798,6 +802,52 @@ def cmd_verify_m04r_global_bound_proposal(args: argparse.Namespace) -> int:
         },
         list(result.failures), source_hashes={
             "global_bound_proposal_contract": str(result.metrics["contract_digest"]),
+            "packed_generation": str(result.metrics["generation_id"]),
+        },
+    ).write(_gates(config))
+    print(json.dumps({
+        "passed": result.passed, **result.metrics,
+        "result_digest": result.result_digest,
+        "failures": result.failures,
+    }, indent=2))
+    print(html)
+    return 0 if result.passed else 2
+
+
+def cmd_verify_m04r_certified_packed_search(args: argparse.Namespace) -> int:
+    config = load_config(args.config)
+    poc_root = config.artifact_dir / "poc" / "m04r"
+    full_root = Path(args.full_root) if args.full_root else (
+        poc_root / "packed-bound-full"
+    )
+    evidence = Path(args.evidence) if args.evidence else (
+        poc_root / "certified-packed-search-full.json"
+    )
+    build_path = full_root / "packed-bound-full.json"
+    build = json.loads(build_path.read_text())
+    query_id = str(build.get("benchmark_selection", {}).get("query_episode_id", ""))
+    authority = Path(args.authority) if args.authority else (
+        config.artifact_dir / "gate12" / "authorities" / "nasdaq"
+        / "cases" / f"{query_id}.json"
+    )
+    result = verify_m04r_certified_packed_search(
+        evidence, full_root / "store", build_path, authority,
+    )
+    output_dir = Path(args.output_dir) if args.output_dir else (
+        config.artifact_dir / "m04r-certified-packed-search"
+    )
+    machine, html = write_m04r_certified_search_verification(result, output_dir)
+    GateReport(
+        "m04r_certified_packed_search", result.passed,
+        {
+            **result.metrics, "result_digest": result.result_digest,
+            "machine_artifact": str(machine.resolve()),
+            "html_artifact": str(html.resolve()),
+        },
+        list(result.failures), source_hashes={
+            "certified_packed_search_contract": str(
+                result.metrics["contract_digest"]
+            ),
             "packed_generation": str(result.metrics["generation_id"]),
         },
     ).write(_gates(config))
@@ -2151,6 +2201,13 @@ def build_parser() -> argparse.ArgumentParser:
     m04r_global_proposal.add_argument("--rank-evidence")
     m04r_global_proposal.add_argument("--output-dir")
     m04r_global_proposal.set_defaults(func=cmd_verify_m04r_global_bound_proposal)
+    m04r_certified = sub.add_parser("verify-m04r-certified-packed-search")
+    m04r_certified.add_argument("--config", required=True)
+    m04r_certified.add_argument("--full-root")
+    m04r_certified.add_argument("--evidence")
+    m04r_certified.add_argument("--authority")
+    m04r_certified.add_argument("--output-dir")
+    m04r_certified.set_defaults(func=cmd_verify_m04r_certified_packed_search)
     compare = sub.add_parser("compare-methods")
     compare.add_argument("--config", required=True)
     compare.add_argument("--seeds-per-family", type=int, default=5)

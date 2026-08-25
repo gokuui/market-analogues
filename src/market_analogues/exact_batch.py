@@ -245,7 +245,13 @@ def _stage_rows(channels: dict[str, np.ndarray], stages: int = 12) -> np.ndarray
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", category=RuntimeWarning)
             volatility = np.nanstd(returns, axis=1, ddof=1)
-            volume = np.nanmean(channels["volume_robust_z"][:, start:end], axis=1)
+        volume_values = channels["volume_robust_z"][:, start:end]
+        volume_count = np.isfinite(volume_values).sum(axis=1)
+        volume = np.full(len(volume_values), np.nan)
+        np.divide(
+            np.nansum(volume_values, axis=1), volume_count,
+            out=volume, where=volume_count > 0,
+        )
         volatility[valid_count < 2] = np.nan
         relative = np.nansum(channels["relative_return"][:, start:end], axis=1)
         parts.extend([

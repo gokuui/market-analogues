@@ -22,7 +22,7 @@
 </header>
 
 <section id="status">
-  <h2>Current status — 24 August 2026</h2>
+  <h2>Current status — 25 August 2026</h2>
   <table>
     <thead><tr><th>Gate</th><th>Status</th><th>Evidence</th></tr></thead>
     <tbody>
@@ -45,7 +45,7 @@
       <tr><td>12E Deterministic scale ladder</td><td class="pass">PASS — BOTH MARKETS</td><td>Full NSE and NASDAQ 1%/10% aggregate gates pass. NASDAQ 10% covers 1,159 symbols/363,633 candidates, prunes 99.78%, repeats its digest, searches in 6.82/6.59 minutes and projects a 68.2-minute full search at 547 MB.</td></tr>
       <tr><td>12F Blind authority matrix</td><td class="pass">PASS — 24/24 SEALED</td><td>All 12 NSE and 12 NASDAQ authorities pass along with both market aggregates. Each artifact has complete candidate accounting, repeat-result identity and a strict exact stopping certificate. No production ranking or forward outcome was read.</td></tr>
       <tr><td>12 Full-universe production comparison</td><td class="open">OPEN</td><td>The independent exact references are complete. Production top-20 recall against all 24 references, diversity behavior and promotion remain unmeasured.</td></tr>
-      <tr><td>M04R certified retrieval repair</td><td class="open">M04R-00…07 PASS; EXACT COMPLETION OPEN</td><td>The 11,584-symbol immutable bound pack and global 1,170-candidate proposal union pass. Composite top-1,000 retains all 240 development-authority targets (maximum bound rank 343); full worst-query forward/reverse scans are identical at 263.11/263.32 s and 279.73 MiB. M04R-08 must still prove exact constrained top-k completion before activation.</td></tr>
+      <tr><td>M04R certified retrieval repair</td><td class="open">M04R-00…08A PASS; ALL-12/BATCH OPEN</td><td>The immutable pack, global proposal and first certified exact-completion gate pass. The preregistered worst query repeats under unequal controls with exact authority IDs/alignments, 2,407 exact evaluations of 3,786,118, strict bound stopping, 417.10/509.14 s and 558.52 MiB. Independent verifier <code>592ecba9…0a070</code> passes. All-12 and shared-I/O batch gates remain open.</td></tr>
       <tr><td>External Kullamagi examples</td><td class="pass">AUDIT COMPLETE — PARTIAL COVERAGE</td><td>132 unique 252-session episodes across 56 NASDAQ-source symbols. Causal top-5 label purity is 51.5% versus a 41.4% frequency baseline (within-query random-candidate p=0.001); causal minority-setup recovery remains weak.</td></tr>
       <tr><td>Yahoo-expanded Kullamagi examples</td><td class="fail">75% TARGET NOT REACHED</td><td>Yahoo expands coverage to 361 episodes across 129 symbols. With one match per candidate symbol, primary causal top-5 purity is 54.44% versus a 50.44% within-query random expectation (p=0.003): measurable but far below the target and concentrated in breakouts.</td></tr>
     </tbody>
@@ -642,6 +642,15 @@
   <p><b>Correction and measured result:</b> The engine now exact-scores 512 stable bound seeds first, derives a finite constrained τ, then materializes only unscored frontier rows whose safe bound is ≤τ. The same full query certifies in 409.1715 seconds at 546.00 MiB. It scores 2,407 of 3,786,118 eligible rows, safely prunes 3,783,711, uses 1,525 grouped materialization operations (1,522 sparse, three batch), and stops at <code>0.7993423150 &gt; 0.7735697168</code>. Ordered IDs exactly equal all 20 frozen authority IDs. Certificate digest is <code>664bcb954590df46a72634d47dd1fee086e3b5845e6604ca852b971f01fea9cb</code>.</p>
   <p><b>Boundary and next:</b> This is M04R-08A development evidence, not the complete gate. The worst query passes the 600-second/1,536-MiB maximum but exceeds the 300-second p95 ambition. Next persist the failed/successful runs through a verifier-owned experiment, measure exact numeric/component/alignment tolerances, repeat deterministically, run all 12 authorities, then implement shared-I/O batch mode. The shadow generation remains inactive and outcomes remain untouched.</p>
 </section>
+
+<section class="entry" id="log-057">
+  <h2>L-057 — M04R-08A repeated full certification and independent verifier</h2>
+  <p><b>Why:</b> One successful development execution was insufficient: it did not persist durable machine evidence, test different execution controls, quantify the post-refactor authority tolerance, preserve the rejected design in the same gate or protect against a self-asserted pass.</p>
+  <p><b>What and how:</b> Added a checkpointing full-universe gate that binds the preregistered worst query, frozen authority, packed-build digest, physical generation and certified-search contract. It runs at least twice with distinct block/worker settings, records partial state after each completed run, fails visibly on exceptions, excludes timing from the deterministic evidence digest and never reads forward outcomes or setup labels. Added a separate verifier that re-hashes the 9.2-GB generation, validates shadow state and authority/build integrity, independently reconstructs each certificate digest from matches and float hex values, and recomputes repeat, numeric, stopping, accounting and resource gates.</p>
+  <p><b>Full evidence:</b> Runs using 2,048 rows/eight workers and 4,097 rows/four workers complete in 417.1000 and 509.1447 seconds at 558.52 MiB peak. Both return the exact 20 frozen IDs and alignments, evaluate 2,407 of 3,786,118 eligible candidates, prune 3,783,711 safely, and stop at lower bound 0.7993423150 above τ 0.7735697168. Both reconstruct certificate digest <code>664bcb954590df46a72634d47dd1fee086e3b5845e6604ca852b971f01fea9cb</code>. Maximum differences from the older authority are 7.8538e−9 total and 9.8172e−8 component, isolated to the pre-shared-kernel coarse float path and accepted under explicit 1e−7/1e−6 practical development tolerances while IDs/alignments remain exact.</p>
+  <p><b>Failures and verifier:</b> The evidence retains the first 8,192-row exact-all attempt as an interrupted performance failure at 840 seconds, 843 MiB and exit 130. Gate evidence digest is <code>8382e417a4d528ccaa423664180a697e5dd42f767968d139db61094e88f48647</code>. Independent physical verification passes with digest <code>592ecba94b9e8c4b0c01a1cc55f8c8ac6a08a88676fe748ea4c27c980490a070</code>. A threaded optional-volume stage exposed a benign <code>nanmean</code> empty-slice warning caused by process-global warning-filter races; the operation now uses an explicit finite count and divide, proven bit-identical and warning-free across 64 concurrent calls.</p>
+  <p><b>Boundary and next:</b> M04R-08A is complete only for the preregistered worst development query. It meets the 600-second maximum but not the 300-second p95 ambition. Next run all 12 frozen NASDAQ authorities with checkpoint/resume and aggregate gates, then implement shared-I/O multi-query batching and prove result/certificate equality plus material total-time reduction. The pack remains shadow-only.</p>
+</section>
 </main>
 
 <section id="reproduce">
@@ -673,6 +682,8 @@
 .venv/bin/market-analogues verify-m04r-full-pack --config config/datasets.example.yaml
 .venv/bin/python experiments/m04r/global_bound_proposal_gate.py --config config/datasets.example.yaml --full-root config/data/analogues/poc/m04r/packed-bound-full --output config/data/analogues/poc/m04r/global-bound-proposal-full.json --block-rows 2048
 .venv/bin/market-analogues verify-m04r-global-bound-proposal --config config/datasets.example.yaml
+.venv/bin/python experiments/m04r/certified_packed_search_gate.py --config config/datasets.example.yaml --full-root config/data/analogues/poc/m04r/packed-bound-full --output config/data/analogues/poc/m04r/certified-packed-search-full.json --runs 2
+.venv/bin/market-analogues verify-m04r-certified-packed-search --config config/datasets.example.yaml
 .venv/bin/python experiments/m04r/distance_v1_bound_gate.py --pairs 1000000 --reference-pairs 2000 --output config/data/analogues/poc/m04r/distance-v1-bound-gate.json
 .venv/bin/market-analogues verify --config config/datasets.example.yaml
 .venv/bin/market-analogues verify-oracle --config config/datasets.example.yaml --dataset nse --symbols reliance tcs --instruments-per-stratum 4
