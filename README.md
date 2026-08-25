@@ -44,6 +44,11 @@ market-analogues verify-m04r-global-bound-proposal \
   --config config/datasets.example.yaml
 market-analogues build-m04r-validation-registry \
   --config config/datasets.example.yaml --dataset nasdaq
+python experiments/m04r/m04r11_build_authorities.py \
+  --config config/datasets.example.yaml \
+  --registry config/data/analogues/m04r10/nasdaq-untouched-authority-registry/query-registry.json \
+  --full-root config/data/analogues/poc/m04r/packed-bound-full \
+  --authority-root config/data/analogues/m04r11/authorities-sealed
 market-analogues compare-methods --config config/datasets.example.yaml
 market-analogues build-view-store --config config/datasets.example.yaml \
   --dataset nse --lookbacks 252 --stride 5
