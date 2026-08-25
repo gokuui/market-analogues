@@ -9,6 +9,7 @@ from html import escape
 import json
 import multiprocessing
 from pathlib import Path
+import sys
 from time import perf_counter
 from typing import Any
 
@@ -19,6 +20,7 @@ from market_analogues.types import stable_hash
 try:
     from experiments.m04r.m04r11_build_authorities import _worker
 except ModuleNotFoundError:  # Direct script execution adds this directory to sys.path.
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
     from m04r11_build_authorities import _worker
 
 
