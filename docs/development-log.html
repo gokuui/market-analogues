@@ -778,6 +778,13 @@
   <p><b>Performance:</b> Warm group speedups are 6,389×/4,804×/3,171×/1,959× at 1/2/4/8 rows and remain 157× at 64, eliminating tiny-array Python-loop overhead. On the fixed 112-real-symbol/335-representation benchmark, complete requested representation construction falls from 2.9302 to 0.8828 seconds, a 3.319× speedup with zero core-array delta.</p>
   <p><b>Next:</b> Rerun only optimized TVTX v4 from a fresh checkpoint. JIT warming occurs during query representation before threaded completion; require exact authority equality, unchanged 9,309 accounting, strict stop and resource gates. Do not infer the end-to-end result from the microbenchmark.</p>
 </section>
+
+<section class="entry">
+  <h2>L-075 — Compiled structural TVTX PASS; deferred-path omission found</h2>
+  <p><b>TVTX result:</b> Optimized v4 with compiled structural features passes exact authority/accounting/stopping in 387.47 seconds at 774.64 MiB. It saves 80.94 seconds/17.3% versus prior v4, 120.61/23.7% versus combined-IQR v2 and 596.81/60.6% versus v1. The deterministic v4 result digest remains unchanged because the compiled features are bit-identical and timing is excluded.</p>
+  <p><b>Remaining gap:</b> TVTX is still 87.47 seconds above p95. Review found that M04R-08's written materialization rule says “reconstruct DTW paths only for final results,” but implementation calls Python full-matrix DTW and constructs a path for every one of 9,309 exact candidates. This was not a research omission—the existing frozen POC already shows a compiled two-row distance kernel exactly matching 2,000 references/path lengths at 527.8×, with zero unsafe/mismatch results on 100,000 threshold cases—but it was not wired into completion.</p>
+  <p><b>Next correction:</b> Add a distinct v5 contract that uses compiled exact DTW distance without paths during candidate scoring, selects the constrained top-20, then recomputes only those 20 through the original full parent matrix to restore exact tie-order alignments. Require compiled/reference distance equality, final path equality, unchanged ranking/accounting and practical numeric gates. Preserve v1–v4.</p>
+</section>
 </main>
 
 <section id="reproduce">
