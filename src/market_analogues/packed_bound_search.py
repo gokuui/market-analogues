@@ -153,12 +153,24 @@ def _stable_bounded(entries: np.ndarray, incoming: np.ndarray, quota: int) -> np
         return _empty_entries()
     if not np.isfinite(merged["route_score"]).all() or np.any(merged["route_score"] < 0):
         raise PackedBoundSearchError("route lower bounds must be finite and nonnegative")
-    identifiers = np.frombuffer(
-        merged["episode_id"].tobytes(),
+    if len(merged) <= quota:
+        return merged.copy()
+    scores = merged["route_score"]
+    boundary = float(np.partition(scores, quota - 1)[quota - 1])
+    lower = np.flatnonzero(scores < boundary)
+    tied = np.flatnonzero(scores == boundary)
+    needed = quota - len(lower)
+    if needed < 0 or needed > len(tied):
+        raise PackedBoundSearchError("stable quota partition accounting differs")
+    tied_identifiers = np.frombuffer(
+        merged["episode_id"][tied].tobytes(),
         dtype=np.dtype([("high", ">u8"), ("low", ">u4")]),
     )
-    order = np.lexsort((identifiers["low"], identifiers["high"], merged["route_score"]))
-    return merged[order[:quota]].copy()
+    tied_order = np.lexsort((
+        tied_identifiers["low"], tied_identifiers["high"],
+    ))
+    selected = np.concatenate((lower, tied[tied_order[:needed]]))
+    return merged[selected].copy()
 
 
 def _eligible_mask(records: np.ndarray, query: PackedBoundQuery, symbol_id: int | None) -> np.ndarray:
