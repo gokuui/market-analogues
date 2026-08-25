@@ -756,6 +756,13 @@
   <p><b>Differential gate:</b> On the market-agnostic physical packed fixture, v4 returns the same constrained IDs, order and alignments as v1–v3 and brute force, with totals/components within 1e−12, identical input digest and exact-evaluation count, plus a distinct v4 schema/contract digest. The full test suite passes after CLI/import checks.</p>
   <p><b>Next:</b> Run only optimized one-scan TVTX with requested positions plus vector lower bounds. Require the frozen authority tolerances, strict stop, bound safety and unchanged 9,309 accounting. Do not infer real speed from synthetic group benchmarks and do not start the other authorities unless the measured TVTX result materially improves.</p>
 </section>
+
+<section class="entry">
+  <h2>L-072 — Vector native-bound v4 TVTX PASS; still above p95</h2>
+  <p><b>Result:</b> Optimized one-scan TVTX under v4 passes every authority, accounting, strict-stop, quantized-safety, 600-second and RSS case gate. It evaluates the unchanged 9,309 rows, returns exact IDs/order/alignments with the same 8.91e−9/1.12e−7 authority deltas, and completes in 468.41 seconds at 643.19 MiB. Certificate/case digests are <code>be2c87a5…cfa8</code>/<code>ac935023…094b</code>.</p>
+  <p><b>Comparison:</b> v4 saves 39.67 seconds/7.8% versus optimized scalar-bound v2 at 508.08, and 515.87 seconds/52.4% versus rejected v1 at 984.28. The gain is real but smaller than isolated group benchmarks because TVTX has 3,809 sparse groups, including many size-one batches, plus concurrent memory pressure and unchanged representation/source work.</p>
+  <p><b>Boundary and next:</b> TVTX remains 168.41 seconds above p95. The next measured costs are requested representation construction and source/prefix work. Benchmark exact-timestamp benchmark alignment and repeated full-frame conversion on fixed real symbol groups against exact-equal alternatives; do not optimize DTW or rerun other authorities without evidence.</p>
+</section>
 </main>
 
 <section id="reproduce">
