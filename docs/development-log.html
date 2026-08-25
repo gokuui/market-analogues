@@ -713,6 +713,13 @@
   <p><b>Verification:</b> On a physical packed fixture, forward 17-row and reverse 64-row batch scans are byte-equivalent to independent scalar scans performed with 31-row blocks for both a broad A/B query and a same-symbol/A-only temporal query. Candidate tuples, candidate digests, scalar result digests, eligibility and route counts all match. One 1,038-row physical scan accounts for 2,076 logical rows across two queries. Empty and duplicate query sets fail closed; the full test suite passes.</p>
   <p><b>Next:</b> Run one shared composite-quota-16,385 scan for the three frozen heavy authorities and compare every per-query candidate digest/eligible count to the already certified one-scan v2 checkpoints. Measure shared elapsed and RSS. This POC covers proposal I/O only; even a pass does not yet share exact source reconstruction or emit new final-search certificates.</p>
 </section>
+
+<section class="entry">
+  <h2>L-066 — Shared physical-read scan rejected on measured speed</h2>
+  <p><b>Correctness:</b> The full 3,786,156-row immutable pack was scanned for TVTX, CAKE and TAIT in one shared traversal. All three embedded reports exactly match same-process scalar candidates, candidate/result digests, eligible counts and route counts, and reproduce the candidate digests already bound into their certified final-search checkpoints. Physical/logical accounting is 3,786,156/11,358,468 rows; peak RSS is 247.71 MiB. Every correctness/resource gate passes.</p>
+  <p><b>Performance rejection:</b> Shared elapsed is 626.34 seconds. Three scalar controls in the same process take 205.36, 180.79 and 255.55 seconds, totaling 641.70. The measured gain is only 1.0245×/2.39%, below the preregistered 10% material threshold, so evidence digest <code>2e042acf…a49</code> is a FAIL and the batch wrapper is not promoted into certified final search.</p>
+  <p><b>Meaning and next:</b> Reading each block once is correct but physical I/O is not the dominant cost; query-specific quantized-bound statistics dominate. Preserve the batch primitive as tested infrastructure, but do not claim it repairs p95. Next decompose the real bound kernel on fixed pack rows, measuring eligibility, presence unpacking/conversion, coarse/stage/structure, each 48-sample group, quantile/std denominators and heap maintenance. Test compact alternatives against identical float results before changing the production kernel.</p>
+</section>
 </main>
 
 <section id="reproduce">

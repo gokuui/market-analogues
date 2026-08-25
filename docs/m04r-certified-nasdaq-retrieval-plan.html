@@ -218,7 +218,8 @@
   <p class="pass"><b>One-scan v2 TVTX PASS 25 August 2026:</b> Starting pure v2 at frontier 16,384 removes the duplicate scan and retains exact authority equality. The certificate accounts for 9,309 exact and 3,003,508 safely pruned rows with strict stopping; runtime is 569.59 seconds and RSS 614.12 MiB. This saves 209.17 seconds versus old-frontier v2 and 414.69 seconds versus v1, passing the case maximum without weakening it.</p>
   <p class="pass"><b>Three-heavy maximum gate PASS 25 August 2026:</b> Under identical one-scan pure-v2 controls, CAKE completes in 425.75 seconds/7,783 exact rows and TAIT in 560.92 seconds/7,419, both exactly matching their frozen authorities. With TVTX at 569.59 seconds, every former >600-second case now passes the unchanged maximum and RSS limits.</p>
   <p class="pass"><b>M04R-08C shared-scan preflight:</b> A batch proposal API now reads each physical block once while preserving independent query eligibility, heaps, accounting and scalar report digests. Forward/reverse and unequal-block physical-fixture tests exactly match repeated scalar candidates/digests for queries with different tier, symbol and temporal eligibility; batch physical/logical row accounting and invalid query-set failures pass. The full suite passes.</p>
-  <p class="open"><b>Remaining M04R-08 boundary:</b> The partial heavy-case p95 is 554.16 seconds, still far above 300; 2/12 cases are not an all-matrix pass. Implement shared block scanning and then shared multi-query completion, prove scalar-equivalent per-query proposals/results/certificates, and require material total-time reduction. Do not rerun all 12 or promote the shadow store before that POC passes.</p>
+  <p class="fail"><b>M04R-08C shared-read POC rejected:</b> The full-pack three-heavy batch is exactly scalar-equivalent and reproduces every certified candidate/eligible digest at 247.71 MiB, but takes 626.34 seconds versus 641.70 seconds for same-process scalar scans. A 1.0245×/2.39% gain fails the frozen 10% material threshold. Evidence digest is <code>2e042acf…a49</code>.</p>
+  <p class="open"><b>Remaining M04R-08 boundary:</b> Query-specific bound computation, not pack reads, now has measured priority. Decompose presence conversion, each bound component, quantile/std denominators and heap maintenance on fixed real rows; test exact-equivalent kernel alternatives before integration. The partial heavy-case p95 remains 554.16 seconds, so all-12 rerun and shadow-store promotion stay blocked.</p>
 </section>
 
 <section class="task" id="m04r-09">
@@ -277,7 +278,7 @@
     <li>Commit a clean rollback point.</li>
     <li>Proceed only if the explicit gate passes. A failure creates a versioned redesign; it never lowers a frozen threshold.</li>
   </ol>
-  <p class="muted">M04R-00 through M04R-07 and M04R-08A are complete. One-scan pure v2 repairs all three former >600-second cases but the heavy-case p95 remains 554.16 seconds. M04R-08C shared-I/O/multi-query batching is next; the all-12 rerun and shadow-store activation remain blocked.</p>
+  <p class="muted">M04R-00 through M04R-07 and M04R-08A are complete. One-scan pure v2 repairs all three former >600-second cases, but p95 remains 554.16 seconds and shared physical reads improve bound scanning by only 2.39%. Bound-kernel decomposition is next; all-12 rerun and shadow-store activation remain blocked.</p>
 </section>
 </body>
 </html>
