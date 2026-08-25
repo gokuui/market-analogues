@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from concurrent.futures import Future, ThreadPoolExecutor
 from hashlib import sha256
 import os
 from pathlib import Path
@@ -8,6 +9,7 @@ import resource
 from time import perf_counter
 from typing import AbstractSet, Any, Callable, Iterable, Mapping
 
+import numba
 import numpy as np
 
 from .packed_bound_store import (
@@ -515,6 +517,137 @@ def scan_packed_bound_proposals(
         eligible_main, eligible_overflow, route_counts, quotas, block_rows,
         block_order, elapsed, peak, candidate_digest, stable_hash(deterministic),
         contract_digest if branch_aware else None, input_digest,
+    )
+
+
+def _bounded_ordered_thread_results(
+    executor: ThreadPoolExecutor, function: Callable[[int], Any],
+    offsets: Iterable[int], maximum_in_flight: int,
+) -> Iterable[Any]:
+    iterator = iter(offsets)
+    pending: list[Future[Any]] = []
+    for _ in range(maximum_in_flight):
+        try:
+            pending.append(executor.submit(function, next(iterator)))
+        except StopIteration:
+            break
+    while pending:
+        future = pending.pop(0)
+        yield future.result()
+        try:
+            pending.append(executor.submit(function, next(iterator)))
+        except StopIteration:
+            pass
+
+
+def scan_packed_bound_proposals_threaded(
+    store_root: Path,
+    generation_id: str,
+    query: PackedBoundQuery,
+    *,
+    route_quotas: Mapping[str, int] | None = None,
+    block_rows: int = 4_096,
+    block_order: str = "forward",
+    threads: int = 4,
+    verify_content: bool = True,
+    expected_provenance_digest: str | None = None,
+) -> BoundProposalReport:
+    """Legacy-v1 scan with bounded parallel block scoring and ordered reduction."""
+    if block_rows < 1 or threads < 1:
+        raise PackedBoundSearchError("block rows and threads must be positive")
+    if block_order not in {"forward", "reverse"}:
+        raise PackedBoundSearchError("block order must be forward or reverse")
+    quotas = dict(route_quotas or DEFAULT_ROUTE_QUOTAS)
+    if "composite" not in quotas or quotas["composite"] < 1_000:
+        raise PackedBoundSearchError("the certified composite route requires quota >= 1000")
+    allowed_routes = {
+        "composite", "coarse", "stage", "structural", "price",
+        "candle_volatility", "volume_shock", "market_context",
+    }
+    if set(quotas) - allowed_routes or any(
+        type(value) is not int or value < 1 for value in quotas.values()
+    ):
+        raise PackedBoundSearchError("threaded route quotas are invalid")
+    loaded = load_packed_generation(
+        store_root, generation_id,
+        expected_provenance_digest=expected_provenance_digest,
+        verify_content=verify_content, validate_records=False,
+    )
+    symbol_id = loaded.symbols.index(query.symbol) if query.symbol in loaded.symbols else None
+    heaps = {route: _empty_entries() for route in quotas}
+    started = perf_counter()
+    peak = _current_rss_mb()
+    eligible_main = 0
+    pack_path = loaded.root / "generations" / loaded.generation_id / str(loaded.manifest["rows_file"])
+    offsets = list(range(0, len(loaded.rows), block_rows))
+    if block_order == "reverse":
+        offsets.reverse()
+    with pack_path.open("rb") as handle:
+        descriptor = handle.fileno()
+
+        def score_block(first: int) -> tuple[int, dict[str, np.ndarray]]:
+            numba.set_num_threads(1)
+            count = min(block_rows, len(loaded.rows) - first)
+            raw = os.pread(
+                descriptor, count * PACK_DTYPE.itemsize,
+                first * PACK_DTYPE.itemsize,
+            )
+            if len(raw) != count * PACK_DTYPE.itemsize:
+                raise PackedBoundSearchError("short threaded positional read")
+            block = np.frombuffer(raw, dtype=PACK_DTYPE, count=count)
+            selected = block[_eligible_mask(block, query, symbol_id)]
+            if not len(selected):
+                return 0, {route: _empty_entries() for route in quotas}
+            bounded = packed_lower_bounds(query.representation, selected)
+            route_values = {"composite": bounded.totals, **bounded.components}
+            return len(selected), {
+                route: _entries(
+                    selected, bounded.totals,
+                    np.asarray(route_values[route], dtype=np.float64),
+                    overflow=False,
+                ) for route in quotas
+            }
+
+        with ThreadPoolExecutor(
+            max_workers=threads, thread_name_prefix="legacy-bound",
+        ) as executor:
+            for eligible, entries in _bounded_ordered_thread_results(
+                executor, score_block, offsets, threads,
+            ):
+                eligible_main += eligible
+                for route, quota in quotas.items():
+                    heaps[route] = _stable_bounded(
+                        heaps[route], entries[route], quota,
+                    )
+                peak = max(peak, _current_rss_mb())
+    overflow = np.asarray(loaded.overflow)
+    selected_overflow = overflow[_eligible_mask(overflow, query, symbol_id)]
+    eligible_overflow = len(selected_overflow)
+    if eligible_overflow:
+        zeros = np.zeros(eligible_overflow, dtype=np.float64)
+        incoming = _entries(selected_overflow, zeros, zeros, overflow=True)
+        for route, quota in quotas.items():
+            heaps[route] = _stable_bounded(heaps[route], incoming, quota)
+    candidates, route_counts, candidate_digest = _finalize(heaps, loaded.symbols)
+    elapsed = perf_counter() - started
+    deterministic = {
+        "schema_version": SEARCH_SCHEMA_VERSION,
+        "contract_digest": packed_bound_search_contract()["digest"],
+        "generation_id": loaded.generation_id,
+        "query_episode_id": query.episode_id,
+        "rows_scanned": len(loaded.rows) + len(loaded.overflow),
+        "eligible_rows": eligible_main + eligible_overflow,
+        "eligible_main_rows": eligible_main,
+        "eligible_overflow_rows": eligible_overflow,
+        "route_counts": route_counts, "route_quotas": quotas,
+        "candidate_digest": candidate_digest,
+        "real_forward_outcomes_accessed": False,
+    }
+    return BoundProposalReport(
+        SEARCH_SCHEMA_VERSION, loaded.generation_id, query.episode_id,
+        candidates, deterministic["rows_scanned"], deterministic["eligible_rows"],
+        eligible_main, eligible_overflow, route_counts, quotas, block_rows,
+        block_order, elapsed, peak, candidate_digest, stable_hash(deterministic),
     )
 
 

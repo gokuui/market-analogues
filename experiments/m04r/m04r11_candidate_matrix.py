@@ -28,7 +28,7 @@ from market_analogues.m04r_candidate_evidence import (
 )
 from market_analogues.packed_bound_search import (
     PackedBoundQuery, bound_proposal_candidate_digest,
-    packed_bound_search_contract, scan_packed_bound_proposals,
+    packed_bound_search_contract, scan_packed_bound_proposals_threaded,
 )
 from market_analogues.packed_bound_store import load_packed_generation
 from market_analogues.representation import represent, representation_input_digest
@@ -39,7 +39,8 @@ from market_analogues.types import InstrumentKey, stable_hash
 CASE_SCHEMA = "candidate-recall-case-v2-producer"
 MATRIX_SCHEMA = "candidate-recall-matrix-v2-producer"
 SEAL_SCHEMA = "candidate-recall-producer-seal-v1"
-CONTRACT_SCHEMA = "candidate-recall-producer-contract-v1"
+CONTRACT_SCHEMA = "candidate-recall-producer-contract-v2"
+SCAN_THREADS = 4
 FROZEN_REGISTRY_DIGEST = "0a4da732f91375a091775cb04e6e77c8d136ade47d7f4d16508a2d9a6555361e"
 FROZEN_GENERATION_ID = "9fc6ae0ec4451133d8006897162f3443803fd30a3c44b78e80a476fbb18bb483"
 FROZEN_PROPOSAL_CONTRACT_DIGEST = "059db6d78bbe62e7588e1fe2408fe244040b501d190bdf7b211a7ecd7aadb96c"
@@ -105,6 +106,11 @@ def _producer_contract(
         "request": FROZEN_REQUEST,
         "scan_protocol": {
             "execution": "serial fresh spawned process per query",
+            "engine": "bounded ordered four-thread legacy-v1 scan",
+            "outer_threads": SCAN_THREADS,
+            "numba_threads_per_scorer": 1,
+            "maximum_in_flight_blocks": SCAN_THREADS,
+            "reduction": "strict requested physical block order into unchanged stable route heaps",
             "cold": {"advice": "POSIX_FADV_DONTNEED", "block_rows": 4_096, "order": "forward"},
             "warm_first": {"block_rows": 4_097, "order": "reverse"},
             "warm_second": {"block_rows": 4_093, "order": "forward"},
@@ -206,20 +212,20 @@ def _worker(
     )
     pack_path = loaded.root / "generations" / loaded.generation_id / str(loaded.manifest["rows_file"])
     cold_advice_applied = _advise_cold(pack_path)
-    cold = scan_packed_bound_proposals(
+    cold = scan_packed_bound_proposals_threaded(
         store_root, generation_id, query, route_quotas=route_quotas,
-        block_rows=4_096, block_order="forward", branch_aware=False,
+        block_rows=4_096, block_order="forward", threads=SCAN_THREADS,
         verify_content=False, expected_provenance_digest=provenance_digest,
     )
     cold_task_seconds = perf_counter() - task_started
-    warm_first = scan_packed_bound_proposals(
+    warm_first = scan_packed_bound_proposals_threaded(
         store_root, generation_id, query, route_quotas=route_quotas,
-        block_rows=4_097, block_order="reverse", branch_aware=False,
+        block_rows=4_097, block_order="reverse", threads=SCAN_THREADS,
         verify_content=False, expected_provenance_digest=provenance_digest,
     )
-    warm_second = scan_packed_bound_proposals(
+    warm_second = scan_packed_bound_proposals_threaded(
         store_root, generation_id, query, route_quotas=route_quotas,
-        block_rows=4_093, block_order="forward", branch_aware=False,
+        block_rows=4_093, block_order="forward", threads=SCAN_THREADS,
         verify_content=False, expected_provenance_digest=provenance_digest,
     )
     candidates = _candidate_payload(cold)

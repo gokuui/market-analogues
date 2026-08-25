@@ -8,7 +8,8 @@ import pytest
 
 from market_analogues.packed_bound_search import (
     PackedBoundQuery, PackedBoundSearchError, scan_packed_bound_proposals,
-    scan_packed_bound_proposals_many, scan_packed_bound_threshold,
+    scan_packed_bound_proposals_many, scan_packed_bound_proposals_threaded,
+    scan_packed_bound_threshold,
 )
 from market_analogues.packed_bound_store import (
     OVERFLOW_DTYPE, make_overflow_record, make_packed_record,
@@ -77,6 +78,47 @@ def test_global_selection_is_stable_across_blocks_and_scan_order(tmp_path: Path)
         f"{value:024x}" for value in range(101, 1_100)
     }
     assert composite == expected
+
+
+def test_threaded_legacy_scan_is_scalar_exact_and_order_stable(tmp_path: Path) -> None:
+    root, generation, representation = _store(tmp_path)
+    query = _query(
+        representation, symbol="AAA", query_start_ns=500,
+        latest_eligible_ns=900, quality_tiers=("A",),
+    )
+    scalar = scan_packed_bound_proposals(
+        root, generation, query, block_rows=31, block_order="forward",
+        verify_content=False,
+    )
+    threaded = tuple(
+        scan_packed_bound_proposals_threaded(
+            root, generation, query, block_rows=block_rows,
+            block_order=order, threads=threads, verify_content=False,
+        )
+        for block_rows, order, threads in (
+            (17, "forward", 2), (29, "reverse", 4), (64, "forward", 4),
+        )
+    )
+    for report in threaded:
+        assert report.candidates == scalar.candidates
+        assert report.candidate_digest == scalar.candidate_digest
+        assert report.result_digest == scalar.result_digest
+        assert report.rows_scanned == scalar.rows_scanned
+        assert report.eligible_rows == scalar.eligible_rows
+        assert report.eligible_main_rows == scalar.eligible_main_rows
+        assert report.eligible_overflow_rows == scalar.eligible_overflow_rows
+        assert report.route_counts == scalar.route_counts
+        assert report.route_quotas == scalar.route_quotas
+
+    with pytest.raises(PackedBoundSearchError, match="positive"):
+        scan_packed_bound_proposals_threaded(
+            root, generation, query, threads=0, verify_content=False,
+        )
+    with pytest.raises(PackedBoundSearchError, match="block order"):
+        scan_packed_bound_proposals_threaded(
+            root, generation, query, block_order="shuffled",
+            verify_content=False,
+        )
 
 
 def test_eligibility_precedes_ranking_and_rejects_bad_contracts(tmp_path: Path) -> None:

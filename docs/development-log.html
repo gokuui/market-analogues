@@ -1023,6 +1023,12 @@
   <h2>L-104 — Preregistered bounded four-thread legacy scan POC</h2>
   <p><b>Development evidence:</b> A 32,768-row real CAKE microbenchmark with Numba fixed to one thread projected 1/2/4/8 outer threads at 102.9/54.8/29.6/28.7 seconds for a full warm scan. Checksums were identical. Eight threads reached about 1,228 MiB and are rejected; four retained an intentionally conservative 874 MiB.</p>
   <p><b>Frozen POC before execution:</b> Use one process, four worker threads, unchanged 4,096-row physical blocks and the exact legacy kernel. Keep at most four blocks in flight; consume completed futures strictly in requested physical order into the unchanged stable route heaps; add overflow only after the main rows. Run advised-cold forward, warm reverse and warm forward scans. Require the frozen candidate/result digests, complete three-scan invariance, cold ≤120 seconds, second warm ≤60 seconds and whole-process high-water RSS ≤1,024 MiB. No untouched query is permitted.</p>
+  <p class="pass"><b>Result:</b> PASS. The three scans preserve the exact legacy candidate/result digests <code>c8f51e20…2555</code>/<code>bb36c3b7…b75b</code>. Cold took 78.72 seconds, warm scans 33.75/33.58 seconds and whole-process high-water RSS was 776.12 MiB; every frozen gate passed. Evidence digest is <code>e7082056…6e</code>.</p>
+</section>
+<section class="entry">
+  <h2>L-105 — Production integration of bounded legacy scan preregistered</h2>
+  <p><b>Change:</b> Promote only the POC execution mechanics into the frozen M04R-11 candidate producer: four outer threads, one Numba lane per scorer, at most four immutable pack blocks in flight, strict requested-order reduction, unchanged overflow handling, routes, quotas, score kernel and proposal-v1 digest. The producer remains serial across queries and uses a fresh spawned process for each complete query.</p>
+  <p><b>Pre-holdout gates:</b> A physical fixture must be exactly equal to the scalar scanner across unequal block sizes, forward/reverse order and two/four threads. Then the complete producer worker must pass on the already-contaminated CAKE development query with three invariant scans, the frozen CAKE candidate/result digests, cold ≤120 seconds, second warm ≤60 seconds and RSS ≤1,024 MiB. The producer contract and independent verifier must bind the thread/in-flight/reduction policy. No untouched query may run until these checks pass.</p>
 </section>
 </main>
 

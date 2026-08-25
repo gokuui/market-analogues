@@ -359,6 +359,11 @@ def main() -> int:
         file_fingerprint(Path(producer_contract["physical_manifest_path"])) == producer_contract["physical_manifest_sha256"],
         producer_contract.get("scan_protocol") == {
             "execution": "serial fresh spawned process per query",
+            "engine": "bounded ordered four-thread legacy-v1 scan",
+            "outer_threads": 4,
+            "numba_threads_per_scorer": 1,
+            "maximum_in_flight_blocks": 4,
+            "reduction": "strict requested physical block order into unchanged stable route heaps",
             "cold": {"advice": "POSIX_FADV_DONTNEED", "block_rows": 4_096, "order": "forward"},
             "warm_first": {"block_rows": 4_097, "order": "reverse"},
             "warm_second": {"block_rows": 4_093, "order": "forward"},
