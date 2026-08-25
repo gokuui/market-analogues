@@ -706,6 +706,13 @@
   <p><b>Aggregate interpretation:</b> The intentionally partial CAKE/TAIT matrix is 2/12 and therefore not a matrix PASS. Its p95 is 554.16 seconds, which confirms that independent per-query scanning still violates the frozen 300-second p95 even after all former hard maximum failures are repaired. No full all-12 rerun is authorized from these partial results.</p>
   <p><b>Next:</b> Implement M04R-08C as a bounded shared-I/O POC: read each physical pack block once for multiple queries, preserve query-specific eligibility, bounded heaps, τ, exact completion and certificates, and prove byte-identical proposal/certificate results against repeated scalar calls. Measure physical rows/bytes read, shared wall time, per-query completion time and RSS. Retain it only if total elapsed materially falls; otherwise profile/decompose the quantized-bound kernel before another design change.</p>
 </section>
+
+<section class="entry">
+  <h2>L-065 — M04R-08C shared proposal-scan preflight</h2>
+  <p><b>Implementation:</b> Added a market-agnostic batch proposal API that validates a non-empty unique ordered query set, loads the immutable generation once, performs one positional read per physical block, and feeds that block to independent per-query eligibility, bound and bounded-heap states. Each embedded report retains the scalar schema, candidate/result digests and complete eligible-row accounting; the batch wrapper separately records physical rows scanned, logical query-row evaluations, shared elapsed/RSS and a contract-bound digest.</p>
+  <p><b>Verification:</b> On a physical packed fixture, forward 17-row and reverse 64-row batch scans are byte-equivalent to independent scalar scans performed with 31-row blocks for both a broad A/B query and a same-symbol/A-only temporal query. Candidate tuples, candidate digests, scalar result digests, eligibility and route counts all match. One 1,038-row physical scan accounts for 2,076 logical rows across two queries. Empty and duplicate query sets fail closed; the full test suite passes.</p>
+  <p><b>Next:</b> Run one shared composite-quota-16,385 scan for the three frozen heavy authorities and compare every per-query candidate digest/eligible count to the already certified one-scan v2 checkpoints. Measure shared elapsed and RSS. This POC covers proposal I/O only; even a pass does not yet share exact source reconstruction or emit new final-search certificates.</p>
+</section>
 </main>
 
 <section id="reproduce">

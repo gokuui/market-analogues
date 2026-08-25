@@ -17,6 +17,7 @@ from .types import stable_hash
 
 
 SEARCH_SCHEMA_VERSION = "m04r-global-bound-proposal-v1"
+BATCH_SEARCH_SCHEMA_VERSION = "m04r-global-bound-proposal-batch-v1"
 DEFAULT_ROUTE_QUOTAS: dict[str, int] = {
     # The composite route is the only authority-certified recall route.  The
     # component routes are additive proposal seeds and never replace it.
@@ -94,6 +95,21 @@ class BoundProposalReport:
     result_digest: str
 
 
+@dataclass(frozen=True)
+class BoundProposalBatchReport:
+    schema_version: str
+    generation_id: str
+    query_episode_ids: tuple[str, ...]
+    reports: tuple[BoundProposalReport, ...]
+    physical_rows_scanned: int
+    logical_rows_evaluated: int
+    block_rows: int
+    block_order: str
+    elapsed_seconds: float
+    peak_rss_mb: float
+    result_digest: str
+
+
 _ENTRY_DTYPE = np.dtype([
     ("episode_id", "V12"),
     ("cutoff_ns", "<i8"),
@@ -127,6 +143,22 @@ def packed_bound_search_contract() -> dict[str, Any]:
         ),
         "io": "bounded positional reads; no full-pack mmap traversal",
         "default_route_quotas": DEFAULT_ROUTE_QUOTAS,
+        "outcomes_or_labels_used": False,
+    }
+    payload["digest"] = stable_hash(payload)
+    return payload
+
+
+def packed_bound_batch_search_contract() -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "schema_version": BATCH_SEARCH_SCHEMA_VERSION,
+        "scalar_contract_digest": packed_bound_search_contract()["digest"],
+        "io": "each physical pack block is read once and offered to every query",
+        "query_isolation": (
+            "eligibility, bounded route heaps, row accounting, candidate ordering "
+            "and scalar result digest remain independent per query"
+        ),
+        "ordering": "input query order; query episode IDs must be unique",
         "outcomes_or_labels_used": False,
     }
     payload["digest"] = stable_hash(payload)
@@ -351,4 +383,158 @@ def scan_packed_bound_proposals(
         candidates, deterministic["rows_scanned"], deterministic["eligible_rows"],
         eligible_main, eligible_overflow, route_counts, quotas, block_rows,
         block_order, elapsed, peak, candidate_digest, stable_hash(deterministic),
+    )
+
+
+def scan_packed_bound_proposals_many(
+    store_root: Path,
+    generation_id: str,
+    queries: Iterable[PackedBoundQuery],
+    *,
+    route_quotas: Mapping[str, int] | None = None,
+    block_rows: int = 2_048,
+    block_order: str = "forward",
+    verify_content: bool = True,
+    expected_provenance_digest: str | None = None,
+) -> BoundProposalBatchReport:
+    """Run scalar-equivalent proposal selection with one shared physical read."""
+    query_rows = tuple(queries)
+    if not query_rows:
+        raise PackedBoundSearchError("batch queries must be non-empty")
+    query_ids = tuple(query.episode_id for query in query_rows)
+    if len(set(query_ids)) != len(query_ids):
+        raise PackedBoundSearchError("batch query episode IDs must be unique")
+    if block_rows < 1:
+        raise PackedBoundSearchError("block rows must be positive")
+    if block_order not in {"forward", "reverse"}:
+        raise PackedBoundSearchError("block order must be forward or reverse")
+    quotas = dict(route_quotas or DEFAULT_ROUTE_QUOTAS)
+    if "composite" not in quotas or quotas["composite"] < 1_000:
+        raise PackedBoundSearchError("the certified composite route requires quota >= 1000")
+    allowed_routes = {
+        "composite", "coarse", "stage", "structural", "price",
+        "candle_volatility", "volume_shock", "market_context",
+    }
+    if set(quotas) - allowed_routes:
+        raise PackedBoundSearchError("route quotas contain unsupported components")
+    if any(type(value) is not int or value < 1 for value in quotas.values()):
+        raise PackedBoundSearchError("route quotas must be positive integers")
+
+    loaded = load_packed_generation(
+        store_root, generation_id,
+        expected_provenance_digest=expected_provenance_digest,
+        verify_content=verify_content, validate_records=False,
+    )
+    states = [{
+        "query": query,
+        "symbol_id": (
+            loaded.symbols.index(query.symbol)
+            if query.symbol in loaded.symbols else None
+        ),
+        "heaps": {route: _empty_entries() for route in quotas},
+        "eligible_main": 0,
+    } for query in query_rows]
+    started = perf_counter()
+    peak = _current_rss_mb()
+    pack_path = (
+        loaded.root / "generations" / loaded.generation_id
+        / str(loaded.manifest["rows_file"])
+    )
+    offsets: Iterable[int] = range(0, len(loaded.rows), block_rows)
+    if block_order == "reverse":
+        offsets = reversed(tuple(offsets))
+    with pack_path.open("rb") as handle:
+        for first in offsets:
+            count = min(block_rows, len(loaded.rows) - first)
+            raw = os.pread(
+                handle.fileno(), count * PACK_DTYPE.itemsize,
+                first * PACK_DTYPE.itemsize,
+            )
+            if len(raw) != count * PACK_DTYPE.itemsize:
+                raise PackedBoundSearchError("short positional read from packed generation")
+            block = np.frombuffer(raw, dtype=PACK_DTYPE, count=count)
+            for state in states:
+                query = state["query"]
+                selected = block[_eligible_mask(
+                    block, query, state["symbol_id"],
+                )]
+                state["eligible_main"] += len(selected)
+                if not len(selected):
+                    continue
+                bounded = packed_lower_bounds(query.representation, selected)
+                route_values = {"composite": bounded.totals, **bounded.components}
+                for route, quota in quotas.items():
+                    incoming = _entries(
+                        selected, bounded.totals,
+                        np.asarray(route_values[route], dtype=np.float64),
+                        overflow=False,
+                    )
+                    state["heaps"][route] = _stable_bounded(
+                        state["heaps"][route], incoming, quota,
+                    )
+            peak = max(peak, _current_rss_mb())
+
+    overflow = np.asarray(loaded.overflow)
+    report_values = []
+    for state in states:
+        query = state["query"]
+        selected_overflow = overflow[_eligible_mask(
+            overflow, query, state["symbol_id"],
+        )]
+        eligible_overflow = len(selected_overflow)
+        if eligible_overflow:
+            zeros = np.zeros(eligible_overflow, dtype=np.float64)
+            incoming = _entries(selected_overflow, zeros, zeros, overflow=True)
+            for route, quota in quotas.items():
+                state["heaps"][route] = _stable_bounded(
+                    state["heaps"][route], incoming, quota,
+                )
+        candidates, route_counts, candidate_digest = _finalize(
+            state["heaps"], loaded.symbols,
+        )
+        eligible_main = int(state["eligible_main"])
+        deterministic = {
+            "schema_version": SEARCH_SCHEMA_VERSION,
+            "contract_digest": packed_bound_search_contract()["digest"],
+            "generation_id": loaded.generation_id,
+            "query_episode_id": query.episode_id,
+            "rows_scanned": len(loaded.rows) + len(loaded.overflow),
+            "eligible_rows": eligible_main + eligible_overflow,
+            "eligible_main_rows": eligible_main,
+            "eligible_overflow_rows": eligible_overflow,
+            "route_counts": route_counts,
+            "route_quotas": quotas,
+            "candidate_digest": candidate_digest,
+            "real_forward_outcomes_accessed": False,
+        }
+        report_values.append((
+            query, candidates, eligible_main, eligible_overflow,
+            route_counts, candidate_digest, stable_hash(deterministic),
+        ))
+    elapsed = perf_counter() - started
+    reports = tuple(BoundProposalReport(
+        SEARCH_SCHEMA_VERSION, loaded.generation_id, query.episode_id,
+        candidates, len(loaded.rows) + len(loaded.overflow),
+        eligible_main + eligible_overflow, eligible_main, eligible_overflow,
+        route_counts, quotas, block_rows, block_order, elapsed, peak,
+        candidate_digest, result_digest,
+    ) for (
+        query, candidates, eligible_main, eligible_overflow,
+        route_counts, candidate_digest, result_digest,
+    ) in report_values)
+    physical_rows = len(loaded.rows) + len(loaded.overflow)
+    deterministic = {
+        "schema_version": BATCH_SEARCH_SCHEMA_VERSION,
+        "contract_digest": packed_bound_batch_search_contract()["digest"],
+        "generation_id": loaded.generation_id,
+        "query_episode_ids": query_ids,
+        "per_query_result_digests": [report.result_digest for report in reports],
+        "physical_rows_scanned": physical_rows,
+        "logical_rows_evaluated": physical_rows * len(query_rows),
+        "real_forward_outcomes_accessed": False,
+    }
+    return BoundProposalBatchReport(
+        BATCH_SEARCH_SCHEMA_VERSION, loaded.generation_id, query_ids, reports,
+        physical_rows, physical_rows * len(query_rows), block_rows, block_order,
+        elapsed, peak, stable_hash(deterministic),
     )

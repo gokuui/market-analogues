@@ -7,6 +7,7 @@ import pytest
 
 from market_analogues.packed_bound_search import (
     PackedBoundQuery, PackedBoundSearchError, scan_packed_bound_proposals,
+    scan_packed_bound_proposals_many,
 )
 from market_analogues.packed_bound_store import (
     OVERFLOW_DTYPE, make_overflow_record, make_packed_record,
@@ -120,3 +121,48 @@ def test_full_96_bit_query_id_is_excluded_even_with_trailing_zero(tmp_path: Path
     assert query_id not in {row.episode_id for row in report.candidates}
     with pytest.raises(PackedBoundSearchError, match="lowercase"):
         _query(representation, episode_id="ABCDEF0123456789ABCDEF01")
+
+
+def test_shared_scan_is_scalar_equivalent_and_order_stable(tmp_path: Path) -> None:
+    root, generation, representation = _store(tmp_path)
+    queries = (
+        _query(representation, episode_id=f"{900_001:024x}"),
+        _query(
+            representation, episode_id=f"{900_002:024x}", symbol="AAA",
+            query_start_ns=500, latest_eligible_ns=900,
+            quality_tiers=("A",),
+        ),
+    )
+    scalar = tuple(scan_packed_bound_proposals(
+        root, generation, query, block_rows=31, verify_content=False,
+    ) for query in queries)
+    batches = tuple(scan_packed_bound_proposals_many(
+        root, generation, queries, block_rows=block_rows, block_order=order,
+        verify_content=False,
+    ) for block_rows, order in ((17, "forward"), (64, "reverse")))
+    assert all(batch.query_episode_ids == tuple(
+        query.episode_id for query in queries
+    ) for batch in batches)
+    assert all(batch.physical_rows_scanned == 1_038 for batch in batches)
+    assert all(batch.logical_rows_evaluated == 2_076 for batch in batches)
+    assert len({batch.result_digest for batch in batches}) == 1
+    for batch in batches:
+        for shared, independent in zip(batch.reports, scalar):
+            assert shared.candidates == independent.candidates
+            assert shared.candidate_digest == independent.candidate_digest
+            assert shared.result_digest == independent.result_digest
+            assert shared.eligible_rows == independent.eligible_rows
+            assert shared.route_counts == independent.route_counts
+
+
+def test_shared_scan_rejects_empty_and_duplicate_queries(tmp_path: Path) -> None:
+    root, generation, representation = _store(tmp_path, count=8)
+    query = _query(representation)
+    with pytest.raises(PackedBoundSearchError, match="non-empty"):
+        scan_packed_bound_proposals_many(
+            root, generation, (), verify_content=False,
+        )
+    with pytest.raises(PackedBoundSearchError, match="unique"):
+        scan_packed_bound_proposals_many(
+            root, generation, (query, query), verify_content=False,
+        )
