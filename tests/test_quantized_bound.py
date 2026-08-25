@@ -13,7 +13,8 @@ from market_analogues.distance import (
 from market_analogues.exact_aligned_features import SAMPLES_48_NAMES
 from market_analogues.quantized_bound import (
     ERROR_VALUE_COUNT, FLOAT16_MAX, PACKED_ROW_BYTES, QuantizedBoundError,
-    _joined_iqr_compiled,
+    _joined_iqr_compiled, _joined_iqr_sorted_compiled,
+    prepare_quantized_bound_arrays, prepared_quantized_array_lower_bounds,
     quantize_bound_row, quantized_batch_lower_bounds, quantized_bound_contract,
     quantized_representation_lower_bound,
 )
@@ -90,6 +91,45 @@ def test_compiled_joined_iqr_exactly_matches_combined_percentiles() -> None:
     np.testing.assert_array_equal(
         _joined_iqr_compiled(samples, query), expected,
     )
+    np.testing.assert_array_equal(
+        _joined_iqr_sorted_compiled(
+            np.sort(samples, axis=2), np.sort(query, axis=1),
+        ),
+        expected,
+    )
+
+
+def test_prepared_candidate_arrays_are_query_reusable_and_exact() -> None:
+    representations = [
+        represent(generate_case(name, 901 + index).episode)
+        for index, name in enumerate(sorted(FAMILIES)[:4])
+    ]
+    rows = [quantize_bound_row(candidate) for candidate in representations]
+    prepared = prepare_quantized_bound_arrays(
+        np.stack([row.coarse for row in rows]),
+        np.stack([row.samples_48 for row in rows]),
+        np.stack([row.presence for row in rows]),
+        np.stack([row.stage for row in rows]),
+        np.stack([row.structural for row in rows]),
+        np.stack([row.error_radii for row in rows]),
+        sort_samples=True,
+    )
+    for query in representations[:2]:
+        expected = quantized_batch_lower_bounds(query, rows)
+        actual = prepared_quantized_array_lower_bounds(query, prepared)
+        np.testing.assert_array_equal(actual.totals, expected.totals)
+        np.testing.assert_array_equal(actual.rigid_price, expected.rigid_price)
+        assert actual.components.keys() == expected.components.keys()
+        for name in actual.components:
+            np.testing.assert_array_equal(
+                actual.components[name], expected.components[name],
+            )
+        selected = prepared_quantized_array_lower_bounds(
+            query, prepared.select(np.asarray([True, False, True, False])),
+        )
+        np.testing.assert_array_equal(selected.totals, expected.totals[[0, 2]])
+    with pytest.raises(QuantizedBoundError, match="selection shape differs"):
+        prepared.select(np.asarray([True, False]))
 
 
 def test_error_radii_are_outward_and_cover_every_stored_field() -> None:

@@ -13,8 +13,9 @@ import numpy as np
 
 from .exact_aligned_features import SAMPLES_48_NAMES
 from .quantized_bound import (
-    ERROR_VALUE_COUNT, PACKED_ROW_BYTES, QuantizedBoundRow,
-    QuantizedLowerBoundBatch, quantized_array_lower_bounds,
+    ERROR_VALUE_COUNT, PACKED_ROW_BYTES, PreparedQuantizedBoundArrays,
+    QuantizedBoundRow, QuantizedLowerBoundBatch,
+    prepare_quantized_bound_arrays, prepared_quantized_array_lower_bounds,
     quantized_bound_contract,
 )
 from .representation import Representation
@@ -173,16 +174,35 @@ def unpack_quantized_rows(records: np.ndarray) -> list[QuantizedBoundRow]:
 def packed_lower_bounds(
     query: Representation, records: np.ndarray,
 ) -> QuantizedLowerBoundBatch:
+    return prepared_packed_lower_bounds(
+        query, prepare_packed_lower_bound_records(records),
+    )
+
+
+def prepare_packed_lower_bound_records(
+    records: np.ndarray,
+) -> PreparedQuantizedBoundArrays:
+    """Unpack and convert packed candidate fields once for many queries."""
     if records.dtype != PACK_DTYPE:
         raise PackedBoundStoreError("record dtype differs from packed contract")
     presence = np.unpackbits(
         np.asarray(records["presence"], dtype=np.uint8),
         axis=1, bitorder="little",
     )[:, :len(SAMPLES_48_NAMES)].astype(bool)
-    return quantized_array_lower_bounds(
-        query, records["coarse"], records["samples_48"], presence,
+    return prepare_quantized_bound_arrays(
+        records["coarse"], records["samples_48"], presence,
         records["stage"], records["structural"], records["error_radii"],
+        sort_samples=True,
     )
+
+
+def prepared_packed_lower_bounds(
+    query: Representation,
+    prepared: PreparedQuantizedBoundArrays,
+    mask: np.ndarray | None = None,
+) -> QuantizedLowerBoundBatch:
+    selected = prepared if mask is None else prepared.select(mask)
+    return prepared_quantized_array_lower_bounds(query, selected)
 
 
 def _file_sha256(path: Path, block_bytes: int = 8 * 1024 * 1024) -> str:

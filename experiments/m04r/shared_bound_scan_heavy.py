@@ -25,7 +25,7 @@ from market_analogues.search import latest_eligible_cutoff
 from market_analogues.types import InstrumentKey, SearchQuery, stable_hash
 
 
-SCHEMA_VERSION = "m04r-shared-bound-scan-heavy-v1"
+SCHEMA_VERSION = "m04r-shared-bound-scan-heavy-v3"
 CASE_OMITTED = {"created_at", "seconds", "peak_rss_mb", "result_digest"}
 EVIDENCE_OMITTED = {
     "created_at", "batch_seconds", "scalar_seconds", "scalar_total_seconds",
@@ -39,6 +39,14 @@ def _case_valid(case: dict[str, Any]) -> bool:
     }
     certificate = case.get("certificate") or {}
     controls = case.get("controls") or {}
+    expected_contract = certified_packed_search_contract(
+        requested_positions=controls.get("requested_positions") is True,
+        hybrid_requested_positions=(
+            controls.get("hybrid_requested_positions") is True
+        ),
+        vector_lower_bounds=controls.get("vector_lower_bounds") is True,
+        deferred_alignments=controls.get("deferred_alignments") is True,
+    )
     return all((
         case.get("schema_version") == "m04r-certified-packed-search-case-v1",
         case.get("status") == "completed",
@@ -47,9 +55,7 @@ def _case_valid(case: dict[str, Any]) -> bool:
         case.get("result_digest") == stable_hash(deterministic),
         case.get("certificate_digest") == _certificate_digest(case),
         certificate.get("result_digest") == _certificate_digest(case),
-        certificate.get("contract_digest") == certified_packed_search_contract(
-            requested_positions=True,
-        )["digest"],
+        certificate.get("contract_digest") == expected_contract["digest"],
         controls.get("requested_positions") is True,
         controls.get("hybrid_requested_positions") is False,
         int(controls.get("initial_frontier_rows", -1)) == 16_384,
@@ -69,7 +75,7 @@ def _write_html(path: Path, payload: dict[str, Any]) -> None:
     css = "pass" if payload["gate_passed"] else "fail"
     status = "PASS" if payload["gate_passed"] else "FAIL"
     temporary = path.with_suffix(path.suffix + ".tmp")
-    temporary.write_text(f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><title>M04R-08C shared heavy scan</title><style>body{{font-family:system-ui;max-width:1200px;margin:2rem auto}}pre{{white-space:pre-wrap}}.pass{{color:#075}}.fail{{color:#a20}}</style></head><body><h1>M04R-08C shared heavy scan: <span class="{css}">{status}</span></h1><p>Proposal-scan evidence only. Exact final matches remain bound to the certified input checkpoints; outcomes and setup labels are excluded.</p><pre>{escape(json.dumps(payload, indent=2, sort_keys=True))}</pre></body></html>""")
+    temporary.write_text(f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><title>M04R-08C prepared shared heavy scan</title><style>body{{font-family:system-ui;max-width:1200px;margin:2rem auto}}pre{{white-space:pre-wrap}}.pass{{color:#075}}.fail{{color:#a20}}</style></head><body><h1>M04R-08C prepared shared heavy scan: <span class="{css}">{status}</span></h1><p>Proposal-scan evidence only. Each physical block is read, unpacked, converted and candidate-sorted once for all queries; exact joined quartiles merge those values with each sorted query. Exact final matches remain bound to the certified input checkpoints; outcomes and setup labels are excluded.</p><pre>{escape(json.dumps(payload, indent=2, sort_keys=True))}</pre></body></html>""")
     temporary.replace(path)
 
 
@@ -207,7 +213,12 @@ def main() -> int:
         "batch_contract_digest": packed_bound_batch_search_contract()["digest"],
         "generation_id": generation_id,
         "query_episode_ids": query_ids,
-        "controls": {"block_rows": args.block_rows, "route_quotas": quotas},
+        "controls": {
+            "block_rows": args.block_rows,
+            "route_quotas": quotas,
+            "shared_prepared_candidate_arrays": True,
+            "sorted_joined_iqr_merge": True,
+        },
         "comparisons": comparisons,
         "physical_rows_scanned": batch.physical_rows_scanned,
         "logical_rows_evaluated": batch.logical_rows_evaluated,

@@ -11,6 +11,7 @@ import numpy as np
 
 from .packed_bound_store import (
     PACK_DTYPE, TIER_CODES, load_packed_generation, packed_lower_bounds,
+    prepare_packed_lower_bound_records, prepared_packed_lower_bounds,
 )
 from .representation import Representation
 from .types import stable_hash
@@ -206,16 +207,16 @@ def _stable_bounded(entries: np.ndarray, incoming: np.ndarray, quota: int) -> np
 
 
 def _eligible_mask(records: np.ndarray, query: PackedBoundQuery, symbol_id: int | None) -> np.ndarray:
-    allowed = np.asarray([TIER_CODES[value] for value in query.quality_tiers], dtype=np.uint8)
-    identifiers = np.frombuffer(
-        records["episode_id"].tobytes(), dtype=np.uint8,
-    ).reshape(len(records), 12)
-    query_identifier = np.frombuffer(bytes.fromhex(query.episode_id), dtype=np.uint8)
+    query_identifier = np.void(bytes.fromhex(query.episode_id))
     mask = (
         (records["cutoff_ns"] <= query.latest_eligible_ns)
-        & np.isin(records["quality_tier"], allowed)
-        & np.any(identifiers != query_identifier, axis=1)
+        & (records["episode_id"] != query_identifier)
     )
+    if set(query.quality_tiers) != set(TIER_CODES):
+        allowed = np.asarray(
+            [TIER_CODES[value] for value in query.quality_tiers], dtype=np.uint8,
+        )
+        mask &= np.isin(records["quality_tier"], allowed)
     if symbol_id is not None:
         mask &= ~(
             (records["symbol_id"] == symbol_id)
@@ -453,15 +454,19 @@ def scan_packed_bound_proposals_many(
             if len(raw) != count * PACK_DTYPE.itemsize:
                 raise PackedBoundSearchError("short positional read from packed generation")
             block = np.frombuffer(raw, dtype=PACK_DTYPE, count=count)
+            prepared = prepare_packed_lower_bound_records(block)
             for state in states:
                 query = state["query"]
-                selected = block[_eligible_mask(
+                eligible_mask = _eligible_mask(
                     block, query, state["symbol_id"],
-                )]
+                )
+                selected = block[eligible_mask]
                 state["eligible_main"] += len(selected)
                 if not len(selected):
                     continue
-                bounded = packed_lower_bounds(query.representation, selected)
+                bounded = prepared_packed_lower_bounds(
+                    query.representation, prepared, eligible_mask,
+                )
                 route_values = {"composite": bounded.totals, **bounded.components}
                 for route, quota in quotas.items():
                     incoming = _entries(

@@ -55,6 +55,49 @@ def _joined_iqr_compiled(
     return output
 
 
+@njit(cache=True, nogil=True, parallel=True)
+def _joined_iqr_sorted_compiled(
+    sorted_samples: np.ndarray, sorted_query_samples: np.ndarray,
+) -> np.ndarray:
+    """Exact joined IQR by merging sorted 48-value candidate/query rows."""
+    rows, channels, width = sorted_samples.shape
+    output = np.empty((rows, channels), dtype=np.float64)
+    for row in prange(rows):
+        for channel in range(channels):
+            candidate_index = 0
+            query_index = 0
+            lower_left = 0.0
+            lower_right = 0.0
+            upper_left = 0.0
+            upper_right = 0.0
+            for merged_index in range(73):
+                if (
+                    candidate_index < width
+                    and (
+                        query_index >= width
+                        or sorted_samples[row, channel, candidate_index]
+                        <= sorted_query_samples[channel, query_index]
+                    )
+                ):
+                    value = sorted_samples[row, channel, candidate_index]
+                    candidate_index += 1
+                else:
+                    value = sorted_query_samples[channel, query_index]
+                    query_index += 1
+                if merged_index == 23:
+                    lower_left = value
+                elif merged_index == 24:
+                    lower_right = value
+                elif merged_index == 71:
+                    upper_left = value
+                elif merged_index == 72:
+                    upper_right = value
+            lower = lower_right - (lower_right - lower_left) * .25
+            upper = upper_left + (upper_right - upper_left) * .25
+            output[row, channel] = upper - lower
+    return output
+
+
 @dataclass(frozen=True)
 class QuantizedBoundRow:
     coarse: np.ndarray
@@ -96,6 +139,36 @@ class QuantizedLowerBoundBatch:
     totals: np.ndarray
     components: dict[str, np.ndarray]
     rigid_price: np.ndarray
+
+
+@dataclass(frozen=True)
+class PreparedQuantizedBoundArrays:
+    """Validated float64 candidate arrays reusable across query bounds."""
+
+    coarse: np.ndarray
+    samples: np.ndarray
+    presence: np.ndarray
+    stage: np.ndarray
+    structural: np.ndarray
+    radii: np.ndarray
+    sorted_samples: np.ndarray | None = None
+
+    @property
+    def row_count(self) -> int:
+        return len(self.coarse)
+
+    def select(self, mask: np.ndarray) -> PreparedQuantizedBoundArrays:
+        selected = np.asarray(mask, dtype=bool)
+        if selected.shape != (self.row_count,):
+            raise QuantizedBoundError("prepared bound selection shape differs")
+        return PreparedQuantizedBoundArrays(
+            self.coarse[selected], self.samples[selected], self.presence[selected],
+            self.stage[selected], self.structural[selected], self.radii[selected],
+            (
+                self.sorted_samples[selected]
+                if self.sorted_samples is not None else None
+            ),
+        )
 
 
 def quantized_bound_contract() -> dict[str, Any]:
@@ -303,7 +376,23 @@ def quantized_array_lower_bounds(
     config: DistanceConfig | None = None,
 ) -> QuantizedLowerBoundBatch:
     """Vectorized bound kernel over array-backed rows, including mmap views."""
-    config = config or DistanceConfig()
+    prepared = prepare_quantized_bound_arrays(
+        coarse, samples, presence, stage, structural, radii,
+    )
+    return prepared_quantized_array_lower_bounds(query, prepared, config)
+
+
+def prepare_quantized_bound_arrays(
+    coarse: np.ndarray,
+    samples: np.ndarray,
+    presence: np.ndarray,
+    stage: np.ndarray,
+    structural: np.ndarray,
+    radii: np.ndarray,
+    *,
+    sort_samples: bool = False,
+) -> PreparedQuantizedBoundArrays:
+    """Validate and convert query-invariant packed arrays exactly once."""
     coarse = np.asarray(coarse)
     samples = np.asarray(samples)
     presence = np.asarray(presence, dtype=bool)
@@ -323,14 +412,37 @@ def quantized_array_lower_bounds(
     for name, (observed, required) in expected.items():
         if observed != required:
             raise QuantizedBoundError(f"{name} batch shape {observed} != {required}")
-    if not row_count:
-        empty = np.empty(0, dtype=np.float64)
-        return QuantizedLowerBoundBatch(empty, {}, empty)
     if not all(np.isfinite(value).all() for value in (
         coarse, samples, stage, structural, radii,
     )) or np.any(radii < 0):
         raise QuantizedBoundError("quantized array batch contains invalid values")
-    radii = radii.astype(np.float64)
+    samples64 = samples.astype(np.float64)
+    return PreparedQuantizedBoundArrays(
+        coarse.astype(np.float64), samples64, presence,
+        stage.astype(np.float64), structural.astype(np.float64),
+        radii.astype(np.float64),
+        np.sort(samples64, axis=2) if sort_samples else None,
+    )
+
+
+def prepared_quantized_array_lower_bounds(
+    query: Representation,
+    prepared: PreparedQuantizedBoundArrays,
+    config: DistanceConfig | None = None,
+) -> QuantizedLowerBoundBatch:
+    """Evaluate a query against already validated and converted candidates."""
+    config = config or DistanceConfig()
+    coarse = prepared.coarse
+    samples = prepared.samples
+    presence = prepared.presence
+    stage = prepared.stage
+    structural = prepared.structural
+    radii = prepared.radii
+    row_count = prepared.row_count
+    count = len(SAMPLES_48_NAMES)
+    if not row_count:
+        empty = np.empty(0, dtype=np.float64)
+        return QuantizedLowerBoundBatch(empty, {}, empty)
 
     def numerator(query_values: np.ndarray, stored: np.ndarray, radius: np.ndarray) -> np.ndarray:
         observed = np.sqrt(np.mean(
@@ -339,7 +451,6 @@ def quantized_array_lower_bounds(
         ))
         return np.maximum(observed - radius, 0.0)
 
-    coarse = coarse.astype(np.float64)
     coarse_error = radii[:, 0]
     coarse_joined = np.c_[coarse, np.broadcast_to(query.coarse, coarse.shape)]
     components: dict[str, np.ndarray] = {
@@ -347,19 +458,22 @@ def quantized_array_lower_bounds(
             np.std(coarse_joined, axis=1) + coarse_error / np.sqrt(2.0), 1e-6,
         ),
     }
-    stage = stage.astype(np.float64)
-    structural = structural.astype(np.float64)
     components["stage"] = numerator(query.stage, stage, radii[:, -2])
     components["structural"] = numerator(
         query.structural, structural, radii[:, -1],
     )
-    samples = samples.astype(np.float64)
     query_samples = np.zeros((count, 48), dtype=np.float64)
     for index, name in enumerate(SAMPLES_48_NAMES):
         values = query.samples_48.get(name)
         if values is not None:
             query_samples[index] = values
-    joined_iqr = _joined_iqr_compiled(samples, query_samples)
+    joined_iqr = (
+        _joined_iqr_sorted_compiled(
+            prepared.sorted_samples, np.sort(query_samples, axis=1),
+        )
+        if prepared.sorted_samples is not None
+        else _joined_iqr_compiled(samples, query_samples)
+    )
     rms_radii = radii[:, 1:1 + count]
     max_radii = radii[:, 1 + count:1 + 2 * count]
     index_by_name = {name: index for index, name in enumerate(SAMPLES_48_NAMES)}
