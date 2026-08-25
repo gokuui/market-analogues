@@ -41,6 +41,25 @@ FROZEN_REQUEST = {
     "max_per_instrument": 3, "minimum_history_gap_bars": 60,
     "quality_tiers": ["A", "B"], "top_k": 20,
 }
+PRODUCER_CONTRACT_SCHEMA = "candidate-recall-producer-contract-v2"
+PRODUCER_SCAN_PROTOCOL = {
+    "execution": "serial fresh spawned process per query",
+    "engine": "bounded ordered four-thread legacy-v1 scan",
+    "outer_threads": 4,
+    "numba_threads_per_scorer": 1,
+    "maximum_in_flight_blocks": 4,
+    "reduction": "strict requested physical block order into unchanged stable route heaps",
+    "cold": {
+        "advice": "POSIX_FADV_DONTNEED", "block_rows": 4_096,
+        "order": "forward",
+    },
+    "warm_first": {"block_rows": 4_097, "order": "reverse"},
+    "warm_second": {"block_rows": 4_093, "order": "forward"},
+}
+PRODUCER_PERFORMANCE_LIMITS = {
+    "cold_seconds": 120.0, "warm_second_seconds": 60.0,
+    "rss_mib": 1_024.0,
+}
 AUTHORITY_CASE_OMITTED = {
     "created_at", "proposal_seconds", "amortized_proposal_seconds",
     "exact_seconds", "final_exact_seconds", "frontier_attempt_measurements",
@@ -111,6 +130,57 @@ def reconstructed_candidate_digest(rows: list[dict[str, Any]]) -> str:
     return reconstruct_truth_blind_candidate_digest(rows)
 
 
+def _expected_producer_implementation_manifest() -> dict[str, Any]:
+    repository = Path(__file__).resolve().parents[2]
+    producer = Path(__file__).with_name("m04r11_candidate_matrix.py").resolve()
+    paths = [producer, *sorted((repository / "src").rglob("*.py"))]
+    files = {
+        str(path.relative_to(repository)): file_fingerprint(path) for path in paths
+    }
+    return {"files": files, "digest": stable_hash(files)}
+
+
+def validate_preopen_producer_contract(
+    contract: dict[str, Any], registry: dict[str, Any],
+) -> tuple[str, ...]:
+    """Validate all execution/code bindings before authority truth is opened."""
+    failures: list[str] = []
+    try:
+        manifest_path = Path(str(contract["physical_manifest_path"]))
+        ordered_ids = [str(case["episode_id"]) for case in registry["cases_data"]]
+        if not all((
+            contract.get("schema_version") == PRODUCER_CONTRACT_SCHEMA,
+            contract.get("registry_digest") == FROZEN_REGISTRY_DIGEST,
+            contract.get("ordered_query_ids") == ordered_ids,
+            contract.get("ordered_query_ids_digest") == FROZEN_CASE_ORDER_DIGEST,
+            contract.get("generation_id") == FROZEN_GENERATION_ID,
+            contract.get("proposal_contract_digest")
+            == FROZEN_PROPOSAL_CONTRACT_DIGEST,
+            contract.get("route_quotas") == FROZEN_ROUTE_QUOTAS,
+            contract.get("request") == FROZEN_REQUEST,
+            contract.get("scan_protocol") == PRODUCER_SCAN_PROTOCOL,
+            contract.get("performance_limits") == PRODUCER_PERFORMANCE_LIMITS,
+            contract.get("prefix_policy")
+            == "worker recomputes and exactly matches frozen stock and benchmark causal prefixes",
+            contract.get("implementation_manifest")
+            == _expected_producer_implementation_manifest(),
+            contract.get("real_forward_outcomes_accessed") is False,
+            type(contract.get("physical_rows")) is int
+            and int(contract["physical_rows"]) > 0,
+            manifest_path.is_file(),
+            file_fingerprint(manifest_path)
+            == contract.get("physical_manifest_sha256"),
+            contract.get("contract_digest") == stable_hash({
+                key: value for key, value in contract.items()
+                if key != "contract_digest"
+            }),
+        )):
+            failures.append("producer execution, code or physical binding differs")
+    except (KeyError, OSError, TypeError, ValueError) as exc:
+        failures.append(f"malformed producer contract:{type(exc).__name__}:{exc}")
+    return tuple(failures)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=Path, required=True)
@@ -158,6 +228,13 @@ def main() -> int:
     candidate_seal = json.loads((args.candidate_root / "SEALED.json").read_text())
     producer_contract = json.loads((args.candidate_root / "candidate-contract.json").read_text())
     failures: list[str] = []
+    producer_contract_failures = validate_preopen_producer_contract(
+        producer_contract, registry,
+    )
+    if producer_contract_failures:
+        raise ValueError(
+            f"candidate producer contract differs before truth open:{producer_contract_failures}"
+        )
     if not all((
         len(registry["cases_data"]) == 60,
         registry.get("registry_digest") == FROZEN_REGISTRY_DIGEST,
@@ -170,9 +247,6 @@ def main() -> int:
         producer_contract.get("ordered_query_ids_digest") == FROZEN_CASE_ORDER_DIGEST,
         registry.get("search_contract", {}).get("fast_route_quotas") == FROZEN_ROUTE_QUOTAS,
         registry.get("search_contract", {}).get("request") == FROZEN_REQUEST,
-        producer_contract.get("contract_digest") == stable_hash({
-            key: value for key, value in producer_contract.items() if key != "contract_digest"
-        }),
         candidate_matrix.get("result_digest") == candidate_matrix_digest(candidate_matrix),
         candidate_seal.get("seal_digest") == seal_digest(candidate_seal),
         candidate_seal.get("candidate_pools_sealed") is True,

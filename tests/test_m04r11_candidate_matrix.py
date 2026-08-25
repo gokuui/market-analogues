@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+from copy import deepcopy
 from pathlib import Path
 
 from market_analogues.types import stable_hash
@@ -66,6 +67,88 @@ def test_matrix_digest_binds_gate_but_not_runtime() -> None:
     assert module.matrix_digest(payload) == digest
     payload["gates"]["recall"] = False
     assert module.matrix_digest(payload) != digest
+
+
+def test_failed_matrix_is_not_sealed_and_complete_pass_is_sealed(
+    tmp_path: Path,
+) -> None:
+    module = _module()
+    matrix = {
+        "schema_version": module.MATRIX_SCHEMA,
+        "registry_digest": "registry",
+        "producer_contract_digest": "producer",
+        "completed_cases": 60,
+        "worker_failures": [],
+        "gates": {
+            "all_60_candidate_pools_sealed": True,
+            "all_safety_determinism_and_resource_gates": False,
+        },
+        "passed": False,
+    }
+    matrix["result_digest"] = module.matrix_digest(matrix)
+    assert not module._write_success_seal(
+        tmp_path, matrix, registry_digest="registry",
+        producer_contract_digest="producer",
+    )
+    assert not (tmp_path / "SEALED.json").exists()
+
+    matrix["gates"]["all_safety_determinism_and_resource_gates"] = True
+    matrix["passed"] = True
+    matrix["result_digest"] = module.matrix_digest(matrix)
+    assert module._write_success_seal(
+        tmp_path, matrix, registry_digest="registry",
+        producer_contract_digest="producer",
+    )
+    seal = json.loads((tmp_path / "SEALED.json").read_text())
+    assert seal["candidate_pools_sealed"] is True
+    assert seal["candidate_matrix_digest"] == matrix["result_digest"]
+    assert seal["seal_digest"] == module._seal_digest(seal)
+
+
+def test_comparator_rejects_producer_drift_before_truth_open(tmp_path: Path) -> None:
+    module = _comparator_module()
+    registry = json.loads((
+        Path(__file__).parents[1] / "config" / "data" / "analogues" / "m04r10"
+        / "nasdaq-untouched-authority-registry" / "query-registry.json"
+    ).read_text())
+    physical_manifest = tmp_path / "manifest.json"
+    physical_manifest.write_text("{}\n")
+    deterministic = {
+        "schema_version": module.PRODUCER_CONTRACT_SCHEMA,
+        "registry_digest": module.FROZEN_REGISTRY_DIGEST,
+        "ordered_query_ids": [
+            case["episode_id"] for case in registry["cases_data"]
+        ],
+        "ordered_query_ids_digest": module.FROZEN_CASE_ORDER_DIGEST,
+        "generation_id": module.FROZEN_GENERATION_ID,
+        "physical_manifest_path": str(physical_manifest.resolve()),
+        "physical_manifest_sha256": module.file_fingerprint(physical_manifest),
+        "physical_rows": 10,
+        "proposal_contract_digest": module.FROZEN_PROPOSAL_CONTRACT_DIGEST,
+        "route_quotas": module.FROZEN_ROUTE_QUOTAS,
+        "request": module.FROZEN_REQUEST,
+        "scan_protocol": module.PRODUCER_SCAN_PROTOCOL,
+        "performance_limits": module.PRODUCER_PERFORMANCE_LIMITS,
+        "prefix_policy": "worker recomputes and exactly matches frozen stock and benchmark causal prefixes",
+        "implementation_manifest": module._expected_producer_implementation_manifest(),
+        "real_forward_outcomes_accessed": False,
+    }
+    contract = {
+        **deterministic, "contract_digest": stable_hash(deterministic),
+    }
+    assert module.validate_preopen_producer_contract(contract, registry) == ()
+
+    for changed in (
+        {"schema_version": "candidate-recall-producer-contract-v1"},
+        {"scan_protocol": {**module.PRODUCER_SCAN_PROTOCOL, "outer_threads": 2}},
+        {"implementation_manifest": {"files": {}, "digest": stable_hash({})}},
+    ):
+        invalid = {**deepcopy(contract), **changed}
+        invalid["contract_digest"] = stable_hash({
+            key: value for key, value in invalid.items()
+            if key != "contract_digest"
+        })
+        assert module.validate_preopen_producer_contract(invalid, registry)
 
 
 def test_checkpoint_is_bound_to_registry_case_and_three_repeats() -> None:

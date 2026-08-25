@@ -130,7 +130,11 @@ def main() -> int:
     if not all((
         registry.get("registry_digest") == FROZEN_REGISTRY_DIGEST,
         stable_hash([case["episode_id"] for case in registry["cases_data"]]) == FROZEN_CASE_ORDER_DIGEST,
+        producer_contract.get("schema_version")
+        == "candidate-recall-producer-contract-v2",
         producer_contract.get("registry_digest") == FROZEN_REGISTRY_DIGEST,
+        producer_contract.get("ordered_query_ids")
+        == [case["episode_id"] for case in registry["cases_data"]],
         producer_contract.get("generation_id") == FROZEN_GENERATION_ID,
         producer_contract.get("proposal_contract_digest") == FROZEN_PROPOSAL_CONTRACT_DIGEST,
         producer_contract.get("route_quotas") == FROZEN_ROUTE_QUOTAS,
@@ -141,6 +145,7 @@ def main() -> int:
         producer_contract.get("contract_digest") == stable_hash({
             key: value for key, value in producer_contract.items() if key != "contract_digest"
         }),
+        producer_contract.get("real_forward_outcomes_accessed") is False,
         candidate_seal.get("producer_contract_digest") == producer_contract.get("contract_digest"),
         candidate_seal.get("candidate_matrix_digest") == candidate_matrix.get("result_digest"),
         candidate_seal.get("completed_cases") == 60,

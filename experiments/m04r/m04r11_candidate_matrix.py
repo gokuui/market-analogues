@@ -82,6 +82,48 @@ def checkpoint_integrity_digest(payload: dict[str, Any]) -> str:
     return candidate_checkpoint_integrity_digest(payload)
 
 
+def _seal_digest(payload: dict[str, Any]) -> str:
+    return stable_hash({
+        key: value for key, value in payload.items()
+        if key not in {"created_at", "seal_digest"}
+    })
+
+
+def _write_success_seal(
+    output_root: Path, matrix: dict[str, Any], *, registry_digest: str,
+    producer_contract_digest: str,
+) -> bool:
+    """Seal only a complete matrix whose safety/performance gates all passed."""
+    if not all((
+        matrix.get("schema_version") == MATRIX_SCHEMA,
+        matrix.get("registry_digest") == registry_digest,
+        matrix.get("producer_contract_digest") == producer_contract_digest,
+        matrix.get("completed_cases") == 60,
+        matrix.get("worker_failures") == [],
+        matrix.get("gates") == {
+            "all_60_candidate_pools_sealed": True,
+            "all_safety_determinism_and_resource_gates": True,
+        },
+        matrix.get("passed") is True,
+        matrix.get("result_digest") == matrix_digest(matrix),
+    )):
+        return False
+    deterministic = {
+        "schema_version": SEAL_SCHEMA, "registry_digest": registry_digest,
+        "producer_contract_digest": producer_contract_digest,
+        "candidate_matrix_digest": matrix["result_digest"],
+        "completed_cases": 60, "candidate_pools_sealed": True,
+        "comparison_results_opened": False,
+        "production_promotion_authorized": False,
+    }
+    seal = {
+        **deterministic, "created_at": datetime.now(timezone.utc).isoformat(),
+        "seal_digest": stable_hash(deterministic),
+    }
+    _atomic_json(output_root / "SEALED.json", seal)
+    return True
+
+
 def _implementation_manifest() -> dict[str, Any]:
     repository = Path(__file__).resolve().parents[2]
     paths = [Path(__file__).resolve(), *sorted((repository / "src").rglob("*.py"))]
@@ -393,15 +435,73 @@ def main() -> int:
     if existing_seal_path.exists():
         existing_seal = json.loads(existing_seal_path.read_text())
         existing_matrix = json.loads((args.output_root / "candidate-matrix.json").read_text())
+        existing_cases: list[dict[str, Any]] = []
+        for raw in cases:
+            episode = build_episode(
+                source, InstrumentKey("nasdaq", str(raw["symbol"])),
+                str(raw["cutoff"]), int(raw["lookback"]),
+                str(raw["representation_version"]),
+            )
+            candidate = json.loads((
+                args.output_root / "cases" / f"{raw['episode_id']}.json"
+            ).read_text())
+            case = {**raw, "registry_digest": registry["registry_digest"]}
+            if not _checkpoint_valid(
+                candidate, case=case, registry_digest=registry["registry_digest"],
+                generation_id=generation_id,
+                proposal_contract_digest=proposal_contract_digest,
+                producer_contract_digest=producer_contract["contract_digest"],
+                route_quotas=route_quotas,
+                physical_rows=int(producer_contract["physical_rows"]),
+                expected_query_start_ns=int(episode.bars.timestamp.iloc[0].value),
+                expected_latest_eligible_ns=int(latest_eligible_cutoff(episode, 60).value),
+                expected_representation_digest=representation_input_digest(
+                    represent(episode),
+                ),
+            ) or candidate.get("passed") is not True:
+                raise ValueError("existing sealed candidate checkpoint differs")
+            existing_cases.append(candidate)
+        expected_existing_gates = {
+            "all_60_candidate_pools_sealed": (
+                len(existing_cases) == 60
+                and existing_matrix.get("worker_failures") == []
+            ),
+            "all_safety_determinism_and_resource_gates": (
+                len(existing_cases) == 60
+                and all(row["passed"] for row in existing_cases)
+            ),
+        }
         if not all((
-            existing_seal.get("seal_digest") == stable_hash({
-                key: value for key, value in existing_seal.items()
-                if key not in {"created_at", "seal_digest"}
-            }),
+            existing_matrix.get("schema_version") == MATRIX_SCHEMA,
+            existing_matrix.get("registry_digest") == registry["registry_digest"],
+            existing_matrix.get("producer_contract_digest")
+            == producer_contract["contract_digest"],
+            existing_matrix.get("proposal_contract_digest")
+            == proposal_contract_digest,
+            existing_matrix.get("generation_id") == generation_id,
+            existing_matrix.get("execution")
+            == "serial isolated spawned query processes",
+            existing_matrix.get("completed_cases") == 60,
+            existing_matrix.get("case_result_digests")
+            == [row["result_digest"] for row in existing_cases],
+            existing_matrix.get("maximum_cold_seconds")
+            == max(row["cold_seconds"] for row in existing_cases),
+            existing_matrix.get("maximum_second_warm_seconds")
+            == max(row["warm_second_seconds"] for row in existing_cases),
+            existing_matrix.get("maximum_peak_rss_mb")
+            == max(row["peak_rss_mb"] for row in existing_cases),
+            existing_matrix.get("gates") == expected_existing_gates,
+            existing_matrix.get("passed") is True,
+            existing_matrix.get("result_digest") == matrix_digest(existing_matrix),
+            existing_seal.get("schema_version") == SEAL_SCHEMA,
+            existing_seal.get("registry_digest") == registry["registry_digest"],
             existing_seal.get("producer_contract_digest") == producer_contract["contract_digest"],
             existing_seal.get("candidate_matrix_digest") == existing_matrix.get("result_digest"),
             existing_seal.get("candidate_pools_sealed") is True,
-            existing_matrix.get("result_digest") == matrix_digest(existing_matrix),
+            existing_seal.get("completed_cases") == 60,
+            existing_seal.get("comparison_results_opened") is False,
+            existing_seal.get("production_promotion_authorized") is False,
+            existing_seal.get("seal_digest") == _seal_digest(existing_seal),
         )):
             raise ValueError("existing candidate seal is invalid")
         print("candidate pools are already sealed; refusing to regenerate one-shot evidence")
@@ -489,18 +589,13 @@ def main() -> int:
     payload["result_digest"] = matrix_digest(payload)
     _atomic_json(args.output_root / "candidate-matrix.json", payload)
     _render(args.output_root / "candidate-matrix.html", payload)
-    seal_deterministic = {
-        "schema_version": SEAL_SCHEMA, "registry_digest": registry["registry_digest"],
-        "producer_contract_digest": producer_contract["contract_digest"],
-        "candidate_matrix_digest": payload["result_digest"],
-        "completed_cases": len(ordered), "candidate_pools_sealed": len(ordered) == 60 and not worker_failures,
-        "comparison_results_opened": False, "production_promotion_authorized": False,
-    }
-    seal = {**seal_deterministic, "created_at": datetime.now(timezone.utc).isoformat(),
-            "seal_digest": stable_hash(seal_deterministic)}
-    _atomic_json(args.output_root / "SEALED.json", seal)
+    sealed = _write_success_seal(
+        args.output_root, payload,
+        registry_digest=registry["registry_digest"],
+        producer_contract_digest=producer_contract["contract_digest"],
+    )
     print(json.dumps(payload, indent=2, sort_keys=True))
-    return 0 if seal["candidate_pools_sealed"] else 2
+    return 0 if sealed else 2
 
 
 if __name__ == "__main__":
