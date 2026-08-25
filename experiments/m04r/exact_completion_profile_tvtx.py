@@ -194,6 +194,7 @@ def main() -> int:
             store_dataset_id="nasdaq", manifest=loaded.manifest,
             workers=args.workers, sparse_cutoff=8, tolerance=1e-12,
             requested_positions=True, hybrid_requested_positions=False,
+            vector_lower_bounds=False,
         )
         seed_seconds = perf_counter() - seed_started
         selected = select_scored(seed, request)
@@ -209,6 +210,7 @@ def main() -> int:
             store_dataset_id="nasdaq", manifest=loaded.manifest,
             workers=args.workers, sparse_cutoff=8, tolerance=1e-12,
             requested_positions=True, hybrid_requested_positions=False,
+            vector_lower_bounds=False,
         )
         completion_seconds = perf_counter() - completion_started
         exact_wall = perf_counter() - exact_started

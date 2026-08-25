@@ -105,6 +105,13 @@ def test_certified_pack_exhaustion_matches_brute_force(
         sparse_cutoff=3, seed_rows=20, verify_content=False,
         hybrid_requested_positions=True,
     )
+    vector = certified_packed_search(
+        query, source, request, store_root, generation,
+        store_dataset_id="test", initial_frontier_rows=1_000,
+        maximum_frontier_rows=1_000, block_rows=15, workers=2,
+        sparse_cutoff=3, seed_rows=20, verify_content=False,
+        requested_positions=True, vector_lower_bounds=True,
+    )
     brute = exact_search(query, brute_candidates, request)
     assert [row.episode_key.id for row in result.matches] == [
         row.episode_key.id for row in brute
@@ -156,6 +163,27 @@ def test_certified_pack_exhaustion_matches_brute_force(
     }
     assert hybrid.certificate.input_digest == certificate.input_digest
     assert hybrid.certificate.exact_evaluated == certificate.exact_evaluated
+    assert [row.episode_key.id for row in vector.matches] == [
+        row.episode_key.id for row in result.matches
+    ]
+    np.testing.assert_allclose(
+        [row.total_distance for row in vector.matches],
+        [row.total_distance for row in result.matches], rtol=0, atol=1e-12,
+    )
+    for actual, expected in zip(vector.matches, result.matches):
+        assert actual.component_distances.keys() == expected.component_distances.keys()
+        np.testing.assert_allclose(
+            list(actual.component_distances.values()),
+            list(expected.component_distances.values()), rtol=0, atol=1e-12,
+        )
+        assert actual.alignment == expected.alignment
+    assert vector.certificate.schema_version == "m04r-certified-packed-search-v4"
+    assert vector.certificate.contract_digest not in {
+        certificate.contract_digest, requested.certificate.contract_digest,
+        hybrid.certificate.contract_digest,
+    }
+    assert vector.certificate.input_digest == certificate.input_digest
+    assert vector.certificate.exact_evaluated == certificate.exact_evaluated
 
 
 def test_requested_position_modes_are_mutually_exclusive(
@@ -169,6 +197,8 @@ def test_requested_position_modes_are_mutually_exclusive(
         certified_packed_search_contract(
             requested_positions=True, hybrid_requested_positions=True,
         )
+    with np.testing.assert_raises(ValueError):
+        certified_packed_search_contract(vector_lower_bounds=True)
 
 
 def test_optional_empty_volume_stages_are_warning_free_across_threads() -> None:

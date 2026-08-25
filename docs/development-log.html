@@ -749,6 +749,13 @@
   <p><b>Existing capability found:</b> <code>batch_representation_lower_bounds</code> already implements the same exact 48-sample native bound vectorized over representation groups and has independent differential verification, but certified completion does not call it. A bounded benchmark over group sizes 1/2/4/8/16/32/64 measures 1.09×/2.08×/3.99×/7.09×/12.15×/18.89×/26.17× speedups with maximum total delta 1.11e−16.</p>
   <p><b>Next:</b> Add this path under a distinct certified-search contract because last-bit values may change even inside the frozen practical tolerance; v1–v3 remain reproducible. Differentially require IDs/order/alignments exact, totals/components within 1e−12 on fixtures, bound safety and unchanged exact accounting, then run optimized TVTX only.</p>
 </section>
+
+<section class="entry">
+  <h2>L-071 — Vector native-bound v4 preflight</h2>
+  <p><b>Implementation:</b> Added explicit <code>m04r-certified-packed-search-v4</code>. It retains pure requested-position representation construction, then applies the existing independently verified <code>batch_representation_lower_bounds</code> once per symbol group before scalar DTW completion. The v4 option requires requested positions and is bound into runner controls/checkpoint validation; invalid combinations fail closed. v1–v3 code paths and contract digests remain reproducible.</p>
+  <p><b>Differential gate:</b> On the market-agnostic physical packed fixture, v4 returns the same constrained IDs, order and alignments as v1–v3 and brute force, with totals/components within 1e−12, identical input digest and exact-evaluation count, plus a distinct v4 schema/contract digest. The full test suite passes after CLI/import checks.</p>
+  <p><b>Next:</b> Run only optimized one-scan TVTX with requested positions plus vector lower bounds. Require the frozen authority tolerances, strict stop, bound safety and unchanged 9,309 accounting. Do not infer real speed from synthetic group benchmarks and do not start the other authorities unless the measured TVTX result materially improves.</p>
+</section>
 </main>
 
 <section id="reproduce">

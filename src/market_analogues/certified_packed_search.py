@@ -16,7 +16,8 @@ from .distance import (
     complete_representation_distance, representation_distance_lower_bound,
 )
 from .exact_batch import (
-    exact_channel_rows, exact_representations_at_positions,
+    batch_representation_lower_bounds, exact_channel_rows,
+    exact_representations_at_positions,
     materialize_exact_representations,
     sliding_exact_representations,
 )
@@ -34,6 +35,7 @@ from .types import (
 CERTIFIED_PACKED_SEARCH_VERSION = "m04r-certified-packed-search-v1"
 CERTIFIED_PACKED_SEARCH_REQUESTED_VERSION = "m04r-certified-packed-search-v2"
 CERTIFIED_PACKED_SEARCH_HYBRID_VERSION = "m04r-certified-packed-search-v3"
+CERTIFIED_PACKED_SEARCH_VECTOR_VERSION = "m04r-certified-packed-search-v4"
 
 
 class CertifiedPackedSearchError(RuntimeError):
@@ -82,10 +84,15 @@ class CertifiedPackedSearchResult:
 def certified_packed_search_contract(
     *, requested_positions: bool = False,
     hybrid_requested_positions: bool = False,
+    vector_lower_bounds: bool = False,
 ) -> dict[str, Any]:
     if requested_positions and hybrid_requested_positions:
         raise ValueError("requested-position modes are mutually exclusive")
-    if hybrid_requested_positions:
+    if vector_lower_bounds and not requested_positions:
+        raise ValueError("vector lower bounds require requested positions")
+    if vector_lower_bounds:
+        version = CERTIFIED_PACKED_SEARCH_VECTOR_VERSION
+    elif hybrid_requested_positions:
         version = CERTIFIED_PACKED_SEARCH_HYBRID_VERSION
     elif requested_positions:
         version = CERTIFIED_PACKED_SEARCH_REQUESTED_VERSION
@@ -106,6 +113,9 @@ def certified_packed_search_contract(
             "incomplete selection has infinite threshold and cannot certify"
         ),
         "exact_scoring": (
+            "native distance-v1 with per-symbol requested-cutoff vector construction "
+            "and vectorized exact non-DTW lower bounds before scalar DTW completion"
+            if vector_lower_bounds else
             "native distance-v1 with scalar reconstruction for sparse symbol groups "
             "and requested-cutoff vector construction for dense symbol groups"
             if hybrid_requested_positions else
@@ -143,6 +153,7 @@ def _score_group(
     tolerance: float,
     requested_positions: bool,
     hybrid_requested_positions: bool,
+    vector_lower_bounds: bool,
 ) -> tuple[list[ScoredCandidate], float, str]:
     key = InstrumentKey(store_dataset_id, symbol)
     bars = source.load(key)
@@ -188,6 +199,23 @@ def _score_group(
             int(pd.Timestamp(frame.timestamp.iloc[int(position)]).value): representation
             for position, representation in zip(batch.positions, batch.representations)
         }
+    lower_bounds: dict[int, tuple[float, dict[str, float], float]] = {}
+    if vector_lower_bounds:
+        ordered = tuple(representations[proposal.cutoff_ns] for proposal in proposals)
+        bounded = batch_representation_lower_bounds(
+            query_representation, ordered,
+        )
+        lower_bounds = {
+            proposal.cutoff_ns: (
+                float(bounded.totals[index]),
+                {
+                    name: float(values[index])
+                    for name, values in bounded.components.items()
+                },
+                float(bounded.rigid_price[index]),
+            )
+            for index, proposal in enumerate(proposals)
+        }
     output: list[ScoredCandidate] = []
     maximum_excess = 0.0
     for proposal in proposals:
@@ -225,9 +253,12 @@ def _score_group(
             raise CertifiedPackedSearchError(
                 f"batch omitted packed cutoff {symbol}:{proposal.cutoff_ns}"
             )
-        native_lower, components, rigid = representation_distance_lower_bound(
-            query_representation, candidate_representation,
-        )
+        if vector_lower_bounds:
+            native_lower, components, rigid = lower_bounds[proposal.cutoff_ns]
+        else:
+            native_lower, components, rigid = representation_distance_lower_bound(
+                query_representation, candidate_representation,
+            )
         excess = proposal.lower_bound - native_lower
         maximum_excess = max(maximum_excess, excess)
         if excess > tolerance:
@@ -258,6 +289,7 @@ def _score_new_proposals(
     tolerance: float,
     requested_positions: bool,
     hybrid_requested_positions: bool,
+    vector_lower_bounds: bool,
 ) -> tuple[list[ScoredCandidate], float, int, int]:
     if workers < 1 or sparse_cutoff < 1:
         raise ValueError("workers and sparse cutoff must be positive")
@@ -289,6 +321,7 @@ def _score_new_proposals(
             sparse_cutoff=sparse_cutoff, tolerance=tolerance,
             requested_positions=requested_positions,
             hybrid_requested_positions=hybrid_requested_positions,
+            vector_lower_bounds=vector_lower_bounds,
         )
 
     items = sorted(grouped.items())
@@ -330,9 +363,12 @@ def certified_packed_search(
     verify_content: bool = True,
     requested_positions: bool = False,
     hybrid_requested_positions: bool = False,
+    vector_lower_bounds: bool = False,
 ) -> CertifiedPackedSearchResult:
     if requested_positions and hybrid_requested_positions:
         raise ValueError("requested-position modes are mutually exclusive")
+    if vector_lower_bounds and not requested_positions:
+        raise ValueError("vector lower bounds require requested positions")
     if (
         initial_frontier_rows < request.top_k
         or maximum_frontier_rows < initial_frontier_rows
@@ -346,6 +382,7 @@ def certified_packed_search(
     contract = certified_packed_search_contract(
         requested_positions=requested_positions,
         hybrid_requested_positions=hybrid_requested_positions,
+        vector_lower_bounds=vector_lower_bounds,
     )
     loaded = load_packed_generation(
         store_root, generation_id, verify_content=verify_content,
@@ -409,6 +446,7 @@ def certified_packed_search(
                     tolerance=tolerance,
                     requested_positions=requested_positions,
                     hybrid_requested_positions=hybrid_requested_positions,
+                    vector_lower_bounds=vector_lower_bounds,
                 )
                 scored_by_id.update({
                     row.match.episode_key.id: row for row in newly_scored
