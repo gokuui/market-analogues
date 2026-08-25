@@ -236,7 +236,8 @@
   <p class="pass"><b>Compiled-IQR TAIT PASS:</b> Exact TAIT falls from 355.95 to 264.57 seconds at 709.39 MiB with unchanged 7,419 rows and authority equality. Certificate/case digests are <code>b7c606fd…5ea5</code>/<code>cab797bd…49ee</code>.</p>
   <p class="pass"><b>Compiled-IQR TVTX PASS:</b> Exact TVTX falls from 328.03 to 260.40 seconds at 733.13 MiB with unchanged 9,309 rows and alignments. All three former heavy failures are now below 300, authorizing a fresh full matrix.</p>
   <p class="pass"><b>Independent verifier v5 preflight:</b> Only frozen legacy-v1 and selected-v5 control dictionaries are supported; contract/schema are derived and common controls required across all cases. Unsupported changes such as 16 workers fail closed. Legacy tamper tests and the full suite pass.</p>
-  <p class="open"><b>Remaining M04R-08 boundary:</b> Run all 12 fresh under selected v5 controls, then independently verify the complete matrix and physical shadow generation. Promotion remains blocked until both pass.</p>
+  <p class="pass"><b>M04R-08B selected-v5 all-12 PASS:</b> A fresh run exactly passes all 12 frozen NASDAQ authorities under the selected controls. Aggregate p95 is 262.0011 seconds, maximum 265.6925 seconds, total 1,961.8827 seconds and peak RSS 755.9961 MiB, all within the unchanged gates. Matrix digest is <code>9bedcf7e…cb8</code>. The independent verifier re-hashes the physical generation and every authority/certificate, confirms no real forward-outcome access and reports no failures with digest <code>1d617a10…e0890</code>.</p>
+  <p class="open"><b>Remaining M04R-08 boundary:</b> Single-query correctness and performance are closed. The frozen 24-query batch requirement is not: the exact shared-read POC improved only 2.39%, below the 10% material threshold. Design and verify a stronger multi-query execution path before M04R-09 or activation; do not reinterpret the all-12 serial pass as a batch pass.</p>
 </section>
 
 <section class="task" id="m04r-09">
@@ -295,7 +296,7 @@
     <li>Commit a clean rollback point.</li>
     <li>Proceed only if the explicit gate passes. A failure creates a versioned redesign; it never lowers a frozen threshold.</li>
   </ol>
-  <p class="muted">M04R-00 through M04R-07 and M04R-08A are complete. One-scan pure v2 repairs all three former >600-second cases, but p95 remains 554.16 seconds and shared reads add only 2.39%. Combined-IQR improves the fixed real-row bound kernel by 1.2306× and now needs full-scan verification; all-12 rerun and activation remain blocked.</p>
+  <p class="muted">M04R-00 through M04R-07, M04R-08A and the M04R-08B selected-v5 single-query matrix are complete. All 12 frozen NASDAQ authorities pass independently verified correctness, p95, maximum and RSS gates. M04R-08 batch execution remains open because the exact shared-read POC saved only 2.39%, below the frozen 10% material threshold; M04R-09 and activation remain blocked.</p>
 </section>
 </body>
 </html>
