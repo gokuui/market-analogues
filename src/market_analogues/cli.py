@@ -83,6 +83,10 @@ from .m04r_certified_search_verification import (
     verify_m04r_certified_packed_search,
     write_m04r_certified_search_verification,
 )
+from .m04r_certified_matrix_verification import (
+    verify_m04r_certified_matrix,
+    write_m04r_certified_matrix_verification,
+)
 from .multiresolution_verification import (
     verify_multiresolution_state, write_multiresolution_verification,
 )
@@ -855,6 +859,56 @@ def cmd_verify_m04r_certified_packed_search(args: argparse.Namespace) -> int:
         "passed": result.passed, **result.metrics,
         "result_digest": result.result_digest,
         "failures": result.failures,
+    }, indent=2))
+    print(html)
+    return 0 if result.passed else 2
+
+
+def cmd_verify_m04r_certified_matrix(args: argparse.Namespace) -> int:
+    config = load_config(args.config)
+    poc_root = config.artifact_dir / "poc" / "m04r"
+    full_root = Path(args.full_root) if args.full_root else (
+        poc_root / "packed-bound-full"
+    )
+    evidence = Path(args.evidence) if args.evidence else (
+        poc_root / "certified-packed-search-all12"
+        / "certified-packed-search-all12.json"
+    )
+    authority_dir = Path(args.authority_dir) if args.authority_dir else (
+        config.artifact_dir / "gate12" / "authorities" / "nasdaq" / "cases"
+    )
+    result = verify_m04r_certified_matrix(
+        evidence, full_root / "store", full_root / "packed-bound-full.json",
+        authority_dir,
+    )
+    output_dir = Path(args.output_dir) if args.output_dir else (
+        config.artifact_dir / "m04r-certified-packed-search-all12"
+    )
+    machine, html = write_m04r_certified_matrix_verification(result, output_dir)
+    GateReport(
+        "m04r_certified_packed_search_all12", result.evidence_gate_passed,
+        {
+            **result.metrics,
+            "evidence_verified": result.passed,
+            "verification_result_digest": result.result_digest,
+            "machine_artifact": str(machine.resolve()),
+            "html_artifact": str(html.resolve()),
+        },
+        list(result.performance_failures if result.passed else result.failures),
+        source_hashes={
+            "certified_packed_search_contract": str(
+                result.metrics["contract_digest"]
+            ),
+            "packed_generation": str(result.metrics["generation_id"]),
+        },
+    ).write(_gates(config))
+    print(json.dumps({
+        "evidence_verified": result.passed,
+        "evidence_gate_passed": result.evidence_gate_passed,
+        **result.metrics,
+        "result_digest": result.result_digest,
+        "failures": result.failures,
+        "performance_failures": result.performance_failures,
     }, indent=2))
     print(html)
     return 0 if result.passed else 2
@@ -2208,6 +2262,13 @@ def build_parser() -> argparse.ArgumentParser:
     m04r_certified.add_argument("--authority")
     m04r_certified.add_argument("--output-dir")
     m04r_certified.set_defaults(func=cmd_verify_m04r_certified_packed_search)
+    m04r_matrix = sub.add_parser("verify-m04r-certified-matrix")
+    m04r_matrix.add_argument("--config", required=True)
+    m04r_matrix.add_argument("--full-root")
+    m04r_matrix.add_argument("--evidence")
+    m04r_matrix.add_argument("--authority-dir")
+    m04r_matrix.add_argument("--output-dir")
+    m04r_matrix.set_defaults(func=cmd_verify_m04r_certified_matrix)
     compare = sub.add_parser("compare-methods")
     compare.add_argument("--config", required=True)
     compare.add_argument("--seeds-per-family", type=int, default=5)

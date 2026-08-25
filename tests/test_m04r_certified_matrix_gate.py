@@ -2,10 +2,17 @@ from __future__ import annotations
 
 import copy
 import importlib.util
+import json
 from pathlib import Path
+from types import SimpleNamespace
 
 from market_analogues.certified_packed_search import certified_packed_search_contract
 from market_analogues.m04r_certified_search_verification import _certificate_digest
+from market_analogues.m04r_certified_matrix_verification import (
+    _matrix_deterministic as verifier_matrix_deterministic,
+    verify_m04r_certified_matrix,
+)
+from market_analogues.m04r_full_pack_verification import EVIDENCE_OMITTED
 from market_analogues.types import stable_hash
 
 
@@ -46,11 +53,24 @@ def _case(query_id: str, seconds: float = 10.0) -> tuple[
         "quality_tier": "A",
     } for index in range(20)]
     authority: dict[str, object] = {
+        "schema_version": "gate12-authority-v1",
         "query_episode_id": query_id,
-        "authority_digest": stable_hash({"query": query_id}),
         "matches": copy.deepcopy(matches),
+        "result_digest": stable_hash(matches),
+        "repeated_digest": stable_hash(matches),
+        "certificate": {"eligible_candidates": 100},
     }
-    build = {"generation_id": generation, "result_digest": "c" * 64}
+    authority["authority_digest"] = stable_hash(authority)
+    build: dict[str, object] = {
+        "schema_version": "m04r-packed-bound-full-build-v1",
+        "generation_id": generation,
+        "gate_passed": True,
+        "shadow_generation": True,
+        "real_forward_outcomes_accessed": False,
+    }
+    build["result_digest"] = stable_hash({
+        key: value for key, value in build.items() if key not in EVIDENCE_OMITTED
+    })
     certificate: dict[str, object] = {
         "schema_version": "m04r-certified-packed-search-v1",
         "contract_digest": contract,
@@ -97,7 +117,7 @@ def _case(query_id: str, seconds: float = 10.0) -> tuple[
         "full_build_evidence_digest": build["result_digest"],
         "query_episode_id": query_id,
         "authority_digest": authority["authority_digest"],
-        "controls": {"block_rows": 7, "workers": 2},
+        "controls": {"block_rows": 2_048, "workers": 8},
         "matches": matches,
         **comparison,
         "certificate": certificate,
@@ -146,3 +166,52 @@ def test_matrix_checkpoint_validation_and_timing_free_digest() -> None:
     tampered["result_digest"] = stable_hash(_deterministic(tampered, CASE_OMITTED))
     _, authority, build = _case(expected[0])
     assert not _valid_checkpoint(tampered, authority, build)
+
+
+def test_independent_matrix_verifier_passes_and_rejects_tamper(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    cases = []
+    expected = []
+    authorities = []
+    build: dict[str, object] | None = None
+    authority_dir = tmp_path / "authorities"
+    authority_dir.mkdir()
+    for index in range(12):
+        query_id = f"{index + 1:024x}"
+        case, authority, build = _case(query_id, 100.0 + index)
+        cases.append(case)
+        authorities.append(authority)
+        expected.append(query_id)
+        (authority_dir / f"{query_id}.json").write_text(json.dumps(authority))
+    assert build is not None
+    matrix = _aggregate(
+        cases, [], build=build, expected_ids=expected, started_at="one",
+    )
+    evidence_path = tmp_path / "matrix.json"
+    evidence_path.write_text(json.dumps(matrix))
+    build_path = tmp_path / "build.json"
+    build_path.write_text(json.dumps(build))
+    store = tmp_path / "store"
+    store.mkdir()
+    monkeypatch.setattr(
+        "market_analogues.m04r_certified_matrix_verification.load_packed_generation",
+        lambda *args, **kwargs: SimpleNamespace(generation_id="b" * 64),
+    )
+    result = verify_m04r_certified_matrix(
+        evidence_path, store, build_path, authority_dir,
+    )
+    assert result.passed, result.failures
+    assert result.evidence_gate_passed
+
+    matrix["cases"][0]["matches"][0]["total_distance"] += 0.01
+    matrix["cases"][0]["result_digest"] = stable_hash(
+        _deterministic(matrix["cases"][0], CASE_OMITTED)
+    )
+    matrix["result_digest"] = stable_hash(verifier_matrix_deterministic(matrix))
+    evidence_path.write_text(json.dumps(matrix))
+    tampered = verify_m04r_certified_matrix(
+        evidence_path, store, build_path, authority_dir,
+    )
+    assert not tampered.passed
+    assert any("case evidence differs" in value for value in tampered.failures)
