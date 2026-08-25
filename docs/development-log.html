@@ -741,6 +741,14 @@
   <p><b>Comparison:</b> The optimized run saves 61.50 seconds/10.8% versus one-scan pre-change v2 at 569.59 seconds and 476.20 seconds/48.4% versus v1 at 984.28. The deterministic partial-matrix digest remains <code>7e613120…372</code> because timing fields are deliberately excluded and results/certificates are unchanged. The one-case matrix remains incomplete by design.</p>
   <p><b>Boundary and next:</b> TVTX still exceeds the 300-second p95 target by 208.08 seconds. Its full bound scan is now 162.76 seconds, leaving roughly 345 seconds in source validation, requested-position reconstruction, exact distance/DTW, selection and overhead. Profile that exact-completion path by phase and group density on the frozen 9,309 proposals before changing it. Do not rerun CAKE/TAIT or all 12 yet.</p>
 </section>
+
+<section class="entry">
+  <h2>L-070 — Certified exact-completion profile and vector-bound decision</h2>
+  <p><b>Profile validity:</b> The standalone profiler reconstructs the same composite frontier, 512 seed rows, 8,797 pending rows, 9,309 total exact evaluations, threshold, strict stop and final frozen top-20 IDs as optimized TVTX. It passes with evidence digest <code>9ef1f1fb…1c2b</code>. Optimized scan wall time is 164.10 seconds and exact completion wall time 355.11.</p>
+  <p><b>Worker-time decomposition:</b> Across eight overlapping workers, requested representation construction consumes 942.14 cumulative seconds, native non-DTW lower-bound distance 935.95, source loads 411.76, full distance/DTW 296.42, causal-prefix validation 162.20 and eligibility 7.89. Sparse/dense group totals are 2,481.08/355.99 seconds. DTW is only 10.8% of measured phase time; representation construction and the scalar native lower bound are the primary targets.</p>
+  <p><b>Existing capability found:</b> <code>batch_representation_lower_bounds</code> already implements the same exact 48-sample native bound vectorized over representation groups and has independent differential verification, but certified completion does not call it. A bounded benchmark over group sizes 1/2/4/8/16/32/64 measures 1.09×/2.08×/3.99×/7.09×/12.15×/18.89×/26.17× speedups with maximum total delta 1.11e−16.</p>
+  <p><b>Next:</b> Add this path under a distinct certified-search contract because last-bit values may change even inside the frozen practical tolerance; v1–v3 remain reproducible. Differentially require IDs/order/alignments exact, totals/components within 1e−12 on fixtures, bound safety and unchanged exact accounting, then run optimized TVTX only.</p>
+</section>
 </main>
 
 <section id="reproduce">
