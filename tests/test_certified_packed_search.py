@@ -91,6 +91,13 @@ def test_certified_pack_exhaustion_matches_brute_force(
         maximum_frontier_rows=1_000, block_rows=13, workers=1,
         sparse_cutoff=3, seed_rows=20, verify_content=False,
     )
+    requested = certified_packed_search(
+        query, source, request, store_root, generation,
+        store_dataset_id="test", initial_frontier_rows=1_000,
+        maximum_frontier_rows=1_000, block_rows=11, workers=2,
+        sparse_cutoff=3, seed_rows=20, verify_content=False,
+        requested_positions=True,
+    )
     brute = exact_search(query, brute_candidates, request)
     assert [row.episode_key.id for row in result.matches] == [
         row.episode_key.id for row in brute
@@ -108,6 +115,22 @@ def test_certified_pack_exhaustion_matches_brute_force(
     assert certificate.maximum_quantized_bound_excess <= 1e-12
     assert repeated.certificate.result_digest == certificate.result_digest
     assert repeated.certificate.input_digest == certificate.input_digest
+    assert [row.episode_key.id for row in requested.matches] == [
+        row.episode_key.id for row in result.matches
+    ]
+    assert [row.total_distance for row in requested.matches] == [
+        row.total_distance for row in result.matches
+    ]
+    assert [row.component_distances for row in requested.matches] == [
+        row.component_distances for row in result.matches
+    ]
+    assert [row.alignment for row in requested.matches] == [
+        row.alignment for row in result.matches
+    ]
+    assert requested.certificate.contract_digest != certificate.contract_digest
+    assert requested.certificate.schema_version == "m04r-certified-packed-search-v2"
+    assert requested.certificate.input_digest == certificate.input_digest
+    assert requested.certificate.exact_evaluated == certificate.exact_evaluated
 
 
 def test_optional_empty_volume_stages_are_warning_free_across_threads() -> None:

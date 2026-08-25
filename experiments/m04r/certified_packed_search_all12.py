@@ -124,7 +124,8 @@ def _case_payload(
     result: Any,
     authority: dict[str, Any],
     build: dict[str, Any],
-    controls: dict[str, int],
+    controls: dict[str, Any],
+    requested_positions: bool,
 ) -> dict[str, Any]:
     matches = [_match(value) for value in result.matches]
     comparison = _comparison(matches, authority["matches"])
@@ -164,7 +165,9 @@ def _case_payload(
     }
     payload = {
         "schema_version": CASE_SCHEMA,
-        "contract_digest": certified_packed_search_contract()["digest"],
+        "contract_digest": certified_packed_search_contract(
+            requested_positions=requested_positions,
+        )["digest"],
         "generation_id": build["generation_id"],
         "full_build_evidence_digest": build["result_digest"],
         "query_episode_id": authority["query_episode_id"],
@@ -189,10 +192,16 @@ def _case_payload(
 def _valid_checkpoint(
     payload: dict[str, Any], authority: dict[str, Any], build: dict[str, Any],
 ) -> bool:
+    requested_positions = bool(
+        (payload.get("controls") or {}).get("requested_positions", False)
+    )
+    contract = certified_packed_search_contract(
+        requested_positions=requested_positions,
+    )
     if not all((
         payload.get("schema_version") == CASE_SCHEMA,
         payload.get("status") == "completed",
-        payload.get("contract_digest") == certified_packed_search_contract()["digest"],
+        payload.get("contract_digest") == contract["digest"],
         payload.get("generation_id") == build.get("generation_id"),
         payload.get("full_build_evidence_digest") == build.get("result_digest"),
         payload.get("query_episode_id") == authority.get("query_episode_id"),
@@ -244,8 +253,7 @@ def _valid_checkpoint(
         certificate_valid = all((
             certificate.get("generation_id") == build.get("generation_id"),
             certificate.get("query_episode_id") == authority.get("query_episode_id"),
-            certificate.get("contract_digest")
-            == certified_packed_search_contract()["digest"],
+            certificate.get("contract_digest") == contract["digest"],
             certificate.get("result_digest") == _certificate_digest(payload),
             payload.get("certificate_digest") == _certificate_digest(payload),
         ))
@@ -265,6 +273,7 @@ def _aggregate(
     build: dict[str, Any],
     expected_ids: list[str],
     started_at: str,
+    requested_positions: bool,
 ) -> dict[str, Any]:
     seconds = [float(case["seconds"]) for case in cases]
     completed_ids = [str(case["query_episode_id"]) for case in cases]
@@ -293,7 +302,9 @@ def _aggregate(
     }
     payload = {
         "schema_version": MATRIX_SCHEMA,
-        "contract_digest": certified_packed_search_contract()["digest"],
+        "contract_digest": certified_packed_search_contract(
+            requested_positions=requested_positions,
+        )["digest"],
         "generation_id": build["generation_id"],
         "full_build_evidence_digest": build["result_digest"],
         "expected_query_episode_ids": expected_ids,
@@ -323,6 +334,8 @@ def main() -> int:
     parser.add_argument("--workers", type=int, default=8)
     parser.add_argument("--block-rows", type=int, default=2_048)
     parser.add_argument("--case-limit", type=int)
+    parser.add_argument("--query-ids", nargs="+")
+    parser.add_argument("--requested-positions", action="store_true")
     args = parser.parse_args()
     if args.workers < 1 or args.block_rows < 1:
         raise ValueError("workers and block rows must be positive")
@@ -368,7 +381,17 @@ def main() -> int:
                 f"authority integrity differs: {authority.get('query_episode_id')}"
             )
     expected_ids = [str(authority["query_episode_id"]) for authority in authorities]
-    selected = authorities[:args.case_limit] if args.case_limit else authorities
+    if args.query_ids:
+        requested_ids = set(args.query_ids)
+        unknown = requested_ids.difference(expected_ids)
+        if unknown:
+            raise ValueError(f"unknown query IDs: {sorted(unknown)}")
+        selected = [
+            authority for authority in authorities
+            if str(authority["query_episode_id"]) in requested_ids
+        ]
+    else:
+        selected = authorities[:args.case_limit] if args.case_limit else authorities
     source = source_from_spec(config.datasets["nasdaq"])
     cases_dir = args.output_root / "cases"
     matrix_path = args.output_root / "certified-packed-search-all12.json"
@@ -418,10 +441,16 @@ def main() -> int:
                 workers=args.workers,
                 sparse_cutoff=8,
                 verify_content=False,
+                requested_positions=args.requested_positions,
             )
             payload = _case_payload(
                 result, authority, build,
-                {"block_rows": args.block_rows, "workers": args.workers},
+                {
+                    "block_rows": args.block_rows,
+                    "workers": args.workers,
+                    "requested_positions": args.requested_positions,
+                },
+                args.requested_positions,
             )
             _write(cases_dir / f"{query_id}.json", payload)
             completed[query_id] = payload
@@ -445,6 +474,7 @@ def main() -> int:
         matrix = _aggregate(
             ordered, failures, build=build, expected_ids=expected_ids,
             started_at=started_at,
+            requested_positions=args.requested_positions,
         )
         _write(matrix_path, matrix)
         _render(matrix_path.with_suffix(".html"), matrix)
@@ -453,6 +483,7 @@ def main() -> int:
     matrix = _aggregate(
         ordered, failures, build=build, expected_ids=expected_ids,
         started_at=started_at,
+        requested_positions=args.requested_positions,
     )
     _write(matrix_path, matrix)
     _render(matrix_path.with_suffix(".html"), matrix)

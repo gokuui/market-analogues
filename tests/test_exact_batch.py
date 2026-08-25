@@ -6,7 +6,8 @@ import pytest
 
 from market_analogues.distance import representation_distance_lower_bound
 from market_analogues.exact_batch import (
-    batch_representation_lower_bounds, sliding_exact_representations,
+    batch_representation_lower_bounds, exact_representations_at_positions,
+    sliding_exact_representations,
 )
 from market_analogues.representation import Representation, represent
 from market_analogues.synthetic import generate_case
@@ -122,6 +123,47 @@ def test_exact_batch_ignores_future_benchmark_mutation() -> None:
     )
     for actual, expected in zip(changed.representations, original.representations):
         _assert_representation_equal(actual, expected)
+
+
+@pytest.mark.parametrize("benchmark_mode", ["full", "partial", "missing"])
+def test_requested_position_batch_matches_scalar_and_sliding(
+    benchmark_mode: str,
+) -> None:
+    case = generate_case("volatile_reversal", 17, n=420)
+    benchmark = case.episode.benchmark if benchmark_mode != "missing" else None
+    if benchmark_mode == "partial":
+        benchmark = benchmark.copy()
+        benchmark.loc[benchmark.index[::11], "close"] = np.nan
+    sliding = sliding_exact_representations(
+        case.episode.bars, benchmark, lookback=126, stride=5,
+    )
+    selected_indices = np.asarray([17, 2, 41, 8, 29])
+    positions = sliding.positions[selected_indices]
+    requested = exact_representations_at_positions(
+        case.episode.bars, benchmark, positions=positions, lookback=126,
+    )
+    assert len(requested) == len(positions)
+    for actual, index, position in zip(requested, selected_indices, positions):
+        _assert_representation_equal(actual, sliding.representations[int(index)])
+        _assert_representation_equal(
+            actual,
+            _reference(case.episode.bars, benchmark, int(position), 126),
+        )
+
+
+@pytest.mark.parametrize(
+    "positions",
+    [np.asarray([[62]]), np.asarray([62, 62]), np.asarray([61]), np.asarray([999])],
+)
+def test_requested_position_batch_rejects_invalid_positions(
+    positions: np.ndarray,
+) -> None:
+    case = generate_case("steady_trend", 19, n=180)
+    with pytest.raises(ValueError):
+        exact_representations_at_positions(
+            case.episode.bars, case.episode.benchmark,
+            positions=positions, lookback=63,
+        )
 
 
 def test_exact_batch_is_materially_faster_than_scalar_reference() -> None:

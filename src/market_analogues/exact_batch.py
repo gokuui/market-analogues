@@ -97,15 +97,7 @@ def _previous(rows: np.ndarray) -> np.ndarray:
     return np.c_[np.full(len(rows), np.nan), rows[:, :-1]]
 
 
-def _benchmark_channels(
-    frame: pd.DataFrame,
-    benchmark: pd.DataFrame | None,
-    lookback: int,
-    stride: int,
-) -> dict[str, np.ndarray]:
-    aligned = align_benchmark(frame, benchmark)
-    raw = pd.to_numeric(aligned.benchmark_close, errors="coerce").to_numpy(float)
-    market = np.lib.stride_tricks.sliding_window_view(raw, lookback)[::stride]
+def _benchmark_channel_rows(market: np.ndarray) -> dict[str, np.ndarray]:
     previous = _previous(market)
     market_return = _log_ratio(market, previous)
     anchor = np.full((len(market), 1), np.nan)
@@ -126,26 +118,27 @@ def _benchmark_channels(
     }
 
 
-def exact_channel_rows(
+def _benchmark_channels(
     frame: pd.DataFrame,
     benchmark: pd.DataFrame | None,
-    *,
     lookback: int,
     stride: int,
-) -> tuple[np.ndarray, dict[str, np.ndarray]]:
-    if len(frame) < lookback:
-        return np.empty(0, dtype=int), {}
-    values = {
-        name: pd.to_numeric(frame[name], errors="coerce").to_numpy(float)
-        for name in ("open", "high", "low", "close", "volume")
-    }
-    window = lambda array: np.lib.stride_tricks.sliding_window_view(
-        array, lookback,
-    )[::stride]
-    open_rows, high_rows, low_rows = (
-        window(values[name]) for name in ("open", "high", "low")
-    )
-    close_rows, volume_rows = window(values["close"]), window(values["volume"])
+) -> dict[str, np.ndarray]:
+    aligned = align_benchmark(frame, benchmark)
+    raw = pd.to_numeric(aligned.benchmark_close, errors="coerce").to_numpy(float)
+    market = np.lib.stride_tricks.sliding_window_view(raw, lookback)[::stride]
+    return _benchmark_channel_rows(market)
+
+
+def _exact_channels_from_rows(
+    open_rows: np.ndarray,
+    high_rows: np.ndarray,
+    low_rows: np.ndarray,
+    close_rows: np.ndarray,
+    volume_rows: np.ndarray,
+    benchmark_rows: np.ndarray,
+) -> dict[str, np.ndarray]:
+    """Build exact channels from explicit episode-by-session input matrices."""
     previous_close = _previous(close_rows)
     true_range = np.fmax.reduce([
         high_rows - low_rows,
@@ -191,17 +184,88 @@ def exact_channel_rows(
     channels["compression_ratio"] = range_20 / np.where(
         range_63 == 0, np.nan, range_63,
     )
-    context = _benchmark_channels(frame, benchmark, lookback, stride)
+    context = _benchmark_channel_rows(benchmark_rows)
     channels.update(context)
     relative_return = stock_return - context["benchmark_return"]
-    relative_path = np.cumsum(np.where(np.isfinite(relative_return), relative_return, 0), axis=1)
+    relative_path = np.cumsum(
+        np.where(np.isfinite(relative_return), relative_return, 0), axis=1,
+    )
     relative_path[~np.isfinite(context["benchmark_return"])] = np.nan
     channels["relative_return"] = relative_return
     channels["relative_path"] = relative_path
     for name, rows in channels.items():
         channels[name] = np.where(np.isfinite(rows), rows, np.nan)
+    return channels
+
+
+def exact_channel_rows(
+    frame: pd.DataFrame,
+    benchmark: pd.DataFrame | None,
+    *,
+    lookback: int,
+    stride: int,
+) -> tuple[np.ndarray, dict[str, np.ndarray]]:
+    if len(frame) < lookback:
+        return np.empty(0, dtype=int), {}
+    values = {
+        name: pd.to_numeric(frame[name], errors="coerce").to_numpy(float)
+        for name in ("open", "high", "low", "close", "volume")
+    }
+    window = lambda array: np.lib.stride_tricks.sliding_window_view(
+        array, lookback,
+    )[::stride]
+    open_rows, high_rows, low_rows = (
+        window(values[name]) for name in ("open", "high", "low")
+    )
+    close_rows, volume_rows = window(values["close"]), window(values["volume"])
+    aligned = align_benchmark(frame, benchmark)
+    benchmark_values = pd.to_numeric(
+        aligned.benchmark_close, errors="coerce",
+    ).to_numpy(float)
+    benchmark_rows = window(benchmark_values)
+    channels = _exact_channels_from_rows(
+        open_rows, high_rows, low_rows, close_rows, volume_rows,
+        benchmark_rows,
+    )
     positions = np.arange(lookback - 1, len(frame), stride, dtype=int)
     return positions, channels
+
+
+def exact_representations_at_positions(
+    frame: pd.DataFrame,
+    benchmark: pd.DataFrame | None,
+    *,
+    positions: np.ndarray,
+    lookback: int,
+) -> tuple[Representation, ...]:
+    """Materialize only explicitly requested cutoff positions in one vector batch."""
+    requested = np.asarray(positions, dtype=int)
+    if requested.ndim != 1:
+        raise ValueError("requested positions must be one-dimensional")
+    if lookback < 2:
+        raise ValueError("lookback must be at least two")
+    if not len(requested):
+        return ()
+    if len(np.unique(requested)) != len(requested):
+        raise ValueError("requested positions must be unique")
+    if np.any(requested < lookback - 1) or np.any(requested >= len(frame)):
+        raise ValueError("requested position cannot provide the complete lookback")
+    values = {
+        name: pd.to_numeric(frame[name], errors="coerce").to_numpy(float)
+        for name in ("open", "high", "low", "close", "volume")
+    }
+    offsets = np.arange(lookback, dtype=int)
+    indices = requested[:, None] - lookback + 1 + offsets
+    aligned = align_benchmark(frame, benchmark)
+    benchmark_values = pd.to_numeric(
+        aligned.benchmark_close, errors="coerce",
+    ).to_numpy(float)
+    channels = _exact_channels_from_rows(
+        values["open"][indices], values["high"][indices],
+        values["low"][indices], values["close"][indices],
+        values["volume"][indices], benchmark_values[indices],
+    )
+    return materialize_exact_representations(channels)
 
 
 def _resample_rows(

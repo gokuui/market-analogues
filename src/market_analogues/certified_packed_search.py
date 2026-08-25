@@ -16,7 +16,8 @@ from .distance import (
     complete_representation_distance, representation_distance_lower_bound,
 )
 from .exact_batch import (
-    exact_channel_rows, materialize_exact_representations,
+    exact_channel_rows, exact_representations_at_positions,
+    materialize_exact_representations,
     sliding_exact_representations,
 )
 from .packed_bound_search import (
@@ -31,6 +32,7 @@ from .types import (
 
 
 CERTIFIED_PACKED_SEARCH_VERSION = "m04r-certified-packed-search-v1"
+CERTIFIED_PACKED_SEARCH_REQUESTED_VERSION = "m04r-certified-packed-search-v2"
 
 
 class CertifiedPackedSearchError(RuntimeError):
@@ -76,9 +78,15 @@ class CertifiedPackedSearchResult:
     certificate: PackedSearchCertificate
 
 
-def certified_packed_search_contract() -> dict[str, Any]:
+def certified_packed_search_contract(
+    *, requested_positions: bool = False,
+) -> dict[str, Any]:
+    version = (
+        CERTIFIED_PACKED_SEARCH_REQUESTED_VERSION
+        if requested_positions else CERTIFIED_PACKED_SEARCH_VERSION
+    )
     payload: dict[str, Any] = {
-        "schema_version": CERTIFIED_PACKED_SEARCH_VERSION,
+        "schema_version": version,
         "frontier": (
             "globally stable quantized-bound prefix plus first omitted bound; "
             "expand geometrically until certified or fail closed"
@@ -91,7 +99,12 @@ def certified_packed_search_contract() -> dict[str, Any]:
             "recompute constrained selection after every completed frontier; an "
             "incomplete selection has infinite threshold and cannot certify"
         ),
-        "exact_scoring": "native distance-v1 with adaptive sparse/full grouped reconstruction",
+        "exact_scoring": (
+            "native distance-v1 with per-symbol vector construction of only requested "
+            "cutoff positions"
+            if requested_positions else
+            "native distance-v1 with adaptive sparse/full grouped reconstruction"
+        ),
         "quantized_check": "stored lower bound <= recomputed native lower bound + tolerance",
         "source_check": "every materialized stock and benchmark matches packed causal-prefix provenance",
         "tie_rule": "ascending exact distance then 24-hex episode ID; strict frontier stop",
@@ -119,6 +132,7 @@ def _score_group(
     maximum_candidate_cutoff: pd.Timestamp,
     sparse_cutoff: int,
     tolerance: float,
+    requested_positions: bool,
 ) -> tuple[list[ScoredCandidate], float, str]:
     key = InstrumentKey(store_dataset_id, symbol)
     bars = source.load(key)
@@ -135,7 +149,24 @@ def _score_group(
     }
     use_batch = len(proposals) >= sparse_cutoff
     representations: dict[int, Representation] = {}
-    if use_batch:
+    if requested_positions:
+        requested = []
+        for proposal in proposals:
+            position = cutoff_to_position.get(proposal.cutoff_ns)
+            if position is None or position + 1 < query.key.lookback:
+                raise CertifiedPackedSearchError(
+                    f"cannot reconstruct packed cutoff {symbol}:{proposal.cutoff_ns}"
+                )
+            requested.append(position)
+        materialized = exact_representations_at_positions(
+            frame, benchmark, positions=np.asarray(requested, dtype=int),
+            lookback=query.key.lookback,
+        )
+        representations = {
+            proposal.cutoff_ns: representation
+            for proposal, representation in zip(proposals, materialized)
+        }
+    elif use_batch:
         batch = sliding_exact_representations(
             frame, benchmark, lookback=query.key.lookback, stride=5,
             batch_size=128,
@@ -166,7 +197,7 @@ def _score_group(
             raise CertifiedPackedSearchError("packed episode identity changed during reconstruction")
         if not eligible(query, episode, request):
             raise CertifiedPackedSearchError(f"packed proposal is ineligible: {proposal.episode_id}")
-        if use_batch:
+        if requested_positions or use_batch:
             candidate_representation = representations.get(proposal.cutoff_ns)
         else:
             positions, channels = exact_channel_rows(
@@ -212,6 +243,7 @@ def _score_new_proposals(
     workers: int,
     sparse_cutoff: int,
     tolerance: float,
+    requested_positions: bool,
 ) -> tuple[list[ScoredCandidate], float, int, int]:
     if workers < 1 or sparse_cutoff < 1:
         raise ValueError("workers and sparse cutoff must be positive")
@@ -241,6 +273,7 @@ def _score_new_proposals(
             store_dataset_id=store_dataset_id, expected_prefix=expected,
             maximum_candidate_cutoff=maximum_cutoff,
             sparse_cutoff=sparse_cutoff, tolerance=tolerance,
+            requested_positions=requested_positions,
         )
 
     items = sorted(grouped.items())
@@ -280,6 +313,7 @@ def certified_packed_search(
     sparse_cutoff: int = 8,
     tolerance: float = 1e-12,
     verify_content: bool = True,
+    requested_positions: bool = False,
 ) -> CertifiedPackedSearchResult:
     if (
         initial_frontier_rows < request.top_k
@@ -291,6 +325,9 @@ def certified_packed_search(
     if store_dataset_id != query.key.instrument.dataset_id and not request.cross_dataset:
         raise CertifiedPackedSearchError("cross-dataset packed search is not authorized")
     started = perf_counter()
+    contract = certified_packed_search_contract(
+        requested_positions=requested_positions,
+    )
     loaded = load_packed_generation(
         store_root, generation_id, verify_content=verify_content,
         validate_records=False,
@@ -351,6 +388,7 @@ def certified_packed_search(
                     store_dataset_id=store_dataset_id, manifest=loaded.manifest,
                     workers=workers, sparse_cutoff=sparse_cutoff,
                     tolerance=tolerance,
+                    requested_positions=requested_positions,
                 )
                 scored_by_id.update({
                     row.match.episode_key.id: row for row in newly_scored
@@ -395,8 +433,8 @@ def certified_packed_search(
     next_lower = rounds[-1].next_lower_bound
     stopped_early = next_lower is not None
     deterministic = {
-        "schema_version": CERTIFIED_PACKED_SEARCH_VERSION,
-        "contract_digest": certified_packed_search_contract()["digest"],
+        "schema_version": contract["schema_version"],
+        "contract_digest": contract["digest"],
         "generation_id": generation_id,
         "query_episode_id": query.key.id,
         "input_digest": input_digest,
@@ -420,8 +458,8 @@ def certified_packed_search(
     }
     digest = stable_hash(deterministic)
     certificate = PackedSearchCertificate(
-        CERTIFIED_PACKED_SEARCH_VERSION,
-        certified_packed_search_contract()["digest"],
+        contract["schema_version"],
+        contract["digest"],
         generation_id, query.key.id, input_digest,
         eligible_count, len(scored_by_id), eligible_count - len(scored_by_id),
         stopped_early, threshold, next_lower, maximum_excess,
