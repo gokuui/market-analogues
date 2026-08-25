@@ -770,6 +770,14 @@
   <p><b>Verification:</b> Added an independent merge-semantics regression covering duplicates and missing timestamps. Context, exact-batch, representation, view and certified physical-pack focused tests pass, followed by the full suite. The helper also keeps the public aligned context frame behavior unchanged.</p>
   <p><b>Next hotspot:</b> A 50-repeat profile of seven real 252-bar positions attributes 0.938/1.822 seconds (51.5%) to <code>_structural_rows</code>, versus channel construction 0.345, resampling 0.160 and robust-z 0.158. The structural routine performs 756 sequential Python time-step iterations per symbol group while vectorizing only across its usually tiny row count. Build an exact-reference compiled/alternative POC, test threshold-boundary behavior and retain it only with exact or explicitly versioned practical parity plus material speed.</p>
 </section>
+
+<section class="entry">
+  <h2>L-074 — Compiled exact structural-row kernel preflight</h2>
+  <p><b>Implementation:</b> Added Numba as an explicit runtime dependency and retained the original NumPy/Python structural-event implementation as an executable reference. The production wrapper performs the identical finite/NaN close-path transform, then calls a cached, no-fast-math, GIL-free compiled loop with the same .03/.06/.12 thresholds, high/low transition order, comparison inclusivity, event amplitude and duration formulas.</p>
+  <p><b>Correctness:</b> Compiled and reference arrays are bit-identical on 64 random 252-bar paths, constants, all-NaN paths and exact threshold/reversal boundaries; maximum delta is zero. Existing exact-batch, scalar representation, quantized-bound and certified-search focused tests pass, followed by the full suite.</p>
+  <p><b>Performance:</b> Warm group speedups are 6,389×/4,804×/3,171×/1,959× at 1/2/4/8 rows and remain 157× at 64, eliminating tiny-array Python-loop overhead. On the fixed 112-real-symbol/335-representation benchmark, complete requested representation construction falls from 2.9302 to 0.8828 seconds, a 3.319× speedup with zero core-array delta.</p>
+  <p><b>Next:</b> Rerun only optimized TVTX v4 from a fresh checkpoint. JIT warming occurs during query representation before threaded completion; require exact authority equality, unchanged 9,309 accounting, strict stop and resource gates. Do not infer the end-to-end result from the microbenchmark.</p>
+</section>
 </main>
 
 <section id="reproduce">

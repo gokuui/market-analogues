@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from time import perf_counter
 import warnings
 
+from numba import njit
 import numpy as np
 import pandas as pd
 
@@ -322,7 +323,7 @@ def _stage_rows(channels: dict[str, np.ndarray], stages: int = 12) -> np.ndarray
     )
 
 
-def _structural_rows(close_path: np.ndarray) -> np.ndarray:
+def _structural_rows_reference(close_path: np.ndarray) -> np.ndarray:
     close = np.exp(np.where(np.isfinite(close_path), close_path, 0.0))
     output: list[np.ndarray] = []
     for threshold in (.03, .06, .12):
@@ -368,6 +369,60 @@ def _structural_rows(close_path: np.ndarray) -> np.ndarray:
             mean_duration[:, None] / max(close.shape[1], 1),
         ])
     return np.concatenate(output, axis=1)
+
+
+@njit(cache=True, nogil=True)
+def _structural_rows_compiled(close: np.ndarray) -> np.ndarray:
+    rows, width = close.shape
+    output = np.empty((rows, 9), dtype=np.float64)
+    thresholds = (.03, .06, .12)
+    for row in range(rows):
+        column = 0
+        for threshold in thresholds:
+            mode = 1
+            extreme = close[row, 0]
+            extreme_index = 0
+            count = 0
+            amplitude_sum = 0.0
+            duration_sum = 0.0
+            for index in range(1, width):
+                price = close[row, index]
+                if mode >= 0:
+                    if price >= extreme:
+                        extreme = price
+                        extreme_index = index
+                    elif price <= extreme * (1.0 - threshold):
+                        count += 1
+                        amplitude_sum += abs(price / extreme - 1.0)
+                        duration_sum += index - extreme_index
+                        mode = -1
+                        extreme = price
+                        extreme_index = index
+                else:
+                    if price <= extreme:
+                        extreme = price
+                        extreme_index = index
+                    elif price >= extreme * (1.0 + threshold):
+                        count += 1
+                        amplitude_sum += abs(price / extreme - 1.0)
+                        duration_sum += index - extreme_index
+                        mode = 1
+                        extreme = price
+                        extreme_index = index
+            output[row, column] = count / max(width, 1)
+            output[row, column + 1] = (
+                amplitude_sum / count if count else 0.0
+            )
+            output[row, column + 2] = (
+                (duration_sum / count if count else 0.0) / max(width, 1)
+            )
+            column += 3
+    return output
+
+
+def _structural_rows(close_path: np.ndarray) -> np.ndarray:
+    close = np.exp(np.where(np.isfinite(close_path), close_path, 0.0))
+    return _structural_rows_compiled(close)
 
 
 def materialize_exact_representations(

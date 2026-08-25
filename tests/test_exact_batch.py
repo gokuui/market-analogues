@@ -6,6 +6,7 @@ import pytest
 
 from market_analogues.distance import representation_distance_lower_bound
 from market_analogues.exact_batch import (
+    _structural_rows, _structural_rows_reference,
     batch_representation_lower_bounds, exact_representations_at_positions,
     sliding_exact_representations,
 )
@@ -102,6 +103,24 @@ def test_exact_batch_handles_constant_zero_volume_and_chunk_identity() -> None:
     for row, position in enumerate(whole.positions):
         _assert_representation_equal(
             whole.representations[row], _reference(bars, None, int(position), 126),
+        )
+
+
+def test_compiled_structural_rows_exactly_match_python_reference() -> None:
+    rng = np.random.default_rng(20260825)
+    paths = [
+        rng.normal(0, .02, size=(64, 252)).cumsum(axis=1),
+        np.zeros((8, 252)),
+        np.full((8, 252), np.nan),
+    ]
+    for threshold in (.03, .06, .12):
+        boundary = np.zeros((8, 252))
+        boundary[:, 1] = np.log(1 - threshold)
+        boundary[:, 2] = np.log((1 - threshold) * (1 + threshold))
+        paths.append(boundary)
+    for path in paths:
+        np.testing.assert_array_equal(
+            _structural_rows(path), _structural_rows_reference(path),
         )
 
 
