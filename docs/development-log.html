@@ -792,6 +792,13 @@
   <p><b>Verification:</b> The compiled kernel exactly matches Python and the independent reference on random unequal multivariate shapes, tied constant/step paths and one-dimensional cases while preserving stable predecessor/path-length normalization. On the physical packed fixture, v5 matches v4/brute-force IDs/order, totals/components within 1e−12, and final alignments exactly, with unchanged input/exact accounting and a distinct contract digest. Invalid mode combinations fail closed and the full suite passes.</p>
   <p><b>Next:</b> Run only compiled-structure TVTX v5. Require exact frozen authority paths and unchanged 9,309 accounting/stopping/bound safety. This directly implements the original final-path-only plan; authorize other cases only from measured p95 evidence.</p>
 </section>
+
+<section class="entry">
+  <h2>L-077 — Deferred-alignment v5 TVTX PASS; near p95 boundary</h2>
+  <p><b>Result:</b> TVTX v5 returns exact authority IDs/order/alignments, unchanged 9,309 accounting, strict stopping and safe quantized bounds in 328.03 seconds at 751.00 MiB. Authority total/component deltas remain 8.91e−9/1.12e−7. Certificate/case digests are <code>7c610635…9050</code>/<code>16808a75…9b3e</code>.</p>
+  <p><b>Comparison:</b> Deferred paths save 59.44 seconds/15.3% versus compiled-structure v4, 140.38/30.0% versus precompiled v4 and 656.25/66.7% versus v1. TVTX misses a standalone 300 seconds by 28.03, while still passing the separate ≤600 maximum.</p>
+  <p><b>Matrix interpretation and next:</b> The frozen p95 is computed over 12 cases and is not a requirement that every case be ≤300; one 328-second maximum may pass if the second-slowest case is sufficiently lower. First test TVTX at 16 workers as a single execution-control change: earlier 8-vs-4 evidence showed material scaling, the compiled kernels release the GIL, and current RSS leaves ~785 MiB headroom. Then run CAKE/TAIT only under the selected worker control to estimate the upper-tail distribution.</p>
+</section>
 </main>
 
 <section id="reproduce">
