@@ -16,6 +16,7 @@ from market_analogues.config import load_config
 from market_analogues.m04r_validation_registry import (
     _canonical_records, _selection_universe, build_contamination_ledger,
     default_search_contract, validate_m04r_validation_registry,
+    validate_store_temporal_coverage,
 )
 from market_analogues.types import stable_hash
 
@@ -80,6 +81,10 @@ def verify(args: argparse.Namespace) -> dict[str, Any]:
     coverage_equal = coverage == registry.get("coverage")
     if not coverage_equal:
         failures.append("independently recomputed coverage differs")
+    store_coverage, store_coverage_failures = validate_store_temporal_coverage(
+        source, cases, registry.get("search_contract") or {},
+    )
+    failures.extend(store_coverage_failures)
     gates = {
         "runtime_registry_validator_passed": not validate_m04r_validation_registry(
             source, registry_root,
@@ -89,6 +94,7 @@ def verify(args: argparse.Namespace) -> dict[str, Any]:
         "case_encodings_equal": cases_equal,
         "coverage_recomputed": coverage_equal,
         "search_store_distance_contract_reconstructed": search_contract_equal,
+        "packed_store_covers_every_latest_eligible_cutoff": not store_coverage_failures,
         "sixty_cases_and_thirty_symbols": len(cases) == 60 and cases.symbol.nunique() == 30,
         "real_forward_outcomes_excluded": registry.get("real_forward_outcomes_accessed") is False,
     }
@@ -100,7 +106,8 @@ def verify(args: argparse.Namespace) -> dict[str, Any]:
         "transcript_digest": registry.get("transcript_digest"),
         "market_latest_timestamp_at_verification": market_latest.isoformat(),
         "cases": len(cases), "symbols": int(cases.symbol.nunique()),
-        "coverage": coverage, "gates": gates,
+        "coverage": coverage, "store_temporal_coverage": store_coverage,
+        "gates": gates,
         "files_opened_by_verifier": [
             str(quality_path.resolve()), str(liquidity_path.resolve()),
             str((registry_root / "query-registry.json").resolve()),

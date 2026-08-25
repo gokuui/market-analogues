@@ -635,6 +635,73 @@ def _contains_forbidden_key(value: Any) -> bool:
     return False
 
 
+def validate_store_temporal_coverage(
+    source: OHLCVSource, cases: pd.DataFrame, search_contract: dict[str, Any],
+) -> tuple[dict[str, Any], tuple[str, ...]]:
+    """Prove the frozen pack reaches every query's latest eligible cutoff."""
+    manifest_value = search_contract.get("packed_generation_manifest_path")
+    if manifest_value is None:
+        return {"applicable": False}, ()
+    failures: list[str] = []
+    manifest_path = Path(str(manifest_value))
+    if not manifest_path.exists():
+        return {"applicable": True}, ("packed generation manifest is missing",)
+    manifest = json.loads(manifest_path.read_text())
+    if file_fingerprint(manifest_path) != search_contract.get(
+        "packed_generation_manifest_sha256"
+    ):
+        failures.append("packed generation manifest hash differs")
+    if manifest.get("manifest_digest") != search_contract.get("packed_generation_id"):
+        failures.append("packed generation identity differs")
+    instrument_map = {item.source_symbol: item for item in source.instruments()}
+    required: list[pd.Timestamp] = []
+    gap = int(search_contract.get("request", {}).get("minimum_history_gap_bars", 60))
+    for row in cases.itertuples(index=False):
+        instrument = instrument_map.get(str(row.symbol))
+        if instrument is None:
+            failures.append(f"store coverage query symbol is unavailable: {row.symbol}")
+            continue
+        bars = source.load(instrument)
+        timestamps = pd.to_datetime(
+            bars[pd.to_datetime(bars.timestamp) <= pd.Timestamp(row.cutoff)].timestamp
+        ).drop_duplicates().sort_values().reset_index(drop=True)
+        if len(timestamps) <= gap:
+            failures.append(f"store coverage gap exceeds query history: {row.case_id}")
+            continue
+        required.append(pd.Timestamp(timestamps.iloc[-gap - 1]))
+    provenance = manifest.get("provenance") or {}
+    benchmark_prefix = provenance.get("benchmark_prefix") or {}
+    requested = benchmark_prefix.get("requested_cutoff")
+    pack_cutoff = pd.Timestamp(requested) if requested is not None else None
+    maximum_required = max(required) if required else None
+    if pack_cutoff is None:
+        failures.append("packed generation has no requested source cutoff")
+    elif maximum_required is not None and pack_cutoff < maximum_required:
+        failures.append(
+            f"packed generation ends {pack_cutoff.isoformat()} before required "
+            f"candidate cutoff {maximum_required.isoformat()}"
+        )
+    prefixes = provenance.get("source_prefixes") or {}
+    prefix_requested = {
+        pd.Timestamp(value["requested_cutoff"])
+        for value in prefixes.values() if value.get("requested_cutoff") is not None
+    }
+    if not prefixes or prefix_requested != ({pack_cutoff} if pack_cutoff is not None else set()):
+        failures.append("packed stock prefix cutoffs are incomplete or inconsistent")
+    selection_symbols = set((provenance.get("selection") or {}).get("symbols", []))
+    if selection_symbols != set(prefixes) or selection_symbols != set(manifest.get("symbols", [])):
+        failures.append("packed generation symbol/provenance coverage differs")
+    metrics = {
+        "applicable": True,
+        "minimum_required_candidate_cutoff": min(required).isoformat() if required else None,
+        "maximum_required_candidate_cutoff": maximum_required.isoformat() if maximum_required else None,
+        "packed_requested_cutoff": pack_cutoff.isoformat() if pack_cutoff else None,
+        "candidate_symbols": len(selection_symbols),
+        "cases_checked": len(required),
+    }
+    return metrics, tuple(dict.fromkeys(failures))
+
+
 def validate_m04r_validation_registry(
     source: OHLCVSource, directory: Path,
 ) -> tuple[str, ...]:
@@ -707,6 +774,10 @@ def validate_m04r_validation_registry(
             for stratum in LIQUIDITY_STRATA:
                 if int(cells.get((tier, stratum), 0)) != SYMBOLS_PER_CELL:
                     failures.append(f"registry cell {tier}/{stratum} is unbalanced")
+        _, store_failures = validate_store_temporal_coverage(
+            source, frame, payload.get("search_contract") or {},
+        )
+        failures.extend(store_failures)
     instrument_map = {item.source_symbol: item for item in source.instruments()}
     benchmark = source.load_benchmark()
     if benchmark is None:

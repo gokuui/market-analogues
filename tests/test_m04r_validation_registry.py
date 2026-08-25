@@ -6,11 +6,12 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from market_analogues.adapters import DirectorySource
+from market_analogues.adapters import DirectorySource, file_fingerprint
 from market_analogues.config import BenchmarkSpec, DatasetSpec
 from market_analogues.m04r_validation_registry import (
     EXPECTED_CASES, build_m04r_validation_registry,
-    validate_m04r_validation_registry, write_m04r_validation_registry,
+    validate_m04r_validation_registry, validate_store_temporal_coverage,
+    write_m04r_validation_registry,
 )
 from market_analogues.types import stable_hash
 
@@ -144,3 +145,42 @@ def test_registry_rejects_transcript_and_outcome_tampering(tmp_path: Path) -> No
     failures = validate_m04r_validation_registry(source, directory)
     assert "registry digest mismatch" in failures
     assert "registry contains a forbidden outcome/setup field" in failures
+
+
+def test_store_temporal_coverage_fails_before_required_candidate_cutoff(
+    tmp_path: Path,
+) -> None:
+    source, quality, liquidity, _ = _fixture(tmp_path)
+    result = build_m04r_validation_registry(
+        source, quality, liquidity, _ledger(), {"real_forward_outcomes_accessed": False},
+    )
+    symbols = sorted(item.source_symbol for item in source.instruments())
+    manifest_path = tmp_path / "manifest.json"
+
+    def contract(requested_cutoff: str) -> dict[str, object]:
+        manifest = {
+            "manifest_digest": "fixture-generation", "symbols": symbols,
+            "provenance": {
+                "benchmark_prefix": {"requested_cutoff": requested_cutoff},
+                "source_prefixes": {
+                    symbol: {"requested_cutoff": requested_cutoff} for symbol in symbols
+                },
+                "selection": {"symbols": symbols},
+            },
+        }
+        manifest_path.write_text(json.dumps(manifest))
+        return {
+            "packed_generation_manifest_path": str(manifest_path),
+            "packed_generation_manifest_sha256": file_fingerprint(manifest_path),
+            "packed_generation_id": "fixture-generation",
+            "request": {"minimum_history_gap_bars": 60},
+        }
+
+    metrics, failures = validate_store_temporal_coverage(
+        source, result.cases, contract("2030-01-01"),
+    )
+    assert not failures and metrics["cases_checked"] == EXPECTED_CASES
+    _, failures = validate_store_temporal_coverage(
+        source, result.cases, contract("2010-01-04"),
+    )
+    assert any("before required candidate cutoff" in value for value in failures)
