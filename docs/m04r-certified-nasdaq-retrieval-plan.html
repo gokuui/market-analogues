@@ -239,7 +239,8 @@
   <p class="pass"><b>M04R-08B selected-v5 all-12 PASS:</b> A fresh run exactly passes all 12 frozen NASDAQ authorities under the selected controls. Aggregate p95 is 262.0011 seconds, maximum 265.6925 seconds, total 1,961.8827 seconds and peak RSS 755.9961 MiB, all within the unchanged gates. Matrix digest is <code>9bedcf7e…cb8</code>. The independent verifier re-hashes the physical generation and every authority/certificate, confirms no real forward-outcome access and reports no failures with digest <code>1d617a10…e0890</code>.</p>
   <p class="pass"><b>M04R-08C shared-quartile proposal POC:</b> After rejecting prepared-only 2,048/4,096-row controls at 9.42%/1.91%, an exact sorted merge reuses once-prepared candidate quartiles across queries while giving scalar the same kernel. On the three former-heavy frozen authorities, shared proposal time is 211.0311 versus 243.8495 seconds, a 13.46% reduction at 543.67 MiB. All scalar/certificate candidate digests, eligibility and accounting remain exact; evidence digest is <code>2ba6bb05…ad1</code>.</p>
   <p class="pass"><b>M04R-08C 24-query registry:</b> A separate outcome-blind registry selects two symbols per A/B × liquidity cell and historical/current cutoffs, producing 24 distinct episodes across 12 symbols. Twelve overlap existing authorities and twelve are new. Independent deterministic reconstruction, fingerprints, exclusions, identities, strata and no-outcome checks pass; registry digest is <code>b8216808…ade2c</code>.</p>
-  <p class="open"><b>Remaining M04R-08 boundary:</b> Generate/revalidate optimized scalar certified controls for all 24 registry cases, then implement shared proposal plus union/grouped exact completion. Require identical final matches/certificates and ≥10% total elapsed reduction against fresh best scalar controls. The registry and three-query proposal POC are prerequisites, not the final batch pass.</p>
+  <p class="pass"><b>M04R-08C 24 optimized scalar controls:</b> All 24 cases pass under current v5/sorted-merge/eight-worker/4,096-row controls. p95 is 252.4311 seconds, maximum 418.7947, total 3,729.2874 and peak RSS 997.1836 MiB. Existing 12 authorities remain exact; new 12 have strict certified stops. Full resume verifies 24/24 checkpoints and repeats digest <code>59963a99…efcd</code>.</p>
+  <p class="open"><b>Remaining M04R-08 boundary:</b> Implement shared proposal plus union/grouped exact completion and preserve each scalar match/certificate. The frozen performance threshold is total elapsed ≤3,356.3586 seconds (≥10% below the optimized 3,729.2874-second scalar baseline), with RSS ≤1,536 MiB. AOUT historical at 17,907 exact rows is the primary stress case.</p>
 </section>
 
 <section class="task" id="m04r-09">
@@ -298,7 +299,7 @@
     <li>Commit a clean rollback point.</li>
     <li>Proceed only if the explicit gate passes. A failure creates a versioned redesign; it never lowers a frozen threshold.</li>
   </ol>
-  <p class="muted">M04R-00 through M04R-07, M04R-08A, the M04R-08B selected-v5 matrix, shared-proposal POC and outcome-blind 24-query registry are complete. M04R-08 batch execution remains open until all 24 optimized scalar controls and the complete grouped-exact pipeline prove identical outputs and ≥10% total reduction; M04R-09 and activation remain blocked.</p>
+  <p class="muted">M04R-00 through M04R-07, M04R-08A, the M04R-08B selected-v5 matrix, shared-proposal POC, outcome-blind 24-query registry and all optimized scalar controls are complete. M04R-08 batch execution remains open until the complete grouped-exact pipeline proves identical outputs and total ≤3,356.3586 seconds; M04R-09 and activation remain blocked.</p>
 </section>
 </body>
 </html>
