@@ -24,7 +24,10 @@ from market_analogues.packed_bound_store import (
     OVERFLOW_DTYPE, make_packed_record, write_packed_generation,
 )
 from market_analogues.packed_bound_search import (
-    PackedBoundQuery, scan_packed_bound_proposals,
+    BRANCH_AWARE_SEARCH_SCHEMA_VERSION, SEARCH_SCHEMA_VERSION,
+    BoundProposal, BoundProposalReport, PackedBoundQuery,
+    _packed_query_input_digest, bound_proposal_candidate_digest,
+    packed_bound_search_contract, scan_packed_bound_proposals,
 )
 from market_analogues.quantized_bound import quantize_bound_row
 from market_analogues.representation import represent, representation_input_digest
@@ -34,7 +37,7 @@ from market_analogues.search import (
 )
 from market_analogues.synthetic import generate_case
 from market_analogues.types import (
-    AnalogueMatch, Episode, EpisodeKey, InstrumentKey, SearchQuery,
+    AnalogueMatch, Episode, EpisodeKey, InstrumentKey, SearchQuery, stable_hash,
 )
 
 
@@ -600,6 +603,250 @@ def test_certified_pack_exhaustion_matches_brute_force(
     assert passes[1].certified
 
 
+def test_threaded_one_pass_proposal_drives_exact_logical_widening_once(
+    directory_dataset: Path, bars: pd.DataFrame, tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import time
+    import market_analogues.certified_packed_search as certified_module
+    from dataclasses import replace
+
+    benchmark_path = directory_dataset / "MARKET.parquet"
+    bars.to_parquet(benchmark_path, index=False)
+    source = DirectorySource(DatasetSpec(
+        "test", "directory", directory_dataset, "parquet",
+        timestamp_column="date",
+        benchmark=BenchmarkSpec(benchmark_path, timestamp_column="date"),
+    ))
+    query = build_episode(
+        source, InstrumentKey("test", "AAA"), bars.date.iloc[-1], 63,
+        "dense-v1",
+    )
+    request = SearchQuery(
+        query.key, ("test",), ("A", "B"), 3,
+        minimum_history_gap_bars=20, max_per_instrument=3,
+    )
+    quantized = quantize_bound_row(represent(query))
+    packed_rows = np.concatenate([
+        make_packed_record(
+            f"{index + 1:024x}", index + 1, 0, "A", quantized,
+        )
+        for index in range(5_000)
+    ])
+    store_root = tmp_path / "threaded-proposal-store"
+    generation = write_packed_generation(
+        store_root, packed_rows, np.empty(0, dtype=OVERFLOW_DTYPE),
+        ("FAKE",), {"purpose": "threaded-certified-proposal-test"},
+        activate=False,
+    )
+    packed_query = PackedBoundQuery(
+        query.key.id, query.key.instrument.source_symbol,
+        int(query.bars.timestamp.iloc[0].value),
+        int(latest_eligible_cutoff(
+            query, request.minimum_history_gap_bars,
+        ).value),
+        represent(query), request.quality_tiers,
+    )
+    keys = [
+        EpisodeKey(
+            InstrumentKey("test", "FAKE"),
+            pd.Timestamp("2000-01-01") + pd.Timedelta(minutes=index),
+            63, "dense-v1",
+        )
+        for index in range(4_097)
+    ]
+    first = sorted(keys[:4_000], key=lambda value: value.id)
+    last = sorted(keys[4_000:], key=lambda value: value.id)
+    ordered = first + last
+    proposals = tuple(
+        BoundProposal(
+            key.id, "FAKE", int(key.cutoff.value), "A",
+            0.0 if index < 4_000 else 101.0,
+            ("composite",), False,
+        )
+        for index, key in enumerate(ordered)
+    )
+    episodes = {
+        key.id: Episode(key, pd.DataFrame({"timestamp": []}), quality_tier="A")
+        for key in ordered
+    }
+
+    def proposal_report(
+        quota: int, *, branch_aware: bool, block_rows: int,
+        block_order: str = "forward",
+    ) -> BoundProposalReport:
+        selected = proposals[:quota]
+        candidate_digest = bound_proposal_candidate_digest(selected)
+        schema = (
+            BRANCH_AWARE_SEARCH_SCHEMA_VERSION
+            if branch_aware else SEARCH_SCHEMA_VERSION
+        )
+        contract_digest = packed_bound_search_contract(
+            branch_aware=branch_aware,
+        )["digest"]
+        proposal_input_digest = (
+            _packed_query_input_digest(packed_query) if branch_aware else None
+        )
+        deterministic = {
+            "schema_version": schema, "contract_digest": contract_digest,
+            "generation_id": generation, "query_episode_id": query.key.id,
+            "rows_scanned": 5_000, "eligible_rows": 5_000,
+            "eligible_main_rows": 5_000, "eligible_overflow_rows": 0,
+            "route_counts": {"composite": len(selected)},
+            "route_quotas": {"composite": quota},
+            "candidate_digest": candidate_digest,
+            "real_forward_outcomes_accessed": False,
+            **({"input_digest": proposal_input_digest} if branch_aware else {}),
+        }
+        return BoundProposalReport(
+            schema, generation, query.key.id, selected, 5_000, 5_000, 5_000, 0,
+            {"composite": len(selected)}, {"composite": quota}, block_rows,
+            block_order, .01, 100.0, candidate_digest, stable_hash(deterministic),
+            contract_digest if branch_aware else None, proposal_input_digest,
+        )
+
+    def exact_score(values, **_kwargs):
+        output = []
+        for proposal in values:
+            episode = episodes[proposal.episode_id]
+            distance = 100.0 if proposal.lower_bound == 0.0 else 200.0
+            output.append(ScoredCandidate(
+                AnalogueMatch(
+                    episode.key, distance, {"price": distance},
+                    quality_tier="A",
+                ),
+                episode,
+            ))
+        return output, [], 0.0, 1, 0
+
+    scalar_calls: list[int] = []
+    threaded_calls: list[dict[str, object]] = []
+
+    def scalar_scan(*_args, route_quotas, block_rows, branch_aware, **_kwargs):
+        quota = route_quotas["composite"]
+        scalar_calls.append(quota)
+        return proposal_report(
+            quota, branch_aware=branch_aware, block_rows=block_rows,
+        )
+
+    def threaded_scan(*_args, route_quotas, block_rows, threads,
+                      branch_aware, expected_provenance_digest, **_kwargs):
+        threaded_calls.append({
+            "route_quotas": route_quotas, "block_rows": block_rows,
+            "threads": threads, "branch_aware": branch_aware,
+            "expected_provenance_digest": expected_provenance_digest,
+        })
+        time.sleep(.01)
+        return proposal_report(
+            route_quotas["composite"], branch_aware=branch_aware,
+            block_rows=block_rows,
+        )
+
+    with monkeypatch.context() as patch:
+        patch.setattr(certified_module, "_score_new_proposals", exact_score)
+        patch.setattr(certified_module, "scan_packed_bound_proposals", scalar_scan)
+        patch.setattr(
+            certified_module, "scan_packed_bound_proposals_threaded",
+            threaded_scan,
+        )
+        scalar = certified_packed_search(
+            query, source, request, store_root, generation,
+            store_dataset_id="test", initial_frontier_rows=1_000,
+            maximum_frontier_rows=4_096, seed_rows=1_000, block_rows=73,
+            verify_content=False,
+        )
+        threaded = certified_packed_search(
+            query, source, request, store_root, generation,
+            store_dataset_id="test", initial_frontier_rows=1_000,
+            maximum_frontier_rows=4_096, seed_rows=1_000, block_rows=73,
+            proposal_threads=6, verify_content=False,
+        )
+        scalar_branch = certified_packed_search(
+            query, source, request, store_root, generation,
+            store_dataset_id="test", initial_frontier_rows=1_000,
+            maximum_frontier_rows=4_096, seed_rows=1_000, block_rows=73,
+            branch_aware_packed_bounds=True, verify_content=False,
+        )
+        threaded_branch = certified_packed_search(
+            query, source, request, store_root, generation,
+            store_dataset_id="test", initial_frontier_rows=1_000,
+            maximum_frontier_rows=4_096, seed_rows=1_000, block_rows=73,
+            branch_aware_packed_bounds=True, proposal_threads=4,
+            verify_content=False,
+        )
+        bad_v1 = replace(
+            proposal_report(4_097, branch_aware=False, block_rows=73),
+            contract_digest="not-allowed-for-v1",
+        )
+        patch.setattr(
+            certified_module, "scan_packed_bound_proposals_threaded",
+            lambda *_args, **_kwargs: bad_v1,
+        )
+        with pytest.raises(
+            certified_module.CertifiedPackedSearchError,
+            match="precomputed proposal",
+        ):
+            certified_packed_search(
+                query, source, request, store_root, generation,
+                store_dataset_id="test", initial_frontier_rows=1_000,
+                maximum_frontier_rows=4_096, seed_rows=1_000,
+                proposal_threads=2, verify_content=False,
+            )
+        bad_v2 = replace(
+            proposal_report(4_097, branch_aware=True, block_rows=73),
+            input_digest="stale-query",
+        )
+        patch.setattr(
+            certified_module, "scan_packed_bound_proposals_threaded",
+            lambda *_args, **_kwargs: bad_v2,
+        )
+        with pytest.raises(
+            certified_module.CertifiedPackedSearchError,
+            match="precomputed proposal",
+        ):
+            certified_packed_search(
+                query, source, request, store_root, generation,
+                store_dataset_id="test", initial_frontier_rows=1_000,
+                maximum_frontier_rows=4_096, seed_rows=1_000,
+                branch_aware_packed_bounds=True, proposal_threads=2,
+                verify_content=False,
+            )
+
+    assert scalar_calls == [1_001, 2_001, 4_001] * 2
+    provenance_digest = stable_hash({
+        "purpose": "threaded-certified-proposal-test",
+    })
+    assert threaded_calls == [
+        {
+            "route_quotas": {"composite": 4_097}, "block_rows": 73,
+            "threads": 6, "branch_aware": False,
+            "expected_provenance_digest": provenance_digest,
+        },
+        {
+            "route_quotas": {"composite": 4_097}, "block_rows": 73,
+            "threads": 4, "branch_aware": True,
+            "expected_provenance_digest": provenance_digest,
+        },
+    ]
+    assert list(dict.fromkeys(
+        row.frontier_rows for row in threaded.certificate.rounds
+    )) == [
+        1_000, 2_000, 4_000,
+    ]
+    assert threaded.certificate.result_digest == scalar.certificate.result_digest
+    assert threaded.matches == scalar.matches
+    assert threaded_branch.certificate.result_digest == (
+        scalar_branch.certificate.result_digest
+    )
+    assert threaded_branch.matches == scalar_branch.matches
+    assert threaded_branch.certificate.schema_version == (
+        "m04r-certified-packed-search-v8"
+    )
+    assert threaded.certificate.elapsed_seconds >= .01
+    brute = select_scored(exact_score(proposals)[0], request)
+    assert threaded.matches == tuple(brute)
+
+
 def test_requested_position_modes_are_mutually_exclusive(
     directory_dataset: Path, bars: pd.DataFrame, tmp_path: Path,
 ) -> None:
@@ -641,6 +888,39 @@ def test_certified_search_rejects_invalid_tolerance(tolerance: float) -> None:
             query, object(), request, Path("unused"), "generation",
             store_dataset_id="test", initial_frontier_rows=1,
             maximum_frontier_rows=1, seed_rows=1, tolerance=tolerance,
+        )
+
+
+@pytest.mark.parametrize("proposal_threads", [0, -1, 1.5, True])
+def test_certified_search_rejects_invalid_proposal_thread_count(
+    proposal_threads: object,
+) -> None:
+    query_key = EpisodeKey(
+        InstrumentKey("test", "QUERY"), pd.Timestamp("2024-12-31"), 10, "v1",
+    )
+    query = Episode(query_key, pd.DataFrame())
+    request = SearchQuery(query_key, ("test",), ("A",), 1)
+    with pytest.raises(ValueError, match="proposal threads"):
+        certified_packed_search(
+            query, object(), request, Path("unused"), "generation",
+            store_dataset_id="test", initial_frontier_rows=1,
+            maximum_frontier_rows=1, seed_rows=1,
+            proposal_threads=proposal_threads,  # type: ignore[arg-type]
+        )
+
+
+def test_certified_search_rejects_two_precomputed_proposal_sources() -> None:
+    query_key = EpisodeKey(
+        InstrumentKey("test", "QUERY"), pd.Timestamp("2024-12-31"), 10, "v1",
+    )
+    query = Episode(query_key, pd.DataFrame())
+    request = SearchQuery(query_key, ("test",), ("A",), 1)
+    with pytest.raises(ValueError, match="mutually exclusive"):
+        certified_packed_search(
+            query, object(), request, Path("unused"), "generation",
+            store_dataset_id="test", initial_frontier_rows=1,
+            maximum_frontier_rows=1, seed_rows=1, proposal_threads=1,
+            precomputed_proposal=object(),  # type: ignore[arg-type]
         )
 
 

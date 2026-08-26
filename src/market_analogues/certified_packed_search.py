@@ -27,7 +27,8 @@ from .packed_bound_search import (
     BoundProposal, BoundProposalReport, PackedBoundQuery,
     _packed_query_input_digest, bound_proposal_candidate_digest,
     scan_packed_bound_proposals,
-    packed_bound_search_contract, scan_packed_bound_threshold,
+    packed_bound_search_contract, scan_packed_bound_proposals_threaded,
+    scan_packed_bound_threshold,
 )
 from .packed_bound_store import load_packed_generation
 from .representation import Representation, represent, representation_input_digest
@@ -645,6 +646,7 @@ def certified_packed_search(
     branch_aware_packed_bounds: bool = False,
     threshold_scan_block_order: str = "forward",
     precomputed_proposal: BoundProposalReport | None = None,
+    proposal_threads: int | None = None,
 ) -> CertifiedPackedSearchResult:
     if requested_positions and hybrid_requested_positions:
         raise ValueError("requested-position modes are mutually exclusive")
@@ -662,6 +664,14 @@ def certified_packed_search(
         )
     if threshold_scan_block_order not in {"forward", "reverse"}:
         raise ValueError("threshold scan block order must be forward or reverse")
+    if proposal_threads is not None and (
+        type(proposal_threads) is not int or proposal_threads < 1
+    ):
+        raise ValueError("proposal threads must be a positive integer")
+    if proposal_threads is not None and precomputed_proposal is not None:
+        raise ValueError(
+            "proposal threads and explicit precomputed proposal are mutually exclusive"
+        )
     if not np.isfinite(tolerance) or tolerance < 0:
         raise ValueError("tolerance must be finite and nonnegative")
     if (
@@ -719,6 +729,14 @@ def certified_packed_search(
         int(latest_eligible_cutoff(query, request.minimum_history_gap_bars).value),
         query_representation, request.quality_tiers,
     )
+    if proposal_threads is not None:
+        precomputed_proposal = scan_packed_bound_proposals_threaded(
+            store_root, generation_id, packed_query,
+            route_quotas={"composite": maximum_frontier_rows + 1},
+            block_rows=block_rows, threads=proposal_threads,
+            branch_aware=branch_aware_packed_bounds, verify_content=False,
+            expected_provenance_digest=str(loaded.manifest["provenance_digest"]),
+        )
     if precomputed_proposal is not None:
         candidates = precomputed_proposal.candidates
         candidate_ids = [row.episode_id for row in candidates]
@@ -760,6 +778,12 @@ def certified_packed_search(
                 == proposal_contract_digest,
                 precomputed_proposal.input_digest == proposal_input_digest,
             )),
+            branch_aware_packed_bounds or all((
+                precomputed_proposal.contract_digest is None,
+                precomputed_proposal.input_digest is None,
+            )),
+            set(precomputed_proposal.route_quotas) == {"composite"},
+            set(precomputed_proposal.route_counts) == {"composite"},
             int(precomputed_proposal.route_quotas.get("composite", 0))
             >= maximum_frontier_rows + 1,
             precomputed_proposal.rows_scanned
@@ -767,7 +791,14 @@ def certified_packed_search(
             precomputed_proposal.eligible_rows
             == precomputed_proposal.eligible_main_rows
             + precomputed_proposal.eligible_overflow_rows,
+            0 <= precomputed_proposal.eligible_rows
+            <= precomputed_proposal.rows_scanned,
             0 <= len(candidates) <= precomputed_proposal.eligible_rows,
+            precomputed_proposal.route_counts.get("composite") == len(candidates),
+            len(candidates) == min(
+                int(precomputed_proposal.route_quotas["composite"]),
+                precomputed_proposal.eligible_rows,
+            ),
             len(candidate_ids) == len(set(candidate_ids)),
             list(candidates) == sorted(
                 candidates, key=lambda row: (row.lower_bound, row.episode_id),
@@ -777,7 +808,7 @@ def certified_packed_search(
                 and row.episode_id.lower() == row.episode_id
                 and np.isfinite(row.lower_bound) and row.lower_bound >= 0
                 and row.quality_tier in {"A", "B"}
-                and row.routes and tuple(sorted(set(row.routes))) == row.routes
+                and row.routes == ("composite",)
                 for row in candidates
             ),
             precomputed_proposal.candidate_digest
