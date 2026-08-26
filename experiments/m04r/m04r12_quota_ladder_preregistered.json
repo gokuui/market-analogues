@@ -1,0 +1,117 @@
+{
+  "baseline_bindings": [
+    {
+      "baseline_result_digest": "d0eb270d69ca73c2c6e1a475fb4efc2402d626c07a3fa586b43d1a8314f1835b",
+      "candidate_count": 1371,
+      "candidate_digest": "2a1f34eae080f9dc65a15c1fd4262e5375ddfe3ec09eb57d54b916d9179489c6",
+      "candidate_ids_digest": "f708fb1cc43c378e0669b9c44c61f8c60cb48018adf07f166bca5037202e65ce",
+      "ordinal": 0,
+      "query_episode_id": "3307023dbe2164d025e788da",
+      "registry_case_id": "nasdaq-JCTC-historical-252",
+      "semantic_digest": "f10ab6be5a6b8e6186c199c508580da14083e6a4a7c021d68ce4ed47d6101c2f"
+    },
+    {
+      "baseline_result_digest": "654a179350eb4e918da4f6c0a539ba5904c6b87646864ebb3bc010eafaeae4a0",
+      "candidate_count": 1173,
+      "candidate_digest": "b0eb4f664e945719ce91c029198c3a92f23de03646f639f6b39398ce57da4afe",
+      "candidate_ids_digest": "5d9868a8f64240c327c618cdb81fd7a539382c19a0e0471b7af51392f4fb7c6d",
+      "ordinal": 1,
+      "query_episode_id": "3618af07dedd52fb3bdb1ccd",
+      "registry_case_id": "nasdaq-GBNY-current-252",
+      "semantic_digest": "7ffef901655db0c8ea151813033cfce05c8b05852da6ae03ec29cfa35ada0b9d"
+    },
+    {
+      "baseline_result_digest": "bc0f5159dfe8b0c3c74ddef15b6bd0211088cbca089a7b08f9c546eff5192ed7",
+      "candidate_count": 1262,
+      "candidate_digest": "d81fcb51dc5e2d892fdf5c74150f981d9814bb51dbbe0adcd668176f9d94cbb9",
+      "candidate_ids_digest": "c63f3b0da5832d293dc832b6564857330b8b47c68149180cea0aa3f8d33ca268",
+      "ordinal": 2,
+      "query_episode_id": "9d7365581643bd93e85beb67",
+      "registry_case_id": "nasdaq-GBNY-historical-252",
+      "semantic_digest": "029f7e8ad3e855d40c5cae46432a3cd4934c0f780adc218a55c0a34c92f072f3"
+    },
+    {
+      "baseline_result_digest": "aacd3c8e4241e57c079884cca5fc6c1182f88f41d6fd8878ceb0ee4e7bbbf80d",
+      "candidate_count": 1171,
+      "candidate_digest": "7b72e53c0248b2ffbab8b49c79f8ed0f9cbc71815b06c85b424e6d2dc851198a",
+      "candidate_ids_digest": "62b37ca30bf76d341e1556803c163e36eb4402d2c6e5ac6de64eb1281ff252b2",
+      "ordinal": 3,
+      "query_episode_id": "99a0838725a09570b4a075ff",
+      "registry_case_id": "nasdaq-ISPOW-current-252",
+      "semantic_digest": "d3f566a955ab80ea0be043942b94b94753a899177f2faec39c095cf3e718c550"
+    }
+  ],
+  "code_manifest": {
+    "digest": "c3e6c818fceefcd61b1cb334803e34225c52ea0e766c32f0e3bac980062b4272",
+    "files": {
+      "experiments/m04r/m04r12_quota_ladder_poc.py": "bd7ae80813d0f67d0daf1cbd7073d3e6338ca26159c93d94c95d5d6678b666ff",
+      "src/market_analogues/adapters.py": "c3b007bc7e3eeac498533f846292a6cf7824a49b55d60c53933d0b426c253e15",
+      "src/market_analogues/config.py": "8db50ec6e726817633c5ad79f9eba040a5ab1347962cb8b883e06149c198f5b5",
+      "src/market_analogues/episodes.py": "6ad5fec2e00ef3c367151814344092320132ea49b490af72adfa42b7b4e0a50a",
+      "src/market_analogues/m04r_candidate_evidence.py": "26b051f72eac33452d646262412069bed8751fb9781c63701c837a069d3dbddf",
+      "src/market_analogues/packed_bound_search.py": "0f9fe52a4fe3e1b3847181ce16c279eaa50f78815ed57123baba38c4f8ec36fc",
+      "src/market_analogues/packed_bound_store.py": "518fa61afdcb1012bb33bb94d0b7f05d3953c0449389c24b8df928dfd9d7272f",
+      "src/market_analogues/representation.py": "b38ec91b32db0bd144f6f1ad153a4c5b22165aedf19d3750602c640353a603f8",
+      "src/market_analogues/resident_store.py": "c01aff0a7d42eb228d6140f8b60a3198f470e584ba9f3e4ead221a821ba63013",
+      "src/market_analogues/search.py": "8db578c7836da69e22a7eaaaeb35aecb09c8bf21eeaa3171003339b75bf5702a",
+      "src/market_analogues/types.py": "484b8b9935408dfcdad5e96d01312164101d1e2239d5dd3c2ce12d3177275a8d"
+    }
+  },
+  "config_path": "/home/vinay/code/market-analogues/config/datasets.example.yaml",
+  "config_sha256": "3b3821d17563e63318429730fb7aab6fea69b2a0eeab57d08506ca7312e4792f",
+  "contract_digest": "2002a4e6715040d0022d229ae64d3c2a7ec4a1d426a3ce3700704f6f430b5796",
+  "environment": {
+    "digest": "17b145d88de4c1c9b0a6912d48dab00d830badaa8744a595f362c13975b03f55",
+    "implementation": "CPython",
+    "machine": "x86_64",
+    "packages": {"numba": "0.63.1", "numpy": "2.3.5", "pandas": "2.3.3"},
+    "python": "3.11.2"
+  },
+  "generation_id": "9fc6ae0ec4451133d8006897162f3443803fd30a3c44b78e80a476fbb18bb483",
+  "maximum_route_quotas": {
+    "candle_volatility": 512, "coarse": 512, "composite": 8000,
+    "market_context": 512, "price": 512, "stage": 512,
+    "structural": 512, "volume_shock": 512
+  },
+  "output_limits": {
+    "maximum_sidecar_bytes_per_case": 33554432,
+    "maximum_total_output_bytes": 268435456
+  },
+  "performance_limits": {
+    "forward_first_seconds": 120.0, "peak_rss_mb": 1536.0,
+    "reverse_warm_seconds": 60.0
+  },
+  "post_open_development_poc": true,
+  "producer_contract_digest": "aa29be3c4d8cdd31e310c64e85ec4692968b608a5fe2bf1248ba2d0825c9aac2",
+  "production_promotion_authorized": false,
+  "provenance_digest": "83ccfa62ac7ffec03e48d0f8a5634c7b8f1b8b0dde1426be22cc343fe116f62d",
+  "query_episode_ids": [
+    "3307023dbe2164d025e788da", "3618af07dedd52fb3bdb1ccd",
+    "9d7365581643bd93e85beb67", "99a0838725a09570b4a075ff"
+  ],
+  "query_order_digest": "7917bfded9b1b11988017ce5fdd1793bd632a34f143b44f3efad098a0f8406f4",
+  "quota_configurations_digest": "673737d8a32d0cad0d728663747170489667b2f5ba84b322911202bd2c9d8b88",
+  "real_forward_outcomes_accessed": false,
+  "registry_digest": "0a4da732f91375a091775cb04e6e77c8d136ade47d7f4d16508a2d9a6555361e",
+  "repository_root": "/home/vinay/code/market-analogues",
+  "resident_content_digest": "27dfa03eea244c1c13d27dcae7970707c60505141a297502de36588b6928437e",
+  "resident_ready_digest": "554cd13f9d20d48e4e0cf6f39a8271648bae2b4152c40f72ae5444934a49afb6",
+  "roots": {
+    "candidate_root": "/home/vinay/code/market-analogues/config/data/analogues/m04r11/candidate-pools-v2",
+    "output_root": "/home/vinay/code/market-analogues/config/data/analogues/m04r12/development-quota-ladder-v1",
+    "registry_root": "/home/vinay/code/market-analogues/config/data/analogues/m04r10/nasdaq-untouched-authority-registry",
+    "resident_root": "/dev/shm/market-analogues/m04r11-candidate-v2/9fc6ae0ec4451133d8006897162f3443803fd30a3c44b78e80a476fbb18bb483",
+    "source_full_root": "/home/vinay/code/market-analogues/config/data/analogues/poc/m04r/packed-bound-full"
+  },
+  "scan_protocol": {
+    "forward": {"block_order": "forward", "block_rows": 4096},
+    "physical_scans_per_case": 2,
+    "reverse": {"block_order": "reverse", "block_rows": 4097},
+    "threads": 8, "verify_content": false
+  },
+  "schema_version": "m04r12-development-quota-ladder-preregistration-v1",
+  "script_relative_path": "experiments/m04r/m04r12_quota_ladder_poc.py",
+  "script_sha256": "bd7ae80813d0f67d0daf1cbd7073d3e6338ca26159c93d94c95d5d6678b666ff",
+  "status": "frozen_before_m04r12_producer_launch",
+  "truth_inputs_allowed_in_producer": false
+}
