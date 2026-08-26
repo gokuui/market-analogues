@@ -960,7 +960,7 @@ def _certificate(certificate: Any, matches: Any, query_id: str, input_digest: st
     cert_keys = {"schema_version", "contract_digest", "generation_id", "query_episode_id", "input_digest",
         "eligible_candidates", "exact_evaluated", "safely_pruned", "stopped_early", "stop_threshold",
         "next_lower_bound", "maximum_quantized_bound_excess", "materialization_groups", "sparse_symbols",
-        "batch_symbols", "rounds", "result_digest", "elapsed_seconds", "native_bound_accounting",
+        "batch_symbols", "rounds", "result_digest", "native_bound_accounting",
         "minimum_native_pruned_bound", "threshold_closure_passes"}
     match_keys = {"episode_id", "symbol", "cutoff", "total_distance", "component_distances",
         "alignment", "quality_tier"}
@@ -980,7 +980,7 @@ def _certificate(certificate: Any, matches: Any, query_id: str, input_digest: st
             or type(certificate["stopped_early"]) is not bool \
             or not all(type(certificate[key]) is float and math.isfinite(certificate[key])
                 and certificate[key] >= 0 for key in ("stop_threshold",
-                    "maximum_quantized_bound_excess", "elapsed_seconds")):
+                    "maximum_quantized_bound_excess")):
         raise VerificationError("certificate numeric schema differs")
     for match in matches:
         if type(match["episode_id"]) is not str or len(match["episode_id"]) != 24 \

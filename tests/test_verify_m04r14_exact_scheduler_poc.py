@@ -324,6 +324,51 @@ def test_production_query_resident_and_source_causal_binding_rejects_mutation() 
             verifier._production_proposal_binding(forged, foundation, expected)
 
 
+def test_production_certificate_uses_timing_free_semantic_schema() -> None:
+    contract = verifier.certified_packed_search_contract(
+        requested_positions=True, vector_lower_bounds=True,
+        deferred_alignments=True, compact_scored=True,
+        native_bound_deferral=True, streaming_threshold_closure=True,
+        branch_aware_packed_bounds=True,
+    )
+    matches = [{"episode_id": f"{index:024d}", "symbol": f"S{index}",
+        "cutoff": "2020-01-01", "total_distance": 1.0,
+        "component_distances": {name: 0.0 for name in verifier.COMPONENT_NAMES},
+        "alignment": [[0, 0]], "quality_tier": "A"} for index in range(20)]
+    certificate = {"schema_version": contract["schema_version"],
+        "contract_digest": contract["digest"], "generation_id": verifier.GENERATION_ID,
+        "query_episode_id": "query", "input_digest": "input",
+        "eligible_candidates": 20, "exact_evaluated": 20, "safely_pruned": 0,
+        "stopped_early": True, "stop_threshold": 1.0, "next_lower_bound": 1.1,
+        "maximum_quantized_bound_excess": 0.0, "materialization_groups": 0,
+        "sparse_symbols": 0, "batch_symbols": 0,
+        "rounds": [{"frontier_rows": 20, "exact_rows": 20, "next_lower_bound": 1.1,
+            "constrained_threshold": 1.0, "selected_rows": 20, "certified": True,
+            "proposal_digest": "proposal"}],
+        "native_bound_accounting": {"native_bound_evaluated": 20,
+            "exact_dtw_evaluated": 20, "native_bound_pruned": 0,
+            "packed_bound_pruned": 0},
+        "minimum_native_pruned_bound": None, "threshold_closure_passes": []}
+    deterministic = {"schema_version": contract["schema_version"],
+        "contract_digest": contract["digest"], "generation_id": verifier.GENERATION_ID,
+        "query_episode_id": "query", "input_digest": "input", "eligible_candidates": 20,
+        "exact_evaluated": 20, "safely_pruned": 0, "stopped_early": True,
+        "stop_threshold_hex": float(1.0).hex(), "next_lower_bound_hex": float(1.1).hex(),
+        "maximum_quantized_bound_excess_hex": float(0.0).hex(),
+        "rounds": certificate["rounds"], "matches": [{"episode_id": row["episode_id"],
+            "total_hex": row["total_distance"].hex(), "components": {key: value.hex()
+            for key, value in sorted(row["component_distances"].items())},
+            "alignment": row["alignment"]} for row in matches],
+        "real_forward_outcomes_accessed": False,
+        "native_bound_accounting": certificate["native_bound_accounting"],
+        "minimum_native_pruned_bound_hex": None, "threshold_closure_passes": []}
+    certificate["result_digest"] = verifier.stable_hash(deterministic)
+    verifier._certificate(certificate, matches, "query", "input", True)
+    forged = copy.deepcopy(certificate); forged["elapsed_seconds"] = 0.1
+    with pytest.raises(verifier.VerificationError, match="certificate exact keys"):
+        verifier._certificate(forged, matches, "query", "input", True)
+
+
 def test_production_runtime_schema_rejects_empty_manifest(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
