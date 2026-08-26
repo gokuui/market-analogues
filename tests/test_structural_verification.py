@@ -30,6 +30,9 @@ def _small_spec(tmp_path: Path) -> Path:
     payload["candidate_seeds"] = [10, 11, 12, 13, 14]
     payload["validation_query_seeds"] = [500, 501, 502, 503, 504]
     payload["acceptance"]["maximum_total_seconds"] = 60.0
+    # ru_maxrss is process-global, so this synthetic gate must include pytest's
+    # collection/plugin footprint.  The frozen production spec is unchanged.
+    payload["acceptance"]["maximum_rss_mb"] = 1536.0
     path = tmp_path / "structural.yaml"
     path.write_text(yaml.safe_dump(payload, sort_keys=False))
     return path

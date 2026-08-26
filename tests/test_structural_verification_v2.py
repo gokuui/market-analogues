@@ -61,7 +61,9 @@ def _spec_payload() -> dict:
             "minimum_precision_at_k_per_family": .75,
             "maximum_critical_negative_error_per_family": .02,
             "maximum_total_seconds": 60.0,
-            "maximum_rss_mb": 1024.0,
+            # ru_maxrss includes the surrounding pytest process.  Keep this
+            # synthetic gate above harness overhead; official specs stay frozen.
+            "maximum_rss_mb": 1536.0,
         },
     }
 
