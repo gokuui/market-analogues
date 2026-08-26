@@ -160,7 +160,7 @@ def main() -> int:
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--full-root", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--threads", type=int, default=4, choices=(2, 4))
+    parser.add_argument("--threads", type=int, default=4, choices=(2, 4, 8))
     args = parser.parse_args()
     numba.set_num_threads(1)
     config = load_config(args.config)
