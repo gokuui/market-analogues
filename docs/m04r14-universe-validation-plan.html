@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>M04R-14 certified universe validation plan</title>
+  <style>
+    :root { color-scheme: light; --ink:#17202a; --muted:#566573; --line:#d5d8dc; --paper:#fff; --bg:#f4f7f8; --good:#08704f; --warn:#9a6700; --bad:#a93226; --blue:#1558a6; }
+    body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.55 system-ui,-apple-system,Segoe UI,sans-serif; }
+    main { max-width:1180px; margin:0 auto; padding:2rem 1rem 5rem; }
+    header, section { background:var(--paper); border:1px solid var(--line); border-radius:12px; padding:1.35rem 1.5rem; margin:1rem 0; }
+    h1,h2,h3 { line-height:1.2; } h1 { margin-top:0; } h2 { border-bottom:1px solid var(--line); padding-bottom:.45rem; }
+    table { width:100%; border-collapse:collapse; font-size:.94rem; } th,td { text-align:left; vertical-align:top; border-bottom:1px solid var(--line); padding:.55rem; }
+    th { background:#eef3f7; } code { overflow-wrap:anywhere; } .good { color:var(--good); } .warn { color:var(--warn); } .bad { color:var(--bad); }
+    .callout { border-left:5px solid var(--blue); background:#f3f8ff; padding:.8rem 1rem; } .stop { border-left-color:var(--bad); background:#fff5f4; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:1rem; } .card { border:1px solid var(--line); border-radius:9px; padding:1rem; }
+    .tag { display:inline-block; padding:.12rem .5rem; border-radius:999px; background:#e8f1fb; margin-right:.35rem; font-size:.84rem; }
+    pre { white-space:pre-wrap; overflow:auto; background:#f7f9fa; border:1px solid var(--line); padding:1rem; border-radius:8px; }
+  </style>
+</head>
+<body><main>
+<header>
+  <p><span class="tag">M04R-14</span><span class="tag">NASDAQ</span><span class="tag">development → untouched → shadow</span></p>
+  <h1>Certified universe validation: no-look-back execution plan</h1>
+  <p>This plan turns the four-case M04R-13 result into a system-level validation. Every task has a machine-verifiable completion gate. A failed gate is diagnosed and fixed on exposed data; untouched evidence is never silently resumed, retuned or relabelled.</p>
+  <p><b>Final goal:</b> for any eligible OHLCV query, return the exact constrained historical top 20 with a reconstructible completeness certificate, stable latency/resource evidence, and an independently verified account of every query attempted or skipped. Retrieval correctness is not a claim of trading profitability.</p>
+</header>
+
+<section>
+  <h2>1. Starting point and claim boundary</h2>
+  <div class="grid">
+    <div class="card"><h3 class="good">Proven</h3><p>M04R-13 v2 exactly matches all 80 authority neighbours across the four known hard failures. Accounting and stock/benchmark causal prefixes match, every resource gate passes, and two independent verifier executions have the same deterministic digest.</p></div>
+    <div class="card"><h3 class="warn">Not yet proven</h3><p>The new engine has not run across the other 56 M04R-11 queries, a fresh untouched cohort, concurrent service loads, a full current-symbol denominator, or a daily drift window. No real run exercised retained overflow or streamed threshold closure.</p></div>
+    <div class="card"><h3 class="bad">Explicitly out of scope</h3><p>No current result proves future returns, profitable trades, complete historical exchange membership, delisting handling, corporate-action correctness, or NSE portability.</p></div>
+  </div>
+  <p class="callout"><b>Data-date limitation:</b> the available stock source ends on 2026-03-30, the benchmark extends to 2026-05-08, and the packed candidate generation is frozen at 2025-12-31. A new cohort can be cross-sectionally untouched using available data, but post-M04R-13 temporal generalization requires a later stock refresh and a rebuilt packed generation.</p>
+</section>
+
+<section>
+  <h2>2. Fixed decisions before implementation</h2>
+  <table><thead><tr><th>Decision</th><th>Rule</th><th>Reason</th></tr></thead><tbody>
+    <tr><td>Correctness target</td><td>Exact ordered 20/20 for every case; no aggregate-recall allowance.</td><td>A certified engine must fail closed. One wrong case fails the matrix.</td></tr>
+    <tr><td>Development matrix</td><td>All 60 already-opened M04R-11 queries.</td><td>The four failures are insufficient; the other 56 must exercise the new implementation too.</td></tr>
+    <tr><td>Untouched matrix</td><td>36 new symbols, 72 paired cases: six symbols in every A/B × low/middle/high cell.</td><td>It balances coverage and runtime and permits the full down/sideways/up × 2010s/2020s historical schedule.</td></tr>
+    <tr><td>Primary execution lane</td><td>Serial fresh child per query; eight proposal threads; calibrate exact workers from 1/2/4/8 only on exposed cases.</td><td>Each proposal already occupies the host. Per-query latency must not be contaminated by oversubscription.</td></tr>
+    <tr><td>Throughput lane</td><td>Separate p8t1 or measured cost-balanced batch; never mix its metrics with service latency.</td><td>Batch throughput and interactive latency answer different operational questions.</td></tr>
+    <tr><td>Evidence encoding</td><td>Incomplete thresholds use an explicit state, never JSON Infinity/NaN. Terminal certified thresholds must be finite.</td><td>Strict JSON evidence must represent algorithm state without weakening validation.</td></tr>
+    <tr><td>Promotion</td><td>Even a full pass leaves <code>production_promotion_authorized=false</code>; it authorizes shadow operation only.</td><td>Operational stability and outcome usefulness remain separate gates.</td></tr>
+  </tbody></table>
+</section>
+
+<section>
+  <h2>3. Task-by-task implementation and verification</h2>
+  <table><thead><tr><th>Task</th><th>Build</th><th>Synthetic/automatic verifier</th><th>Completion gate</th></tr></thead><tbody>
+    <tr><td><b>T14-00 Evidence catalog and schemas</b></td><td>Catalog M04R-13 v1 as superseded pre-open, v2 as terminal, all roots/digests and exact claim boundaries. New schemas split proposal-resource, exact-stage and end-to-end SLO status. Rename the authority trace comparison so it cannot be mistaken for the finite diagnostic binding.</td><td>Strict schema/key/digest tests; duplicate-key and non-finite JSON rejection; exact active/superseded root inventory; clean-Git manifest reconstruction.</td><td>No ambiguous active artifact, no overloaded <code>performance_passed</code>, and every immutable digest resolves.</td></tr>
+    <tr><td><b>T14-01 Adversarial oracle qualification</b></td><td>Generate many small packed universes and compare progressive certification against a scalar brute-force oracle. Force main/overflow results, real closure, ties at K, band edges, exact 0–19–20 eligibility, missing/sparse volume, native deferred bounds, repeated frontiers, overlap exclusion, per-symbol caps and duplicate IDs.</td><td>Randomized seeds × scalar/forward/reverse traversal × thread counts; mutate every certificate/accounting/binding layer; inject crash, timeout and source/resident identity changes.</td><td>Exact IDs/order/scores/components/alignment/accounting for every seed; zero nondeterminism; every mutation rejected before success publication.</td></tr>
+    <tr><td><b>T14-02 Exact-worker and scheduler POC</b></td><td>On exposed cases only, compare exact workers 1/2/4/8 with the same eight-thread proposal. Separately measure serial latency and p8t1 throughput. Reuse a forward proposal exactly once; never add an unmeasured third scan.</td><td>Semantic digests must be identical across worker counts, traversal and scheduling. Measure CPU, page faults, swap delta, RSS and stage wall time.</td><td>Select the fastest stable configuration by frozen rule; no correctness difference; no host oversubscription in the primary lane.</td></tr>
+    <tr><td><b>T14-03 Exposed 60-case producer</b></td><td>Registry-driven fresh children, create-only case bundles, ordered <code>CASE_STARTED</code>/<code>CASE_COMPLETED</code> ledger, verified gap-free prefix recovery, source/resident leases around every scan, and a truth-free aggregate seal.</td><td>Fault injection for child death, holes, extras, symlinks, partial writes, reordered IDs, lease changes and terminal resume. Validate all retained matches against the durable pack.</td><td>60/60 certified; forward/reverse equality; finite evidence; every query/case/accounting/prefix bound; no semantic failure.</td></tr>
+    <tr><td><b>T14-04 Exposed authority comparison</b></td><td>After a durable results-open marker, compare with all 60 sealed v4 authorities. Run a separately implemented terminal verifier in a fresh root.</td><td>Marker-before-authority instrumentation; authority byte hashes; opposite traversal replay; terminal-tree mutation tests; second verifier replay in another fresh root.</td><td>1,200/1,200 ordered matches, exact applicable accounting/prefixes on every case, terminal verifier PASS, identical replay digest.</td></tr>
+    <tr><td><b>T14-05 Performance qualification</b></td><td>Measure primary cold/warm runs, exact stage, whole case, concurrency 1/2/4, throughput lane, restart/resident rebuild, and a simulated growth cohort. Keep semantic and timing seals separate.</td><td>Quantile reconstruction from raw cases; baseline comparison against M04R-12; scheduler/resource accounting; deliberate timing/RSS failures must remain semantic-only evidence and block performance success.</td><td>Freeze holdout SLOs before selecting it. Initial ceilings: proposal first ≤120s, reverse ≤60s, RSS ≤1,536 MiB, exact p95 ≤120s/max ≤180s, end-to-end p95 ≤180s/max ≤300s, serial 60 ≤7,200s.</td></tr>
+    <tr><td><b>T14-06 New untouched registry</b></td><td>Select 36 never-used symbols mechanically from the six quality/liquidity cells, producing historical/current pairs. Preserve the full eligible universe and ranking/rejection transcript. Expand contamination and issuer-alias exclusions.</td><td>A verifier implemented without importing builder validators independently reconstructs the source lock, exclusions, universe, transcript, cases, causal prefixes and temporal coverage.</td><td>72 unique case IDs, 36 new symbols, exact cell/schedule coverage, zero forbidden outcome reads, independent registry PASS.</td></tr>
+    <tr><td><b>T14-07 Candidate-first untouched run</b></td><td>Commit implementation H0, registry-only H1 and preregistration-only H2. Run candidate with no authority path, independently verify producer, write/fsync results-opened, then build and verify exact authority, compare and terminally verify.</td><td>Process-level path denial, exact Git commits/blobs, create-only roots, marker ordering, authority isolation, source immutability and independent reconstruction.</td><td>72/72 exact top-20 and certificates; fixed performance SLOs; all verifiers PASS. Any mismatch fails the whole matrix.</td></tr>
+    <tr><td><b>T14-08 Full eligible-universe shadow</b></td><td>For every eligible current NASDAQ symbol, publish query ID or a mechanical skip reason. Run the selected certified lane without authority access; brute-force-audit a preregistered random subset.</td><td>Denominator manifest reconciliation, no missing/duplicate symbols, independent sample oracle, daily drift and clean-rebuild parity checks.</td><td>100% denominator accounted, zero uncertified/error cases, fixed p95/max/throughput/resource gates across a sustained shadow window.</td></tr>
+    <tr><td><b>T14-09 Outcome decision-support layer</b></td><td>Only after retrieval seals, attach benchmark-relative forward paths and win/fail distributions to analogues; keep query-time retrieval blind to outcomes.</td><td>Walk-forward causality, horizon/barrier invariants, delisting/corporate-action tests, outcome mutation must never alter neighbour identities.</td><td>Reproducible HTML/API answer to “what happened next?” with uncertainty and coverage; no profitability claim.</td></tr>
+    <tr><td><b>T14-10 Portability</b></td><td>Repeat adapter, registry, oracle and shadow evidence for NSE and a generic canonical OHLCV fixture without market branches in the core.</td><td>Cross-adapter invariance and dataset-specific benchmark/calendar checks.</td><td>Same core digests for equivalent canonical input; separate honest performance/coverage reports per dataset.</td></tr>
+  </tbody></table>
+</section>
+
+<section>
+  <h2>4. Untouched selection and sealing protocol</h2>
+  <ol>
+    <li>Freeze seed, source lock, six-cell quotas, historical schedule, freshness/history/gap rules, all exclusions and issuer aliases before selection.</li>
+    <li>Selection may use quality/liquidity data at the lock, benchmark and stock OHLCV only through each cutoff, and later timestamps solely to count the 60-session gap. It may not read forward values, setup labels, outcomes, previous candidates or authorities.</li>
+    <li>Commit finished code/tests/verifiers as H0. Generate and independently verify the registry; commit only its binding as H1. Generate final preregistration; commit only that file as H2.</li>
+    <li>The candidate producer accepts no authority argument and must seal all cases plus performance before any truth exists.</li>
+    <li>A separate pre-open verifier reconstructs producer evidence. Then and only then atomically write/fsync <code>RESULTS_OPENED</code>.</li>
+    <li>Build the exhaustive authority in a fresh isolated root, verify it independently, compare, and run a separate terminal verifier.</li>
+  </ol>
+  <p class="callout stop"><b>Failure policy:</b> before any case-start marker, a mechanically proven zero-query-read launch failure may retry unchanged code in a new root. After any case starts, no resume or replacement. A semantic/source/Git/seal failure stops immediately and forbids authority construction. A timing failure may finish semantic evidence but still forbids truth opening. Any post-open failure is terminal; a repair can audit integrity only.</p>
+</section>
+
+<section>
+  <h2>5. Deliverables and review checkpoints</h2>
+  <table><thead><tr><th>Checkpoint</th><th>Human-readable deliverable</th><th>Machine evidence</th></tr></thead><tbody>
+    <tr><td>A — Oracle ready</td><td>Adversarial coverage matrix and failure-injection report.</td><td>Seed manifest, oracle equality digests, mutation rejection ledger.</td></tr>
+    <tr><td>B — 60-case development complete</td><td>Per-case frontier/exact work/latency table and bottleneck report.</td><td>Producer, comparison and independent-verification seals.</td></tr>
+    <tr><td>C — Holdout frozen</td><td>Registry coverage/exclusion report and explicit data-date limitation.</td><td>Independent registry verification, H0/H1/H2 bindings.</td></tr>
+    <tr><td>D — Untouched matrix complete</td><td>Exactness and fixed-SLO summary; no retrospective retuning.</td><td>Candidate, authority, comparison and terminal verifier seals.</td></tr>
+    <tr><td>E — Shadow complete</td><td>Full denominator, latency, drift, failure and skip-reason dashboard.</td><td>Daily append-only manifests and sampled exact-oracle audits.</td></tr>
+    <tr><td>F — Decision support</td><td>Copyable HTML chart analogues plus “what happened next?” distributions.</td><td>Outcome-blind retrieval binding and causal outcome audit.</td></tr>
+  </tbody></table>
+</section>
+
+<section>
+  <h2>6. Immediate execution order</h2>
+  <ol>
+    <li>Implement T14-00 and T14-01; do not launch 60 cases until every forced branch has oracle coverage.</li>
+    <li>Run the bounded exact-worker/scheduler POC, select one primary lane, and freeze the exposed-60 contract.</li>
+    <li>Execute and independently verify all 60 exposed cases. Use the results only for engineering/performance decisions.</li>
+    <li>Freeze untouched SLOs and registry code. With available data, label the cohort cross-sectionally untouched; after a future refresh, repeat with a rebuilt pack for temporal generalization.</li>
+    <li>Run the 72-case candidate-first untouched protocol, then proceed to the full eligible-universe shadow only if it passes.</li>
+  </ol>
+  <p><b>Estimated development-60 runtime after implementation:</b> 75–100 minutes for the primary serial lane, with a two-hour ceiling; a separate p8t1 throughput lane is expected to take roughly 20–35 minutes. These are planning estimates and will be replaced by raw measured distributions.</p>
+</section>
+</main></body></html>
