@@ -115,7 +115,7 @@ def test_fixed_output_rejects_symlinked_parent(tmp_path: Path) -> None:
     outside.mkdir()
     parent = tmp_path / "config/data/analogues/m04r13"
     parent.mkdir(parents=True)
-    (parent / "finite-threshold-diagnostic-v1").symlink_to(
+    (parent / "finite-threshold-diagnostic-v2").symlink_to(
         outside, target_is_directory=True,
     )
     with pytest.raises(diagnostic.DiagnosticError, match="aliased|symlink"):

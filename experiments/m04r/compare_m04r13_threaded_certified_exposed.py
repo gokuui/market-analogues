@@ -18,10 +18,14 @@ from typing import Any, Callable, Mapping
 
 from math import isfinite
 
+import numpy as np
+import pandas as pd
+
 from market_analogues.certified_packed_search import certified_packed_search_contract
 from market_analogues.packed_bound_search import packed_bound_search_contract
 from market_analogues.packed_bound_search import (
-    _eligible_mask, packed_branch_aware_lower_bounds,
+    BRANCH_AWARE_SEARCH_SCHEMA_VERSION, BoundProposalReport, _eligible_mask,
+    bound_proposal_candidate_digest, packed_branch_aware_lower_bounds,
     scan_packed_bound_threshold,
 )
 from market_analogues.packed_bound_store import TIER_NAMES, load_packed_generation
@@ -147,7 +151,7 @@ def _strict_payload_digest(
 
 def _validate_proposal(
     value: Mapping[str, Any], query_id: str, order: str,
-) -> producer.BoundProposalReport:
+) -> BoundProposalReport:
     required = {
         "schema_version", "generation_id", "query_episode_id", "candidates",
         "rows_scanned", "eligible_rows", "eligible_main_rows",
@@ -169,7 +173,7 @@ def _validate_proposal(
         raise ComparisonError("proposal encoding differs") from exc
     contract = packed_bound_search_contract(branch_aware=True)["digest"]
     deterministic = {
-        "schema_version": producer.BRANCH_AWARE_SEARCH_SCHEMA_VERSION,
+        "schema_version": BRANCH_AWARE_SEARCH_SCHEMA_VERSION,
         "contract_digest": contract, "generation_id": producer.GENERATION_ID,
         "query_episode_id": query_id, "rows_scanned": report.rows_scanned,
         "eligible_rows": report.eligible_rows,
@@ -188,7 +192,7 @@ def _validate_proposal(
     except ValueError:
         identifiers_valid = False
     if not all((
-        report.schema_version == producer.BRANCH_AWARE_SEARCH_SCHEMA_VERSION,
+        report.schema_version == BRANCH_AWARE_SEARCH_SCHEMA_VERSION,
         report.contract_digest == contract,
         report.generation_id == producer.GENERATION_ID,
         report.query_episode_id == query_id,
@@ -209,7 +213,7 @@ def _validate_proposal(
         list(report.candidates) == sorted(
             report.candidates, key=lambda row: (row.lower_bound, row.episode_id)),
         report.candidate_digest
-        == producer.bound_proposal_candidate_digest(report.candidates),
+        == bound_proposal_candidate_digest(report.candidates),
         report.result_digest == stable_hash(deterministic),
     )):
         raise ComparisonError("proposal reconstruction differs")
@@ -386,7 +390,7 @@ def _validate_certificate(
 
 
 def _validate_round_proposal_bindings(
-    certificate: Mapping[str, Any], forward: producer.BoundProposalReport,
+    certificate: Mapping[str, Any], forward: BoundProposalReport,
 ) -> None:
     exact = True
     for row in certificate["rounds"]:
@@ -397,7 +401,7 @@ def _validate_round_proposal_bindings(
         )
         effective_next = row["next_lower_bound"]
         if not all((
-            row["proposal_digest"] == producer.bound_proposal_candidate_digest(
+            row["proposal_digest"] == bound_proposal_candidate_digest(
                 forward.candidates[:min(frontier_rows + 1, forward.eligible_rows)]
             ),
             packed_next is None or (
@@ -450,14 +454,14 @@ def reconstruct_match_universe(
     except ValueError as exc:
         raise ComparisonError("retained match episode ID encoding differs") from exc
     found: dict[str, tuple[Any, bool]] = {}
-    encoded_array = producer.np.asarray(
-        [producer.np.void(value) for value in encoded], dtype="V12",
+    encoded_array = np.asarray(
+        [np.void(value) for value in encoded], dtype="V12",
     )
     for array, overflow in ((loaded.rows, False), (loaded.overflow, True)):
         for first in range(0, len(array), 65_536):
             block = array[first:first + 65_536]
             selected = block[
-                producer.np.isin(block["episode_id"], encoded_array)
+                np.isin(block["episode_id"], encoded_array)
             ] if len(encoded_array) else block[:0]
             for record in selected:
                 identifier = bytes(record["episode_id"])
@@ -494,7 +498,7 @@ def reconstruct_match_universe(
             if located is None:
                 continue
             record, overflow = located
-            single = producer.np.asarray([record], dtype=(
+            single = np.asarray([record], dtype=(
                 loaded.overflow.dtype if overflow else loaded.rows.dtype
             ))
             if not bool(_eligible_mask(single, query, symbol_id)[0]):
@@ -580,7 +584,7 @@ def _source_generation_identity(store_root: Path) -> dict[str, Any]:
 
 
 def _validate_closure_scan_evidence(
-    certificate: Mapping[str, Any], forward: producer.BoundProposalReport,
+    certificate: Mapping[str, Any], forward: BoundProposalReport,
     reports: list[Mapping[str, Any]],
 ) -> None:
     closures = certificate["threshold_closure_passes"]
@@ -606,7 +610,7 @@ def _validate_closure_scan_evidence(
 
 
 def _validate_match_universe_cross_binding(
-    matches: list[dict[str, Any]], forward: producer.BoundProposalReport,
+    matches: list[dict[str, Any]], forward: BoundProposalReport,
     closures: list[dict[str, Any]], universe: Mapping[str, Mapping[str, Any]],
 ) -> None:
     proposal = {row.episode_id: row for row in forward.candidates}
@@ -620,7 +624,7 @@ def _validate_match_universe_cross_binding(
         metadata_exact = all((
             source.get("episode_id") == episode_id,
             source.get("symbol") == match["symbol"],
-            source.get("cutoff_ns") == producer.pd.Timestamp(match["cutoff"]).value,
+            source.get("cutoff_ns") == pd.Timestamp(match["cutoff"]).value,
             source.get("quality_tier") == match["quality_tier"],
             type(source.get("branch_aware_bound")) is float,
             isfinite(source["branch_aware_bound"]),
@@ -722,7 +726,7 @@ def _validate_case(
         matches_cross_bound = len(candidates) == len(forward.candidates) and all(
             row["episode_id"] in candidates
             and row["symbol"] == candidates[row["episode_id"]].symbol
-            and producer.pd.Timestamp(row["cutoff"]).value
+            and pd.Timestamp(row["cutoff"]).value
             == candidates[row["episode_id"]].cutoff_ns
             and row["quality_tier"] == candidates[row["episode_id"]].quality_tier
             for row in payload["matches"]

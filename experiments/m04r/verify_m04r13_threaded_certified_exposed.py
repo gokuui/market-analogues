@@ -65,10 +65,10 @@ RESULTS_OPENED_SCHEMA = "m04r13-threaded-certified-results-opened-v1"
 COMPARISON_SCHEMA = "m04r13-threaded-certified-comparison-v1"
 COMPARISON_SEAL_SCHEMA = "m04r13-threaded-certified-comparison-seal-v1"
 PREREG_RELATIVE = Path(
-    "experiments/m04r/m04r13_threaded_certified_exposed_preregistered.json"
+    "experiments/m04r/m04r13_threaded_certified_exposed_preregistered_v2.json"
 )
 DIAGNOSTIC_RELATIVE = Path(
-    "config/data/analogues/m04r13/finite-threshold-diagnostic-v1/DIAGNOSTIC.json"
+    "config/data/analogues/m04r13/finite-threshold-diagnostic-v2/DIAGNOSTIC.json"
 )
 DIAGNOSTIC_SCHEMA = "m04r13-truth-blind-finite-threshold-diagnostic-v1"
 DIAGNOSTIC_CASE_SCHEMA = "m04r13-truth-blind-finite-threshold-case-v1"
@@ -77,7 +77,7 @@ REGISTRY_RELATIVE = Path(
     "config/data/analogues/m04r10/nasdaq-untouched-authority-registry"
 )
 SOURCE_FULL_RELATIVE = Path("config/data/analogues/poc/m04r/packed-bound-full")
-OUTPUT_RELATIVE = Path("config/data/analogues/m04r13/threaded-certified-exposed-v1")
+OUTPUT_RELATIVE = Path("config/data/analogues/m04r13/threaded-certified-exposed-v2")
 GENERATION_ID = "9fc6ae0ec4451133d8006897162f3443803fd30a3c44b78e80a476fbb18bb483"
 PROVENANCE_DIGEST = "83ccfa62ac7ffec03e48d0f8a5634c7b8f1b8b0dde1426be22cc343fe116f62d"
 REGISTRY_DIGEST = "0a4da732f91375a091775cb04e6e77c8d136ade47d7f4d16508a2d9a6555361e"

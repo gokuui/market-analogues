@@ -331,6 +331,88 @@ def _truth_free_test_kwargs(root: Path, prereg: dict[str, Any]) -> dict[str, Any
     }
 
 
+def test_default_match_universe_uses_local_numeric_dependencies_truth_free(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    query_id = producer.FROZEN_QUERY_IDS[0]
+    retained_id = "01" * 12
+    row_dtype = np.dtype([
+        ("episode_id", "V12"), ("symbol_id", "<i4"),
+        ("cutoff_ns", "<i8"), ("quality_tier", "u1"),
+    ])
+    rows = np.zeros(1, dtype=row_dtype)
+    rows["episode_id"][0] = np.void(bytes.fromhex(retained_id))
+    rows["symbol_id"][0] = 0
+    rows["cutoff_ns"][0] = 123
+    rows["quality_tier"][0] = 1
+    loaded = SimpleNamespace(
+        rows=rows, overflow=np.zeros(0, dtype=row_dtype), symbols=("S0",),
+    )
+    case = producer.CaseInput(0, {
+        "episode_id": query_id, "case_id": producer.FROZEN_CASE_IDS[0],
+    })
+    observed_load: dict[str, Any] = {}
+
+    def load_generation(*_args: Any, **kwargs: Any) -> Any:
+        observed_load.update(kwargs)
+        return loaded
+
+    monkeypatch.setattr(
+        comparator, "_source_generation_identity", lambda _root: {"stable": True},
+    )
+    monkeypatch.setattr(comparator, "load_packed_generation", load_generation)
+    monkeypatch.setattr(
+        producer, "_registry_cases",
+        lambda *_args: (producer.REGISTRY_DIGEST, (case,)),
+    )
+    monkeypatch.setattr(
+        producer, "_case_context",
+        lambda *_args: (
+            None, None, None,
+            SimpleNamespace(symbol="QUERY", representation=object()),
+        ),
+    )
+    monkeypatch.setattr(
+        comparator, "_eligible_mask",
+        lambda *_args: np.asarray([True], dtype=np.bool_),
+    )
+    monkeypatch.setattr(
+        comparator, "packed_branch_aware_lower_bounds",
+        lambda *_args: SimpleNamespace(totals=np.asarray([0.25])),
+    )
+    # Third-party modules are comparator dependencies, not producer API.
+    monkeypatch.delattr(producer, "np", raising=False)
+    monkeypatch.delattr(producer, "pd")
+    prereg = {
+        "roots": {
+            "source_full_root": str(tmp_path / "source"),
+            "registry_root": str(tmp_path / "registry"),
+            "resident_root": str(tmp_path / "resident"),
+            "output_root": str(tmp_path / "output"),
+        },
+        "config_path": str(tmp_path / "config.yaml"),
+        "registry_digest": producer.REGISTRY_DIGEST,
+        "reserve_bytes": producer.RESIDENT_RESERVE_BYTES,
+        "preregistration_digest": "diagnostic",
+    }
+
+    universe, closure_evidence = comparator.reconstruct_match_universe(
+        prereg, {query_id: {retained_id}}, [{
+            "query_episode_id": query_id,
+            "certificate": {"threshold_closure_passes": []},
+        }],
+    )
+
+    assert observed_load["verify_content"] is True
+    assert observed_load["validate_records"] is True
+    assert universe == {query_id: {retained_id: {
+        "episode_id": retained_id, "symbol": "S0", "cutoff_ns": 123,
+        "quality_tier": "A", "branch_aware_bound": 0.25,
+        "overflow": False,
+    }}}
+    assert closure_evidence == {query_id: []}
+
+
 def _rehash_certificate(certificate: dict[str, Any], matches: list[dict[str, Any]]) -> str:
     return stable_hash({
         "schema_version": certificate["schema_version"],

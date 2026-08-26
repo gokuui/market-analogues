@@ -25,7 +25,7 @@ from market_analogues.types import stable_hash
 SCHEMA = "m04r13-truth-blind-finite-threshold-diagnostic-v1"
 CASE_SCHEMA = "m04r13-truth-blind-finite-threshold-case-v1"
 DIAGNOSTIC_RELATIVE = Path(
-    "config/data/analogues/m04r13/finite-threshold-diagnostic-v1/DIAGNOSTIC.json"
+    "config/data/analogues/m04r13/finite-threshold-diagnostic-v2/DIAGNOSTIC.json"
 )
 
 
@@ -238,7 +238,7 @@ def validate_diagnostic_output_path(repository: Path) -> Path:
     expected = (repository / DIAGNOSTIC_RELATIVE).absolute()
     if expected.parent != (
         repository
-        / "config/data/analogues/m04r13/finite-threshold-diagnostic-v1"
+        / "config/data/analogues/m04r13/finite-threshold-diagnostic-v2"
     ).absolute():
         raise DiagnosticError("finite-threshold diagnostic path differs")
     _unalias(expected.parent, require_directory=expected.parent.exists())

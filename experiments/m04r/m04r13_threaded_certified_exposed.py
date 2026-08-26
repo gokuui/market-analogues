@@ -61,12 +61,12 @@ FROZEN_CASE_IDS = (
     "nasdaq-JCTC-historical-252", "nasdaq-GBNY-current-252",
     "nasdaq-GBNY-historical-252", "nasdaq-ISPOW-current-252",
 )
-OUTPUT_RELATIVE = Path("config/data/analogues/m04r13/threaded-certified-exposed-v1")
+OUTPUT_RELATIVE = Path("config/data/analogues/m04r13/threaded-certified-exposed-v2")
 PREREG_RELATIVE = Path(
-    "experiments/m04r/m04r13_threaded_certified_exposed_preregistered.json"
+    "experiments/m04r/m04r13_threaded_certified_exposed_preregistered_v2.json"
 )
 DIAGNOSTIC_RELATIVE = Path(
-    "config/data/analogues/m04r13/finite-threshold-diagnostic-v1/DIAGNOSTIC.json"
+    "config/data/analogues/m04r13/finite-threshold-diagnostic-v2/DIAGNOSTIC.json"
 )
 DIAGNOSTIC_SCHEMA = "m04r13-truth-blind-finite-threshold-diagnostic-v1"
 DIAGNOSTIC_CASE_SCHEMA = "m04r13-truth-blind-finite-threshold-case-v1"
