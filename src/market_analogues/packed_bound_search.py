@@ -549,10 +549,11 @@ def scan_packed_bound_proposals_threaded(
     block_rows: int = 4_096,
     block_order: str = "forward",
     threads: int = 4,
+    branch_aware: bool = False,
     verify_content: bool = True,
     expected_provenance_digest: str | None = None,
 ) -> BoundProposalReport:
-    """Legacy-v1 scan with bounded parallel block scoring and ordered reduction."""
+    """Bounded parallel scoring with exact scalar-v1/v2 ordered reduction."""
     if block_rows < 1 or threads < 1:
         raise PackedBoundSearchError("block rows and threads must be positive")
     if block_order not in {"forward", "reverse"}:
@@ -598,7 +599,11 @@ def scan_packed_bound_proposals_threaded(
             selected = block[_eligible_mask(block, query, symbol_id)]
             if not len(selected):
                 return 0, {route: _empty_entries() for route in quotas}
-            bounded = packed_lower_bounds(query.representation, selected)
+            bounded = (
+                packed_branch_aware_lower_bounds(query.representation, selected)
+                if branch_aware else
+                packed_lower_bounds(query.representation, selected)
+            )
             route_values = {"composite": bounded.totals, **bounded.components}
             return len(selected), {
                 route: _entries(
@@ -630,9 +635,17 @@ def scan_packed_bound_proposals_threaded(
             heaps[route] = _stable_bounded(heaps[route], incoming, quota)
     candidates, route_counts, candidate_digest = _finalize(heaps, loaded.symbols)
     elapsed = perf_counter() - started
+    schema_version = (
+        BRANCH_AWARE_SEARCH_SCHEMA_VERSION
+        if branch_aware else SEARCH_SCHEMA_VERSION
+    )
+    contract_digest = packed_bound_search_contract(
+        branch_aware=branch_aware,
+    )["digest"]
+    input_digest = _packed_query_input_digest(query) if branch_aware else None
     deterministic = {
-        "schema_version": SEARCH_SCHEMA_VERSION,
-        "contract_digest": packed_bound_search_contract()["digest"],
+        "schema_version": schema_version,
+        "contract_digest": contract_digest,
         "generation_id": loaded.generation_id,
         "query_episode_id": query.episode_id,
         "rows_scanned": len(loaded.rows) + len(loaded.overflow),
@@ -643,11 +656,14 @@ def scan_packed_bound_proposals_threaded(
         "candidate_digest": candidate_digest,
         "real_forward_outcomes_accessed": False,
     }
+    if branch_aware:
+        deterministic["input_digest"] = input_digest
     return BoundProposalReport(
-        SEARCH_SCHEMA_VERSION, loaded.generation_id, query.episode_id,
+        schema_version, loaded.generation_id, query.episode_id,
         candidates, deterministic["rows_scanned"], deterministic["eligible_rows"],
         eligible_main, eligible_overflow, route_counts, quotas, block_rows,
         block_order, elapsed, peak, candidate_digest, stable_hash(deterministic),
+        contract_digest if branch_aware else None, input_digest,
     )
 
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from hashlib import sha256
 import importlib.util
 import json
 from pathlib import Path
@@ -679,7 +680,7 @@ def test_producer_cli_does_not_accept_truth_paths(monkeypatch):
     assert raised.value.code == 2
 
 
-def test_real_preregistration_and_truth_blind_input_binding_read_only(monkeypatch):
+def test_real_preregistration_and_truth_blind_input_binding_read_only():
     repository = Path(__file__).resolve().parents[1]
     artifact = repository / "config/data/analogues"
     resident = Path(
@@ -687,25 +688,83 @@ def test_real_preregistration_and_truth_blind_input_binding_read_only(monkeypatc
     ) / module.FROZEN_GENERATION_ID
     prereg_path = repository / module.PREREGISTRATION_RELATIVE_PATH
     prereg_payload = module._read_json(prereg_path)
-    try:
-        module._validate_git_gate(repository, prereg_payload)
-    except module.QuotaLadderError:
-        assert subprocess.run(
-            ["git", "ls-files", "--error-unmatch", "--", str(
-                module.PREREGISTRATION_RELATIVE_PATH
-            )], cwd=repository, capture_output=True,
-        ).returncode != 0
-    monkeypatch.setattr(module, "_validate_git_gate", lambda *_args, **_kwargs: None)
-    inputs, prereg = module.validate_producer_inputs(
-        repository=repository,
-        config_path=repository / "config/datasets.example.yaml",
-        registry_root=artifact / "m04r10/nasdaq-untouched-authority-registry",
-        candidate_root=artifact / "m04r11/candidate-pools-v2",
-        source_full_root=artifact / "poc/m04r/packed-bound-full",
-        resident_root=resident,
-        output_root=artifact / "m04r12/development-quota-ladder-v1",
+    history = subprocess.run(
+        [
+            "git", "log", "--diff-filter=A", "--format=%H", "--",
+            str(module.PREREGISTRATION_RELATIVE_PATH),
+        ], cwd=repository, text=True, capture_output=True, check=True,
+    ).stdout.splitlines()
+    assert len(history) == 1
+    introduction = history[0]
+
+    def historical_blob(relative: str) -> bytes:
+        return subprocess.run(
+            ["git", "show", f"{introduction}:{relative}"], cwd=repository,
+            capture_output=True, check=True,
+        ).stdout
+
+    historical_prereg = json.loads(historical_blob(
+        str(module.PREREGISTRATION_RELATIVE_PATH),
+    ))
+    assert historical_prereg == prereg_payload
+    files = prereg_payload["code_manifest"]["files"]
+    for relative, expected_digest in files.items():
+        assert sha256(historical_blob(relative)).hexdigest() == expected_digest
+    script_relative = prereg_payload["script_relative_path"]
+    assert sha256(historical_blob(script_relative)).hexdigest() == prereg_payload[
+        "script_sha256"
+    ]
+    config_relative = str(
+        Path(prereg_payload["config_path"]).relative_to(repository)
     )
-    assert tuple(case.query_id for case in inputs.cases) == module.FROZEN_QUERY_IDS
-    assert inputs.resident_content_digest == prereg["resident_content_digest"]
-    assert inputs.resident_ready_digest == prereg["resident_ready_digest"]
-    assert prereg["truth_inputs_allowed_in_producer"] is False
+    assert sha256(historical_blob(config_relative)).hexdigest() == prereg_payload[
+        "config_sha256"
+    ]
+    assert prereg_payload["code_manifest"]["digest"] == module.stable_hash(files)
+    assert prereg_payload["contract_digest"] == module.stable_hash(
+        module._without(prereg_payload, {"contract_digest"})
+    )
+
+    # Later production development must not rewrite the completed historical
+    # preregistration. A fresh launch under changed tracked code fails closed.
+    with pytest.raises(module.QuotaLadderError, match="preregistration differs"):
+        module.validate_producer_inputs(
+            repository=repository,
+            config_path=repository / "config/datasets.example.yaml",
+            registry_root=artifact / "m04r10/nasdaq-untouched-authority-registry",
+            candidate_root=artifact / "m04r11/candidate-pools-v2",
+            source_full_root=artifact / "poc/m04r/packed-bound-full",
+            resident_root=resident,
+            output_root=artifact / "m04r12/development-quota-ladder-v1",
+        )
+
+    registry_cases = module._validate_registry(module._read_json(
+        artifact / "m04r10/nasdaq-untouched-authority-registry/query-registry.json"
+    ))
+    contract, bundles, resident_evidence = module._validate_candidate_blind(
+        artifact / "m04r11/candidate-pools-v2"
+    )
+    assert tuple(
+        case["episode_id"] for case in registry_cases
+        if case["episode_id"] in module.FROZEN_QUERY_IDS
+    ) == module.FROZEN_QUERY_IDS
+    assert prereg_payload["provenance_digest"] == contract["source_pack"][
+        "provenance_digest"
+    ]
+    assert prereg_payload["resident_content_digest"] == resident_evidence[
+        "resident_content_digest"
+    ]
+    assert prereg_payload["resident_ready_digest"] == resident_evidence[
+        "resident_ready_observation"
+    ]["ready_digest"]
+    for binding in prereg_payload["baseline_bindings"]:
+        semantic = bundles[binding["query_episode_id"]]["semantic"]
+        candidate_ids = [row["episode_id"] for row in semantic["candidates"]]
+        assert binding["semantic_digest"] == semantic["semantic_digest"]
+        assert binding["candidate_digest"] == semantic["candidate_digest_reconstructed"]
+        assert binding["candidate_count"] == len(candidate_ids)
+        assert binding["candidate_ids_digest"] == module.stable_hash(candidate_ids)
+        assert binding["baseline_result_digest"] == semantic["scan_semantics"][0][
+            "result_digest"
+        ]
+    assert prereg_payload["truth_inputs_allowed_in_producer"] is False

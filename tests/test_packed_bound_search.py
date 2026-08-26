@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -109,6 +110,8 @@ def test_threaded_legacy_scan_is_scalar_exact_and_order_stable(tmp_path: Path) -
         assert report.eligible_overflow_rows == scalar.eligible_overflow_rows
         assert report.route_counts == scalar.route_counts
         assert report.route_quotas == scalar.route_quotas
+        assert report.contract_digest is None
+        assert report.input_digest is None
 
     with pytest.raises(PackedBoundSearchError, match="positive"):
         scan_packed_bound_proposals_threaded(
@@ -119,6 +122,130 @@ def test_threaded_legacy_scan_is_scalar_exact_and_order_stable(tmp_path: Path) -
             root, generation, query, block_order="shuffled",
             verify_content=False,
         )
+
+
+def _assert_semantic_report_parity(left: object, right: object) -> None:
+    for name in (
+        "schema_version", "generation_id", "query_episode_id", "candidates",
+        "rows_scanned", "eligible_rows", "eligible_main_rows",
+        "eligible_overflow_rows", "route_counts", "route_quotas",
+        "candidate_digest", "result_digest", "contract_digest", "input_digest",
+    ):
+        assert getattr(left, name) == getattr(right, name)
+
+
+def test_threaded_branch_aware_is_scalar_exact_across_order_blocks_threads_ties_and_overflow(
+    tmp_path: Path,
+) -> None:
+    root, generation, representation = _store(tmp_path)
+    query = _query(representation)
+    scalar = scan_packed_bound_proposals(
+        root, generation, query, block_rows=37, branch_aware=True,
+        verify_content=False,
+    )
+    assert scalar.schema_version == "m04r-global-bound-proposal-v2"
+    assert scalar.contract_digest is not None and scalar.input_digest is not None
+    assert any(row.overflow_fallback for row in scalar.candidates)
+    # All main rows are identical packed representations, exercising the
+    # score/episode-ID tie boundary independently of physical block order.
+    for block_rows, order, threads in (
+        (1, "forward", 1), (17, "forward", 2),
+        (29, "reverse", 3), (257, "reverse", 7),
+    ):
+        threaded = scan_packed_bound_proposals_threaded(
+            root, generation, query, block_rows=block_rows,
+            block_order=order, threads=threads, branch_aware=True,
+            verify_content=False,
+        )
+        _assert_semantic_report_parity(threaded, scalar)
+
+
+def test_threaded_branch_aware_preserves_exclusions_and_zero_or_short_heaps(
+    tmp_path: Path,
+) -> None:
+    root, generation, representation = _store(tmp_path, count=8)
+    excluded = _query(
+        representation, episode_id=f"{108:024x}", symbol="AAA",
+        query_start_ns=5, latest_eligible_ns=8, quality_tiers=("A",),
+    )
+    scalar = scan_packed_bound_proposals(
+        root, generation, excluded, block_rows=3, branch_aware=True,
+        verify_content=False,
+    )
+    threaded = scan_packed_bound_proposals_threaded(
+        root, generation, excluded, block_rows=5, block_order="reverse",
+        threads=6, branch_aware=True, verify_content=False,
+    )
+    _assert_semantic_report_parity(threaded, scalar)
+    assert scalar.eligible_rows == 1
+    assert all(row.episode_id != excluded.episode_id for row in scalar.candidates)
+    assert all(row.symbol == "AAA" and row.cutoff_ns < 5 for row in scalar.candidates)
+    assert all(
+        count < scalar.route_quotas[route]
+        for route, count in scalar.route_counts.items()
+    )
+
+    empty = _query(
+        representation, query_start_ns=0, latest_eligible_ns=0,
+    )
+    empty_scalar = scan_packed_bound_proposals(
+        root, generation, empty, block_rows=2, branch_aware=True,
+        verify_content=False,
+    )
+    empty_threaded = scan_packed_bound_proposals_threaded(
+        root, generation, empty, block_rows=11, block_order="reverse",
+        threads=8, branch_aware=True, verify_content=False,
+    )
+    _assert_semantic_report_parity(empty_threaded, empty_scalar)
+    assert empty_scalar.candidates == ()
+    assert set(empty_scalar.route_counts.values()) == {0}
+
+
+def test_threaded_branch_aware_matches_scalar_at_adversarial_float16_boundaries(
+    tmp_path: Path,
+) -> None:
+    query_representation = represent(generate_case("steady_trend", 41_001).episode)
+    candidate = represent(generate_case("rounded_base", 41_002).episode)
+    boundary = np.asarray([
+        0.0,
+        float(np.nextafter(np.float16(0), np.float16(1))),
+        float(np.nextafter(np.float16(1), np.float16(2))),
+        -float(np.nextafter(np.float16(1), np.float16(2))),
+        np.finfo(np.float16).max,
+        -np.finfo(np.float16).max,
+    ])
+    boundary_candidate = replace(
+        candidate, coarse=np.resize(boundary, 128).astype(np.float64),
+    )
+    candidates = (query_representation, candidate, boundary_candidate)
+    rows = []
+    for index in range(15):
+        rows.append(make_packed_record(
+            f"{index + 200:024x}", index + 1, 0, "A",
+            quantize_bound_row(candidates[index % len(candidates)]),
+        ))
+    root = tmp_path / "branch-boundary-store"
+    generation = write_packed_generation(
+        root, np.concatenate(rows),
+        make_overflow_record(f"{1:024x}", 1, 1, "B"),
+        ("AAA", "BBB"), {"purpose": "threaded-branch-boundary-test"},
+        activate=False,
+    )
+    query = _query(query_representation)
+    scalar = scan_packed_bound_proposals(
+        root, generation, query, block_rows=4, branch_aware=True,
+        verify_content=False,
+    )
+    assert all(np.isfinite(row.lower_bound) for row in scalar.candidates)
+    for block_rows, order, threads in (
+        (2, "forward", 2), (7, "reverse", 4), (64, "forward", 8),
+    ):
+        threaded = scan_packed_bound_proposals_threaded(
+            root, generation, query, block_rows=block_rows,
+            block_order=order, threads=threads, branch_aware=True,
+            verify_content=False,
+        )
+        _assert_semantic_report_parity(threaded, scalar)
 
 
 def test_eligibility_precedes_ranking_and_rejects_bad_contracts(tmp_path: Path) -> None:
