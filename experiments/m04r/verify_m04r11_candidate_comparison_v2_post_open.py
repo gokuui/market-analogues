@@ -204,8 +204,31 @@ def _frozen_git_binding(
     )
     if changed.returncode != 0 or changed.stdout.decode().splitlines() != [prereg]:
         raise ValueError("frozen launch HEAD is not the sole-file preregistration commit")
-    expected_files = dict(contract["implementation_manifest"]["files"])
+    manifest = contract.get("implementation_manifest")
+    if type(manifest) is not dict or set(manifest) != {"files", "digest"}:
+        raise ValueError("frozen implementation manifest fields differ")
+    expected_files = dict(manifest.get("files", {}))
+    if not expected_files or manifest.get("digest") != frozen._hash(expected_files):
+        raise ValueError("frozen implementation manifest digest differs")
+    source_tree = _run_git(
+        repository, "ls-tree", "-r", "--name-only", head, "--", "src",
+    )
+    if source_tree.returncode != 0:
+        raise ValueError("cannot enumerate frozen source implementation tree")
+    frozen_source_files = {
+        value for value in source_tree.stdout.decode().splitlines()
+        if value.endswith(".py")
+    }
+    exact_manifest_files = set(frozen.IMPLEMENTATION_FILES) | frozen_source_files
+    if set(expected_files) != exact_manifest_files:
+        raise ValueError("frozen implementation manifest file set differs")
     for relative, digest in expected_files.items():
+        if (
+            not isinstance(relative, str) or not relative
+            or Path(relative).is_absolute() or ".." in Path(relative).parts
+            or not isinstance(digest, str) or len(digest) != 64
+        ):
+            raise ValueError("frozen implementation manifest entry differs")
         blob = _run_git(repository, "show", f"{head}:{relative}")
         if blob.returncode != 0 or sha256(blob.stdout).hexdigest() != digest:
             raise ValueError(f"frozen implementation blob differs: {relative}")
@@ -240,6 +263,17 @@ def _repair_implementation_binding(repository: Path) -> dict[str, Any]:
         "index_clean": True,
     }
     return {**deterministic, "binding_digest": frozen._hash(deterministic)}
+
+
+@contextmanager
+def _frozen_real_manifest_view(files: Iterable[str]) -> Iterator[None]:
+    """Correct only the frozen verifier's seven-file manifest-shape defect."""
+    original = frozen.IMPLEMENTATION_FILES
+    frozen.IMPLEMENTATION_FILES = tuple(files)
+    try:
+        yield
+    finally:
+        frozen.IMPLEMENTATION_FILES = original
 
 
 class _FrozenHeadSubprocess:
@@ -350,10 +384,14 @@ def verify_post_open(
     for name in ("manifest_path", "rows_path", "overflow_path"):
         _require_plain_file(Path(str(source_pack.get(name, ""))), f"source pack {name}")
 
-    contract, prereg, roles, execution = frozen._validate_contract_and_prereg(
-        registry, artifact_dir, repository, candidate_root,
+    frozen_binding = _frozen_git_binding(
+        repository, candidate_root, untrusted_contract,
     )
-    frozen_binding = _frozen_git_binding(repository, candidate_root, contract)
+    manifest_files = untrusted_contract["implementation_manifest"]["files"]
+    with _frozen_real_manifest_view(manifest_files):
+        contract, prereg, roles, execution = frozen._validate_contract_and_prereg(
+            registry, artifact_dir, repository, candidate_root,
+        )
     expected_queries = {
         str(case["episode_id"]): frozen._query_context(config, case)
         for case in registry["cases_data"]

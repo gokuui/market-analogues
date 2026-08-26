@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from copy import deepcopy
+from hashlib import sha256
 import importlib.util
+import json
 import os
 from pathlib import Path
 import subprocess
@@ -184,3 +187,94 @@ def test_tree_prescan_rejects_required_file_symlink_before_read(tmp_path: Path) 
             authority_root, expected_files={"cases/query.json"},
             expected_directories={"cases"}, label="authority",
         )
+
+
+def _frozen_manifest_fixture(module, tmp_path: Path):
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    subprocess.run(["git", "init", "-q"], cwd=repository, check=True)
+    for index, relative in enumerate(module.frozen.IMPLEMENTATION_FILES):
+        path = repository / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(f"# fixed implementation {index}\n")
+    source = repository / "src/market_analogues/example.py"
+    source.parent.mkdir(parents=True, exist_ok=True)
+    source.write_text("VALUE = 1\n")
+    (source.parent / "not-code.txt").write_text("not manifested\n")
+    subprocess.run(["git", "add", "."], cwd=repository, check=True)
+    subprocess.run(
+        ["git", "-c", "user.name=test", "-c", "user.email=test@example.invalid",
+         "commit", "-qm", "implementation"],
+        cwd=repository, check=True,
+    )
+    prereg = repository / module.frozen.PREREGISTRATION_RELATIVE_PATH
+    prereg.write_text("{}\n")
+    subprocess.run(["git", "add", str(prereg)], cwd=repository, check=True)
+    subprocess.run(
+        ["git", "-c", "user.name=test", "-c", "user.email=test@example.invalid",
+         "commit", "-qm", "preregister"],
+        cwd=repository, check=True,
+    )
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repository, check=True,
+        capture_output=True, text=True,
+    ).stdout.strip()
+    names = [*module.frozen.IMPLEMENTATION_FILES, "src/market_analogues/example.py"]
+    files = {
+        relative: sha256((repository / relative).read_bytes()).hexdigest()
+        for relative in names
+    }
+    manifest = {"files": files, "digest": module.frozen._hash(files)}
+    contract = {"implementation_manifest": manifest}
+    candidate = tmp_path / "candidate"
+    event = {
+        "details": {"git_binding": {
+            "head_commit": head,
+            "preregistration_blob_sha256": sha256(prereg.read_bytes()).hexdigest(),
+        }},
+    }
+    event_path = candidate / "ledger/events/000000.json"
+    event_path.parent.mkdir(parents=True)
+    event_path.write_text(json.dumps(event))
+    return repository, candidate, contract
+
+
+def test_real_shaped_manifest_superset_is_verified_and_scoped(
+    tmp_path: Path,
+) -> None:
+    module = _module()
+    repository, candidate, contract = _frozen_manifest_fixture(module, tmp_path)
+    original = module.frozen.IMPLEMENTATION_FILES
+    binding = module._frozen_git_binding(repository, candidate, contract)
+    assert binding["implementation_blobs_verified"] == len(original) + 1
+    assert module.frozen.IMPLEMENTATION_FILES == original
+    with module._frozen_real_manifest_view(contract["implementation_manifest"]["files"]):
+        assert set(module.frozen.IMPLEMENTATION_FILES) == set(
+            contract["implementation_manifest"]["files"],
+        )
+    assert module.frozen.IMPLEMENTATION_FILES == original
+
+
+def test_tampered_or_omitted_frozen_manifest_file_fails(
+    tmp_path: Path,
+) -> None:
+    module = _module()
+    repository, candidate, contract = _frozen_manifest_fixture(module, tmp_path)
+    tampered = deepcopy(contract)
+    first = next(iter(tampered["implementation_manifest"]["files"]))
+    tampered["implementation_manifest"]["files"][first] = "0" * 64
+    tampered["implementation_manifest"]["digest"] = module.frozen._hash(
+        tampered["implementation_manifest"]["files"],
+    )
+    with pytest.raises(ValueError, match="blob differs"):
+        module._frozen_git_binding(repository, candidate, tampered)
+
+    omitted = deepcopy(contract)
+    del omitted["implementation_manifest"]["files"][
+        "src/market_analogues/example.py"
+    ]
+    omitted["implementation_manifest"]["digest"] = module.frozen._hash(
+        omitted["implementation_manifest"]["files"],
+    )
+    with pytest.raises(ValueError, match="file set differs"):
+        module._frozen_git_binding(repository, candidate, omitted)
