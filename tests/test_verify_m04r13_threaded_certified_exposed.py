@@ -312,6 +312,18 @@ def test_verifier_has_no_producer_or_comparator_import() -> None:
     assert "from experiments.m04r.m04r13" not in source
 
 
+def test_independent_verifier_accepts_canonical_naive_source_cutoffs(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "evidence"
+    support._producer_fixture(root)
+    query_id = verifier.QUERY_IDS[0]
+    case = support.producer._read_json(root / "cases" / f"00-{query_id}.json")
+    for match in case["matches"]:
+        match["cutoff"] = pd.Timestamp(match["cutoff"]).tz_localize(None).isoformat()
+    verifier._validate_matches(case["matches"])
+
+
 def _mock_query_context(monkeypatch: pytest.MonkeyPatch) -> None:
     registry = [{
         "episode_id": query_id, "symbol": f"Q{ordinal}",

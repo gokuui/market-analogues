@@ -1870,6 +1870,25 @@ def test_repeated_max_frontier_with_changing_native_minimum_is_accepted(
     )
 
 
+def test_real_source_naive_match_cutoffs_are_canonical_and_accepted(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "evidence"
+    _prereg, _authorities = _producer_fixture(root)
+    query_id = producer.FROZEN_QUERY_IDS[0]
+    case = producer._read_json(root / "cases" / f"00-{query_id}.json")
+    for match in case["matches"]:
+        match["cutoff"] = pd.Timestamp(match["cutoff"]).tz_localize(None).isoformat()
+    producer.validate_certificate_and_matches(
+        case["certificate"], case["matches"], query_id,
+    )
+    case["matches"][0]["cutoff"] = "2019-01-01T05:30:00+05:30"
+    with pytest.raises(producer.HarnessError, match="match raw JSON schema differs"):
+        producer.validate_certificate_and_matches(
+            case["certificate"], case["matches"], query_id,
+        )
+
+
 def test_zero_native_pruned_rejects_forged_native_minimum_and_final_next(
     tmp_path: Path,
 ) -> None:

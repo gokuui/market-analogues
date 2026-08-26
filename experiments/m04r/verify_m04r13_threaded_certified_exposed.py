@@ -1251,7 +1251,12 @@ def _validate_matches(matches: Any) -> list[dict[str, Any]]:
             raise VerificationError("match identity encoding differs") from exc
         if not all((
             type(row) is dict, set(row) == keys, identifier_valid,
-            type(row["symbol"]) is str and row["symbol"], cutoff.tzinfo is not None,
+            type(row["symbol"]) is str and row["symbol"],
+            cutoff.isoformat() == row["cutoff"],
+            cutoff.tzinfo is None or (
+                cutoff.utcoffset() is not None
+                and cutoff.utcoffset().total_seconds() == 0
+            ),
             type(row["total_distance"]) is float
             and isfinite(row["total_distance"]) and row["total_distance"] >= 0,
             type(row["component_distances"]) is dict

@@ -1235,7 +1235,11 @@ def validate_certificate_and_matches(
         if not all((
             type(row["episode_id"]) is str, identifier_valid,
             type(row["symbol"]) is str and row["symbol"] != "",
-            type(row["cutoff"]) is str and cutoff.tzinfo is not None,
+            type(row["cutoff"]) is str and cutoff.isoformat() == row["cutoff"],
+            cutoff.tzinfo is None or (
+                cutoff.utcoffset() is not None
+                and cutoff.utcoffset().total_seconds() == 0
+            ),
             type(row["total_distance"]) is float
             and isfinite(row["total_distance"]) and row["total_distance"] >= 0,
             type(row["component_distances"]) is dict,
