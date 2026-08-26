@@ -683,6 +683,31 @@ def test_timing_failure_still_seals_semantic_case(
     assert (inputs.output_root / "cases" / f"00-{case.query_id}.json").is_file()
 
 
+def test_run_case_canonicalizes_dataclass_tuple_evidence(tmp_path: Path,
+                                                         monkeypatch: pytest.MonkeyPatch) -> None:
+    inputs, resident, case, context = _run_case_fixture(tmp_path)
+    query = context(inputs, case)[3]
+    result, certificate = _certified_result(case.query_id)
+    certificate["rounds"] = tuple(certificate["rounds"])
+    certificate["threshold_closure_passes"] = tuple()
+    monkeypatch.setattr(producer, "asdict", lambda value: certificate)
+    scan = lambda *args, **kwargs: _valid_report(
+        query, order=kwargs["block_order"], block=kwargs["block_rows"],
+    )
+
+    payload = producer.run_case(
+        inputs, {}, resident, case, scan=scan,
+        certified=lambda *args, **kwargs: result,
+        lease=lambda *args: "lease", context=context,
+        full_validation=lambda *args: resident,
+        binding_builder=_binding,
+        clock=iter((0.0, 1.0, 2.0, 3.0)).__next__,
+    )
+
+    assert type(payload["certificate"]["rounds"]) is list
+    assert type(payload["certificate"]["threshold_closure_passes"]) is list
+
+
 def test_existing_partial_root_is_terminal_and_never_resumed(tmp_path: Path) -> None:
     inputs, resident, _case, _context = _run_case_fixture(tmp_path)
     _partial_foundation(inputs, resident)

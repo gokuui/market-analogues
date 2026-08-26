@@ -1521,7 +1521,20 @@ def run_case(
         branch_aware_packed_bounds=True, precomputed_proposal=forward,
     )
     leases.append(lease(inputs, resident))
-    certificate = asdict(result.certificate); matches = [_match(value) for value in result.matches]
+    try:
+        # ``dataclasses.asdict`` deliberately preserves tuple containers.  The
+        # sealed evidence contract is JSON, so validate the exact canonical
+        # representation that will be published, not the pre-serialization
+        # Python container types.  This also fails closed on an infinite
+        # intermediate threshold before any case checkpoint is written.
+        certificate = json.loads(json.dumps(
+            asdict(result.certificate), allow_nan=False,
+        ))
+        matches = json.loads(json.dumps(
+            [_match(value) for value in result.matches], allow_nan=False,
+        ))
+    except (TypeError, ValueError) as exc:
+        raise HarnessError("certified result is not canonical finite JSON") from exc
     validate_certificate_and_matches(
         certificate, matches, case.query_id,
         expected_input_digest=binding["certified_input_digest"],
