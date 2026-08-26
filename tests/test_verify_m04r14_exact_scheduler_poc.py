@@ -369,6 +369,18 @@ def test_production_certificate_uses_timing_free_semantic_schema() -> None:
         verifier._certificate(forged, matches, "query", "input", True)
 
 
+def test_producer_attempt_keeps_timing_outside_semantic_certificate(
+    candidate: Path,
+) -> None:
+    leaf = json.loads((candidate / "primary/r0/c0/EXACT-w1.json").read_text())
+    certificate = leaf["semantic"]["state"]["attempt"]["certificate"]
+    measurement = leaf["measurement"]["measurement"]
+    assert "elapsed_seconds" not in certificate
+    assert type(measurement["engine_seconds"]) is float
+    assert 0 <= measurement["engine_seconds"] <= measurement["wall_seconds"]
+    verifier.verify_terminal(candidate, repository=ROOT, require_production=False)
+
+
 def test_production_runtime_schema_rejects_empty_manifest(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

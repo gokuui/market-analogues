@@ -95,8 +95,8 @@ ENGINE_TOLERANCE = 1e-12
 RUN_HARD_LIMIT_SECONDS = 6 * 60 * 60
 CHILD_STARTUP_TIMEOUT_SECONDS = 600
 CHILD_TASK_TIMEOUT_SECONDS = 3600
-OUTPUT_RELATIVE = Path("config/data/analogues/m04r14/exact-scheduler-poc-v1")
-PREREG_RELATIVE = Path("experiments/m04r/m04r14_exact_scheduler_poc_preregistered.json")
+OUTPUT_RELATIVE = Path("config/data/analogues/m04r14/exact-scheduler-poc-v2")
+PREREG_RELATIVE = Path("experiments/m04r/m04r14_exact_scheduler_poc_v2_preregistered.json")
 THREAD_ENV_KEYS = (
     "OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS",
     "NUMEXPR_NUM_THREADS", "VECLIB_MAXIMUM_THREADS", "BLIS_NUM_THREADS",

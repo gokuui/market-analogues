@@ -113,10 +113,10 @@ RUNTIME_FIXED_FILES = (
     "experiments/m04r/m04r11_candidate_matrix_v2.py",
     "experiments/m04r/m04r12_quota_ladder_poc.py",
 )
-CANDIDATE_RELATIVE = Path("config/data/analogues/m04r14/exact-scheduler-poc-v1")
-PREREG_RELATIVE = Path("experiments/m04r/m04r14_exact_scheduler_poc_preregistered.json")
+CANDIDATE_RELATIVE = Path("config/data/analogues/m04r14/exact-scheduler-poc-v2")
+PREREG_RELATIVE = Path("experiments/m04r/m04r14_exact_scheduler_poc_v2_preregistered.json")
 VERIFICATION_RELATIVE = Path(
-    "config/data/analogues/m04r14/exact-scheduler-poc-v1-verification"
+    "config/data/analogues/m04r14/exact-scheduler-poc-v2-verification"
 )
 
 
