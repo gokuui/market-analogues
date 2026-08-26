@@ -278,3 +278,203 @@ def test_tampered_or_omitted_frozen_manifest_file_fails(
     )
     with pytest.raises(ValueError, match="file set differs"):
         module._frozen_git_binding(repository, candidate, omitted)
+
+
+def _authority_history_fixture(module, tmp_path: Path):
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    subprocess.run(["git", "init", "-q"], cwd=repository, check=True)
+    builder = repository / "experiments/m04r/m04r11_build_authorities.py"
+    source = repository / "src/market_analogues/packed_bound_search.py"
+    builder.parent.mkdir(parents=True)
+    source.parent.mkdir(parents=True)
+    builder.write_text("# sealed builder\n")
+    source.write_text("SEALED = True\n")
+    subprocess.run(["git", "add", "."], cwd=repository, check=True)
+    commit_environment = {
+        **os.environ,
+        "GIT_AUTHOR_DATE": "2026-01-01T00:00:00+00:00",
+        "GIT_COMMITTER_DATE": "2026-01-01T00:00:00+00:00",
+    }
+    subprocess.run(
+        ["git", "-c", "user.name=test", "-c", "user.email=test@example.invalid",
+         "commit", "-qm", "sealed authority implementation"],
+        cwd=repository, check=True, env=commit_environment,
+    )
+    sealed_commit = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repository, check=True,
+        capture_output=True, text=True,
+    ).stdout.strip()
+    relative_files = (
+        "experiments/m04r/m04r11_build_authorities.py",
+        "src/market_analogues/packed_bound_search.py",
+    )
+    files = {
+        relative: sha256((repository / relative).read_bytes()).hexdigest()
+        for relative in relative_files
+    }
+    module.FROZEN_AUTHORITY_IMPLEMENTATION_COMMIT = sealed_commit
+    module.FROZEN_AUTHORITY_IMPLEMENTATION_MANIFEST_DIGEST = (
+        module.frozen._hash(files)
+    )
+    authority_root = tmp_path / "authority"
+    authority_root.mkdir()
+    (authority_root / "authority-contract.json").write_text(json.dumps({
+        "runner_sha256": files[relative_files[0]],
+        "implementation_manifest": {
+            "files": files, "digest": module.frozen._hash(files),
+        },
+    }))
+    (authority_root / "authority-matrix.json").write_text(json.dumps({
+        "created_at": "2026-01-02T00:00:00+00:00",
+    }))
+
+    source.write_text("SEALED = False\n")
+    (source.parent / "m04r_candidate_evidence.py").write_text("LATER = 1\n")
+    (source.parent / "resident_store.py").write_text("LATER = 2\n")
+    subprocess.run(["git", "add", "."], cwd=repository, check=True)
+    later_environment = {
+        **os.environ,
+        "GIT_AUTHOR_DATE": "2026-01-03T00:00:00+00:00",
+        "GIT_COMMITTER_DATE": "2026-01-03T00:00:00+00:00",
+    }
+    subprocess.run(
+        ["git", "-c", "user.name=test", "-c", "user.email=test@example.invalid",
+         "commit", "-qm", "later implementation drift"],
+        cwd=repository, check=True, env=later_environment,
+    )
+    return repository, authority_root, files
+
+
+def test_historical_authority_tree_repairs_only_real_worktree_drift(
+    tmp_path: Path,
+) -> None:
+    module = _module()
+    repository, authority_root, files = _authority_history_fixture(
+        module, tmp_path,
+    )
+    manifest = {"files": files, "digest": module.frozen._hash(files)}
+    assert module.frozen._manifest_valid(manifest, repository) is False
+    assert set(files) != {
+        "experiments/m04r/m04r11_build_authorities.py",
+        *(str(path.relative_to(repository)) for path in (
+            repository / "src"
+        ).rglob("*.py")),
+    }
+
+    binding, observed_files = module._authority_historical_binding(
+        repository, authority_root,
+    )
+    assert binding["implementation_blobs_verified"] == 2
+    assert binding["unique_matching_preseal_git_tree"] is True
+    with module._historical_authority_tree(
+        repository, binding, observed_files,
+    ) as historical:
+        assert module.frozen._manifest_valid(manifest, historical) is True
+        assert set(files) == {
+            "experiments/m04r/m04r11_build_authorities.py",
+            *(str(path.relative_to(historical)) for path in (
+                historical / "src"
+            ).rglob("*.py")),
+        }
+
+
+def test_historical_authority_manifest_tamper_or_omission_fails(
+    tmp_path: Path,
+) -> None:
+    module = _module()
+    repository, authority_root, files = _authority_history_fixture(
+        module, tmp_path,
+    )
+    contract_path = authority_root / "authority-contract.json"
+    contract = json.loads(contract_path.read_text())
+    contract["implementation_manifest"]["files"][
+        "src/market_analogues/packed_bound_search.py"
+    ] = "0" * 64
+    contract["implementation_manifest"]["digest"] = module.frozen._hash(
+        contract["implementation_manifest"]["files"],
+    )
+    contract_path.write_text(json.dumps(contract))
+    with pytest.raises(ValueError, match="manifest is not the frozen artifact"):
+        module._authority_historical_binding(repository, authority_root)
+
+    contract["implementation_manifest"]["files"] = dict(files)
+    del contract["implementation_manifest"]["files"][
+        "src/market_analogues/packed_bound_search.py"
+    ]
+    contract["implementation_manifest"]["digest"] = module.frozen._hash(
+        contract["implementation_manifest"]["files"],
+    )
+    contract_path.write_text(json.dumps(contract))
+    with pytest.raises(ValueError, match="manifest is not the frozen artifact"):
+        module._authority_historical_binding(repository, authority_root)
+
+
+def test_canonical_authority_verification_is_exactly_bound(
+    tmp_path: Path,
+) -> None:
+    module = _module()
+    root = tmp_path / "authority-verification"
+    root.mkdir()
+    contract = {"contract_digest": "1" * 64}
+    matrix = {
+        "created_at": "2026-01-01T00:00:00+00:00",
+        "contract_digest": contract["contract_digest"],
+        "result_digest": "2" * 64,
+        "performance_gate_passed": False,
+    }
+    seal = {"seal_digest": "3" * 64}
+    deterministic = {
+        "schema_version": "m04r11-certified-authority-verification-v4",
+        "registry_digest": module.frozen.FROZEN_REGISTRY_DIGEST,
+        "contract_digest": contract["contract_digest"],
+        "generation_id": module.frozen.FROZEN_GENERATION_ID,
+        "authority_matrix_digest": matrix["result_digest"],
+        "authority_seal_digest": seal["seal_digest"],
+        "verified_cases": 60,
+        "authority_correctness_passed": True,
+        "performance_gate_passed": False,
+        "production_promotion_authorized": False,
+        "proposal_rescans": 8,
+        "proposal_failures": [],
+        "per_case_failures": {},
+        "gates": {
+            "all_60_cases_independently_reconstructed": True,
+            "all_proposal_prefixes_independently_rescanned": True,
+            "candidate_results_remained_unopened": True,
+            "matrix_and_seal_reconstructed": True,
+            "physical_generation_rehashed": True,
+            "real_forward_outcomes_excluded": True,
+            "registry_runtime_validation_passed": True,
+        },
+        "failures": [],
+        "real_forward_outcomes_accessed": False,
+        "passed": True,
+    }
+    evidence = {
+        **deterministic,
+        "created_at": "2026-01-01T00:00:01+00:00",
+        "result_digest": module.frozen._hash(deterministic),
+    }
+    module.FROZEN_AUTHORITY_MATRIX_DIGEST = matrix["result_digest"]
+    module.FROZEN_AUTHORITY_SEAL_DIGEST = seal["seal_digest"]
+    module.FROZEN_AUTHORITY_VERIFICATION_DIGEST = evidence["result_digest"]
+    path = root / "m04r11-authority-verification.json"
+    path.write_text(json.dumps(evidence))
+    binding = module._authority_verification_binding(
+        root, contract_digest=contract["contract_digest"],
+        matrix=matrix, seal=seal,
+    )
+    assert binding["all_seven_gates_passed"] is True
+
+    evidence["proposal_rescans"] = 7
+    evidence["result_digest"] = module.frozen._hash({
+        key: value for key, value in evidence.items()
+        if key not in {"created_at", "result_digest"}
+    })
+    path.write_text(json.dumps(evidence))
+    with pytest.raises(ValueError, match="verification evidence differs"):
+        module._authority_verification_binding(
+            root, contract_digest=contract["contract_digest"],
+            matrix=matrix, seal=seal,
+        )
