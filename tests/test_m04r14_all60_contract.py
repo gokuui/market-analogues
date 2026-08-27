@@ -35,7 +35,7 @@ def test_descriptor_paths_schemas_keys_and_digest_are_deterministic() -> None:
     assert contract.DESCRIPTOR_DIGEST == contract.stable_digest(contract.DESCRIPTOR)
     assert len(bytes.fromhex(contract.DESCRIPTOR_DIGEST)) == 32
     assert contract.DESCRIPTOR_DIGEST == \
-        "6c46edc1b403177fb39322d4177b67acb4e3b4d97b23c39da497d4337ce5eb00"
+        "522336628b0d344eea866596484cee1a235c321041867699d5c36e5efacfbbc4"
 
 
 def test_t14_02_verified_binding_freezes_selected_lane_and_artifact_shas() -> None:

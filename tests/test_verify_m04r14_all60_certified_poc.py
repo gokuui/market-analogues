@@ -262,3 +262,17 @@ def test_verifier_does_not_import_producer_or_serial_runtime() -> None:
         elif isinstance(node, ast.ImportFrom): imported.append(node.module or "")
     assert not any("m04r14_all60_certified_poc" in name for name in imported)
     assert not any("m04r14_serial_certified_runtime" in name for name in imported)
+
+
+def test_registry_map_requires_frozen_exact_60_without_hidden_duplicates() -> None:
+    rows = [{"episode_id": query_id} for query_id in contract.QUERY_IDS]
+    registry = {"registry_digest": verifier.FROZEN_REGISTRY_DIGEST, "cases_data": rows}
+    source = {"registry_digest": verifier.FROZEN_REGISTRY_DIGEST}
+    assert tuple(verifier._registry_case_map(registry, source)) == contract.QUERY_IDS
+    with pytest.raises(verifier.VerificationError, match="binding"):
+        verifier._registry_case_map({**registry, "registry_digest": "0" * 64}, source)
+    with pytest.raises(verifier.VerificationError, match="binding"):
+        verifier._registry_case_map({**registry, "cases_data": rows + [rows[0]]}, source)
+    duplicate = rows[:-1] + [rows[0]]
+    with pytest.raises(verifier.VerificationError, match="universe"):
+        verifier._registry_case_map({**registry, "cases_data": duplicate}, source)

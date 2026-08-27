@@ -73,6 +73,7 @@ RUNTIME_FIXED_FILES = (
 THREAD_ENV_KEYS = ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS",
     "NUMEXPR_NUM_THREADS", "VECLIB_MAXIMUM_THREADS", "BLIS_NUM_THREADS",
     "NUMBA_NUM_THREADS", "NUMBA_THREADING_LAYER")
+FROZEN_REGISTRY_DIGEST = "0a4da732f91375a091775cb04e6e77c8d136ade47d7f4d16508a2d9a6555361e"
 
 
 class VerificationError(RuntimeError):
@@ -481,6 +482,20 @@ def _runtime_and_lineage(prereg: Mapping[str, Any], repository: Path) -> None:
         raise VerificationError("preregistration H0/H1 lineage differs")
 
 
+def _registry_case_map(registry: Mapping[str, Any], source_lock: Mapping[str, Any]) \
+        -> dict[str, dict[str, Any]]:
+    rows = registry.get("cases_data")
+    if registry.get("registry_digest") != FROZEN_REGISTRY_DIGEST \
+            or source_lock.get("registry_digest") != FROZEN_REGISTRY_DIGEST \
+            or type(rows) is not list or len(rows) != 60 \
+            or any(type(row) is not dict or type(row.get("episode_id")) is not str for row in rows):
+        raise VerificationError("registry binding differs")
+    by_id = {row["episode_id"]: row for row in rows}
+    if len(by_id) != 60 or set(by_id) != set(contract.QUERY_IDS):
+        raise VerificationError("registry query universe differs")
+    return by_id
+
+
 def _production_queries(prereg: Mapping[str, Any], source_lock: Mapping[str, Any]) \
         -> tuple[dict[str, tuple[PackedBoundQuery, dict[str, Any]]], Any, Path]:
     roots = prereg["roots"]
@@ -490,12 +505,7 @@ def _production_queries(prereg: Mapping[str, Any], source_lock: Mapping[str, Any
             or _file_snapshot(registry_path)[0] != source_lock["registry_sha256"]:
         raise VerificationError("causal input SHA differs")
     registry = _read(registry_path)
-    if registry.get("registry_digest") != source_lock["registry_digest"] \
-            or type(registry.get("cases_data")) is not list:
-        raise VerificationError("registry binding differs")
-    by_id = {row.get("episode_id"): row for row in registry["cases_data"] if type(row) is dict}
-    if len(by_id) != 60 or set(by_id) != set(contract.QUERY_IDS):
-        raise VerificationError("registry query universe differs")
+    by_id = _registry_case_map(registry, source_lock)
     config = load_config(config_path); source = source_from_spec(config.datasets["nasdaq"])
     benchmark = source.load_benchmark(); output = {}
     for query_id in contract.QUERY_IDS:

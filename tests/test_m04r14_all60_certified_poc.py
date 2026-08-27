@@ -351,6 +351,23 @@ def test_preregister_and_run_cli_wiring_is_canonical_and_truth_blind(
     assert calls[-1][2] is sentinel
 
 
+def test_production_registry_preflight_uses_all_60_in_canonical_registry_order() -> None:
+    """Regression for the failed launch: M13's helper selects only four cases."""
+    m13 = producer._module(
+        ROOT / "experiments/m04r/m04r13_threaded_certified_exposed.py",
+        "m04r14_all60_real_registry_test",
+    )
+    digest, cases = producer._ordered_all60_registry_cases(
+        m13, ROOT, ROOT / m13.REGISTRY_RELATIVE,
+    )
+    assert digest == "0a4da732f91375a091775cb04e6e77c8d136ade47d7f4d16508a2d9a6555361e"
+    assert len(cases) == 60
+    assert tuple(case.ordinal for case in cases) == tuple(range(60))
+    assert tuple(case.query_id for case in cases) == contract.QUERY_IDS
+    assert tuple(case.query_id for case in m13._registry_cases(ROOT, ROOT / m13.REGISTRY_RELATIVE)[1]) \
+        != contract.QUERY_IDS
+
+
 def test_global_deadline_is_partitioned_across_startup_and_task(
     tmp_path: Path, monkeypatch,
 ):

@@ -427,6 +427,27 @@ def _validate_runtime_state(repository: Path, prereg: Mapping[str, Any], *,
         raise All60Error("runtime Git state could not be reconstructed") from exc
 
 
+def _ordered_all60_registry_cases(m13: Any, repository: Path,
+                                  registry_root: Path) -> tuple[str, tuple[Any, ...]]:
+    """Validate the complete registry in its frozen T14-03 order."""
+    registry = m13._read_json(registry_root / "query-registry.json")
+    rows = m13._m12(repository)._validate_registry(registry)
+    if type(rows) is not list or type(registry) is not dict \
+            or type(registry.get("registry_digest")) is not str:
+        raise All60Error("full registry shape/digest differs")
+    query_ids = [row.get("episode_id") if type(row) is dict else None for row in rows]
+    case_ids = [row.get("case_id") if type(row) is dict else None for row in rows]
+    if any(type(value) is not str or not value for value in (*query_ids, *case_ids)):
+        raise All60Error("full registry ID encoding differs")
+    if len(rows) != 60 or len(query_ids) != len(set(query_ids)) \
+            or len(case_ids) != len(set(case_ids)):
+        raise All60Error("full registry IDs are not exactly 60 unique cases")
+    if tuple(query_ids) != contract.QUERY_IDS:
+        raise All60Error("full registry execution order differs")
+    ordered = tuple(m13.CaseInput(index, dict(row)) for index, row in enumerate(rows))
+    return str(registry["registry_digest"]), ordered
+
+
 def production_backend(repository: Path, preregistration: Mapping[str, Any]) -> ProductionBackendAdapter:
     """Build the real truth-free backend from the exact frozen M13 inputs."""
     prereg = validate_preregistration(preregistration); repository = repository.resolve(strict=True)
@@ -451,9 +472,8 @@ def production_backend(repository: Path, preregistration: Mapping[str, Any]) -> 
     for root_key, name, sha_key in artifact_checks:
         path = repository / binding[root_key] / name
         if _sha(path) != binding[sha_key]: raise All60Error("verified T14-02 binding differs")
-    registry_digest, m13_cases = m13._registry_cases(repository, roots["registry"])
-    if tuple(case.query_id for case in m13_cases) != contract.QUERY_IDS:
-        raise All60Error("M13 registry order differs from contract")
+    registry_digest, m13_cases = _ordered_all60_registry_cases(
+        m13, repository, roots["registry"])
     resident = m13.resident_full(roots["source"] / "store", roots["resident"],
         m13.GENERATION_ID, m13.PROVENANCE_DIGEST, m13.RESIDENT_RESERVE_BYTES)
     runtime_cases = tuple(runtime_module.RuntimeCase(index, case.case_id, case.query_id,

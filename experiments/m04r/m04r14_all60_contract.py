@@ -31,6 +31,10 @@ VERIFIER_RELATIVE = (
 PREREGISTRATION_RELATIVE = "experiments/m04r/m04r14_all60_preregistered.json"
 
 QUERY_IDS = (
+    "d107eb49f0ae78d63a90bbce", "f51fc69c1920a76409acc8ff",
+    "e20fa3265667c4d84c50aa92", "2429c38cd8e4f7d8ff1af984",
+    "942bba10f93b0a36d4d21766", "224498b96b521ad0e84c703d",
+    "e3ae797166ab7df0a224edf6",
     "1209f9a230cf2659dfe6c71c", "c4cc388da15e6d2a3619ccd1",
     "dbfd8bfae9e292f7a6945d5a", "068c024bfddc815a4262f8f3",
     "a51854b042fafc711133af00",
@@ -58,10 +62,6 @@ QUERY_IDS = (
     "67da5d1bccf2c9fb4826e89d", "9c6efffcbe5e7cbd5d464654",
     "9124908ee82121f1affd5981", "79c1f9d3a9dad9e29769dfd2",
     "678af00eb7c43f18e64de828", "2d5fd014631f9d4ce97ac34d",
-    "d107eb49f0ae78d63a90bbce", "f51fc69c1920a76409acc8ff",
-    "e20fa3265667c4d84c50aa92", "2429c38cd8e4f7d8ff1af984",
-    "942bba10f93b0a36d4d21766", "224498b96b521ad0e84c703d",
-    "e3ae797166ab7df0a224edf6",
 )
 
 SCHEMAS = {
