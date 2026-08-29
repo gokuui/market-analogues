@@ -1184,6 +1184,15 @@
   <p class="pass"><b>Independent seal:</b> A separately implemented verifier reconstructs the strict two-file comparison tree, marker digest and marker-bound committed comparator source; rebinds the upstream candidate and authority verification receipts; rereads all 120 case files; reconstructs every gate and row; and seals independent SHA-256 manifests for both 60-case trees. Its create-only result digest is <code>c84ae837…1876</code> and receipt SHA-256 is <code>1124fbbd…ef5</code>. A second dry replay is exactly equal to the published deterministic state. The complete regression suite passed before both implementation commits.</p>
   <p><b>Decision:</b> T14-04 is complete. The grouped retrieval path is now semantically equivalent to the sealed exposed authority and materially faster, but <code>production_promotion_authorized</code> remains false. The next gate is T14-05 operational stability (restart/resume and repeated-run performance), followed by the frozen untouched candidate-first T14-06/T14-07 evidence. Outcome distributions and the Stockbee studies begin only after retrieval is sealed on untouched cases.</p>
 </section>
+<section class="entry">
+  <h2>L-126 — T14-05 performance and operational qualification is independently sealed</h2>
+  <p><b>Frozen boundary:</b> The committed performance contract separates interactive single-query latency from grouped batch throughput and follows the user's priority of correctness and speed over the obsolete 1,536-MiB portability target. RSS is capacity evidence; process swap, OOM and semantic differences remain hard failures. No performance run accesses outcomes, and this gate does not authorize production promotion.</p>
+  <p class="pass"><b>Interactive and stability result:</b> All 60 exposed queries retain exact semantics. End-to-end p95/max are 171.35/257.19 seconds against frozen 210/300-second ceilings. Three complete P8 runs took 1,355.43, 1,302.41 and 1,288.03 seconds; population coefficient of variation is 2.20% against 20%, and worst/best is 1.0523 against 1.50. A fourth continuously monitored run took 1,302.25 seconds and independently verified 60/60 cases.</p>
+  <p class="pass"><b>Concurrency and growth result:</b> The same hard-eight workload took 1,576.19, 914.83, 541.65 and 443.77 seconds at P1/P2/P4/P8, with exact semantic equality at every setting; P8 is selected. The independently verified 12-query extension took 555.15 seconds. Combining it with the worst preregistered 60-case stability run gives a conservative 72-query load of 1,910.58 seconds against the frozen 2,400-second ceiling.</p>
+  <p class="pass"><b>Operational result:</b> Two full source/resident validations reproduced the same content, seal and readiness digests. A real spawned worker was killed with SIGKILL; the producer failed closed with only <code>FAILED.json</code>, same-root retry was rejected, and a fresh-root hardest-case restart independently matched canonical semantics. The monitored P8 run collected 5,221 process-tree samples at 250-ms intervals across ten processes: maximum tree RSS was 6,226,312 KiB, maximum tree and individual swap were zero, and cgroup OOM/OOM-kill/swap-failure deltas were zero.</p>
+  <p class="pass"><b>Aggregate and independent seal:</b> The create-only qualification has result digest <code>ff1d5210…6c68</code>. A separate verifier imports neither aggregate producer nor its helpers; it rereads every raw run through the independent run verifier, reconstructs all metrics/gates, validates the marker-bound producer source and embedded resident observation digests, and publishes result digest <code>a88ac9e3…f366</code>. Its receipt SHA-256 is <code>fbbee600…8918</code>; one fresh replay is exactly equal.</p>
+  <p><b>Decision:</b> T14-05 is complete. No more exposed performance runs are justified. Proceed to T14-06 mechanical construction and independent verification of the new 36-symbol/72-case untouched registry. Production promotion remains false.</p>
+</section>
 </main>
 
 <section id="reproduce">
@@ -1309,6 +1318,11 @@ git commit -m "Preregister M04R-11 candidate v2"
 # Commit the independent verifier implementation before publishing its create-only receipt.
 .venv/bin/python -m experiments.m04r.verify_m04r14_exposed_authority_comparison --repository /home/vinay/code/market-analogues
 .venv/bin/python -m experiments.m04r.verify_m04r14_exposed_authority_comparison --repository /home/vinay/code/market-analogues --dry-run</code></pre>
+  <pre><code># T14-05 aggregate runs only after every raw performance/operational root exists.
+.venv/bin/python -m experiments.m04r.m04r14_performance_qualification --repository /home/vinay/code/market-analogues --resident-observation /tmp/t1405_resident_validate.json --resident-observation /tmp/t1405_resident_validate_2.json
+# Commit the independent verifier before publishing its create-only receipt.
+.venv/bin/python -m experiments.m04r.verify_m04r14_performance_qualification --repository /home/vinay/code/market-analogues
+.venv/bin/python -m experiments.m04r.verify_m04r14_performance_qualification --repository /home/vinay/code/market-analogues --dry-run</code></pre>
   <p class="muted">Source datasets are read-only. Generated artifacts live under the configured artifact directory and are intentionally excluded from Git.</p>
 </section>
 </body>
