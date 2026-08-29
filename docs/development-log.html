@@ -1177,6 +1177,13 @@
   <p class="pass"><b>Independent verification:</b> A separately implemented verifier imports neither throughput runner nor grouped engine. It reconstructs strict JSON, the exact 61-file tree, every case's semantic/integrity digests, registry and prefix bindings, V3 proposal/certificate/match equality, group coverage, raw timing arithmetic and aggregate digest. Its create-only receipt covers all 60 cases with manifest digest <code>37e7fbb0…9a79</code>, result digest <code>dcdbfaa6…af2c</code> and file SHA-256 <code>e2a7c90a…bdec</code>. A second read-only replay is exactly equal to the published state.</p>
   <p><b>Boundary and next:</b> The historical 1,312-second grouped authority construction and V3 also have identical final matches for all 1,200 positions, but that diagnostic is not relabelled as formal T14-04. The service-throughput architecture is now selected and verified. Next formalize the exposed authority comparison boundary, then proceed to outcome decision support and the preregistered Stockbee 25%-move/4%-expansion replication and predictive inversion.</p>
 </section>
+<section class="entry">
+  <h2>L-125 — T14-04 exposed authority comparison is independently sealed</h2>
+  <p><b>Boundary:</b> The comparison implementation was committed at H0 <code>1252d291fcd8ae369c0cbb430cdfc0c14ca33f0f</code>. From that clean tree it created <code>RESULTS_OPENED.json</code> before reading the sealed M04R-11 authority. The marker binds H0, the independently verified P8 candidate and authority root, and records that neither authority nor outcomes were read before marker creation.</p>
+  <p class="pass"><b>Comparison result:</b> All 60 case identities, query identities, stock prefixes, benchmark prefixes, final ordered match lists and stable correctness-certificate fields agree. This is exact agreement at all <b>1,200/1,200</b> analogue positions, not a tolerance score. Both candidate and authority engine gates pass. Scheduler-dependent traversal records are deliberately excluded because the selected grouped service uses a 1K→16K frontier while the older authority used a different batch schedule; those differences do not change final certified results. Comparison result digest is <code>e7d82ba6…2ec9</code>.</p>
+  <p class="pass"><b>Independent seal:</b> A separately implemented verifier reconstructs the strict two-file comparison tree, marker digest and marker-bound committed comparator source; rebinds the upstream candidate and authority verification receipts; rereads all 120 case files; reconstructs every gate and row; and seals independent SHA-256 manifests for both 60-case trees. Its create-only result digest is <code>c84ae837…1876</code> and receipt SHA-256 is <code>1124fbbd…ef5</code>. A second dry replay is exactly equal to the published deterministic state. The complete regression suite passed before both implementation commits.</p>
+  <p><b>Decision:</b> T14-04 is complete. The grouped retrieval path is now semantically equivalent to the sealed exposed authority and materially faster, but <code>production_promotion_authorized</code> remains false. The next gate is T14-05 operational stability (restart/resume and repeated-run performance), followed by the frozen untouched candidate-first T14-06/T14-07 evidence. Outcome distributions and the Stockbee studies begin only after retrieval is sealed on untouched cases.</p>
+</section>
 </main>
 
 <section id="reproduce">
@@ -1297,6 +1304,11 @@ git commit -m "Preregister M04R-11 candidate v2"
 # Commit exactly experiments/m04r/m04r14_all60_preregistered_v3.json as the sole H1 change.
 .venv/bin/python -m experiments.m04r.m04r14_all60_certified_poc run --repository /home/vinay/code/market-analogues
 .venv/bin/python -m experiments.m04r.verify_m04r14_all60_certified_poc --candidate-root /home/vinay/code/market-analogues/config/data/analogues/m04r14/all60-certified-development-v3 --verifier-root /home/vinay/code/market-analogues/config/data/analogues/m04r14/all60-certified-development-v3-verification</code></pre>
+  <pre><code># T14-04 must start from a clean commit and an absent comparison root.
+.venv/bin/python -m experiments.m04r.m04r14_exposed_authority_comparison --repository /home/vinay/code/market-analogues
+# Commit the independent verifier implementation before publishing its create-only receipt.
+.venv/bin/python -m experiments.m04r.verify_m04r14_exposed_authority_comparison --repository /home/vinay/code/market-analogues
+.venv/bin/python -m experiments.m04r.verify_m04r14_exposed_authority_comparison --repository /home/vinay/code/market-analogues --dry-run</code></pre>
   <p class="muted">Source datasets are read-only. Generated artifacts live under the configured artifact directory and are intentionally excluded from Git.</p>
 </section>
 </body>
