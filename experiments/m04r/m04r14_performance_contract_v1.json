@@ -1,0 +1,57 @@
+{
+  "schema_version": "m04r14-performance-contract-v1",
+  "status": "frozen-before-additional-performance-runs",
+  "claim_boundary": {
+    "market": "nasdaq-development-exposed",
+    "retrieval_correctness_source": "t14-04-independent-seal",
+    "outcomes_accessed": false,
+    "production_promotion_authorized": false,
+    "memory_policy": "measure-capacity-oom-and-swap;do-not-optimize-to-legacy-1536-mib",
+    "cold_scope": "fresh-process-on-tmpfs;not-durable-disk-cold-and-not-guaranteed-unswappable-ram"
+  },
+  "evidence_bindings": {
+    "v3_complete_digest": "cf377ec86f703fcba0d7fe6d527541824b1c084e549995cae6b9fcb0090d6e76",
+    "throughput_result_digest": "858edbc1a49841b16c84efcbf24271ad29725b6f8a50f035bc5cc29517e3a694",
+    "throughput_verification_digest": "dcdbfaa6df55f7b2213de377b4f429dc49b6ee1730d00076077f07ede95caf2c",
+    "authority_comparison_digest": "e7d82ba6603d5c043960b5c55f11f6fc974c36be21459a121665265dedd72ec9",
+    "authority_comparison_verification_digest": "c84ae837d12fed9cd6db0a04ecc3f2ffd7cbc0a4bc880394e144cfa91aed1876",
+    "resident_content_digest": "27dfa03eea244c1c13d27dcae7970707c60505141a297502de36588b6928437e"
+  },
+  "interactive_lane": {
+    "case_count": 60,
+    "fresh_child_per_query": true,
+    "end_to_end_seconds_p95_max": 210,
+    "end_to_end_seconds_max": 300,
+    "semantic_pass_rate_required": 1.0,
+    "exact_stage_is_diagnostic_not_user_visible": true
+  },
+  "batch_lane": {
+    "processes": 8,
+    "exact_workers_per_process": 1,
+    "numba_threads_per_process": 1,
+    "sixty_case_wall_seconds_max": 1800,
+    "seventy_two_load_case_wall_seconds_max": 2400,
+    "speedup_vs_serial_service_sum_min": 2.0,
+    "maximum_group_wall_over_median_max": 1.25,
+    "semantic_pass_rate_required": 1.0
+  },
+  "stability_lane": {
+    "complete_sixty_case_runs_required": 3,
+    "wall_seconds_coefficient_of_variation_max": 0.20,
+    "worst_to_best_wall_ratio_max": 1.50,
+    "oom_events_max": 0,
+    "process_swap_bytes_max": 0,
+    "rss_is_observed_not_a_fixed_failure_ceiling": true
+  },
+  "operational_lane": {
+    "resident_validate_existing_runs_required": 2,
+    "resident_digest_equality_required": true,
+    "forced_child_termination_required": true,
+    "failed_root_must_be_non_resumable": true,
+    "fresh_root_restart_must_match_canonical_semantics": true,
+    "growth_load_definition": "60 unique exposed cases plus an independently executed 12-query repeated-load extension;performance-only-not-generalization-evidence"
+  },
+  "required_concurrency_matrix": [1, 2, 4, 8],
+  "decision_rule": "all semantic, interactive, batch, stability, operational and concurrency gates must pass; otherwise performance qualification fails closed",
+  "next_gate_if_passed": "t14-06-new-untouched-registry"
+}
