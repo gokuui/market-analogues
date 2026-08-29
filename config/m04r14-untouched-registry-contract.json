@@ -1,0 +1,43 @@
+{
+  "schema_version": "m04r14-untouched-registry-contract-v1",
+  "status": "frozen_before_selection",
+  "dataset": "nasdaq",
+  "seed": "m04r14-untouched-authority-v1",
+  "lookback": 252,
+  "symbols_per_cell": 6,
+  "expected_symbols": 36,
+  "expected_cases": 72,
+  "minimum_rows": 1000,
+  "minimum_future_sessions": 60,
+  "maximum_staleness_days": 120,
+  "regime_threshold": 0.1,
+  "target_schedule": [
+    ["down", "2010s"],
+    ["sideways", "2010s"],
+    ["up", "2010s"],
+    ["down", "2020s"],
+    ["sideways", "2020s"],
+    ["up", "2020s"]
+  ],
+  "required_cells": [
+    ["A", "low"], ["A", "middle"], ["A", "high"],
+    ["B", "low"], ["B", "middle"], ["B", "high"]
+  ],
+  "contamination_sources": {
+    "base_design": "config/m04r10-design-exclusions.yaml",
+    "previous_registry": "config/data/analogues/m04r10/nasdaq-untouched-authority-registry/query-registry.json"
+  },
+  "issuer_alias_policy": {
+    "normalization": "strip-and-uppercase-exact-symbol-plus-explicit-known-alias-groups",
+    "unknown_alias_action": "fail-closed-before-candidate-results-open",
+    "authoritative_historical_alias_map_available": false
+  },
+  "outcome_firewall": {
+    "real_forward_outcomes_accessed": false,
+    "forbidden_inputs": [
+      "forward outcomes", "trade results", "setup labels",
+      "candidate-system results", "authority results"
+    ]
+  },
+  "production_promotion_authorized": false
+}

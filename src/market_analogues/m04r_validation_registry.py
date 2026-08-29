@@ -388,11 +388,23 @@ def build_m04r_validation_registry(
     minimum_rows: int = 1000, minimum_future_sessions: int = 60,
     maximum_staleness_days: int = 120, regime_threshold: float = .10,
     representation_version: str = "dense-v1",
+    target_schedule: tuple[tuple[str, str], ...] = TARGET_SCHEDULE,
+    symbols_per_cell: int = SYMBOLS_PER_CELL,
+    schema_version: str = SCHEMA_VERSION,
 ) -> M04RValidationRegistry:
     if minimum_rows < lookback + minimum_future_sessions:
         raise ValueError("minimum rows cannot support lookback and future gap")
     if not 0 < regime_threshold < 1:
         raise ValueError("regime threshold must be strictly between zero and one")
+    if symbols_per_cell < 1 or len(target_schedule) != symbols_per_cell:
+        raise ValueError("target schedule must contain exactly one slot per selected symbol")
+    if len(set(target_schedule)) != len(target_schedule) or any(
+        regime not in {"up", "down", "sideways"} or era not in {"2010s", "2020s"}
+        for regime, era in target_schedule
+    ):
+        raise ValueError("target schedule contains duplicate or unsupported regime/era slots")
+    expected_symbols = len(QUALITY_TIERS) * len(LIQUIDITY_STRATA) * symbols_per_cell
+    expected_cases = expected_symbols * 2
     instruments = source.instruments()
     if not instruments:
         raise ValueError("source has no instruments")
@@ -417,7 +429,7 @@ def build_m04r_validation_registry(
         ["quality_tier", "liquidity_stratum"], sort=True,
     ):
         used: set[str] = set()
-        for slot, (target_regime, target_era) in enumerate(TARGET_SCHEDULE):
+        for slot, (target_regime, target_era) in enumerate(target_schedule):
             ranked = cell.copy()
             ranked["selection_hash"] = ranked.symbol.map(lambda symbol: sha256(
                 f"{seed}:{dataset_id}:{tier}:{stratum}:{slot}:"
@@ -528,10 +540,10 @@ def build_m04r_validation_registry(
         transcript_frame = transcript_frame.sort_values([
             "quality_tier", "liquidity_stratum", "slot", "candidate_rank",
         ], kind="stable", ignore_index=True)
-    if len(cases) != EXPECTED_CASES or cases.symbol.nunique() != EXPECTED_SYMBOLS:
+    if len(cases) != expected_cases or cases.symbol.nunique() != expected_symbols:
         failures.append(
             f"created {len(cases)} cases/{cases.symbol.nunique() if len(cases) else 0} symbols; "
-            f"require {EXPECTED_CASES}/{EXPECTED_SYMBOLS}"
+            f"require {expected_cases}/{expected_symbols}"
         )
     if len(cases) and (cases.case_id.duplicated().any() or cases.episode_id.duplicated().any()):
         failures.append("registry contains duplicate case or episode IDs")
@@ -543,14 +555,14 @@ def build_m04r_validation_registry(
     transcript_records = _canonical_records(transcript_frame)
     case_records = _canonical_records(cases)
     metrics: dict[str, Any] = {
-        "schema_version": SCHEMA_VERSION, "dataset": dataset_id, "seed": seed,
-        "symbols_per_cell": SYMBOLS_PER_CELL, "symbols": EXPECTED_SYMBOLS,
+        "schema_version": schema_version, "dataset": dataset_id, "seed": seed,
+        "symbols_per_cell": symbols_per_cell, "symbols": expected_symbols,
         "cases": len(cases), "lookback": lookback,
         "minimum_rows": minimum_rows,
         "minimum_future_sessions": minimum_future_sessions,
         "maximum_staleness_days": maximum_staleness_days,
         "regime_threshold": regime_threshold,
-        "target_schedule": [list(value) for value in TARGET_SCHEDULE],
+        "target_schedule": [list(value) for value in target_schedule],
         "representation_version": representation_version,
         "market_latest_timestamp_at_lock": market_latest.isoformat(),
         "contamination_ledger_digest": contamination_ledger["ledger_digest"],
