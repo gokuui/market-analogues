@@ -595,10 +595,12 @@ def _case_documents(ordinal: int, prepared: Any, attempt: Any, proposal_sha: str
     limits = contract.EXECUTION_POLICY["performance_limits"]
     process = pm.get("spawned_process", {})
     process_peak = process.get("effective_peak_rss_kib", 0) if type(process) is dict else 0
-    resource_peak = proposal_resources.get("peak_rss_mb", 0) if type(proposal_resources) is dict else 0
-    if type(process_peak) not in {int, float} or type(resource_peak) not in {int, float}:
+    if type(process_peak) not in {int, float}:
         raise All60Error("proposal RSS is not numeric")
-    proposal_peak_mib = max(float(process_peak) / 1024.0, float(resource_peak))
+    # The supervised /proc VmHWM peak is post-exec and process-specific.
+    # RUSAGE_SELF ru_maxrss in proposal_resources can retain a pre-exec
+    # fork high-water mark from the evidence-accumulating parent.
+    proposal_peak_mib = float(process_peak) / 1024.0
     process_swap = type(process) is dict and type(process.get("peak_swap_kib")) is int \
         and process["peak_swap_kib"] == 0 and type(process.get("final_swap_kib")) is int \
         and process["final_swap_kib"] == 0

@@ -109,6 +109,17 @@ def test_serial_success_supports_arbitrary_ordinal_59(tmp_path: Path) -> None:
     assert len(attempt.measurement["spawned_process"]["cpus"]) == 1
 
 
+def test_spawned_child_rss_excludes_large_parent_preexec_high_water(tmp_path: Path) -> None:
+    retained_parent_evidence = bytearray(160 * 1024 * 1024)
+    retained_parent_evidence[0] = 1
+    instance = _instance(tmp_path)
+    prepared = instance.prepare(0, "rss-boundary")
+    process = prepared.measurement["spawned_process"]
+    assert process["wait4_max_rss_kib_context_only"] is True
+    assert process["effective_peak_rss_kib"] < 128 * 1024
+    assert retained_parent_evidence[0] == 1
+
+
 def test_case_table_rejects_holes_duplicates_and_wrong_worker(tmp_path: Path) -> None:
     values = list(_cases(2)); values[1] = runtime.RuntimeCase(3, "case-1", "query-1", {})
     with pytest.raises(runtime.RuntimeErrorEvidence, match="case table"):

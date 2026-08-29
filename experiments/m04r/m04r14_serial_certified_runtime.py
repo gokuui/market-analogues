@@ -366,10 +366,15 @@ class SerialSpawnedRuntime:
         before_swap = _vmstat(); started = perf_counter(); peak = {"VmRSS": 0, "VmHWM": 0, "VmSwap": 0}
         process: subprocess.Popen[Any] | None = None; usage = None
         try:
-            process = subprocess.Popen(list(command), cwd=self.repository,
+            # Avoid preexec_fn: fork briefly inherited the growing producer's
+            # address space and polluted ru_maxrss before exec.  taskset execs
+            # the child under the frozen affinity while leaving Popen eligible
+            # for Python's posix_spawn path.
+            affinity_command = ["/usr/bin/taskset", "--cpu-list",
+                ",".join(str(cpu) for cpu in cpus), *command]
+            process = subprocess.Popen(affinity_command, cwd=self.repository,
                 env=_child_environment(), stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                preexec_fn=lambda: os.sched_setaffinity(0, set(cpus)))
+                stderr=subprocess.DEVNULL)
             deadline = perf_counter() + self.startup_timeout
             while True:
                 try:
@@ -429,6 +434,7 @@ class SerialSpawnedRuntime:
         wait4_rss = int(usage.ru_maxrss * (1024 if sys.platform == "darwin" else 1))
         final_swap = (payload.get("measurement", {}).get("resources", {})
                       .get("after", {}).get("swap_kib"))
+        authoritative_peak = max(peak["VmRSS"], peak["VmHWM"])
         evidence = {"pid": process.pid, "cpus": cpus, "workers": workers,
             "wall_seconds": perf_counter() - started, "ready_evidence": ready,
             "release_evidence": release_evidence,
@@ -436,7 +442,8 @@ class SerialSpawnedRuntime:
             "minor_faults": int(usage.ru_minflt), "major_faults": int(usage.ru_majflt),
             "peak_rss_kib": peak["VmRSS"], "peak_hwm_kib": peak["VmHWM"],
             "wait4_max_rss_kib": wait4_rss,
-            "effective_peak_rss_kib": max(peak["VmRSS"], peak["VmHWM"], wait4_rss),
+            "effective_peak_rss_kib": authoritative_peak,
+            "wait4_max_rss_kib_context_only": True,
             "peak_swap_kib": peak["VmSwap"], "final_swap_kib": final_swap,
             "host_vmstat_swap_before": before_swap,
             "host_vmstat_swap_after": _vmstat(), "host_swap_is_context_only": True}

@@ -254,6 +254,20 @@ def test_production_mode_mandates_independent_replay(candidate: Path, monkeypatc
                                  replay_scans=False)
 
 
+def test_production_runtime_envelope_matches_actual_two_key_preregistration(candidate: Path) -> None:
+    prereg = json.loads((candidate / "CONTRACT.json").read_text())
+    state = verifier._runtime_envelope(prereg)
+    assert set(prereg["runtime_binding"]) == {"state", "digest"}
+    assert state["contracts"] == {
+        "descriptor_digest": contract.DESCRIPTOR_DIGEST,
+        "execution_policy": contract.EXECUTION_POLICY,
+    }
+    incompatible = copy.deepcopy(prereg)
+    incompatible["runtime_binding"]["schema_version"] = "not-in-the-contract"
+    with pytest.raises(verifier.VerificationError, match="runtime binding"):
+        verifier._runtime_envelope(incompatible)
+
+
 def test_verifier_does_not_import_producer_or_serial_runtime() -> None:
     source = (ROOT / "experiments/m04r/verify_m04r14_all60_certified_poc.py").read_text()
     imported = []

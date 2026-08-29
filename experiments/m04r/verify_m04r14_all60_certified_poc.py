@@ -404,9 +404,9 @@ def _case(snapshots: Mapping[str, dict[str, Any]], shas: Mapping[str, str],
     return case, case_semantic, case_measurement
 
 
-def _runtime_and_lineage(prereg: Mapping[str, Any], repository: Path) -> None:
+def _runtime_envelope(prereg: Mapping[str, Any]) -> Mapping[str, Any]:
     runtime = prereg["runtime_binding"]
-    if type(runtime) is not dict or set(runtime) != {"schema_version", "state", "digest"} \
+    if type(runtime) is not dict or set(runtime) != {"state", "digest"} \
             or runtime["digest"] != _digest(runtime["state"]):
         raise VerificationError("runtime binding differs")
     state = runtime["state"]
@@ -415,6 +415,11 @@ def _runtime_and_lineage(prereg: Mapping[str, Any], repository: Path) -> None:
             or state["contracts"] != {"descriptor_digest": contract.DESCRIPTOR_DIGEST,
                                       "execution_policy": contract.EXECUTION_POLICY}:
         raise VerificationError("runtime state differs")
+    return state
+
+
+def _runtime_and_lineage(prereg: Mapping[str, Any], repository: Path) -> None:
+    state = _runtime_envelope(prereg)
     h0 = state["git_head"]; manifest = state["files"]
     environment = state["environment"]
     if type(environment) is not dict or set(environment) != {"state", "digest"} \
@@ -763,13 +768,12 @@ def verify_terminal(root: Path, *, repository: Path, require_production: bool = 
         after = resources.get("after", {}) if type(resources) is dict else {}
         process = row["child_process"].get("proposal", {})
         process_peak = process.get("effective_peak_rss_kib", 0) if type(process) is dict else 0
-        resource_peak = resources.get("peak_rss_mb", 0) if type(resources) is dict else 0
         return type(after.get("swap_kib")) is int and after["swap_kib"] == 0 \
             and type(process.get("peak_swap_kib")) is int and process["peak_swap_kib"] == 0 \
             and type(process.get("final_swap_kib")) is int and process["final_swap_kib"] == 0 \
             and row["forward_proposal_seconds"] <= limits["forward_proposal_seconds"] \
             and row["reverse_proposal_seconds"] <= limits["reverse_proposal_seconds"] \
-            and max(float(process_peak) / 1024.0, float(resource_peak)) <= limits["proposal_process_rss_mb"]
+            and float(process_peak) / 1024.0 <= limits["proposal_process_rss_mb"]
     if any(row["proposal_resource_gate_passed"] is not expected_proposal_gate(row)
            or row["exact_stage_slo_passed"] is not (
                row["exact_stage_seconds"] <= limits["exact_stage_max_seconds"])
