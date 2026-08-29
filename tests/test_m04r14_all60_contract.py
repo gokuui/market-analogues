@@ -19,11 +19,11 @@ SPEC.loader.exec_module(contract)
 
 def test_descriptor_paths_schemas_keys_and_digest_are_deterministic() -> None:
     assert contract.DESCRIPTOR["paths"] == {
-        "candidate": "config/data/analogues/m04r14/all60-certified-development-v1",
+        "candidate": "config/data/analogues/m04r14/all60-certified-development-v2",
         "verifier": (
-            "config/data/analogues/m04r14/all60-certified-development-v1-verification"
+            "config/data/analogues/m04r14/all60-certified-development-v2-verification"
         ),
-        "preregistration": "experiments/m04r/m04r14_all60_preregistered.json",
+        "preregistration": "experiments/m04r/m04r14_all60_preregistered_v2.json",
     }
     assert set(contract.SCHEMAS) == set(contract.FIELD_KEYS)
     assert all(tuple(sorted(keys)) == keys and len(keys) == len(set(keys))
@@ -35,7 +35,7 @@ def test_descriptor_paths_schemas_keys_and_digest_are_deterministic() -> None:
     assert contract.DESCRIPTOR_DIGEST == contract.stable_digest(contract.DESCRIPTOR)
     assert len(bytes.fromhex(contract.DESCRIPTOR_DIGEST)) == 32
     assert contract.DESCRIPTOR_DIGEST == \
-        "522336628b0d344eea866596484cee1a235c321041867699d5c36e5efacfbbc4"
+        "db7b9e42566f88e5a2fa1ddeee178f87e08a505e99e944396e1e9015f16aadab"
 
 
 def test_t14_02_verified_binding_freezes_selected_lane_and_artifact_shas() -> None:

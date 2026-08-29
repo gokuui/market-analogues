@@ -160,6 +160,16 @@ def test_timing_free_semantic_digest_is_deterministic(tmp_path: Path, monkeypatc
     assert first["semantic_digest"] == second["semantic_digest"]
 
 
+def test_m13_raw_validator_view_restores_only_ephemeral_elapsed_seconds() -> None:
+    semantic = {"result_digest": "f" * 64}
+    assert producer._m13_certificate_view(semantic) == {
+        "result_digest": "f" * 64, "elapsed_seconds": 0.0,
+    }
+    assert semantic == {"result_digest": "f" * 64}
+    with pytest.raises(producer.All60Error, match="timing-free"):
+        producer._m13_certificate_view({**semantic, "elapsed_seconds": 0.01})
+
+
 @pytest.mark.parametrize("stage,expected", [
     ("prepare", "started"), ("hang", "started"),
     ("bind", "proposal"), ("exact", "proposal"),

@@ -514,7 +514,7 @@ def production_backend(repository: Path, preregistration: Mapping[str, Any]) -> 
                  "lease_digest": current["lease"]["lease_digest"]})
     def validate_certified(certificate: Any, matches: Any, query_id: str,
                            query_binding: Mapping[str, Any]) -> None:
-        m13.validate_certificate_and_matches(certificate, matches, query_id,
+        m13.validate_certificate_and_matches(_m13_certificate_view(certificate), matches, query_id,
             expected_input_digest=query_binding.get("certified_input_digest"))
     return ProductionBackendAdapter(runtime, source_payload=source_payload,
         resident_payload=resident, final_observer=final,
@@ -529,6 +529,19 @@ def _strip_timing(value: Any) -> Any:
     if type(value) is list:
         return [_strip_timing(item) for item in value]
     return value
+
+
+def _m13_certificate_view(certificate: Any) -> dict[str, Any]:
+    """Restore M13's required raw timing field only for validator input.
+
+    T14-03 intentionally keeps exact timing in the separately sealed
+    measurement payload, so ``elapsed_seconds`` must never enter a semantic
+    certificate or its digest.  M13's raw-schema validator nevertheless
+    requires a finite value and does not include it in the result digest.
+    """
+    if type(certificate) is not dict or "elapsed_seconds" in certificate:
+        raise All60Error("timing-free certificate boundary differs")
+    return {**certificate, "elapsed_seconds": 0.0}
 
 
 def _proposal_leaf(prepared: Any, created_at: str) -> dict[str, Any]:
@@ -1175,7 +1188,7 @@ def _validate_evidence(root: Path, preregistration: Mapping[str, Any], *,
             m13_validator = _module(repository / "experiments/m04r/m04r13_threaded_certified_exposed.py",
                                     "m04r14_all60_terminal_m13")
             certified_validator = lambda certificate, matches, identity, binding: (
-                m13_validator.validate_certificate_and_matches(certificate, matches, identity,
+                m13_validator.validate_certificate_and_matches(_m13_certificate_view(certificate), matches, identity,
                     expected_input_digest=binding.get("certified_input_digest")))
         try:
             certified_validator(exact_semantic.get("certificate"), exact_semantic.get("matches"),

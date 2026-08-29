@@ -24,11 +24,11 @@ from typing import Any, Mapping, Sequence
 
 
 DESCRIPTOR_SCHEMA = "m04r14-all60-compatibility-contract-v1"
-CANDIDATE_RELATIVE = "config/data/analogues/m04r14/all60-certified-development-v1"
+CANDIDATE_RELATIVE = "config/data/analogues/m04r14/all60-certified-development-v2"
 VERIFIER_RELATIVE = (
-    "config/data/analogues/m04r14/all60-certified-development-v1-verification"
+    "config/data/analogues/m04r14/all60-certified-development-v2-verification"
 )
-PREREGISTRATION_RELATIVE = "experiments/m04r/m04r14_all60_preregistered.json"
+PREREGISTRATION_RELATIVE = "experiments/m04r/m04r14_all60_preregistered_v2.json"
 
 QUERY_IDS = (
     "d107eb49f0ae78d63a90bbce", "f51fc69c1920a76409acc8ff",
