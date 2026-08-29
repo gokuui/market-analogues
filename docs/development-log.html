@@ -1193,6 +1193,13 @@
   <p class="pass"><b>Aggregate and independent seal:</b> The create-only qualification has result digest <code>ff1d5210…6c68</code>. A separate verifier imports neither aggregate producer nor its helpers; it rereads every raw run through the independent run verifier, reconstructs all metrics/gates, validates the marker-bound producer source and embedded resident observation digests, and publishes result digest <code>a88ac9e3…f366</code>. Its receipt SHA-256 is <code>fbbee600…8918</code>; one fresh replay is exactly equal.</p>
   <p><b>Decision:</b> T14-05 is complete. No more exposed performance runs are justified. Proceed to T14-06 mechanical construction and independent verification of the new 36-symbol/72-case untouched registry. Production promotion remains false.</p>
 </section>
+<section class="entry">
+  <h2>L-127 — T14-06 untouched 36-symbol registry is independently sealed</h2>
+  <p><b>Why and boundary:</b> T14-07 needs a genuinely new evaluation set whose identities and historical cutoffs are fixed before any candidate run or forward outcome is opened. The selection implementation, frozen JSON contract and independent verifier were committed at H0 <code>4c27b915533fb43c6c192f13971c5ded8241c42d</code> before real selection. The source lock binds that commit, configuration, quality/liquidity tables, base contamination design and the prior 60-case registry. Selection reads only causal OHLCV and benchmark prefixes; <code>real_forward_outcomes_accessed</code> is false.</p>
+  <p><b>Construction:</b> A deterministic hash-ranked process selected exactly 36 previously unused NASDAQ symbols, six from every A/B quality × low/middle/high liquidity cell. Each cell contains one symbol for every down/sideways/up × 2010s/2020s regime/era slot. Historical and current cutoffs form exactly 72 cases. All 30 symbols used by the previous M04R-10/M04R-14 registry, the earlier design ledger and explicitly known aliases are excluded. The honest alias boundary remains exact normalized symbols plus explicit locally known groups because no authoritative historical issuer-identity map exists in the source data.</p>
+  <p class="pass"><b>Independent result:</b> The create-only registry is sealed at digest <code>e01238cd4f1662ab5821f9b4d4f4ae1dae2d8d292c07932d2d809c943f256e01</code>. A separately implemented verifier independently reconstructed the contamination ledger, eligible universe, hash ordering, every attempted candidate, all 36 selections, 72 episode IDs, causal stock/benchmark prefixes and descriptors. It verified all six cells and six regime/era slots, exact stored parquet/JSON equality, the six-file seal and the outcome firewall. Dry and published verification states agree at result digest <code>f4b07028cc9933d1edb37b2ec2c53ea7e1532d5aeb72dd9777a30e266bac4f80</code>.</p>
+  <p><b>Tests and decision:</b> All eight focused new tests pass. The complete suite passed every test except one existing spawned-runtime metadata race; rerunning that sole test passed immediately. T14-06 is complete and immutable. Next, freeze the T14-07 candidate-first execution contract and lifecycle, run all 72 cases without authority or outcome access, independently seal retrieval, and only then open the corresponding authorities for comparison. Production promotion remains false.</p>
+</section>
 </main>
 
 <section id="reproduce">
@@ -1323,6 +1330,10 @@ git commit -m "Preregister M04R-11 candidate v2"
 # Commit the independent verifier before publishing its create-only receipt.
 .venv/bin/python -m experiments.m04r.verify_m04r14_performance_qualification --repository /home/vinay/code/market-analogues
 .venv/bin/python -m experiments.m04r.verify_m04r14_performance_qualification --repository /home/vinay/code/market-analogues --dry-run</code></pre>
+  <pre><code># T14-06 selection must run from the clean commit containing its contract, builder and verifier.
+.venv/bin/python -m experiments.m04r.m04r14_untouched_registry --repository /home/vinay/code/market-analogues --config /home/vinay/code/market-analogues/config/datasets.example.yaml
+.venv/bin/python -m experiments.m04r.verify_m04r14_untouched_registry --repository /home/vinay/code/market-analogues --config /home/vinay/code/market-analogues/config/datasets.example.yaml --dry-run
+.venv/bin/python -m experiments.m04r.verify_m04r14_untouched_registry --repository /home/vinay/code/market-analogues --config /home/vinay/code/market-analogues/config/datasets.example.yaml</code></pre>
   <p class="muted">Source datasets are read-only. Generated artifacts live under the configured artifact directory and are intentionally excluded from Git.</p>
 </section>
 </body>
