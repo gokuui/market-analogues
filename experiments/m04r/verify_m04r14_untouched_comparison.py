@@ -9,16 +9,20 @@ import os
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
-from experiments.m04r import m04r14_untouched_authority as authority
 from experiments.m04r import m04r14_untouched_candidate_contract as contract
-from experiments.m04r import verify_m04r14_untouched_authority as authority_verifier
-from experiments.m04r import verify_m04r14_untouched_batch_amendment as candidate_verifier
 from experiments.m04r import verify_m04r14_untouched_candidate as evidence
 
 
-SCHEMA = "m04r14-untouched-comparison-terminal-verification-v1"
+SCHEMA = "m04r14-untouched-comparison-terminal-verification-v2"
 COMPARISON = Path("config/data/analogues/m04r14/untouched-comparison-v1")
-OUTPUT = Path("config/data/analogues/m04r14/untouched-comparison-v1-terminal-verification")
+OUTPUT = Path("config/data/analogues/m04r14/untouched-comparison-v2-terminal-verification")
+AUTHORITY_ROOT = Path("config/data/analogues/m04r14/untouched-authority-v1")
+CANDIDATE_VERIFICATION = Path(
+    "config/data/analogues/m04r14/untouched-candidate-v1-batch-verification"
+)
+AUTHORITY_VERIFICATION = Path(
+    "config/data/analogues/m04r14/untouched-authority-v1-verification"
+)
 
 
 class TerminalVerificationError(RuntimeError): pass
@@ -59,41 +63,73 @@ def _case_map(root: Path) -> dict[str, dict[str, Any]]:
     return result
 
 
+def _sealed_payload(value: Mapping[str, Any]) -> bool:
+    state = {key: item for key, item in value.items()
+        if key not in {"created_at", "result_digest"}}
+    return value.get("result_digest") == contract.digest(state)
+
+
+def _introduced_source(repository: Path, relative: Path,
+                       artifact_created_at: str) -> dict[str, str]:
+    commits = str(evidence._git(repository, "log", "--diff-filter=A", "--format=%H",
+        "--", relative.as_posix())).splitlines()
+    if len(commits) != 1: raise TerminalVerificationError(f"source introduction differs: {relative}")
+    commit = commits[0]; raw = evidence._git(repository, "show", f"{commit}:{relative.as_posix()}", raw=True)
+    committed_at = str(evidence._git(repository, "show", "-s", "--format=%cI", commit))
+    if committed_at >= artifact_created_at:
+        raise TerminalVerificationError(f"artifact predates committed producer: {relative}")
+    return {"path": relative.as_posix(), "commit": commit,
+        "sha256": sha256(raw).hexdigest(), "commit_time": committed_at}
+
+
 def verify(repository: Path) -> dict[str, Any]:
     repository = repository.resolve(strict=True)
     comparison, comparison_raw = evidence._read(repository / COMPARISON / "RESULT.json")
     candidate_receipt, candidate_raw = evidence._read(
-        repository / candidate_verifier.OUTPUT / "VERIFIED.json")
+        repository / CANDIDATE_VERIFICATION / "VERIFIED.json")
     authority_receipt, authority_raw = evidence._read(
-        repository / authority_verifier.OUTPUT / "VERIFIED.json")
+        repository / AUTHORITY_VERIFICATION / "VERIFIED.json")
     deterministic = {key: value for key, value in comparison.items()
         if key not in {"result_digest", "created_at"}}
     if comparison.get("result_digest") != contract.digest(deterministic) \
             or comparison.get("status") != "complete" or comparison.get("passed") is not True \
-            or candidate_receipt.get("passed") is not True \
-            or authority_receipt.get("passed") is not True \
+            or not _sealed_payload(candidate_receipt) or not _sealed_payload(authority_receipt) \
+            or candidate_receipt.get("passed") is not True or authority_receipt.get("passed") is not True \
             or comparison.get("candidate_verification_result_digest") != candidate_receipt.get("result_digest") \
             or comparison.get("authority_verification_result_digest") != authority_receipt.get("result_digest"):
         raise TerminalVerificationError("terminal upstream binding differs")
     candidate = _case_map(repository / contract.CANDIDATE_RELATIVE / "cases")
-    exact = _case_map(repository / authority.OUTPUT / "cases")
+    exact = _case_map(repository / AUTHORITY_ROOT / "cases")
     rows = reconstruct_rows(candidate, exact)
     matching = sum(row["matching_positions"] for row in rows)
     if rows != comparison.get("case_comparisons") or not all(row["passed"] for row in rows) \
             or matching != 1440 or comparison.get("matching_positions") != 1440 \
+            or comparison.get("authority_accessed_after_results_open") is not True \
             or comparison.get("real_forward_outcomes_accessed") is not False:
         raise TerminalVerificationError("terminal comparison reconstruction differs")
     marker, marker_raw = evidence._read(repository /
         "config/data/analogues/m04r14/untouched-results-opened-v1/RESULTS_OPENED.json")
-    if marker.get("status") != "results_opened" or marker.get("authority_access_authorized") is not True \
+    marker_state = {key: value for key, value in marker.items()
+        if key not in {"created_at", "marker_digest"}}
+    if marker.get("marker_digest") != contract.digest(marker_state) \
+            or marker.get("status") != "results_opened" or marker.get("authority_access_authorized") is not True \
             or marker.get("outcome_access_authorized") is not False:
         raise TerminalVerificationError("terminal results-open boundary differs")
+    authority_result, _ = evidence._read(repository / AUTHORITY_ROOT / "AUTHORITY.json")
+    producer_sources = [
+        _introduced_source(repository, Path("experiments/m04r/m04r14_untouched_authority.py"),
+            str(authority_result["created_at"])),
+        _introduced_source(repository, Path("experiments/m04r/compare_m04r14_untouched.py"),
+            str(comparison["created_at"])),
+    ]
     state = {"schema_version": SCHEMA, "status": "verified", "passed": True,
         "comparison_result_digest": comparison["result_digest"],
         "comparison_sha256": sha256(comparison_raw).hexdigest(),
         "candidate_verification_sha256": sha256(candidate_raw).hexdigest(),
         "authority_verification_sha256": sha256(authority_raw).hexdigest(),
         "results_open_marker_sha256": sha256(marker_raw).hexdigest(),
+        "producer_sources": producer_sources,
+        "producer_binding_limit": "post-run reconstruction; producer artifacts did not embed Git commit",
         "verified_cases": 72, "verified_positions": 1440,
         "exact_ordered_match_agreement": True,
         "original_performance_failure_preserved": True,

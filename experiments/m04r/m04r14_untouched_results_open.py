@@ -32,10 +32,16 @@ def build(repository: Path) -> dict[str, Any]:
     receipt_path = repository / amended.OUTPUT / "VERIFIED.json"
     receipt, receipt_raw = _read(receipt_path)
     listener, listener_raw = _read(repository / "config/data/analogues/m04r14/step-listener-v1/TERMINAL.json")
+    candidate_state = {key: value for key, value in candidate.items()
+        if key not in {"created_at", "result_digest"}}
+    receipt_state = {key: value for key, value in receipt.items()
+        if key not in {"created_at", "result_digest"}}
     if not all((candidate.get("semantic_passed") is True,
+            candidate.get("result_digest") == contract.digest(candidate_state),
             candidate.get("authority_accessed") is False,
             candidate.get("real_forward_outcomes_accessed") is False,
             receipt.get("passed") is True, receipt.get("results_open_authorized") is True,
+            receipt.get("result_digest") == contract.digest(receipt_state),
             receipt.get("candidate_result_digest") == candidate.get("result_digest"),
             listener.get("status") == "ready_for_results_open",
             listener.get("verification_result_digest") == receipt.get("result_digest"))):

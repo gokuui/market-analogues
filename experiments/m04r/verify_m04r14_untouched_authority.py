@@ -10,12 +10,15 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 from experiments.m04r import m04r13_threaded_certified_exposed as m13
-from experiments.m04r import m04r14_untouched_authority as authority
 from experiments.m04r import m04r14_untouched_candidate_contract as contract
 from experiments.m04r import verify_m04r14_untouched_candidate as base
 
 
 SCHEMA = "m04r14-untouched-authority-verification-v1"
+AUTHORITY_ROOT = Path("config/data/analogues/m04r14/untouched-authority-v1")
+RESULTS_OPEN_MARKER = Path(
+    "config/data/analogues/m04r14/untouched-results-opened-v1/RESULTS_OPENED.json"
+)
 OUTPUT = Path("config/data/analogues/m04r14/untouched-authority-v1-verification")
 
 
@@ -23,7 +26,7 @@ class VerificationError(RuntimeError): pass
 
 
 def verify(repository: Path) -> dict[str, Any]:
-    repository = repository.resolve(strict=True); root = repository / authority.OUTPUT
+    repository = repository.resolve(strict=True); root = repository / AUTHORITY_ROOT
     result, result_raw = base._read(root / "AUTHORITY.json")
     deterministic = {key: value for key, value in result.items() if key not in {"result_digest", "created_at"}}
     if result.get("result_digest") != contract.digest(deterministic) \
@@ -34,7 +37,7 @@ def verify(repository: Path) -> dict[str, Any]:
         raise VerificationError("authority aggregate differs")
     registry_root = repository / contract.REGISTRY_RELATIVE
     registry, _ = base._read(registry_root / "query-registry.json")
-    marker, marker_raw = base._read(repository / authority.MARKER)
+    marker, marker_raw = base._read(repository / RESULTS_OPEN_MARKER)
     if marker.get("marker_digest") != result.get("marker_digest") \
             or marker.get("authority_access_authorized") is not True \
             or marker.get("outcome_access_authorized") is not False \
