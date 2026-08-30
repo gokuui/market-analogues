@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from experiments.m04r import m04r14_shadow_registry as shadow
+from experiments.m04r import m04r14_shadow_run as shadow_run
 from market_analogues.types import InstrumentKey
 
 
@@ -123,3 +124,40 @@ def test_records_support_nested_prefixes_and_reject_non_finite_json():
         pass
     else:
         raise AssertionError("strict JSON unexpectedly accepted NaN")
+
+
+def test_shadow_groups_are_complete_deterministic_and_load_balanced():
+    cases = [{
+        "case_id": f"case-{index}", "episode_id": f"query-{index}",
+        "active_source_universe": 100 + index,
+    } for index in range(31)]
+    first = shadow_run._groups(cases, 8)
+    second = shadow_run._groups(list(reversed(cases)), 8)
+    assert first == second
+    flattened = [row["case_id"] for group in first for row in group]
+    assert sorted(flattened) == sorted(row["case_id"] for row in cases)
+    assert len(flattened) == len(set(flattened)) == len(cases)
+    loads = [sum(row["active_source_universe"] for row in group) for group in first]
+    assert max(loads) - min(loads) <= max(row["active_source_universe"] for row in cases)
+
+
+def test_work_promotion_is_create_only_and_collision_safe(tmp_path, monkeypatch):
+    work = tmp_path / "work"
+    root = tmp_path / "root"
+    (work / "cases").mkdir(parents=True)
+    (root / "cases").mkdir(parents=True)
+    case = {"case_id": "case-x", "episode_id": "query-x"}
+    source = work / "cases/query-x.json"
+    source.write_text('{"value":1}\n')
+    monkeypatch.setattr(shadow_run, "_case_valid", lambda *args: True)
+    assert shadow_run._promote_work(ROOT, work, root, {"query-x": case}, {}) == 1
+    assert not source.exists()
+    assert (root / "cases/query-x.json").read_text() == '{"value":1}\n'
+
+    source.write_text('{"value":2}\n')
+    try:
+        shadow_run._promote_work(ROOT, work, root, {"query-x": case}, {})
+    except shadow_run.ShadowRunError as exc:
+        assert "collision" in str(exc)
+    else:
+        raise AssertionError("different same-ID work file unexpectedly overwrote a result")
