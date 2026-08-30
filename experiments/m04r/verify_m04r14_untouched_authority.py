@@ -56,20 +56,28 @@ def verify(repository: Path) -> dict[str, Any]:
         row, _ = base._read(path); query_id = str(row.get("query_episode_id"))
         if query_id in observed: raise VerificationError("duplicate authority query")
         observed[query_id] = row
+    # M13's semantic validator is intentionally parameterized by module-level
+    # execution controls.  Bind it to the authority's frozen 16K->32K schedule
+    # while validating; the candidate verifier separately uses 1K->16K.
+    original_controls = (m13.INITIAL_FRONTIER, m13.MAXIMUM_FRONTIER)
+    m13.INITIAL_FRONTIER, m13.MAXIMUM_FRONTIER = 16_384, 32_768
     verified_matches = 0
-    for case in cases:
-        row = observed.get(case.query_id)
-        if row is None or row.get("registry_case_id") != case.case_id \
-                or row.get("gate_passed") is not True or len(row.get("matches", [])) != 20 \
-                or row.get("result_digest") != base._deterministic_case_digest(row) \
-                or row.get("checkpoint_integrity_digest") != base._integrity_digest(row):
-            raise VerificationError(f"authority case differs: {case.case_id}")
-        source, episode, request, packed = m13._case_context(inputs, case)
-        query = m13.query_binding(source, episode, request, packed, contract.PROVENANCE_DIGEST)
-        m13.validate_certificate_and_matches({**row["certificate"], "elapsed_seconds": 0.0},
-            row["matches"], case.query_id,
-            expected_input_digest=query["certified_input_digest"])
-        verified_matches += len(row["matches"])
+    try:
+        for case in cases:
+            row = observed.get(case.query_id)
+            if row is None or row.get("registry_case_id") != case.case_id \
+                    or row.get("gate_passed") is not True or len(row.get("matches", [])) != 20 \
+                    or row.get("result_digest") != base._deterministic_case_digest(row) \
+                    or row.get("checkpoint_integrity_digest") != base._integrity_digest(row):
+                raise VerificationError(f"authority case differs: {case.case_id}")
+            source, episode, request, packed = m13._case_context(inputs, case)
+            query = m13.query_binding(source, episode, request, packed, contract.PROVENANCE_DIGEST)
+            m13.validate_certificate_and_matches({**row["certificate"], "elapsed_seconds": 0.0},
+                row["matches"], case.query_id,
+                expected_input_digest=query["certified_input_digest"])
+            verified_matches += len(row["matches"])
+    finally:
+        m13.INITIAL_FRONTIER, m13.MAXIMUM_FRONTIER = original_controls
     resident = m13.resident_full(repository / contract.SOURCE_FULL_RELATIVE / "store",
         contract.RESIDENT_ROOT, contract.GENERATION_ID, contract.PROVENANCE_DIGEST, 1024 ** 3)
     if resident["identity_digest"] != result.get("resident_identity_digest") \

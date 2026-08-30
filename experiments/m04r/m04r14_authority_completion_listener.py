@@ -17,7 +17,7 @@ from experiments.m04r import m04r14_untouched_authority as authority
 from experiments.m04r import verify_m04r14_untouched_authority as verifier
 
 
-ROOT = Path("config/data/analogues/m04r14/untouched-authority-listener-v1")
+ROOT = Path("config/data/analogues/m04r14/untouched-authority-listener-v2")
 
 
 def _write(path: Path, value: dict[str, Any]) -> None:
