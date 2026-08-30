@@ -1,0 +1,67 @@
+{
+  "schema_version": "m04r14-full-universe-shadow-contract-v1",
+  "status": "frozen_before_shadow_denominator",
+  "dataset": "nasdaq",
+  "snapshot_seed": "m04r14-nasdaq-shadow-v1",
+  "lookback": 252,
+  "representation_version": "dense-v1",
+  "minimum_history_rows": 252,
+  "maximum_staleness_days": 120,
+  "minimum_history_gap_bars": 60,
+  "quality_tiers": ["A", "B"],
+  "liquidity_strata": ["low", "middle", "high"],
+  "top_k": 20,
+  "max_per_instrument": 3,
+  "denominator_policy": {
+    "scope": "union of source instruments and quality/liquidity metadata at the source lock",
+    "one_row_per_normalized_source_symbol": true,
+    "skip_reason_priority": [
+      "missing_source_file",
+      "missing_quality_metadata",
+      "quarantined_quality",
+      "missing_liquidity_metadata",
+      "insufficient_query_history",
+      "stale_at_source_lock",
+      "missing_benchmark_cutoff",
+      "packed_temporal_coverage_unavailable"
+    ],
+    "unexpected_load_or_identity_difference_is_error": true
+  },
+  "execution": {
+    "processes": 8,
+    "numba_threads_per_process": 1,
+    "exact_workers_per_process": 1,
+    "block_rows": 4096,
+    "initial_frontier_rows": 1000,
+    "maximum_frontier_rows": 16384,
+    "seed_rows": 512,
+    "requested_positions": true,
+    "vector_lower_bounds": true,
+    "deferred_alignments": true,
+    "sorted_joined_iqr_merge": true,
+    "resume_policy": "validate immutable completed cases and run only the missing set",
+    "case_publication": "atomic create-only",
+    "authority_and_outcome_paths_accepted": false
+  },
+  "performance": {
+    "lane": "grouped batch only; interactive per-query SLOs are descriptive",
+    "minimum_queries_per_second": 0.025,
+    "snapshot_wall_seconds_max": 130800,
+    "worker_peak_rss_mib_max": 4096,
+    "process_swap_kib_max": 0,
+    "oom_or_worker_failure_allowed": false
+  },
+  "audit": {
+    "selection": "two SHA-256-ranked scheduled queries per quality/liquidity cell",
+    "sample_size": 12,
+    "oracle": "independently rebuilt exhaustive-frontier universe with exact constrained top-20 comparison",
+    "clean_rebuild_parity": true,
+    "daily_drift_minimum_distinct_source_locks": 5
+  },
+  "claims": {
+    "retrieval_outcome_blind": true,
+    "production_promotion_authorized": false,
+    "profitability_claimed": false,
+    "one_snapshot_completes_sustained_window": false
+  }
+}
