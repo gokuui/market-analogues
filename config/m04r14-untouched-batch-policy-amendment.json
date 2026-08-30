@@ -1,0 +1,21 @@
+{
+  "schema_version": "m04r14-untouched-batch-policy-amendment-v1",
+  "status": "post-run-user-authorized-policy-correction",
+  "authorized_at": "2026-08-30",
+  "reason": "The candidate run is the qualified P8 grouped batch lane. Applying interactive per-query exact-stage limits to concurrently contended batch tasks mixed two operational contracts that the validation plan explicitly separates.",
+  "original_result_digest": "dfbaace9be157101e7e5bcb912855d7e0cc0769c96f9746d851c9f479eb43868",
+  "original_performance_passed": false,
+  "original_failure_preserved": true,
+  "candidate_rerun_authorized": false,
+  "batch_acceptance": {
+    "required_cases": 72,
+    "required_matches_per_case": 20,
+    "semantic_pass_required": true,
+    "candidate_wall_seconds_max": 2400.0,
+    "authority_accessed_required": false,
+    "real_forward_outcomes_accessed_required": false
+  },
+  "concurrent_case_exact_seconds_role": "diagnostic-only-for-grouped-batch; interactive latency remains governed by the separately sealed T14-05 interactive lane",
+  "results_open_condition": "separate post-run verifier reconstructs all 72 cases and 1440 certified matches and passes the amended batch contract",
+  "production_promotion_authorized": false
+}
