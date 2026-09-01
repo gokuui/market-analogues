@@ -1265,6 +1265,14 @@
   <p><b>Descriptive coverage:</b> Across all six horizons, 320,228 rows are complete, 6,149 end at source exhaustion and 11,891 are censored for missing expected sessions. At the fixed 20-session barrier: 16,467 favorable-first, 33,217 adverse-first, 226 ambiguous same-bar, 3,793 no-touch and 2,675 censored. These are inventory facts, not probabilities or trading claims; query-level evidence must apply the stored causal embargo and dependence controls.</p>
   <p><b>Next:</b> T09-03 and T09-04 are complete. Build T09-05 descriptive evidence cards from the verified store, showing raw analogues, actual paths, counterexamples, censor/ambiguity counts, one-best-per-symbol effective samples and explicit abstention. Walk-forward calibration and the Stockbee 25%/4% universe study remain later preregistered stages.</p>
 </section>
+<section class="entry">
+  <h2>L-136 — Evidence-card semantics frozen before query-level aggregation</h2>
+  <p><b>Why:</b> The full store makes query-level outcome summaries possible, but denominators, dependence handling, weights and abstention rules could otherwise be selected after seeing individual query results. EC-01 therefore freezes presentation and aggregation before any such summary is computed.</p>
+  <p><b>Rules:</b> All original ranks 1–20 appear before summaries. Same-query-symbol memories move to a separate panel; primary evidence keeps only the lowest-rank episode per matched symbol. Complete causally observable horizons contribute; censored cases remain visible but leave measure denominators, and same-bar ambiguity leaves the directional denominator. Cards report uniform and original-rank exponential half-life-10 weights with explicit effective sample sizes. Minimum effective sample size remains M00's 10.</p>
+  <p><b>Unavailable controls:</b> Point-in-time event-cluster, sector and regime labels do not exist, so cards disclose those panels as unavailable rather than fabricate them. Event-cluster cap compliance is therefore unverified. Calibrated novelty, stability and contradictory-context thresholds remain future walk-forward work.</p>
+  <p class="pass"><b>Gate:</b> Contract digest <code>3ca1d4aa…2de0</code> binds M00, retrieval, outcome semantics and full verification. Twenty-six focused tests reject rank, symbol-cap, weight, abstention, upstream and promotion weakening. Verification receipt <code>7272f19d…3a1</code> passes with <code>query_level_outcome_aggregation_opened=false</code> and production promotion false. The readable sequence is <a href="t14-09-evidence-cards-plan.html">the evidence-card implementation plan</a>.</p>
+  <p><b>Next:</b> Implement production and independent synthetic aggregation oracles under this contract, then preregister the complete 3,270-card build before opening query-level distributions.</p>
+</section>
 </main>
 
 <section id="reproduce">

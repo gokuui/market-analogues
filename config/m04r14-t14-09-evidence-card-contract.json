@@ -1,0 +1,111 @@
+{
+  "schema_version": "m04r14-t14-09-evidence-card-contract-v1",
+  "contract_id": "nasdaq-descriptive-analogue-evidence-cards-v1",
+  "status": "frozen_before_query_level_outcome_aggregation",
+  "upstream": {
+    "m00_contract_digest": "8b333ac8a6cdf0df9d71d3599e25336f7db246957d3a29a925fedc0e9103fa53",
+    "m00_sha256": "26d33b5e4f69d20b1be1458e28c7a85e5c20554e70d0de0beced3c7e08c8aebe",
+    "outcome_contract_digest": "2aee56f0671c7ff89e2df39cb3803b35adaae9988ce199259a7c930eab316c40",
+    "outcome_contract_sha256": "aff7525d5d3de2115c83f29f281aed3d2f691d8b11c179d0f05a257af8039b13",
+    "registry_digest": "e5a1024e021425cace30d2172fee426ff1e6490702ea4f30583ad056e1ca89f2",
+    "registry_sha256": "9efe135c690779d0018260c5cfc3546101e487203a60599ba335ad92136af494",
+    "full_store_result_digest": "5626b55bbcf9ff24f7e203bec6e1d8a5d55761c2fa7ae2b79556ecaf602a1f76",
+    "full_verification_result_digest": "5f6d313e938c894a78ec9df1d0052d3e9571b364010bf2d7e2420023d1e3e942",
+    "full_verification_sha256": "fbfb2bab06ea6a2b40ea00554d58dc477fde7d15ee7d9b3e81dd8fdec33a8688"
+  },
+  "population": {
+    "dataset_id": "nasdaq",
+    "query_count": 3270,
+    "raw_neighbors_per_query": 20,
+    "query_link_count": 65400,
+    "unique_outcome_episode_count": 56378,
+    "horizons_sessions": [5, 10, 20, 40, 60, 126],
+    "primary_horizon_sessions": 20
+  },
+  "raw_evidence": {
+    "display_before_summaries": true,
+    "preserve_original_rank_1_through_20": true,
+    "required_fields": [
+      "matched_symbol", "matched_cutoff", "total_distance", "component_distances",
+      "quality_tier", "eligibility_by_horizon", "outcomes_by_horizon",
+      "primary_barrier_label", "future_path_episode_reference"
+    ],
+    "show_counterexamples": true,
+    "show_censored_and_ambiguous": true
+  },
+  "primary_evidence": {
+    "exclude_query_symbol_to_separate_panel": true,
+    "maximum_episodes_per_matched_symbol": 1,
+    "duplicate_selection": "lowest_original_match_rank",
+    "event_cluster_contribution_cap": 1,
+    "event_cluster_identity_status": "unavailable_no_point_in_time_cluster_labels",
+    "minimum_effective_sample_size": 10,
+    "eligible_when": "stored_complete_outcome_and_completion_timestamp_lte_query_cutoff",
+    "censored_policy": "show_but_exclude_from_measure_denominators",
+    "ambiguous_primary_policy": "show_but_exclude_from_directional_denominator"
+  },
+  "summaries": {
+    "unweighted": true,
+    "locked_weighted": {
+      "enabled": true,
+      "name": "original_rank_exponential_half_life_10",
+      "unnormalized_formula": "2 ** (-(original_match_rank - 1) / 10)",
+      "normalization": "renormalize_within_each_eligible_measure_denominator",
+      "effective_sample_size_formula": "(sum(weights) ** 2) / sum(weights ** 2)",
+      "outcomes_cannot_change_weights": true
+    },
+    "continuous_statistics": [
+      "count", "mean", "median", "q25_linear", "q75_linear", "minimum", "maximum",
+      "positive_count", "negative_count", "zero_count"
+    ],
+    "primary_barrier_statistics": [
+      "favorable_first", "adverse_first", "no_touch",
+      "ambiguous_same_first_touch_bar", "censored", "resolved_directional_denominator"
+    ],
+    "required_sample_counts": [
+      "raw_links", "raw_unique_episodes", "raw_unique_symbols", "same_symbol_links",
+      "effective_rows_before_horizon_eligibility", "eligible_rows_by_horizon",
+      "weighted_effective_sample_size_by_horizon"
+    ]
+  },
+  "sensitivity_panels": {
+    "neighbor_count": "report_prefixes_5_10_15_20_using_identical_rules",
+    "same_regime_vs_different_regime": "unavailable_no_point_in_time_regime_labels",
+    "same_sector_vs_cross_sector": "unavailable_no_point_in_time_sector_history",
+    "structure_vs_full_context": "component_distances_visible_but_alternative_ranking_not_certified"
+  },
+  "abstention": {
+    "predictive_claim_status": "always_abstain_until_expanding_window_calibration_passes",
+    "always_present_reason": "failed_calibration",
+    "additional_reason_rules": {
+      "insufficient_effective_sample_size": "eligible_primary_rows_less_than_10",
+      "historically_novel_query": "unavailable_until_development_novelty_threshold_is_frozen",
+      "unstable_neighborhood": "unavailable_until_neighbor_sensitivity_is_walk_forward_validated",
+      "contradictory_context": "unavailable_until_point_in_time_context_panels_exist",
+      "poor_data_quality": "event_cluster_cap_unverifiable_or_required_source_binding_missing"
+    },
+    "allowed_claim": "historical_conditional_descriptive_evidence_only",
+    "forbidden_claims": [
+      "calibrated_probability", "expected_profit", "buy_or_sell_recommendation",
+      "guaranteed_future_direction", "pattern_name_as_ground_truth"
+    ]
+  },
+  "artifacts": {
+    "query_summaries": "query-evidence.parquet",
+    "raw_analogue_rows": "analogue-evidence.parquet",
+    "card_directory": "cards",
+    "searchable_html": "index.html",
+    "coverage": "COVERAGE.json",
+    "seal": "SEALED.json"
+  },
+  "verification": {
+    "independent_reconstruction": true,
+    "all_queries_required": 3270,
+    "all_links_required": 65400,
+    "exact_row_and_summary_equality": true,
+    "outcome_mutation_must_not_change_raw_ranks": true,
+    "production_promotion_authorized": false,
+    "query_level_outcome_aggregation_opened": false
+  },
+  "contract_digest": "3ca1d4aa23ef7c0ee9f146b74c0672c0c27457b7189174d92f933afb59f82de0"
+}
