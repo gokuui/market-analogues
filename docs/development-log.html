@@ -1478,6 +1478,14 @@
   <p><b>Decision:</b> Generation <code>c4b068a6…96cb9</code> is authorized for retrieval integration. This certifies storage, alignment, lower-bound evaluation and performance—not predictive value or production use. Historical query outcomes and the final-period result remain unopened.</p>
   <p><b>Next:</b> Integrate the independently verified auxiliary DTW term with the existing exact price route, require combined lower-bound safety and exhaustive neighbor equality on synthetic and the three real probes, then freeze the price-only retrieval mechanism before scale.</p>
 </section>
+<section class="entry">
+  <h2>L-165 — Combined price-plus-DTW route integrated; old 16k cap falsified</h2>
+  <p><b>Implementation:</b> An aligned component scanner binds both the packed and DTW generation IDs and computes the exact safe formula <code>packed branch-aware 55% rigid-price bound + 45% outward-corrected interval-DTW bound</code>. Eligibility is applied without disturbing physical alignment; packed overflow retains zero. Forward/reverse synthetic scans are identical, every combined score is below the exact price-development distance and exact completion matches a distinct-symbol exhaustive oracle.</p>
+  <p><b>Real frontier diagnostic:</b> At row 16,385, early/middle/late combined bounds are <code>0.69759 / 0.97537 / 0.73995</code>, materially above the old <code>0.55072 / 0.80385 / 0.58966</code> bounds but still below the old exact thresholds. The early route's own exact completion also overflows the frozen 16,384-row ceiling; no result is emitted. This falsifies the old cap rather than silently expanding it.</p>
+  <p><b>Scaling implication:</b> The old threshold scan admitted 638,971 / 870,707 / 1,910,633 rows. The independently verified interval bound pruned about 90% of comparable old-bound admissions, implying that a serious closure ladder must cover roughly 64k / 87k / 191k rows. The next preregistered ladder is therefore 16,384, 32,768, 65,536, 131,072 and 262,144, with typed overflow if the final level fails.</p>
+  <p><b>Performance finding:</b> The first sequential combined scans take 108–144 seconds because packed and DTW kernels run serially and the late query has the largest eligible set. Correctness is retained; before scale, overlap the independent packed and DTW block computations across the eight CPUs and compare exact outputs and real timings. Monthly multi-query physical scans remain required.</p>
+  <p><b>Boundary:</b> This is implementation and diagnostic evidence, not a frozen real-query certificate. Do not claim price-only retrieval complete until the expanded ladder passes exhaustive equality and independent verification on all three probes.</p>
+</section>
 </main>
 
 <section id="reproduce">

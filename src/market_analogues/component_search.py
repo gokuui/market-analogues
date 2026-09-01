@@ -151,6 +151,7 @@ def _score_group(
     maximum_candidate_cutoff: pd.Timestamp,
     completion_threshold: float,
     tolerance: float,
+    strengthened_proposal_bound: bool = False,
 ) -> tuple[list[_CompactComponentScore], int, float]:
     key = InstrumentKey(store_dataset_id, symbol)
     bars = source.load(key)
@@ -190,9 +191,11 @@ def _score_group(
         native_lower = float(bounded.components[PRICE_COMPONENT][index])
         excess = proposal.lower_bound - native_lower
         if not np.isfinite(native_lower) or native_lower < 0 \
-                or not np.isfinite(excess) or excess > tolerance:
-            raise CertifiedComponentSearchError("packed component bound exceeds native bound")
-        maximum_excess = max(maximum_excess, excess)
+                or not np.isfinite(excess) \
+                or not strengthened_proposal_bound and excess > tolerance:
+            raise CertifiedComponentSearchError("packed component/native bound relation differs")
+        if not strengthened_proposal_bound:
+            maximum_excess = max(maximum_excess, excess)
         if native_lower > completion_threshold:
             native_pruned += 1
             continue
@@ -206,8 +209,14 @@ def _score_group(
         )
         exact_price = float(exact_components[PRICE_COMPONENT])
         if not np.isfinite(total) or not np.isfinite(exact_price) \
-                or exact_price + tolerance < native_lower:
+                or exact_price + tolerance < native_lower \
+                or strengthened_proposal_bound \
+                and exact_price + tolerance < proposal.lower_bound:
             raise CertifiedComponentSearchError("exact component violates native bound")
+        if strengthened_proposal_bound:
+            maximum_excess = max(
+                maximum_excess, proposal.lower_bound - exact_price,
+            )
         output.append(_CompactComponentScore(AnalogueMatch(
             episode.key, exact_price, {PRICE_COMPONENT: exact_price}, [],
             episode.quality_tier, episode.quality_issues,
@@ -221,6 +230,7 @@ def _score(
     request: SearchQuery, store_dataset_id: str, manifest: dict[str, object],
     completion_threshold: float, tolerance: float, workers: int,
     benchmark: pd.DataFrame,
+    strengthened_proposal_bound: bool = False,
 ) -> tuple[list[_CompactComponentScore], int, float]:
     grouped: dict[str, list[BoundProposal]] = {}
     for proposal in proposals:
@@ -246,6 +256,7 @@ def _score(
             store_dataset_id=store_dataset_id, expected_prefix=expected,
             maximum_candidate_cutoff=maximum_cutoff,
             completion_threshold=completion_threshold, tolerance=tolerance,
+            strengthened_proposal_bound=strengthened_proposal_bound,
         )
 
     items = sorted(grouped.items())
