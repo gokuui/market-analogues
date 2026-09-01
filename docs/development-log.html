@@ -1390,6 +1390,12 @@
   <p><b>Interpretation:</b> The old 30–52% exact-admission estimates were caused primarily by the missing DTW lower-bound term, not inherent ambiguity in the price-development measure. A compact 64-sample auxiliary index is now justified for engineering and performance validation. This is not production authorization and says nothing about future returns.</p>
   <p><b>Next:</b> Commit and run an independently structured verifier that reverse-scans the complete admitted sets, reconstructs the same SHA samples, recomputes all exact comparisons and re-evaluates the frozen gate. Only a verified receipt authorizes auxiliary-store construction.</p>
 </section>
+<section class="entry">
+  <h2>L-152 — Real DTW-bound evidence independently verified</h2>
+  <p class="pass"><b>Independent replay:</b> Verifier commit <code>84c4dc9</code> reverse-scanned each complete old-bound admission set with 4,097-row blocks, independently reconstructed the three SHA samples and recomputed all exact representations, native bounds, interval bounds and exact DTWs. Every admitted-set, sample and score digest exactly equals the forward producer.</p>
+  <p><b>Verified result:</b> All 12,288 rows retain zero false prunes and the exact 3,705 / 3,754 / 3,582 pruning counts. Aggregate pruning is <code>0.8985188802083334</code>; producer digest <code>b083027f…3851</code> is accepted at verification digest <code>e056de94…bc95</code>. Historical query futures and the final-period result remain unopened.</p>
+  <p><b>Next engineering boundary:</b> Build an immutable auxiliary store aligned one-for-one with the existing packed generation. Preserve temporal float16 centers, outward channel radii and sufficient order information for the tight joint-IQR proof. First prove scalar/batch equivalence, alignment, mutation refusal and measured block throughput on a bounded symbol subset; only then launch the full-universe build.</p>
+</section>
 </main>
 
 <section id="reproduce">
