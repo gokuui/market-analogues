@@ -1424,6 +1424,13 @@
   <p><b>Repair:</b> V2 uses a fresh output root and preregistration path and explicitly canonicalizes every NumPy-derived scalar and comparison to native <code>float</code>/<code>bool</code>. A regression round-trips the representative gate payload with <code>allow_nan=false</code>. All gates and numeric limits remain unchanged.</p>
   <p><b>Next:</b> Pass the full suite, commit the v2 repair as a new H0, generate its sole-child H1 preregistration and rebuild both roots from scratch.</p>
 </section>
+<section class="entry">
+  <h2>L-157 — Bounded DTW-store v2 passes every frozen gate</h2>
+  <p><b>Fresh lifecycle:</b> Repair H0 <code>d6b67e5</code> and sole-child H1 <code>4c5ac08</code> freeze v2 at preregistration digest <code>a72ead55…4b348</code>. V2 rebuilt both roots from raw OHLCV and reused no v1 shard.</p>
+  <p class="pass"><b>Result:</b> Both 64-symbol builds are byte-identical and exactly align 20,009 main plus all 35 overflow rows. The 123 available deterministic scalar probes match the compiled block kernel within <code>6.66e-16</code>. Repeated scan outputs are identical. The measured projection is 69.54 seconds for all 3,786,156 rows against the frozen 90-second ceiling; projected size is 2.779 GiB against 3.1 GiB. Result digest is <code>bb204164…2f13</code>.</p>
+  <p><b>Boundary:</b> This authorizes an independently reconstructed verification, not yet the full build. Production promotion, historical query futures and final-period outcomes remain unopened.</p>
+  <p><b>Next:</b> Independently rebuild the same 64 symbols in reverse order from raw OHLCV, compare every byte with both producer roots, repeat scalar and block scans, and publish a create-only verification receipt before implementing the full build.</p>
+</section>
 </main>
 
 <section id="reproduce">
