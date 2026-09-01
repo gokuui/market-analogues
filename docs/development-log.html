@@ -1438,6 +1438,14 @@
   <p><b>Boundary:</b> This authorizes construction of the immutable 11,584-symbol auxiliary store. It does not authorize query outcomes, final-period access, production promotion or any predictive-value claim.</p>
   <p><b>Next:</b> Freeze a resumable full-build contract bound to the verified receipt and packed generation, materialize all main and overflow rows with eight single-thread workers, publish a content-addressed generation, then independently verify full inventory alignment, selected raw reconstructions, corruption guards and measured block scans before query integration.</p>
 </section>
+<section class="entry">
+  <h2>L-159 — Full-universe DTW store builder prepared</h2>
+  <p><b>Implementation:</b> The full builder binds the independently verified bounded receipt, the complete immutable packed generation, all 11,584 symbols in physical order, every causal source-prefix identity and the fixed query-independent 788-byte row contract. Eight forked workers each use one Numba thread. A symbol shard is reusable only when its seal, source identity, row counts, content hashes, dtype and record invariants revalidate.</p>
+  <p><b>Durability and publication:</b> Atomic progress records expose completed symbols and row counts. Every worker reconstructs the complete stride-five episode inventory from raw OHLCV and refuses missing, extra, duplicate or lane-misaligned episodes. Only after all shards complete does the builder concatenate them in packed order, verify the content-addressed generation, scan every main and overflow row, check the frozen 90-second/3.1-GiB gates and confirm the resident source lease did not change.</p>
+  <p><b>Scaling correction:</b> A first local preflight reused the bounded selector and needlessly touched the 9.2-GiB packed record map while creating per-symbol slice digests. No evidence was published. The full contract now freezes the already content-addressed packed manifest, ordered symbol list and source-prefix map; exact slice inventory is checked inside each worker. Preregistration falls to about 1.2 seconds without weakening the packed binding.</p>
+  <p class="pass"><b>Pre-run verification:</b> Focused synthetic build/resume/scan tests and the complete regression suite pass. Disk preflight shows 14 GiB available; the retained shards plus published generation require about 5.56 GiB at peak. The full build has not started, and no query future or final-period outcome has been opened.</p>
+  <p><b>Next:</b> Commit this implementation as H0, generate and commit only its preregistration as sole-child H1, then launch the resumable full build. An independently committed verifier must pass before retrieval code may consume the generation.</p>
+</section>
 </main>
 
 <section id="reproduce">
@@ -1576,6 +1584,10 @@ git commit -m "Preregister M04R-11 candidate v2"
 .venv/bin/python -m experiments.m04r.m04r14_t14_09_evidence_card_store --repository /home/vinay/code/market-analogues
 # The first verifier refusal and post-open formula-spelling amendment are retained in Git.
 .venv/bin/python -m experiments.m04r.verify_m04r14_t14_09_evidence_card_store --repository /home/vinay/code/market-analogues --dry-run</code></pre>
+  <pre><code># T14-10 WF-03B full DTW store starts only after the bounded independent receipt passes.
+.venv/bin/python -m experiments.m04r.m04r14_t14_10_wf03b_dtw_store_full preregister --repository /home/vinay/code/market-analogues
+# Commit exactly experiments/m04r/m04r14_t14_10_wf03b_dtw_store_full_v1_preregistered.json as sole-child H1.
+.venv/bin/python -m experiments.m04r.m04r14_t14_10_wf03b_dtw_store_full run --repository /home/vinay/code/market-analogues</code></pre>
   <p class="muted">Source datasets are read-only. Generated artifacts live under the configured artifact directory and are intentionally excluded from Git.</p>
 </section>
 </body>
