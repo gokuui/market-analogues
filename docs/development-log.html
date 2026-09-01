@@ -1470,6 +1470,14 @@
   <p><b>Incident:</b> Corrected H0 <code>6264fa1</code> and sole-child preregistration <code>204b0c3</code> froze verifier v1 at digest <code>8c5bf0d6…e0c4</code>. The run loaded and production-validated the full generation, then its separately written validator refused while viewing a structured memmap's non-contiguous padding field as bytes. No verification root or receipt was written, and no outcome was accessed.</p>
   <p><b>Repair and prevention:</b> V2 copies only the three padding bytes per row into a contiguous array before byte inspection; all substantive checks remain unchanged. A two-row real memmap regression now exercises the strided layout that the earlier one-row in-memory fixture missed. Before a new H0, the corrected validator must also run directly on real mapped generation rows and real seed shards.</p>
 </section>
+<section class="entry">
+  <h2>L-164 — Full DTW generation independently verified</h2>
+  <p class="pass"><b>Verified receipt:</b> V2 repair H0 <code>bbb08ac</code> and sole-child H1 <code>47cb786</code> froze verifier digest <code>578c8074…5720</code>. The create-only receipt passes all 15 gates at verification digest <code>8e190c2b…fca8</code>. Runtime was 524.84 seconds.</p>
+  <p><b>Complete physical audit:</b> All 11,584 shard seals, hashes, source-prefix bindings and independently checked record arrays agree. Ordered shard concatenations exactly reproduce generation hashes <code>9430cbd0…f9b0</code> and <code>33d306f8…9473</code>; counts remain 3,786,121 main plus 35 overflow and eight safe fallback rows. The producer metadata and first-query scan digests match independently.</p>
+  <p><b>Raw and traversal audit:</b> All 128 frozen raw symbols reconstruct byte-for-byte across 45,983 main rows, all 35 overflow rows and all eight fallback rows. For the early, middle and late queries, forward 4,096-row and reverse 4,093-row scans are exactly equal. All six scans take 69.94–70.30 seconds, below the 90-second ceiling. Malformed orders and changed packed bindings fail closed, and the resident lease remains unchanged.</p>
+  <p><b>Decision:</b> Generation <code>c4b068a6…96cb9</code> is authorized for retrieval integration. This certifies storage, alignment, lower-bound evaluation and performance—not predictive value or production use. Historical query outcomes and the final-period result remain unopened.</p>
+  <p><b>Next:</b> Integrate the independently verified auxiliary DTW term with the existing exact price route, require combined lower-bound safety and exhaustive neighbor equality on synthetic and the three real probes, then freeze the price-only retrieval mechanism before scale.</p>
+</section>
 </main>
 
 <section id="reproduce">
