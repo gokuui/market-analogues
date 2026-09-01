@@ -39,17 +39,18 @@
 </section>
 
 <section class="task">
-  <h2>T09-00 — Freeze the operational contract <span class="open">IN PROGRESS</span></h2>
+  <h2>T09-00 — Freeze the operational contract <span class="done">COMPLETE</span></h2>
   <p><b>Build:</b> machine JSON plus this readable plan. Bind the M00 charter, retrieval receipts, source lock, case manifest, all formulas, censoring precedence, artifacts, process count and claim limits.</p>
   <p><b>Test:</b> schema and self-digest validation; reject altered upstream hashes, horizons, formulas, ambiguity policy, delisting policy, outcome-fed retrieval, or claim language.</p>
   <p><b>Pass:</b> commit the contract before reading a single post-match source row. Later implementation is preregistered as a sole child of a clean code commit.</p>
 </section>
 
 <section class="task">
-  <h2>T09-01 — Independent synthetic outcome oracle</h2>
+  <h2>T09-01 — Independent synthetic outcome oracle <span class="done">COMPLETE</span></h2>
   <p><b>Build:</b> a production calculator and a deliberately separate reference implementation. Cover exact returns/excursions, causal ATR, favorable/adverse first touch, same-bar ambiguity, no touch, incomplete history, missing benchmark, missing stock sessions, invalid prices and duplicate episode caching.</p>
   <p><b>Test:</b> hand-calculated fixtures; scale invariance; future mutation changes outcomes but cannot change frozen retrieval; row-order invariance; serial/12-process equality; Parquet round trips preserve exact semantic digests.</p>
   <p><b>Pass:</b> exact production/reference equality on every scalar, label, timestamp, censor reason and path row. No real forward value is opened during development.</p>
+  <p class="done"><b>Result:</b> ten synthetic episode families produce exact production/reference semantic digests. Serial and 12-process executions are identical; future mutation leaves the frozen prefix unchanged while changing only outcomes; exact duplicate episodes collapse and conflicting reuse fails; Parquet round trips preserve semantics. Gate digest <code>0714f5d0…e6f4</code>.</p>
 </section>
 
 <section class="task">
