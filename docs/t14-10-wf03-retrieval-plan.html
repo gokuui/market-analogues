@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>T14-10 WF-03 historical retrieval and baseline plan</title>
+<style>body{font-family:system-ui,sans-serif;max-width:1150px;margin:2rem auto;padding:0 1rem;color:#18212b;line-height:1.52}section{border:1px solid #d8dee6;border-radius:10px;padding:1rem 1.2rem;margin:1rem 0}table{border-collapse:collapse;width:100%}th,td{padding:.55rem;border-bottom:1px solid #ddd;text-align:left;vertical-align:top}code{overflow-wrap:anywhere}.warn{background:#fff4dc;border-left:5px solid #b9770e;padding:.8rem}.pass{color:#176b37}.open{color:#9a6700}</style></head><body>
+<h1>WF-03 — Historical retrieval and baseline store</h1>
+<p><b>Inputs already sealed:</b> 3,936 outcome-blind queries at registry digest <code>784e771b…82c4</code> and all scoring/inference formulas at synthetic verification digest <code>00387710…7d90</code>. Query futures and the final evaluation remain unopened.</p>
+<p class="warn"><b>State change:</b> one deterministic early-query feasibility search was started after WF-01 and WF-02 passed. Its first invocation failed before scanning because the resident parent—not its <code>store/</code> child—was supplied. The corrected search completed, but the terminal wrapper detached and lost the certificate output. Retrieval is therefore conservatively recorded as opened, but the run is not evidence and no query future was accessed. All further probes must publish durable create-only receipts.</p>
+
+<section><h2>WF-03A — Durable feasibility harness</h2>
+<p>Use the SHA-selected early, middle and late probes <code>a69def45…2284</code>, <code>4ebfb91d…e71e</code> and <code>b923b64e…0643</code>. Each case writes RUN_STARTED, proposal, exact certificate, resource measurements and terminal COMPLETE/FAILED records atomically. A detached terminal cannot lose state.</p>
+<p>The current cgroup exposes eight CPUs (0–7), not twelve. The 9.21 GB branch-aware pack with 3,786,156 eligible windows is already resident in shared memory. Probes use all eight CPUs for proposal work, single-thread numerical libraries, and no outcome path.</p>
+<p><b>Pass:</b> all three composite results certify, reproduce under reverse/block-order verification, match the frozen prefix identities and show a viable bounded full-run estimate. Failure is retained and repaired before a 3,936-query launch.</p></section>
+
+<section><h2>WF-03B — Prove the four neighbor mechanisms</h2>
+<table><thead><tr><th>Method</th><th>Required proof before scale</th></tr></thead><tbody>
+<tr><td>Composite</td><td>Reuse the verified branch-aware lower bound, requested-position exact completion, native-bound deferral and streaming threshold closure. Enforce 20 distinct matched symbols and the frozen 60-session retrieval gap; outcome completion is checked later per measure.</td></tr>
+<tr><td>Price-only</td><td>Add a route-specific certificate retaining the price lower bound, exact price component and strict next-bound closure. On synthetic and the three probes it must equal an exhaustive exact price-component oracle; a component proposal alone is not accepted as a certificate.</td></tr>
+<tr><td>Deterministic random</td><td>Freeze a SHA-256 order over causally eligible distinct symbols, then a SHA-256 episode order within each selected symbol. Verify exact eligibility and deterministic reconstruction. This avoids pretending repeated windows from one symbol are independent.</td></tr>
+<tr><td>Recent return/volatility</td><td>Build a causal feature store for 20-session return, 63-session return and 20-session log-return volatility. Compare compact exact nearest-neighbor alternatives on synthetic/exhaustive probes, including distinct-symbol selection and temporal eligibility, before choosing and freezing the fastest exact-equivalent method.</td></tr>
+</tbody></table>
+<p>Regime and unconditional frequencies do not retrieve neighbors; they are expanding prior-query baselines applied only after eligible prior query outcomes exist. Sector remains explicitly unavailable.</p></section>
+
+<section><h2>WF-03C — Scale without repeated scans</h2>
+<p>Group the 24 queries at each of 164 month-ends. A shared physical pack pass computes composite and price lower-bound frontiers for the month, while query state and certificates remain isolated. Run up to eight month batches concurrently with one numerical thread per process. Exact completion then runs as resumable per-query tasks.</p>
+<p>Do not publish a monolithic result only at the end. Each query has create-only proposal/exact terminal state; a supervisor validates completed cases, resumes only missing cases and advances automatically. Process failure, OOM, timeout or certificate overflow emits a typed failure and no result.</p>
+<p><b>Pass:</b> 3,936/3,936 queries have certified composite, price, random and return/vol inventories; every link is causal, distinct-symbol constrained and outcome-blind; forward/reverse audits and a deterministic sample exhaustive oracle agree exactly.</p></section>
+
+<section><h2>WF-03D — Prediction-before-query-outcome ordering</h2>
+<ol>
+<li>Seal all neighbor links and retrieval certificates with no outcome columns.</li>
+<li>Compute or reuse analogue outcomes only when that particular outcome completion timestamp is no later than the query cutoff. Ambiguous and censored states remain visible.</li>
+<li>Freeze raw analogue links, method-specific probabilities/quantiles, abstention inputs and all baseline predictions for every query.</li>
+<li>Only then compute query outcomes for development and validation 1–3. Verify those folds without changing formulas or thresholds.</li>
+<li>Open final 2024–August-2025 query outcomes exactly once only after all earlier artifacts and the final predictions independently verify.</li>
+</ol>
+<p>This ordering prevents a query’s realized future from selecting its neighbors, changing a baseline, altering abstention or deciding which prediction gets published.</p></section>
+
+<section><h2>Acceptance boundary</h2>
+<p>WF-03 completion proves causal, exact and performant prediction construction. It does not prove usefulness. WF-04 alone measures Brier/log/interval performance and may fail. Even a research pass cannot clear missing membership, delisting, sector and event-cluster limitations or authorize production.</p></section>
+</body></html>
