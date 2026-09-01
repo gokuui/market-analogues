@@ -1338,6 +1338,14 @@
   <p class="pass"><b>Pre-run checks:</b> Six unit tests pass for exact proposal round-trip, create-only writes, monotone retained attempts, terminal binding and mutation rejection. All three real query episodes reconstruct to their frozen IDs with <code>max_per_instrument=1</code>; the 3,936-query registry self-digest and resident store identity validate. No new durable probe result has been opened yet.</p>
   <p><b>Next:</b> Commit this H0 implementation, generate and commit its preregistration as the sole H1 child, then execute the early/middle/late probes. The resulting evidence decides whether the composite path is viable before any full walk-forward launch or baseline implementation choice.</p>
 </section>
+<section class="entry">
+  <h2>L-145 — WF-03A durable probes certify; serial scale is rejected</h2>
+  <p><b>Frozen execution:</b> H0 <code>cef6172</code> and sole-child preregistration H1 <code>ba217f0</code> bind three outcome-blind cases, the exact query rows, resident generation, eight-thread forward/reverse proposal scans, one-match-per-symbol request and certified exact settings. The run completed without retry at candidate digest <code>0c91c1e…c4bf</code>.</p>
+  <p class="pass"><b>Correctness result:</b> Early, middle and late cases each returned 20 distinct-symbol matches and a strict certified next-bound closure. Forward 4,096-row and reverse 4,097-row scans produced identical candidate semantics. The exact stages evaluated only 1,769 / 4,401 / 4,713 of 1,961,577 / 2,861,682 / 3,683,053 eligible windows and safely pruned every remainder. Query futures and the final period remain unopened.</p>
+  <p><b>Resource result:</b> Case wall times were 92.7, 165.9 and 206.8 seconds; exact completion consumed 58.9, 126.0 and 162.2 seconds. Peak process RSS rose from 0.97 to 1.25 GB and process swap remained zero. The observed mean extrapolates to 169.6 hours for a serial 3,936-query run, so correctness passes but serial scaling is explicitly rejected.</p>
+  <p><b>Independent dry run:</b> A separately structured verifier reconstructs source prefixes, query/request identity, proposal candidate/result digests, forward/reverse equality, certificate accounting and closure, temporal eligibility, distinct-symbol constraints, every leaf SHA/seal, closed inventories and root aggregates. Its dry-run digest is <code>85dc4dd6…75bb</code>; publication follows only after committing the verifier.</p>
+  <p><b>Next:</b> Publish independent verification, then implement WF-03B proofs for exact price-only, deterministic random and recent-return/volatility neighbors. WF-03C must batch the 24 queries per month so one physical pack pass serves the month and run independent exact tasks across available cores.</p>
+</section>
 </main>
 
 <section id="reproduce">
