@@ -83,6 +83,10 @@ class FullStoreVerificationError(RuntimeError):
     pass
 
 
+def _probe_query_ids() -> list[str]:
+    return [str(probe[1]) for probe in base.PROBES]
+
+
 def _git(repository: Path, *args: str) -> str:
     result = subprocess.run(
         ["git", *args], cwd=repository, text=True, capture_output=True,
@@ -239,7 +243,7 @@ def build_preregistration(repository: Path) -> dict[str, Any]:
     selection = _select(packed.symbols, metadata, packed)
     _registry, by_id = base._registry(repository)
     queries = []
-    for _label, query_id in base.PROBES:
+    for query_id in _probe_query_ids():
         _source, _episode, _request, packed_query = base._context(
             repository, by_id[query_id],
         )
@@ -295,7 +299,7 @@ def validate_preregistration(
     contract, result, packed, samples = _producer(repository)
     metadata = _metadata(repository, packed.symbols)
     selection = _select(packed.symbols, metadata, packed)
-    expected_query_ids = [query_id for _label, query_id in base.PROBES]
+    expected_query_ids = _probe_query_ids()
     frozen_query_ids = [
         row.get("query_id") for row in preregistration.get("queries", [])
     ]

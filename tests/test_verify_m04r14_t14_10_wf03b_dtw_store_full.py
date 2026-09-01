@@ -12,6 +12,7 @@ sys.path.insert(0, str(ROOT))
 from experiments.m04r.verify_m04r14_t14_10_wf03b_dtw_store_full import (
     FullStoreVerificationError,
     _independent_validate,
+    _probe_query_ids,
     _raw_symbol,
     _scan,
     _select,
@@ -27,6 +28,14 @@ from market_analogues.quantized_bound import quantize_bound_row
 from market_analogues.representation import represent
 from market_analogues.synthetic import generate_case
 from market_analogues.types import EpisodeKey, InstrumentKey
+
+
+def test_frozen_probe_query_ids_use_four_field_probe_contract() -> None:
+    assert _probe_query_ids() == [
+        "a69def453340e01048a52284",
+        "4ebfb91d87892612d998e71e",
+        "b923b64e7f3b36fe2a8d0643",
+    ]
 
 
 def test_selection_forces_edges_and_computes_physical_offsets() -> None:

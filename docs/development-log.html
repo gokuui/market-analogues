@@ -1460,6 +1460,11 @@
   <p><b>Raw and scan evidence:</b> Before execution, freeze 128 deterministic raw symbols while forcing every overflow and zero-fallback symbol. Rebuild their complete causal episode inventories from OHLCV with eight one-thread workers and compare every byte at frozen physical offsets. For all three early/middle/late outcome-blind queries, scan the entire generation forward in 4,096-row blocks and backward in 4,093-row blocks; require exact arrays, the producer's first-query digest and at most 90 seconds per pass. Changed packed binding and malformed order fixtures must fail closed.</p>
   <p><b>Boundary and next:</b> The producer authorizes only this independent verification. Commit the verifier and its tests, freeze a sole-child preregistration, then run it create-only. Retrieval integration remains prohibited until that receipt passes; outcomes and final-period results remain unopened.</p>
 </section>
+<section class="entry">
+  <h2>L-162 — Verifier preregistration tuple refusal repaired before evidence</h2>
+  <p><b>Incident:</b> Verifier H0 <code>2bcad50</code> passed its focused and complete suites, but its first preregistration invocation treated each frozen feasibility probe as a two-field tuple. The actual contract contains label, query ID, symbol and cutoff, so Python refused the unpack before writing a preregistration or verification root. No store changed and no outcome was accessed.</p>
+  <p><b>Repair:</b> A single helper now extracts position one from the four-field contract and is regression-checked against the exact early, middle and late query IDs. The correction requires a new clean H0 and a fresh sole-child preregistration; the failed invocation remains a logged pre-evidence implementation error.</p>
+</section>
 </main>
 
 <section id="reproduce">
