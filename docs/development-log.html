@@ -1431,6 +1431,13 @@
   <p><b>Boundary:</b> This authorizes an independently reconstructed verification, not yet the full build. Production promotion, historical query futures and final-period outcomes remain unopened.</p>
   <p><b>Next:</b> Independently rebuild the same 64 symbols in reverse order from raw OHLCV, compare every byte with both producer roots, repeat scalar and block scans, and publish a create-only verification receipt before implementing the full build.</p>
 </section>
+<section class="entry">
+  <h2>L-158 — Bounded DTW store independently reconstructed and authorized</h2>
+  <p class="pass"><b>Independent verification:</b> A separately structured eight-process verifier rebuilt all 20,044 rows from raw OHLCV in reverse symbol-selection order and compared every record byte-for-byte with both clean producer builds. All raw rows, all eight safe zero-bound fallback rows and all 123 scalar probes agree; the maximum scalar delta remains below <code>1e-12</code>.</p>
+  <p><b>Performance and capacity replay:</b> Three independent block scans were deterministic and remained below the frozen 90-second full-universe projection. The verifier separately recomputed the exact 788-byte-row capacity and accepted the producer only after every frozen gate passed. Verification digest is <code>29d16eb2…a2a5</code>.</p>
+  <p><b>Boundary:</b> This authorizes construction of the immutable 11,584-symbol auxiliary store. It does not authorize query outcomes, final-period access, production promotion or any predictive-value claim.</p>
+  <p><b>Next:</b> Freeze a resumable full-build contract bound to the verified receipt and packed generation, materialize all main and overflow rows with eight single-thread workers, publish a content-addressed generation, then independently verify full inventory alignment, selected raw reconstructions, corruption guards and measured block scans before query integration.</p>
+</section>
 </main>
 
 <section id="reproduce">
