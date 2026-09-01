@@ -37,7 +37,7 @@ from market_analogues.types import EpisodeKey, InstrumentKey, stable_hash
 from experiments.m04r import m04r14_t14_10_wf03_feasibility as base
 
 
-SCHEMA = "m04r14-t14-10-wf03b-dtw-store-full-verifier-preregistration-v1"
+SCHEMA = "m04r14-t14-10-wf03b-dtw-store-full-verifier-preregistration-v2"
 PRODUCER_ROOT = Path(
     "config/data/analogues/m04r14/t14-10-wf03b-dtw-store-full-v2"
 )
@@ -45,11 +45,11 @@ SEED_ROOT = Path(
     "config/data/analogues/m04r14/t14-10-wf03b-dtw-store-full-v1/work/shards"
 )
 VERIFICATION_ROOT = Path(
-    "config/data/analogues/m04r14/t14-10-wf03b-dtw-store-full-v2-verification"
+    "config/data/analogues/m04r14/t14-10-wf03b-dtw-store-full-v2-verification-v2"
 )
 PREREGISTRATION = Path(
     "experiments/m04r/"
-    "verify_m04r14_t14_10_wf03b_dtw_store_full_v1_preregistered.json"
+    "verify_m04r14_t14_10_wf03b_dtw_store_full_v2_preregistered.json"
 )
 SAMPLE_SYMBOLS = 128
 WORKERS = 8
@@ -138,7 +138,9 @@ def _independent_validate(records: np.ndarray) -> None:
         orders = np.asarray(block["orders"])
         presence_byte = np.asarray(block["presence"], dtype=np.uint8)
         presence = ((presence_byte[:, None] >> np.arange(4)) & 1).astype(bool)
-        padding = np.asarray(block["padding"]).view(np.uint8).reshape(len(block), -1)
+        padding = np.ascontiguousarray(block["padding"]).view(np.uint8).reshape(
+            len(block), -1,
+        )
         if not np.isfinite(centers).all() or not np.isfinite(radii).all() \
                 or np.any(radii < 0) or np.any(presence_byte > 15) \
                 or np.any(padding != 0):
@@ -627,7 +629,7 @@ def verify(repository: Path, preregistration: Mapping[str, Any]) -> dict[str, An
     if not all(gates.values()):
         raise FullStoreVerificationError("independent full-store gate failed")
     state = {
-        "schema_version": "m04r14-t14-10-wf03b-dtw-store-full-verification-v1",
+        "schema_version": "m04r14-t14-10-wf03b-dtw-store-full-verification-v2",
         "status": "verified", "passed": True, "gates": gates,
         "producer_result_digest": result["result_digest"],
         "generation_id": fully_loaded.generation_id,

@@ -1465,6 +1465,11 @@
   <p><b>Incident:</b> Verifier H0 <code>2bcad50</code> passed its focused and complete suites, but its first preregistration invocation treated each frozen feasibility probe as a two-field tuple. The actual contract contains label, query ID, symbol and cutoff, so Python refused the unpack before writing a preregistration or verification root. No store changed and no outcome was accessed.</p>
   <p><b>Repair:</b> A single helper now extracts position one from the four-field contract and is regression-checked against the exact early, middle and late query IDs. The correction requires a new clean H0 and a fresh sole-child preregistration; the failed invocation remains a logged pre-evidence implementation error.</p>
 </section>
+<section class="entry">
+  <h2>L-163 — V1 independent verifier refuses strided padding view</h2>
+  <p><b>Incident:</b> Corrected H0 <code>6264fa1</code> and sole-child preregistration <code>204b0c3</code> froze verifier v1 at digest <code>8c5bf0d6…e0c4</code>. The run loaded and production-validated the full generation, then its separately written validator refused while viewing a structured memmap's non-contiguous padding field as bytes. No verification root or receipt was written, and no outcome was accessed.</p>
+  <p><b>Repair and prevention:</b> V2 copies only the three padding bytes per row into a contiguous array before byte inspection; all substantive checks remain unchanged. A two-row real memmap regression now exercises the strided layout that the earlier one-row in-memory fixture missed. Before a new H0, the corrected validator must also run directly on real mapped generation rows and real seed shards.</p>
+</section>
 </main>
 
 <section id="reproduce">

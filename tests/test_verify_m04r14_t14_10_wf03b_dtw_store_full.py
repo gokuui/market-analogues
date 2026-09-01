@@ -60,11 +60,17 @@ def test_selection_forces_edges_and_computes_physical_offsets() -> None:
     assert by_id[2]["overflow_offset"] == 1
 
 
-def test_independent_validator_rejects_hidden_bits_padding_and_order() -> None:
+def test_independent_validator_handles_strided_memmap_and_rejects_values(
+    tmp_path: Path,
+) -> None:
     record = make_dtw_sample_record(
         represent(generate_case("rounded_base", 160_000).episode)
     )
-    _independent_validate(record)
+    pair = np.concatenate((record, record))
+    path = tmp_path / "records.bin"
+    pair.tofile(path)
+    mapped = np.memmap(path, dtype=DTW_SAMPLE_DTYPE, mode="r")
+    _independent_validate(mapped)
     high_presence = record.copy()
     high_presence["presence"][0] |= np.uint8(16)
     with pytest.raises(FullStoreVerificationError, match="values"):
