@@ -19,6 +19,7 @@ from .dtw_interval_bound import (
     quantize_dtw_samples,
     quantized_dtw_lower_bounds,
     quantized_dtw_orders,
+    validate_quantized_dtw_samples,
 )
 from .representation import Representation
 from .types import stable_hash
@@ -78,7 +79,13 @@ def dtw_sample_store_contract() -> dict[str, Any]:
 
 
 def make_dtw_sample_record(representation: Representation) -> np.ndarray:
-    quantized = quantize_dtw_samples(representation)
+    return make_dtw_sample_record_from_quantized(quantize_dtw_samples(representation))
+
+
+def make_dtw_sample_record_from_quantized(
+    quantized: QuantizedDtwSamples,
+) -> np.ndarray:
+    validate_quantized_dtw_samples(quantized)
     output = np.zeros(1, dtype=DTW_SAMPLE_DTYPE)
     output["centers"][0] = quantized.centers
     output["orders"][0] = quantized_dtw_orders(quantized)

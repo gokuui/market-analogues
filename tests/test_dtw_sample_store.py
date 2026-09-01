@@ -13,6 +13,7 @@ from market_analogues.dtw_sample_store import (
     dtw_sample_lower_bounds,
     load_dtw_sample_generation,
     make_dtw_sample_record,
+    make_dtw_sample_record_from_quantized,
     make_zero_dtw_sample_record,
     validate_dtw_sample_records,
     write_dtw_sample_generation_from_shards,
@@ -33,6 +34,9 @@ def test_store_round_trip_is_aligned_and_batch_equals_scalar(tmp_path: Path) -> 
     query = represent(generate_case("trend_contraction_breakout", 130_000).episode)
     candidate = represent(generate_case("rounded_base", 130_001).episode)
     row = make_dtw_sample_record(candidate)
+    assert np.array_equal(row, make_dtw_sample_record_from_quantized(
+        quantize_dtw_samples(candidate)
+    ))
     zero = make_zero_dtw_sample_record()
     main = tmp_path / "main.bin"; overflow = tmp_path / "overflow.bin"
     row.tofile(main); zero.tofile(overflow)

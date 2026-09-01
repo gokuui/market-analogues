@@ -1409,6 +1409,14 @@
   <p class="pass"><b>Focused verification:</b> Synthetic main/overflow round-trip reproduces the scalar interval bound within <code>1e-12</code>; absent fallback rows return zero. Duplicate order entries and post-publication byte corruption are rejected. No outcome or label is present in the store contract.</p>
   <p><b>Next:</b> Build the preregistered bounded real shard POC, including independently rebuilt parity and physical packed-row alignment, before spending the approximately sixteen-minute full-pack materialization pass.</p>
 </section>
+<section class="entry">
+  <h2>L-155 — Bounded real DTW-store build gate prepared</h2>
+  <p><b>Frozen population:</b> The gate selects 64 packed symbols by a deterministic SHA rule while forcing all seven symbols that contain the 35 overflow rows. The resulting 20,044-row main-plus-overflow population binds every symbol’s packed episode/cutoff/tier sequence and causal source prefix before materialization.</p>
+  <p><b>Build proof:</b> Two separate eight-process shard roots reconstruct every 252-session, stride-five representation. Each reconstructed episode must occur exactly once in its expected main or overflow slice; missing, additional, reordered or prefix-changed episodes fail closed. Each worker uses one Numba thread, so eight processes consume the eight CPUs without nested oversubscription. Interrupted valid shards can be reused only after their seals, byte hashes, dtype and alignment are revalidated.</p>
+  <p><b>Automatic gates:</b> The two clean builds must be byte-identical; 128 independently selected real scalar probes must equal compiled batch bounds within <code>1e-12</code>; repeated scans must be identical; projected full-universe arithmetic must remain at most 90 seconds; projected storage must remain at most 3.1 GiB; and the resident packed-store lease must not change. The full build is authorized only if every condition passes.</p>
+  <p class="pass"><b>Pre-run coverage:</b> Focused tests exercise deterministic overflow forcing, exact symbol slicing, the complete one-symbol reconstruction/write/seal path, content corruption, malformed orders, absent fallback and scalar/batch equality. The real gate has not run and no future outcome has been opened.</p>
+  <p><b>Next:</b> Commit the implementation, freeze it in a sole-child preregistration and run the two bounded builds. Do not allocate the full auxiliary store unless this gate passes.</p>
+</section>
 </main>
 
 <section id="reproduce">
