@@ -1,0 +1,39 @@
+{
+  "card_count": 3270,
+  "contract_digest": "3ca1d4aa23ef7c0ee9f146b74c0672c0c27457b7189174d92f933afb59f82de0",
+  "contract_sha256": "742797e4eb1cfae6748631a4f0e132846dd74f8d9c94a9da6a9c0ac65a94cbdb",
+  "contract_verification_result_digest": "7272f19d184e63b6c163c413d3152445b5eafa80f03c658b64961178daa883a1",
+  "contract_verification_sha256": "1cb4fb77f31eb0a0ab626a62992e689a0cd6605c737cd156195d53c493ea86a1",
+  "implementation_h0": "91df1c3af62412da758def928326478c34faae19",
+  "outcome_store_result_digest": "5626b55bbcf9ff24f7e203bec6e1d8a5d55761c2fa7ae2b79556ecaf602a1f76",
+  "outcome_store_sha256": "15d33224b0197429552f592197fe8d9e880fcf17b1c46a0ad237d3b6c65cb771",
+  "outcome_verification_result_digest": "5f6d313e938c894a78ec9df1d0052d3e9571b364010bf2d7e2420023d1e3e942",
+  "outcome_verification_sha256": "fbfb2bab06ea6a2b40ea00554d58dc477fde7d15ee7d9b3e81dd8fdec33a8688",
+  "output": "/home/vinay/code/market-analogues/config/data/analogues/m04r14/t14-09-evidence-card-store-v1",
+  "preregistration_digest": "cc0380db734c759f75fe00042896d2c461734966b2831907d143b5a8ac8e297c",
+  "production_promotion_authorized": false,
+  "query_count": 3270,
+  "query_level_real_outcome_aggregation_opened": false,
+  "query_link_count": 65400,
+  "raw_neighbors_per_query": 20,
+  "runtime_files": {
+    "experiments/m04r/m04r14_t14_09_evidence_card_oracle.py": "8ee034fcafdf06fc658b95ccef4b18c66129b6864629f2cc62ac6c5dd1a76b4b",
+    "experiments/m04r/m04r14_t14_09_evidence_card_store.py": "de2d5e020e8ba9b02a3f47daacb1e91e35f844da1678e1a319f4edd20c47fb6d",
+    "experiments/m04r/verify_m04r14_t14_09_evidence_card_store.py": "5a9ab391bdab2a35667284492e52ee9118bdd7beea42d7db85e0c0c5bfe74b86",
+    "src/market_analogues/evidence_cards.py": "7da06f47bcbe6d10d26e594b0685d992a25038aa4ec7b816c23919773752dc35",
+    "src/market_analogues/types.py": "484b8b9935408dfcdad5e96d01312164101d1e2239d5dd3c2ce12d3177275a8d"
+  },
+  "schema_version": "m04r14-t14-09-evidence-card-store-preregistration-v1",
+  "source_file_sha256": {
+    "COVERAGE.json": "8b61315e05c53b04289b78391996998f76b4fa24ff4d3c40b39497a27ea1f966",
+    "SEALED.json": "15d33224b0197429552f592197fe8d9e880fcf17b1c46a0ad237d3b6c65cb771",
+    "episode-outcomes.parquet": "064ce69d9230de1d1823ad2a011e521f25f90ad880b3d5f9a56422ab15c622c1",
+    "future-paths.parquet": "8e3a26f1bd40ed4dcf4c0fdf81b6c9dbcca1359689604f12c0a2b5258f5ba819",
+    "query-match-links.parquet": "8c25c57275de6ecedc9f2b00f2a3ba169eef1dd67bf8f73c332fc75b109f024c"
+  },
+  "status": "frozen_before_complete_real_query_aggregation",
+  "summary_count": 3270,
+  "synthetic_gate_result_digest": "7d03d71c9b1cf08ce201248354e73423e79b14e7fb88a236a4ed391cf6250aff",
+  "synthetic_gate_sha256": "f89970de5dff10cce0c3618762218fe186d913902a92f2ebfeffdb76208b4675",
+  "verification": "/home/vinay/code/market-analogues/config/data/analogues/m04r14/t14-09-evidence-card-store-v1-verification"
+}
