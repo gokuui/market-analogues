@@ -1273,6 +1273,14 @@
   <p class="pass"><b>Gate:</b> Contract digest <code>3ca1d4aa…2de0</code> binds M00, retrieval, outcome semantics and full verification. Twenty-six focused tests reject rank, symbol-cap, weight, abstention, upstream and promotion weakening. Verification receipt <code>7272f19d…3a1</code> passes with <code>query_level_outcome_aggregation_opened=false</code> and production promotion false. The readable sequence is <a href="t14-09-evidence-cards-plan.html">the evidence-card implementation plan</a>.</p>
   <p><b>Next:</b> Implement production and independent synthetic aggregation oracles under this contract, then preregister the complete 3,270-card build before opening query-level distributions.</p>
 </section>
+<section class="entry">
+  <h2>L-137 — Evidence-card production and independent synthetic aggregation agree</h2>
+  <p><b>Production aggregation:</b> Added deterministic raw-rank preservation, same-query-symbol separation, one-lowest-rank episode per matched symbol, 5/10/15/20 neighbor sensitivity, six causally eligible horizon panels, unweighted distributions, original-rank half-life-10 weighting, weighted effective sample sizes, primary barrier counts, redaction of not-yet-observable outcomes and explicit abstention/context limitations.</p>
+  <p><b>Operational details frozen:</b> Unweighted quartiles use linear interpolation in the exact order <code>lower × (1−fraction) + upper × fraction</code>. Weighted quartiles use the first ordered value whose cumulative normalized rank weight reaches the requested probability. Exact zero defines zero counts; null/non-finite measures leave only their own denominator.</p>
+  <p><b>Independent oracle:</b> A separately structured scalar implementation imports no production evidence-card formulas. Six synthetic families cover baseline, same-symbol/duplicate-symbol dependence, censoring, causal embargo, missing measures and combined edge cases. The gate also reverses all input rows, mutates outcomes while requiring ranks to remain fixed, and round-trips canonical cards through Parquet.</p>
+  <p class="pass"><b>Gate:</b> All 17 focused card/contract/gate tests pass. Every complete production card equals the oracle exactly; gate digest is <code>7d03d71c…0aff</code>, elapsed 0.21 seconds, and <code>query_level_real_outcome_aggregation_opened=false</code>.</p>
+  <p><b>Next:</b> Commit EC-02 as the immutable card implementation H0, add the full builder and independent verifier without opening query-level summaries, then freeze their runtime and exact 3,270/65,400 inventory in a sole-child H1 preregistration before EC-03.</p>
+</section>
 </main>
 
 <section id="reproduce">
