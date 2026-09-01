@@ -1,0 +1,25 @@
+{
+  "amendment_digest": "7311d62a5b865190a28a533cf7cda57475dd1a96df670b4779e6b9e5f7e9360c",
+  "contract_formula": "(sum(weights) ** 2) / sum(weights ** 2)",
+  "corrected_runtime_files": {
+    "experiments/m04r/m04r14_t14_09_evidence_card_oracle.py": "ad7a23a2c4b4530d5aeba26712c187ea9f0c4eca0f948a35fdf4ddf80b979476",
+    "experiments/m04r/verify_m04r14_t14_09_evidence_card_store.py": "1f7a118c636d246a0b0f1e3daba6ade31d943d508ea0bbbb9c170729d6a08d5a"
+  },
+  "correction": "spell_the_independent_oracle_numerator_exactly_as_the_frozen_contract",
+  "first_failure_field_class": "weighted_effective_sample_size",
+  "first_failure_query_episode_id": "21d70343dabd86cfab0ef272",
+  "first_verification_receipt_published": false,
+  "implementation_h2": "977e962815fddf2d6dde1045ccc4ccbc69174bab",
+  "original_oracle_formula": "(sum(weights) * sum(weights)) / sum(weights ** 2)",
+  "original_oracle_value": 14.620572929755884,
+  "original_preregistration_digest": "cc0380db734c759f75fe00042896d2c461734966b2831907d143b5a8ac8e297c",
+  "original_preregistration_h1": "c23e1b4b71b4f9d657ff2536dc776da16810386e",
+  "producer_value": 14.620572929755886,
+  "production_promotion_authorized": false,
+  "query_level_real_outcome_aggregation_opened": true,
+  "schema_version": "m04r14-t14-09-evidence-verification-amendment-v1",
+  "status": "frozen_after_first_verification_refusal_before_second_verification",
+  "store_rebuilt_or_modified": false,
+  "store_result_digest": "11ccd344aaab71e70c63dd8f4e93a7b1a43c28e4e6a6ab621032d9664a356530",
+  "store_result_sha256": "46fc77bcc2c5440ec8056623fcaf1cabdb83c9f2db125877baa4d634cf59cb15"
+}
