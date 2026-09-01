@@ -1,6 +1,7 @@
 from pathlib import Path
 import sys
 from types import SimpleNamespace
+import json
 
 import numpy as np
 import pandas as pd
@@ -85,3 +86,15 @@ def test_real_worker_flow_on_one_complete_synthetic_symbol(
     assert metadata["rows"] == 1
     assert metadata["overflow_rows"] == 0
     assert len(metadata["scalar_probes"]) == 1
+
+
+def test_gate_evidence_uses_strict_json_native_scalars() -> None:
+    payload = {
+        "maximum_scalar_delta": float(np.float64(0.0)),
+        "gates": {
+            "scalar_batch_passed": bool(np.float64(0.0) <= 1e-12),
+            "capacity_passed": bool(np.int64(10) < 20),
+        },
+        "scan_seconds": [float(np.float64(0.1))],
+    }
+    assert json.loads(json.dumps(payload, allow_nan=False)) == payload

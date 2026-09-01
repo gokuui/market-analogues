@@ -41,10 +41,10 @@ from market_analogues.types import EpisodeKey, InstrumentKey, stable_hash
 from experiments.m04r import m04r14_t14_10_wf03_feasibility as base
 
 
-SCHEMA = "m04r14-t14-10-wf03b-dtw-store-poc-preregistration-v1"
-OUTPUT_RELATIVE = Path("config/data/analogues/m04r14/t14-10-wf03b-dtw-store-poc-v1")
+SCHEMA = "m04r14-t14-10-wf03b-dtw-store-poc-preregistration-v2"
+OUTPUT_RELATIVE = Path("config/data/analogues/m04r14/t14-10-wf03b-dtw-store-poc-v2")
 PREREGISTRATION_RELATIVE = Path(
-    "experiments/m04r/m04r14_t14_10_wf03b_dtw_store_poc_preregistered.json"
+    "experiments/m04r/m04r14_t14_10_wf03b_dtw_store_poc_v2_preregistered.json"
 )
 VERIFICATION_RELATIVE = Path(
     "config/data/analogues/m04r14/t14-10-wf03b-dtw-bound-poc-v1-verification/VERIFIED.json"
@@ -478,7 +478,7 @@ def execute(repository: Path, preregistration: Mapping[str, Any]) -> dict[str, A
             scalar_deltas.append(abs(
                 float.fromhex(probe["scalar_bound_hex"]) - scans[0][offset]
             ))
-    maximum_scalar_delta = max(scalar_deltas, default=0.0)
+    maximum_scalar_delta = float(max(scalar_deltas, default=0.0))
     eligible = int(loaded.manifest["row_count"]) + int(loaded.manifest["overflow_count"])
     median_scan = float(np.median(scan_seconds[1:]))
     projected_scan = median_scan * eligible / len(records_a)
@@ -492,19 +492,25 @@ def execute(repository: Path, preregistration: Mapping[str, Any]) -> dict[str, A
         for metadata, specification in zip(first, preregistration["selection"], strict=True)
     )
     gates = {
-        "clean_rebuild_equal": rebuild_equal,
-        "packed_alignment_passed": alignment
+        "clean_rebuild_equal": bool(rebuild_equal),
+        "packed_alignment_passed": bool(alignment
             and sum(row["rows"] for row in first) == len(main_a)
-            and sum(row["overflow_rows"] for row in first) == len(overflow_a),
-        "scalar_batch_passed": maximum_scalar_delta <= TOLERANCE,
+            and sum(row["overflow_rows"] for row in first) == len(overflow_a)),
+        "scalar_batch_passed": bool(maximum_scalar_delta <= TOLERANCE),
         "scan_deterministic": True,
-        "scan_performance_passed": projected_scan <= MAX_PROJECTED_SCAN_SECONDS,
-        "capacity_passed": projected_bytes / 1024 ** 3 <= MAX_PROJECTED_STORE_GIB,
-        "resident_lease_unchanged": lease_before["lease_digest"] == lease_after["lease_digest"],
+        "scan_performance_passed": bool(
+            projected_scan <= MAX_PROJECTED_SCAN_SECONDS
+        ),
+        "capacity_passed": bool(
+            projected_bytes / 1024 ** 3 <= MAX_PROJECTED_STORE_GIB
+        ),
+        "resident_lease_unchanged": bool(
+            lease_before["lease_digest"] == lease_after["lease_digest"]
+        ),
     }
     passed = all(gates.values())
     state = {
-        "schema_version": "m04r14-t14-10-wf03b-dtw-store-poc-result-v1",
+        "schema_version": "m04r14-t14-10-wf03b-dtw-store-poc-result-v2",
         "status": "complete", "passed": passed, "gates": gates,
         "selection_digest": preregistration["selection_digest"],
         "symbols": len(first), "forced_overflow_symbols": sum(
@@ -519,7 +525,7 @@ def execute(repository: Path, preregistration: Mapping[str, Any]) -> dict[str, A
         } for row in first]),
         "scalar_probes": len(scalar_deltas),
         "maximum_scalar_batch_delta": maximum_scalar_delta,
-        "scan_seconds": scan_seconds,
+        "scan_seconds": [float(value) for value in scan_seconds],
         "median_warm_scan_seconds": median_scan,
         "projected_full_scan_seconds": projected_scan,
         "projected_store_bytes": projected_bytes,

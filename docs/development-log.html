@@ -1417,6 +1417,13 @@
   <p class="pass"><b>Pre-run coverage:</b> Focused tests exercise deterministic overflow forcing, exact symbol slicing, the complete one-symbol reconstruction/write/seal path, content corruption, malformed orders, absent fallback and scalar/batch equality. The real gate has not run and no future outcome has been opened.</p>
   <p><b>Next:</b> Commit the implementation, freeze it in a sole-child preregistration and run the two bounded builds. Do not allocate the full auxiliary store unless this gate passes.</p>
 </section>
+<section class="entry">
+  <h2>L-156 — Bounded store v1 retained after strict-JSON publication refusal</h2>
+  <p><b>Incident:</b> H0 <code>3d43ff1</code> and sole-child H1 <code>74cb1d1</code> froze v1. Both 64-symbol build roots completed, but final publication rejected a NumPy boolean in the gate payload because the evidence writer permits only native strict finite JSON scalars. No <code>RESULT.json</code> exists, so v1 makes no correctness or performance claim.</p>
+  <p><b>Scope:</b> The exception occurred only while encoding the terminal aggregate after shard materialization and scanning. It did not open a future outcome or alter source, packed store, representation, bound, selection or threshold. The complete v1 root is retained as failed-run evidence and is not reused by the formal rerun.</p>
+  <p><b>Repair:</b> V2 uses a fresh output root and preregistration path and explicitly canonicalizes every NumPy-derived scalar and comparison to native <code>float</code>/<code>bool</code>. A regression round-trips the representative gate payload with <code>allow_nan=false</code>. All gates and numeric limits remain unchanged.</p>
+  <p><b>Next:</b> Pass the full suite, commit the v2 repair as a new H0, generate its sole-child H1 preregistration and rebuild both roots from scratch.</p>
+</section>
 </main>
 
 <section id="reproduce">
