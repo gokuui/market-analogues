@@ -1,0 +1,72 @@
+{
+  "schema_version": "m04r14-t14-10-walk-forward-registry-spec-v1",
+  "status": "frozen_before_historical_query_retrieval_or_futures",
+  "walk_forward_contract_digest": "2c65288b45dd79627a1e16f0a4c2d9449919d0602974d7a52440415bd7f96a8e",
+  "walk_forward_contract_sha256": "4969771ccdef0221db934b377d9e688577ccb6507631067f0f2a990f4fb5f8d1",
+  "denominator_registry_digest": "e5a1024e021425cace30d2172fee426ff1e6490702ea4f30583ad056e1ca89f2",
+  "denominator_registry_sha256": "9efe135c690779d0018260c5cfc3546101e487203a60599ba335ad92136af494",
+  "denominator_seal_digest": "ae65689ba687b4d2a5eafb31026b8d6831274608a9ec601e206cfc4e5b917253",
+  "denominator_seal_sha256": "e0f9898a1d0d2e41dbe9ac89d3cdef771562916ee1a89dcdc1b7daf3bca935b8",
+  "denominator_parquet_sha256": "43bc97afbb29904459b452ac4f7609aa8766731678341e429edc2f1b55f15f59",
+  "denominator_symbols": 12080,
+  "dataset_id": "nasdaq",
+  "representation_version": "dense-v1",
+  "causal_eligibility": {
+    "month_cutoff": "last benchmark session in every calendar month from 2012-01 through 2025-08 inclusive",
+    "stock_presence": "stock must contain an exact bar on the benchmark cutoff",
+    "minimum_prefix_rows": 252,
+    "source_scope": "symbols from the sealed 12080-row NASDAQ shadow denominator only",
+    "source_vintage_limit": "reject any post-denominator-lock row whose timestamp is on or before 2026-03-30",
+    "future_append_policy": "ignore rows after 2026-03-30 and prove selected query identity is unchanged",
+    "invalid_prefix_policy": "exclude a prefix with any missing required field invalid OHLC nonpositive price or negative volume"
+  },
+  "prefix_quality": {
+    "A": "at least 252 rows, zero critical issues, zero greater-than-threefold close discontinuities, and cumulative zero-volume rows not above max(5,floor(0.02*prefix_rows))",
+    "B": "at least 252 rows, zero critical issues, and at least one greater-than-threefold close discontinuity or cumulative zero-volume rows above max(5,floor(0.02*prefix_rows))",
+    "quarantined": "not eligible and never reassigned"
+  },
+  "liquidity": {
+    "measure": "median(close*volume) over exactly the trailing 252 stock sessions ending at cutoff",
+    "population": "all causal A/B candidates with an exact cutoff bar",
+    "rank": "ascending (median_dollar_volume_252,symbol), one-based rank divided by monthly population size",
+    "cells": {
+      "low": "percentile <= 1/3",
+      "middle": "1/3 < percentile <= 2/3",
+      "high": "percentile > 2/3"
+    }
+  },
+  "selection": {
+    "cells": "quality A/B cross liquidity low/middle/high",
+    "target_per_cell": 4,
+    "selection_hash_payload": "compact JSON array [contract_digest,dataset_id,cutoff_iso,quality_tier,liquidity_stratum,symbol]",
+    "order": "ascending (selection_hash,symbol)",
+    "underfill": "retain and report shortfall without replacement",
+    "same_symbol_across_months_allowed": true
+  },
+  "prefix_binding": {
+    "stock": "canonical-ohlcv-prefix-v1 digest from first stored row through selected cutoff",
+    "benchmark": "canonical-ohlcv-prefix-v1 digest from first stored row through monthly cutoff",
+    "selected_queries_only": true
+  },
+  "execution": {
+    "processes": 12,
+    "symbol_file_reads_per_universe_pass": 1,
+    "maximum_build_seconds": 900,
+    "atomic_create_only_publication": true,
+    "independent_full_reconstruction": true
+  },
+  "implementation": {
+    "implementation_h0": "ae48230c39411cd01d425ccca4dbd7456f04f130",
+    "files": {
+      "src/market_analogues/walk_forward_registry.py": "7ea807b5e9e1a6e6623d1512398114e02e1b5ccadf81a3037a54623cad634db3",
+      "experiments/m04r/m04r14_t14_10_walk_forward_registry.py": "b51b18d6d0113bb29e24d819b6e960b6bd4f521371310c58b19f927b34950fbf",
+      "experiments/m04r/verify_m04r14_t14_10_walk_forward_registry.py": "dd0d00599b5d048e063636601f4533a13afc36e37ccd452df90997819786a000",
+      "tests/test_walk_forward_registry.py": "770bb7ec27ff96454385f55723890bb9c53e7289d917b017fbb7c11a5d4a7a6b"
+    }
+  },
+  "historical_query_retrieval_opened": false,
+  "historical_walk_forward_query_outcomes_opened": false,
+  "final_period_result_opened": false,
+  "production_promotion_authorized": false,
+  "spec_digest": "01c042c567725d079e62e7277f6f7021f41fb748eb9f6e35990d5ef4f48f154c"
+}
