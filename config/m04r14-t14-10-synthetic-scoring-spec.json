@@ -1,0 +1,77 @@
+{
+  "schema_version": "m04r14-t14-10-synthetic-scoring-spec-v1",
+  "status": "frozen_before_real_historical_query_outcomes",
+  "walk_forward_contract_digest": "2c65288b45dd79627a1e16f0a4c2d9449919d0602974d7a52440415bd7f96a8e",
+  "walk_forward_contract_sha256": "4969771ccdef0221db934b377d9e688577ccb6507631067f0f2a990f4fb5f8d1",
+  "registry_verification_digest": "ae83d45c2fd0a2e98c47394c725c7013b125a585cb76c9f5b75a74399d73f810",
+  "registry_verification_sha256": "b0143c33c09582bb3b2916bbe67083378bd4e5fdbc1e42acf5121da3611b317f",
+  "probability": {
+    "mass": "sum frozen positive rank weights by eligible class",
+    "multiclass": "add 0.5 to every favorable_first adverse_first no_touch mass and normalize",
+    "binary": "same formula over favorable_first adverse_first only",
+    "zero_count": "smoothing-only uniform distribution",
+    "normalization_tolerance": 1e-15,
+    "multiclass_brier": "sum squared probability minus one-hot outcome over all classes",
+    "log_loss": "negative natural logarithm of observed-class probability",
+    "brier_skill": "1-model_mean_brier/baseline_mean_brier"
+  },
+  "continuous": {
+    "weighted_quantile": "stable ascending value order and first value whose cumulative positive weight is at least q times total weight",
+    "weighted_median": "weighted quantile q=0.5",
+    "path_median": "apply weighted median independently at each step after excluding only rows missing that step",
+    "pinball": "max(q*(observed-forecast),(q-1)*(observed-forecast))",
+    "central_interval_score": "width plus 2/(1-coverage) times distance beyond the breached endpoint",
+    "missing_measure": "exclude only from that measure denominator"
+  },
+  "calibration_and_abstention": {
+    "equal_count_bins": "stable ascending probability order; use min(10,max(1,floor(rows/30))) array-split bins",
+    "ece": "row-count-weighted absolute mean-probability minus observed-frequency gap",
+    "novelty": "strictly greater than NumPy linear 0.95 quantile after at least 250 prior scored distances",
+    "instability": "strictly greater than 0.2 maximum-minus-minimum favorable probability across available 5 10 15 20 prefixes",
+    "insufficient_rows": "eligible primary rows less than 10",
+    "risk_coverage": "stable ascending risk score; retain ceil(requested coverage times rows), minimum one"
+  },
+  "baselines": {
+    "expanding_frequency": "half-smoothed prior completed registry labels only",
+    "regime_frequency": "half-smoothed same-regime labels at count at least 50, otherwise explicit unconditional fallback"
+  },
+  "dependence_and_inference": {
+    "unit": "arithmetic mean stock loss within sorted calendar month before paired inference",
+    "moving_block_bootstrap": "overlapping non-circular length-3 blocks sampled with replacement from mean-centered paired monthly differences, concatenate and truncate to n",
+    "bootstrap_rng": "NumPy PCG64 seed 20260901",
+    "bootstrap_resamples": 10000,
+    "bootstrap_lower_pvalue": "(1 + count(null bootstrap mean <= observed mean))/(resamples+1)",
+    "diebold_mariano": "raw paired mean difference divided by Newey-West standard error with Bartlett weights and lags 1 through 3; lower normal tail; no HLN correction",
+    "holm": "ascending raw p with stable name tie break; cumulative maximum of (remaining hypotheses)*p; reject only adjusted p < 0.05"
+  },
+  "coverage_tests": {
+    "marginal": "two-sided exact binomial test at nominal interval coverage",
+    "christoffersen": "likelihood-ratio Markov independence test with chi-square one degree of freedom",
+    "dynamic_binary": "DQ quadratic form of hit-minus-nominal on intercept and three hit lags, chi-square four degrees of freedom"
+  },
+  "synthetic_requirements": {
+    "zero_counts": true,
+    "censor_and_ambiguity_exclusion_boundary": true,
+    "missing_measures": true,
+    "probability_boundaries": true,
+    "duplicate_split_and_weight_scale_invariance": true,
+    "regime_fallback_49_50_boundary": true,
+    "novelty_249_250_and_strict_threshold_boundary": true,
+    "clustered_months": true,
+    "invalid_input_rejection": true
+  },
+  "implementation": {
+    "implementation_h0": "e9414e44a4bb6ffcbd227c7b2aaf86e500e42948",
+    "files": {
+      "src/market_analogues/walk_forward_scoring.py": "125e69b77f024d848c64df872683c9b10e1b8a5ee6c6c81f5a5f9fec33e233e4",
+      "experiments/m04r/verify_m04r14_t14_10_synthetic_scoring.py": "54c6af3ce133261243b08ae5dcc908a185d065923fed2d018dcc1b8b827025c7",
+      "tests/test_walk_forward_scoring.py": "771b04c6b6d55b4f27b1e5c7b1b6572ee287e08b5bc646446ac74a14e5e10348"
+    }
+  },
+  "real_forward_outcomes_accessed": false,
+  "historical_query_retrieval_opened": false,
+  "historical_walk_forward_query_outcomes_opened": false,
+  "final_period_result_opened": false,
+  "production_promotion_authorized": false,
+  "spec_digest": "7c809fae1ca95afc80e98ed06b7dac288145113d2b8b4172c1890ff7ec75ceaf"
+}
