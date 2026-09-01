@@ -5,6 +5,8 @@ only with synthetic fixtures before any real forward path is opened.
 """
 from __future__ import annotations
 
+from bisect import bisect_right
+from dataclasses import dataclass
 import math
 from typing import Any
 
@@ -12,6 +14,14 @@ import pandas as pd
 
 
 HORIZONS = (5, 10, 20, 40, 60, 126)
+
+
+@dataclass(frozen=True)
+class ReferenceSeries:
+    rows: list[dict[str, Any]]
+    timestamps: list[pd.Timestamp]
+    positions: dict[pd.Timestamp, tuple[int, ...]]
+    closes: dict[pd.Timestamp, float]
 
 
 def _ordered(frame: pd.DataFrame) -> list[dict[str, Any]]:
@@ -26,6 +36,20 @@ def _ordered(frame: pd.DataFrame) -> list[dict[str, Any]]:
     return result
 
 
+def prepare_reference_series(frame: pd.DataFrame) -> ReferenceSeries:
+    """Build an oracle-owned reusable scalar representation."""
+    rows = _ordered(frame)
+    positions: dict[pd.Timestamp, list[int]] = {}
+    for index, row in enumerate(rows):
+        positions.setdefault(row["timestamp"], []).append(index)
+    return ReferenceSeries(
+        rows=rows,
+        timestamps=[row["timestamp"] for row in rows],
+        positions={key: tuple(value) for key, value in positions.items()},
+        closes={row["timestamp"]: row["close"] for row in rows},
+    )
+
+
 def reference_episode(
     stock_bars: pd.DataFrame,
     benchmark_bars: pd.DataFrame,
@@ -36,12 +60,58 @@ def reference_episode(
     contract_digest: str,
     source_content_digest: str,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    stock = _ordered(stock_bars)
-    benchmark = _ordered(benchmark_bars)
+    return reference_prepared_episode(
+        prepare_reference_series(stock_bars), prepare_reference_series(benchmark_bars),
+        episode_id=episode_id, cutoff=cutoff,
+        source_fingerprint=source_fingerprint, contract_digest=contract_digest,
+        source_content_digest=source_content_digest,
+    )
+
+
+def reference_ordered_episode(
+    stock: list[dict[str, Any]],
+    benchmark: list[dict[str, Any]],
+    *,
+    episode_id: str,
+    cutoff: pd.Timestamp | str,
+    source_fingerprint: str,
+    contract_digest: str,
+    source_content_digest: str,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Compute from independently prepared scalar records for batched verification."""
+    def prepared(rows: list[dict[str, Any]]) -> ReferenceSeries:
+        positions: dict[pd.Timestamp, list[int]] = {}
+        for index, row in enumerate(rows):
+            positions.setdefault(row["timestamp"], []).append(index)
+        return ReferenceSeries(
+            rows=rows, timestamps=[row["timestamp"] for row in rows],
+            positions={key: tuple(value) for key, value in positions.items()},
+            closes={row["timestamp"]: row["close"] for row in rows},
+        )
+    return reference_prepared_episode(
+        prepared(stock), prepared(benchmark), episode_id=episode_id, cutoff=cutoff,
+        source_fingerprint=source_fingerprint, contract_digest=contract_digest,
+        source_content_digest=source_content_digest,
+    )
+
+
+def reference_prepared_episode(
+    stock_series: ReferenceSeries,
+    benchmark_series: ReferenceSeries,
+    *,
+    episode_id: str,
+    cutoff: pd.Timestamp | str,
+    source_fingerprint: str,
+    contract_digest: str,
+    source_content_digest: str,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Compute from oracle-owned reusable indexes without production formula imports."""
+    stock = stock_series.rows
+    benchmark = benchmark_series.rows
     cutoff_value = pd.Timestamp(cutoff)
     if cutoff_value.tzinfo is not None:
         cutoff_value = cutoff_value.tz_convert("UTC").tz_localize(None)
-    origin_positions = [i for i, row in enumerate(stock) if row["timestamp"] == cutoff_value]
+    origin_positions = stock_series.positions.get(cutoff_value, ())
     if len(origin_positions) != 1:
         raise ValueError("oracle cutoff differs")
     origin = origin_positions[0]
@@ -61,9 +131,10 @@ def reference_episode(
         if math.isfinite(candidate) and candidate > 0:
             atr = candidate
     future = stock[origin + 1:origin + 127]
-    benchmark_close = {row["timestamp"]: row["close"] for row in benchmark}
+    benchmark_close = benchmark_series.closes
     benchmark_origin = benchmark_close.get(cutoff_value)
-    expected = [row["timestamp"] for row in benchmark if row["timestamp"] > cutoff_value][:126]
+    expected_start = bisect_right(benchmark_series.timestamps, cutoff_value)
+    expected = benchmark_series.timestamps[expected_start:expected_start + 126]
     paths: list[dict[str, Any]] = []
     for position, row in enumerate(future, 1):
         stock_gross = row["close"] / origin_close
@@ -96,11 +167,13 @@ def reference_episode(
         available = len(window)
         observed = {row["timestamp"] for row in window}
         endpoint_for_continuity = window[-1]["timestamp"] if window else None
-        benchmark_expected = {
-            row["timestamp"] for row in benchmark
-            if endpoint_for_continuity is not None
-            and cutoff_value < row["timestamp"] <= endpoint_for_continuity
-        }
+        benchmark_expected = set()
+        if endpoint_for_continuity is not None:
+            benchmark_expected = set(benchmark_series.timestamps[
+                expected_start:bisect_right(
+                    benchmark_series.timestamps, endpoint_for_continuity,
+                )
+            ])
         continuous = benchmark_expected.issubset(observed)
         complete = available == horizon and continuous
         if available < horizon:

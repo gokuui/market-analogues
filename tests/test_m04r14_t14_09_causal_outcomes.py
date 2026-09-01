@@ -11,12 +11,18 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from experiments.m04r.m04r14_t14_09_outcome_oracle import reference_episode
+from experiments.m04r.m04r14_t14_09_outcome_oracle import (
+    prepare_reference_series,
+    reference_episode,
+    reference_prepared_episode,
+)
 from market_analogues.causal_outcomes import (
     CausalOutcomeError,
     compute_episode_outcomes,
+    compute_prepared_episode_outcomes,
     deduplicate_episode_requests,
     outcome_embargo,
+    prepare_outcome_sessions,
 )
 
 
@@ -225,3 +231,32 @@ def test_price_scale_invariance_for_returns_barrier_labels_and_atr_units() -> No
     ):
         assert _null_normalized(original.outcomes[[field]].to_dict("records")) \
             == _null_normalized(transformed.outcomes[[field]].to_dict("records"))
+
+
+def test_prepared_batch_path_is_exact_and_rejects_unvalidated_frames() -> None:
+    stock, benchmark, cutoff = _frames()
+    scalar = _compute(stock, benchmark, cutoff)
+    prepared = compute_prepared_episode_outcomes(
+        prepare_outcome_sessions(stock, "stock"),
+        prepare_outcome_sessions(benchmark, "benchmark"),
+        cutoff=cutoff, **BINDINGS,
+    )
+    assert _null_normalized(prepared.outcomes.to_dict("records")) \
+        == _null_normalized(scalar.outcomes.to_dict("records"))
+    assert _null_normalized(prepared.paths.to_dict("records")) \
+        == _null_normalized(scalar.paths.to_dict("records"))
+    with pytest.raises(CausalOutcomeError, match="was not prepared"):
+        compute_prepared_episode_outcomes(
+            stock, prepare_outcome_sessions(benchmark, "benchmark"),
+            cutoff=cutoff, **BINDINGS,
+        )
+
+
+def test_independent_oracle_prepared_path_equals_its_scalar_path() -> None:
+    stock, benchmark, cutoff = _frames()
+    scalar = reference_episode(stock, benchmark, cutoff=cutoff, **BINDINGS)
+    prepared = reference_prepared_episode(
+        prepare_reference_series(stock), prepare_reference_series(benchmark),
+        cutoff=cutoff, **BINDINGS,
+    )
+    assert prepared == scalar

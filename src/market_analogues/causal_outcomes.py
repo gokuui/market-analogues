@@ -73,6 +73,19 @@ def _sessions(frame: pd.DataFrame, name: str) -> pd.DataFrame:
     return result
 
 
+def prepare_outcome_sessions(frame: pd.DataFrame, name: str) -> pd.DataFrame:
+    """Validate/canonicalize a reusable frame for batched outcome computation."""
+    result = _sessions(frame, name)
+    result.attrs["causal_outcome_sessions_v1"] = True
+    return result
+
+
+def _prepared(frame: pd.DataFrame, name: str) -> pd.DataFrame:
+    if frame.attrs.get("causal_outcome_sessions_v1") is not True:
+        raise CausalOutcomeError(f"{name} was not prepared by prepare_outcome_sessions")
+    return frame
+
+
 def _origin_index(stock: pd.DataFrame, cutoff: pd.Timestamp | str) -> tuple[int, pd.Timestamp]:
     value = pd.Timestamp(cutoff)
     if value.tzinfo is not None:
@@ -150,12 +163,33 @@ def compute_episode_outcomes(
     horizons: Sequence[int] = HORIZONS,
 ) -> OutcomeBundle:
     """Compute immutable episode outcomes and the observed future path."""
+    stock = prepare_outcome_sessions(stock_bars, "stock")
+    benchmark = prepare_outcome_sessions(benchmark_bars, "benchmark")
+    return compute_prepared_episode_outcomes(
+        stock, benchmark, episode_id=episode_id, cutoff=cutoff,
+        source_fingerprint=source_fingerprint, contract_digest=contract_digest,
+        source_content_digest=source_content_digest, horizons=horizons,
+    )
+
+
+def compute_prepared_episode_outcomes(
+    stock_sessions: pd.DataFrame,
+    benchmark_sessions: pd.DataFrame,
+    *,
+    episode_id: str,
+    cutoff: pd.Timestamp | str,
+    source_fingerprint: str,
+    contract_digest: str,
+    source_content_digest: str,
+    horizons: Sequence[int] = HORIZONS,
+) -> OutcomeBundle:
+    """Compute an episode from reusable frames validated by the preparation API."""
     if tuple(horizons) != HORIZONS:
         raise CausalOutcomeError("horizons differ from the frozen contract")
     if not episode_id or not source_fingerprint or not contract_digest or not source_content_digest:
         raise CausalOutcomeError("non-empty identity bindings are required")
-    stock = _sessions(stock_bars, "stock")
-    benchmark = _sessions(benchmark_bars, "benchmark")
+    stock = _prepared(stock_sessions, "stock")
+    benchmark = _prepared(benchmark_sessions, "benchmark")
     origin, cutoff_value = _origin_index(stock, cutoff)
     origin_close = float(stock.at[origin, "close"])
     atr = _origin_atr(stock, origin)
