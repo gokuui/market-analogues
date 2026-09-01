@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 
 from market_analogues.distance import representation_distance_lower_bound
+from market_analogues.distance import _robust_scale_pair
 from market_analogues.dtw_interval_bound import (
     DTW_CHANNELS,
     DtwIntervalBoundError,
@@ -91,6 +92,31 @@ def test_quantized_dtw_bound_is_safe_for_random_finite_paths() -> None:
             query, quantize_dtw_samples(candidate),
         )
         assert combined <= exact_price_component(query, candidate) + 1e-12
+
+
+def test_interval_scale_upper_covers_exact_iqr_and_std_branches() -> None:
+    from market_analogues.dtw_interval_bound import _pair_scale_upper
+
+    rng = np.random.default_rng(98_000)
+    for iteration in range(256):
+        query = rng.normal(size=64) * 10.0 ** rng.uniform(-5.0, 3.0)
+        candidate = rng.normal(size=64) * 10.0 ** rng.uniform(-5.0, 3.0)
+        if iteration % 19 == 0:
+            query.fill(rng.normal() * 1e-10)
+            candidate.fill(rng.normal() * 1e-10)
+        center = candidate.astype(np.float16).astype(np.float64)
+        radius = float(np.nextafter(
+            np.float32(np.max(np.abs(candidate - center))), np.float32(np.inf),
+        ))
+        left, _right = _robust_scale_pair(query, candidate, preserve_level=True)
+        exact_scale = float(query[0] / left[0]) if query[0] != 0 else None
+        if exact_scale is None or not np.isfinite(exact_scale):
+            joined = np.r_[query, candidate]
+            exact_scale = float(np.percentile(joined, 75) - np.percentile(joined, 25))
+            if exact_scale < 1e-8:
+                exact_scale = float(np.std(joined))
+            exact_scale = max(exact_scale, 1e-6)
+        assert _pair_scale_upper(query, center, radius) >= exact_scale - 1e-15
 
 
 def test_malformed_rows_and_band_fail_closed() -> None:

@@ -26,15 +26,16 @@ class QuantizedDtwSamples:
 
 def dtw_interval_bound_contract() -> dict[str, object]:
     state: dict[str, object] = {
-        "schema_version": "quantized-dtw-interval-bound-v1",
+        "schema_version": "quantized-dtw-interval-bound-v2",
         "channels": list(DTW_CHANNELS), "samples_per_channel": SAMPLES,
         "storage": (
             "float16 sample centers, one outward-rounded float32 maximum absolute "
             "quantization radius and one presence bit per channel"
         ),
         "pair_scale_upper": (
-            "joint query/candidate interval range, bounded below by 1e-6; this "
-            "dominates the exact joint IQR or constant-series std fallback"
+            "outward joint interval IQR upper when its lower bound proves the "
+            "exact IQR branch; otherwise max(interval IQR upper, RMS-based std "
+            "upper), bounded below by 1e-6"
         ),
         "path_bound": (
             "maximum of the two one-way sums of minimum interval local costs "
@@ -89,6 +90,41 @@ def validate_quantized_dtw_samples(value: QuantizedDtwSamples) -> None:
         raise DtwIntervalBoundError("quantized DTW sample row differs")
 
 
+def _pair_scale_upper(
+    query_values: np.ndarray, center: np.ndarray, radius: float,
+) -> float:
+    candidate_lower = center - radius
+    candidate_upper = center + radius
+    lower_values = np.r_[query_values, candidate_lower]
+    upper_values = np.r_[query_values, candidate_upper]
+    lower_q25, lower_q75 = np.percentile(lower_values, (25, 75))
+    upper_q25, upper_q75 = np.percentile(upper_values, (25, 75))
+    magnitude = max(
+        float(np.max(np.abs(lower_values))),
+        float(np.max(np.abs(upper_values))), 1.0,
+    )
+    rounding = 16 * np.finfo(np.float64).eps * magnitude
+    iqr_lower = max(float(lower_q75 - upper_q25) - rounding, 0.0)
+    iqr_upper = max(float(upper_q75 - lower_q25) + rounding, 0.0)
+    if iqr_lower >= 1e-8:
+        upper = iqr_upper
+    else:
+        # std(values) is no larger than RMS(values-reference) for any fixed
+        # reference.  Endpoint distances bound every candidate interval value.
+        reference = (float(np.min(lower_values)) + float(np.max(upper_values))) / 2
+        query_deviation = np.abs(query_values - reference)
+        candidate_deviation = np.maximum(
+            np.abs(candidate_lower - reference),
+            np.abs(candidate_upper - reference),
+        )
+        std_upper = float(np.sqrt(np.mean(np.r_[
+            query_deviation * query_deviation,
+            candidate_deviation * candidate_deviation,
+        ]))) + rounding
+        upper = max(iqr_upper, std_upper)
+    return float(np.nextafter(max(upper, 1e-6), np.inf))
+
+
 def quantized_dtw_lower_bound(
     query: Representation,
     candidate: QuantizedDtwSamples,
@@ -116,12 +152,10 @@ def quantized_dtw_lower_bound(
     for channel, query_values in included:
         center = candidate.centers[channel].astype(np.float64)
         radius = float(candidate.channel_error_radii[channel])
-        upper = max(float(np.max(query_values)), float(np.max(center + radius)))
-        lower = min(float(np.min(query_values)), float(np.min(center - radius)))
         query_matrix.append(query_values)
         center_matrix.append(center)
         radius_vector.append(radius)
-        denominators.append(max(upper - lower, 1e-6))
+        denominators.append(_pair_scale_upper(query_values, center, radius))
     queries = np.asarray(query_matrix, dtype=np.float64).T
     centers = np.asarray(center_matrix, dtype=np.float64).T
     radii = np.asarray(radius_vector, dtype=np.float64)
