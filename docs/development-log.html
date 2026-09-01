@@ -1353,6 +1353,14 @@
   <p class="pass"><b>Verification:</b> The packed-bound regression set passes, including scalar quantization safety for every component. New adversarial tie/overflow tests prove identical component candidates, bounds and result digests across 1/3/7 threads, forward/reverse traversal and different block sizes; invalid components and quotas fail closed.</p>
   <p><b>Next:</b> Add component-specific exact completion and strict next-bound closure, then compare it with an exhaustive exact price-component oracle on synthetic universes and the three frozen probes before scaling.</p>
 </section>
+<section class="entry">
+  <h2>L-147 — Exact price-component search matches exhaustive synthetic oracle</h2>
+  <p><b>Exact meaning:</b> This is the existing distance-v1 “price” component, not a new fitted measure: 55% rigid price-channel distance plus 45% exact banded multivariate DTW. The DTW also sees ATR, volume shock and relative path, so reports must describe this as a price-development view rather than pretending it is close-only.</p>
+  <p><b>Certificate:</b> Search grows a route-specific packed frontier geometrically, computes exact requested-position representations, verifies packed ≤ native ≤ exact component distance, completes equality ties, prunes only native bounds strictly above the monotone distinct-symbol threshold and stops only when the next packed bound is strictly larger. Every eligible row is accounted as exact, native-pruned or packed-pruned; frontier exhaustion fails closed.</p>
+  <p class="pass"><b>Synthetic result:</b> On a complete generated two-symbol universe, certified price-development retrieval exactly equals a separately enumerated exhaustive exact oracle in IDs, order and distance to 1e-12. Tests also cover one-symbol-per-match enforcement, quantized component safety, forward/reverse component frontiers and invalid contracts. The focused 60-test distance/exact/packed/certificate regression set passes.</p>
+  <p><b>Durable real POC:</b> A separate create-only three-probe runner is ready. It binds the same early/middle/late registry rows and resident leases, persists forward and reverse price frontiers, records typed frontier overflow instead of returning an uncertified answer, and opens no outcome or authority path.</p>
+  <p><b>Next:</b> Commit the implementation, rerun the tracked-module/full-suite checks, preregister the durable POC as a sole child and execute it. A 16,384-row overflow is evidence to add threshold-stream closure—not permission to enlarge or approximate silently.</p>
+</section>
 </main>
 
 <section id="reproduce">
