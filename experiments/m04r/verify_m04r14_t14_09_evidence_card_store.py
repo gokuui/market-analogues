@@ -27,6 +27,9 @@ PREREG_SCHEMA = "m04r14-t14-09-evidence-card-store-preregistration-v1"
 PREREGISTRATION = Path(
     "experiments/m04r/m04r14_t14_09_evidence_card_store_preregistered.json"
 )
+AMENDMENT = Path(
+    "experiments/m04r/m04r14_t14_09_evidence_card_verification_amendment.json"
+)
 CONTRACT = Path("config/m04r14-t14-09-evidence-card-contract.json")
 CONTRACT_VERIFICATION = Path(
     "config/data/analogues/m04r14/t14-09-evidence-card-contract-verification-v1/VERIFIED.json"
@@ -122,6 +125,86 @@ def _sole_child(repository: Path, raw: bytes, h0: str) -> str:
     return accepted[0]
 
 
+def _sole_amendment_child(repository: Path, raw: bytes, h2: str) -> str:
+    accepted: list[str] = []
+    for line in str(_git(repository, "rev-list", "--all", "--children")).splitlines():
+        values = line.split()
+        if not values or values[0] != h2:
+            continue
+        for child in values[1:]:
+            lineage = str(_git(repository, "rev-list", "--parents", "-n", "1", child)).split()
+            changed = str(_git(
+                repository, "diff-tree", "--no-commit-id", "--name-only", "-r", child,
+            )).splitlines()
+            if lineage == [child, h2] and changed == [AMENDMENT.as_posix()] \
+                    and _git(repository, "show", f"{child}:{AMENDMENT}", raw=True) == raw:
+                accepted.append(child)
+    if len(set(accepted)) != 1:
+        raise EvidenceVerificationError("verification amendment lifecycle differs")
+    return accepted[0]
+
+
+def _validate_amendment(
+    repository: Path, prereg: Mapping[str, Any], h1: str,
+) -> tuple[dict[str, Any], str]:
+    amendment, raw = _read(repository / AMENDMENT)
+    state = {key: value for key, value in amendment.items() if key != "amendment_digest"}
+    if amendment.get("schema_version") != "m04r14-t14-09-evidence-verification-amendment-v1" \
+            or amendment.get("amendment_digest") != stable_hash(state):
+        raise EvidenceVerificationError("verification amendment seal differs")
+    h2 = str(amendment.get("implementation_h2"))
+    lineage = str(_git(repository, "rev-list", "--parents", "-n", "1", h2)).split()
+    changed = str(_git(
+        repository, "diff-tree", "--no-commit-id", "--name-only", "-r", h2,
+    )).splitlines()
+    if lineage != [h2, h1] or changed != [
+        "experiments/m04r/m04r14_t14_09_evidence_card_oracle.py",
+        "experiments/m04r/verify_m04r14_t14_09_evidence_card_store.py",
+        "tests/test_m04r14_t14_09_evidence_card_store.py",
+    ]:
+        raise EvidenceVerificationError("verification correction commit scope differs")
+    h3 = _sole_amendment_child(repository, raw, h2)
+    if subprocess.run(
+        ["git", "merge-base", "--is-ancestor", h3, "HEAD"], cwd=repository,
+    ).returncode:
+        raise EvidenceVerificationError("HEAD does not descend from verification amendment")
+    output_seal, output_raw = _read(repository / OUTPUT / "SEALED.json")
+    expected = {
+        "status": "frozen_after_first_verification_refusal_before_second_verification",
+        "original_preregistration_h1": h1,
+        "original_preregistration_digest": prereg["preregistration_digest"],
+        "store_result_digest": output_seal.get("result_digest"),
+        "store_result_sha256": sha256(output_raw).hexdigest(),
+        "first_failure_query_episode_id": "21d70343dabd86cfab0ef272",
+        "first_failure_field_class": "weighted_effective_sample_size",
+        "producer_value": 14.620572929755886,
+        "original_oracle_value": 14.620572929755884,
+        "contract_formula": "(sum(weights) ** 2) / sum(weights ** 2)",
+        "original_oracle_formula": "(sum(weights) * sum(weights)) / sum(weights ** 2)",
+        "correction": "spell_the_independent_oracle_numerator_exactly_as_the_frozen_contract",
+        "first_verification_receipt_published": False,
+        "store_rebuilt_or_modified": False,
+        "query_level_real_outcome_aggregation_opened": True,
+        "production_promotion_authorized": False,
+    }
+    if any(amendment.get(key) != value for key, value in expected.items()):
+        raise EvidenceVerificationError("verification amendment evidence differs")
+    corrected = amendment.get("corrected_runtime_files")
+    required = {
+        "experiments/m04r/m04r14_t14_09_evidence_card_oracle.py",
+        "experiments/m04r/verify_m04r14_t14_09_evidence_card_store.py",
+    }
+    if type(corrected) is not dict or set(corrected) != required:
+        raise EvidenceVerificationError("corrected runtime inventory differs")
+    for name, expected_hash in corrected.items():
+        for revision in (h2, h3):
+            if sha256(_git(repository, "show", f"{revision}:{name}", raw=True)).hexdigest() != expected_hash:
+                raise EvidenceVerificationError(f"corrected runtime differs at {revision}: {name}")
+        if _sha(repository / name) != expected_hash:
+            raise EvidenceVerificationError(f"working corrected runtime differs: {name}")
+    return amendment, h3
+
+
 def _prerequisites(repository: Path) -> dict[str, Any]:
     contract, contract_raw = _read(repository / CONTRACT)
     contract_verified, contract_verified_raw = _read(repository / CONTRACT_VERIFICATION)
@@ -176,16 +259,17 @@ def _validate_preregistration(repository: Path) -> tuple[dict[str, Any], dict[st
         raise EvidenceVerificationError("evidence preregistration differs")
     h0 = str(prereg.get("implementation_h0"))
     h1 = _sole_child(repository, raw, h0)
-    if subprocess.run(
-        ["git", "merge-base", "--is-ancestor", h1, "HEAD"], cwd=repository,
-    ).returncode:
-        raise EvidenceVerificationError("HEAD does not descend from evidence preregistration")
+    corrected_names = {
+        "experiments/m04r/m04r14_t14_09_evidence_card_oracle.py",
+        "experiments/m04r/verify_m04r14_t14_09_evidence_card_store.py",
+    }
     for name, expected in prereg.get("runtime_files", {}).items():
         for revision in (h0, h1):
             if sha256(_git(repository, "show", f"{revision}:{name}", raw=True)).hexdigest() != expected:
                 raise EvidenceVerificationError(f"frozen runtime differs at {revision}: {name}")
-        if _sha(repository / name) != expected:
+        if name not in corrected_names and _sha(repository / name) != expected:
             raise EvidenceVerificationError(f"working runtime differs: {name}")
+    amendment, _ = _validate_amendment(repository, prereg, h1)
     prerequisite = _prerequisites(repository)
     expected = {
         "contract_digest": prerequisite["contract"]["contract_digest"],
@@ -209,7 +293,7 @@ def _validate_preregistration(repository: Path) -> tuple[dict[str, Any], dict[st
     }
     if any(prereg.get(key) != value for key, value in expected.items()):
         raise EvidenceVerificationError("preregistered evidence input differs")
-    return prereg, prerequisite, h1
+    return {**prereg, "verification_amendment_digest": amendment["amendment_digest"]}, prerequisite, h1
 
 
 def _plain(value: Any) -> Any:
@@ -495,6 +579,7 @@ def verify(repository: Path) -> dict[str, Any]:
         "store_result_digest": seal["result_digest"],
         "store_result_sha256": sha256(seal_raw).hexdigest(),
         "contract_digest": prerequisite["contract"]["contract_digest"],
+        "verification_amendment_digest": prereg["verification_amendment_digest"],
         "query_count": QUERY_COUNT, "verified_cards": QUERY_COUNT,
         "verified_raw_analogue_rows": LINK_COUNT,
         "exact_independent_card_equality": True,

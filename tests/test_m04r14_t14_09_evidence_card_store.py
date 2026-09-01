@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from experiments.m04r import m04r14_t14_09_evidence_card_store as store
+from experiments.m04r import m04r14_t14_09_evidence_card_oracle as oracle
 from experiments.m04r import m04r14_t14_09_evidence_card_synthetic_gate as synthetic
 from experiments.m04r import verify_m04r14_t14_09_evidence_card_store as verifier
 from market_analogues.evidence_cards import build_evidence_card
@@ -44,6 +45,9 @@ def test_independent_full_card_verifier_has_no_production_aggregation_import() -
     assert "market_analogues.evidence_cards" not in source
     assert "import m04r14_t14_09_evidence_card_store" not in source
     assert "reference_card" in source
+    oracle_source = inspect.getsource(oracle)
+    assert "total ** 2 / math.fsum" in oracle_source
+    assert "total * total / math.fsum" not in oracle_source
 
 
 def test_raw_and_summary_projection_preserve_card_bindings() -> None:

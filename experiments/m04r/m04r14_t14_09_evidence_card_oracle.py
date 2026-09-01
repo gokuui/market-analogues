@@ -78,7 +78,7 @@ def _measure(rows: Sequence[Mapping[str, Any]], horizon: int, name: str) -> dict
         },
         "locked_weighted": {
             "weight_sum": total,
-            "effective_sample_size": total * total / math.fsum(w * w for w in weights),
+            "effective_sample_size": total ** 2 / math.fsum(w * w for w in weights),
             "mean": math.fsum(value * weight for value, weight in pairs) / total,
             "median_inverted_cdf": _inverse(pairs, .5),
             "q25_inverted_cdf": _inverse(pairs, .25),
@@ -113,7 +113,7 @@ def _panel(rows: Sequence[Mapping[str, Any]], query_symbol: str, prefix: int) ->
         horizon_panels[str(horizon)] = {
             "eligible_rows": len(eligible),
             "weighted_effective_sample_size": (
-                total * total / math.fsum(weight * weight for weight in weights)
+                total ** 2 / math.fsum(weight * weight for weight in weights)
                 if weights else 0.0
             ),
             "measures": {name: _measure(eligible, horizon, name) for name in MEASURES},
