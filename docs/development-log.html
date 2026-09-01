@@ -1453,6 +1453,13 @@
   <p><b>V2 repair:</b> Progress now uses fsync plus atomic replacement, while contracts, results, manifests and verification receipts remain create-only. A regression performs multiple progress transitions. V2 uses a fresh output root and may consume the v1 shards only after recomputing the complete seed audit and matching its preregistered digest; it does not trust or mutate the failed root. The final content-addressed generation is independent of those source shards.</p>
   <p><b>Boundary and next:</b> Preserve v1 unchanged as failed-run evidence. Pass the complete suite, commit the repair as a new H0, generate a sole-child v2 preregistration, then publish and independently verify the generation. Query futures and final-period outcomes remain unopened.</p>
 </section>
+<section class="entry">
+  <h2>L-161 — Full DTW generation published; independent verifier prepared</h2>
+  <p class="pass"><b>V2 publication:</b> Repair H0 <code>b8e53aa</code> and sole-child H1 <code>0b6c2db</code> froze v2 at preregistration digest <code>828db612…9294d</code>. The complete v1 shard inventory was revalidated against frozen digest <code>54f9eb2c…9a0da</code> before use. Content-addressed generation <code>c4b068a6…96cb9</code> contains 3,786,121 main plus 35 overflow rows in 2.779 GiB. Its complete scan took 73.75 seconds; every publication, capacity, alignment and resident-lease gate passed. Result digest is <code>903630cc…c7a95</code>.</p>
+  <p><b>Independent verifier design:</b> Re-read every one of the 11,584 shard seals and record arrays with a separately written validator, including finite/nonnegative values, low-bit presence encoding, zero padding, true stable order permutations and absent-channel zeros. Independently hash ordered shard concatenations and require equality with both generation files and the producer metadata digest.</p>
+  <p><b>Raw and scan evidence:</b> Before execution, freeze 128 deterministic raw symbols while forcing every overflow and zero-fallback symbol. Rebuild their complete causal episode inventories from OHLCV with eight one-thread workers and compare every byte at frozen physical offsets. For all three early/middle/late outcome-blind queries, scan the entire generation forward in 4,096-row blocks and backward in 4,093-row blocks; require exact arrays, the producer's first-query digest and at most 90 seconds per pass. Changed packed binding and malformed order fixtures must fail closed.</p>
+  <p><b>Boundary and next:</b> The producer authorizes only this independent verification. Commit the verifier and its tests, freeze a sole-child preregistration, then run it create-only. Retrieval integration remains prohibited until that receipt passes; outcomes and final-period results remain unopened.</p>
+</section>
 </main>
 
 <section id="reproduce">
@@ -1594,7 +1601,10 @@ git commit -m "Preregister M04R-11 candidate v2"
   <pre><code># T14-10 WF-03B v1 is retained as a progress-publication refusal; v2 revalidates its complete shards.
 .venv/bin/python -m experiments.m04r.m04r14_t14_10_wf03b_dtw_store_full preregister --repository /home/vinay/code/market-analogues
 # Commit exactly experiments/m04r/m04r14_t14_10_wf03b_dtw_store_full_v2_preregistered.json as sole-child H1.
-.venv/bin/python -m experiments.m04r.m04r14_t14_10_wf03b_dtw_store_full run --repository /home/vinay/code/market-analogues</code></pre>
+.venv/bin/python -m experiments.m04r.m04r14_t14_10_wf03b_dtw_store_full run --repository /home/vinay/code/market-analogues
+# Commit the verifier implementation before its sole-child preregistration.
+.venv/bin/python -m experiments.m04r.verify_m04r14_t14_10_wf03b_dtw_store_full preregister --repository /home/vinay/code/market-analogues
+.venv/bin/python -m experiments.m04r.verify_m04r14_t14_10_wf03b_dtw_store_full run --repository /home/vinay/code/market-analogues</code></pre>
   <p class="muted">Source datasets are read-only. Generated artifacts live under the configured artifact directory and are intentionally excluded from Git.</p>
 </section>
 </body>
