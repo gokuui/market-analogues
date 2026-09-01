@@ -11,7 +11,9 @@ from market_analogues.dtw_interval_bound import (
     dtw_interval_bound_contract,
     exact_price_component,
     quantize_dtw_samples,
+    quantized_dtw_lower_bounds,
     quantized_dtw_lower_bound,
+    quantized_dtw_orders,
     validate_quantized_dtw_samples,
 )
 from market_analogues.quantized_bound import (
@@ -128,3 +130,33 @@ def test_malformed_rows_and_band_fail_closed() -> None:
     fresh = quantize_dtw_samples(query)
     with pytest.raises(DtwIntervalBoundError, match="band"):
         quantized_dtw_lower_bound(query, fresh, band_fraction=-0.1)
+
+
+def test_compiled_batch_exactly_matches_scalar_interval_bound() -> None:
+    query = represent(generate_case("trend_contraction_breakout", 99_000).episode)
+    candidates = [
+        represent(generate_case(family, 100_000 + index).episode)
+        for index, family in enumerate(FAMILIES)
+    ]
+    rows = [quantize_dtw_samples(candidate) for candidate in candidates]
+    centers = np.asarray([row.centers for row in rows], dtype=np.float16)
+    orders = np.asarray([quantized_dtw_orders(row) for row in rows], dtype=np.uint8)
+    radii = np.asarray([row.channel_error_radii for row in rows], dtype=np.float32)
+    presence = np.asarray([row.presence for row in rows], dtype=bool)
+    actual = quantized_dtw_lower_bounds(query, centers, orders, radii, presence)
+    expected = np.asarray([
+        quantized_dtw_lower_bound(query, row) for row in rows
+    ])
+    assert np.max(np.abs(actual - expected)) <= 1e-12
+
+
+def test_compiled_batch_rejects_non_permutation_order() -> None:
+    query = represent(generate_case("rounded_base", 101_000).episode)
+    row = quantize_dtw_samples(query)
+    order = quantized_dtw_orders(row)[None]
+    order[0, 0, 0] = order[0, 0, 1]
+    with pytest.raises(DtwIntervalBoundError, match="permutation"):
+        quantized_dtw_lower_bounds(
+            query, row.centers[None], order,
+            row.channel_error_radii[None], row.presence[None],
+        )
