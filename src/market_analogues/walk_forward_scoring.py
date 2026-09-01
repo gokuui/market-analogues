@@ -23,6 +23,22 @@ class CoverageTests:
     dynamic_binary_pvalue: float
 
 
+def partition_barrier_routes(
+    routes: Sequence[str],
+) -> tuple[tuple[str, ...], dict[str, int]]:
+    eligible_classes = {"favorable_first", "adverse_first", "no_touch"}
+    excluded_classes = {"ambiguous_same_first_touch_bar", "censored"}
+    unknown = set(routes).difference(eligible_classes | excluded_classes)
+    if unknown:
+        raise WalkForwardScoringError(f"unknown barrier routes: {sorted(unknown)}")
+    eligible = tuple(route for route in routes if route in eligible_classes)
+    excluded = {
+        route: sum(value == route for value in routes)
+        for route in sorted(excluded_classes)
+    }
+    return eligible, excluded
+
+
 def _weights(values: Sequence[float]) -> np.ndarray:
     result = np.asarray(values, dtype=np.float64)
     if result.ndim != 1 or not len(result) or not np.isfinite(result).all() \

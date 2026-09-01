@@ -33,6 +33,7 @@ from market_analogues.walk_forward_scoring import (
     log_loss,
     moving_block_bootstrap_lower_pvalue,
     multiclass_brier,
+    partition_barrier_routes,
     pinball_loss,
     pointwise_weighted_median,
     regime_frequency,
@@ -144,6 +145,13 @@ def _run_cases() -> tuple[int, list[str]]:
     check("multiclass_brier", multiclass_brier(probability, 0) == manual_brier)
     check("multiclass_log", log_loss(probability, 0) == -math.log(probability[0]))
     check("brier_skill", brier_skill(.18, .24) == .25)
+    eligible, excluded = partition_barrier_routes([
+        "favorable_first", "ambiguous_same_first_touch_bar", "no_touch", "censored",
+    ])
+    check("ambiguous_censored_exclusion", eligible == ("favorable_first", "no_touch"))
+    check("excluded_route_accounting", excluded == {
+        "ambiguous_same_first_touch_bar": 1, "censored": 1,
+    })
 
     quantiles = weighted_inverted_cdf([4, 1, 2, 2], [1, 1, 2, 1], [0, .1, .5, .9, 1])
     check("weighted_inverted_cdf", np.array_equal(quantiles, [1, 1, 2, 4, 4]))

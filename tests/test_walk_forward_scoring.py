@@ -22,6 +22,7 @@ from market_analogues.walk_forward_scoring import (
     log_loss,
     moving_block_bootstrap_lower_pvalue,
     multiclass_brier,
+    partition_barrier_routes,
     pinball_loss,
     pointwise_weighted_median,
     regime_frequency,
@@ -41,6 +42,16 @@ def test_half_smoothed_multiclass_and_zero_count_oracles() -> None:
     np.testing.assert_array_equal(probabilities, np.array([2.0, .5, 2.5]) / 5.0)
     np.testing.assert_array_equal(expanding_frequency([], CLASSES), np.repeat(1 / 3, 3))
     assert np.all(probabilities > 0) and probabilities.sum() == 1.0
+
+
+def test_ambiguous_and_censored_routes_are_excluded_and_counted() -> None:
+    eligible, excluded = partition_barrier_routes([
+        "favorable_first", "ambiguous_same_first_touch_bar", "no_touch", "censored",
+    ])
+    assert eligible == ("favorable_first", "no_touch")
+    assert excluded == {"ambiguous_same_first_touch_bar": 1, "censored": 1}
+    with pytest.raises(WalkForwardScoringError):
+        partition_barrier_routes(["fabricated"])
 
 
 def test_effective_sample_size_uses_frozen_exponent_spelling() -> None:
