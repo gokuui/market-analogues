@@ -22,7 +22,7 @@
 </header>
 
 <section id="status">
-  <h2>Current status — 26 August 2026</h2>
+  <h2>Current status — 1 September 2026</h2>
   <table>
     <thead><tr><th>Gate</th><th>Status</th><th>Evidence</th></tr></thead>
     <tbody>
@@ -49,6 +49,7 @@
       <tr><td>M04R-09 performance bake-off</td><td class="pass">COMPLETE — RESUMABLE PARALLEL GATE 4.060×</td><td>ANN's optimistic exact-phase ceiling is only 1.69%. Eight spawned one-thread query groups preserve all 24 proposals, matches and complete certificates; integrity-bound checkpoints resume in 25.73 s. Maximum group wall is 806.82 s versus 3,275.88 s serial (75.37% less). Independent verifier passes with zero failures.</td></tr>
       <tr><td>M04R-10 untouched authority contract</td><td class="pass">PASS — 60 CASES SEALED</td><td>Thirty new symbols/five per A/B × liquidity cell, paired historical/current cutoffs and benchmark-only regime/era selection. The ledger excludes 270 development symbols. Registry <code>0a4da732…5361e</code> and coverage-strengthened verification <code>1e362bc3…e77377</code> pass with no outcome access.</td></tr>
       <tr><td>M04R-14 universe validation</td><td class="pass">THROUGHPUT QUALIFIED — 60/60 AT 2.637×</td><td>V3 supplies the 60-case forward/reverse correctness baseline. The selected adaptive P8 service lane reproduces every proposal, certificate and ordered match in 1,355.43 seconds versus 3,574.61 serial service seconds. Independent verification and an equal second replay pass with all 60 cases and an exact 61-file manifest.</td></tr>
+      <tr><td>T14-09 descriptive evidence cards</td><td class="pass">EC-01–04 COMPLETE — 3,270/3,270 VERIFIED</td><td>All 65,400 immutable analogues are joined to causal outcomes in 3,270 searchable cards. A formula-independent oracle exactly reconstructs every card, raw row and summary after an explicitly retained 2e−15 verifier-only ESS amendment. Store <code>11ccd344…6530</code>; verification <code>5f53f14a…7c5f</code>. Walk-forward is authorized; production remains blocked.</td></tr>
       <tr><td>M04R-11 untouched truth matrix</td><td class="open">RUNNER READY — 0/60 BEFORE LAUNCH</td><td>Write-isolated eight-process authority runner, atomic semantic/integrity checkpoints, strict certificate/eligibility gates and an independent verifier are implemented. Candidate comparison remains forbidden until all 60 truths aggregate and seal.</td></tr>
       <tr><td>External Kullamagi examples</td><td class="pass">AUDIT COMPLETE — PARTIAL COVERAGE</td><td>132 unique 252-session episodes across 56 NASDAQ-source symbols. Causal top-5 label purity is 51.5% versus a 41.4% frequency baseline (within-query random-candidate p=0.001); causal minority-setup recovery remains weak.</td></tr>
       <tr><td>Yahoo-expanded Kullamagi examples</td><td class="fail">75% TARGET NOT REACHED</td><td>Yahoo expands coverage to 361 episodes across 129 symbols. With one match per candidate symbol, primary causal top-5 purity is 54.44% versus a 50.44% within-query random expectation (p=0.003): measurable but far below the target and concentrated in breakouts.</td></tr>
@@ -1281,6 +1282,14 @@
   <p class="pass"><b>Gate:</b> All 17 focused card/contract/gate tests pass. Every complete production card equals the oracle exactly; gate digest is <code>7d03d71c…0aff</code>, elapsed 0.21 seconds, and <code>query_level_real_outcome_aggregation_opened=false</code>.</p>
   <p><b>Next:</b> Commit EC-02 as the immutable card implementation H0, add the full builder and independent verifier without opening query-level summaries, then freeze their runtime and exact 3,270/65,400 inventory in a sole-child H1 preregistration before EC-03.</p>
 </section>
+<section class="entry">
+  <h2>L-138 — Complete descriptive evidence-card store independently verified</h2>
+  <p><b>Frozen lifecycle:</b> Builder, independent verifier and focused tamper tests were committed as H0 <code>91df1c3a…e19</code>. Sole direct-child H1 <code>c23e1b4b…86e</code> changes only the preregistration and binds the exact evidence contract, synthetic receipt, verified outcome store, all five source-file hashes, 3,270 queries, 65,400 links, runtime sources and absent create-only targets before query-level outcomes were aggregated. Preregistration digest is <code>cc0380db…297c</code>.</p>
+  <p class="pass"><b>Producer:</b> The streaming builder validated each retrieval match digest, joined the six stored horizons without changing rank, applied causal redaction and frozen dependence controls, and atomically published 3,270 JSON cards, 65,400 visible raw rows, 3,270 Parquet summaries and a searchable HTML index in 137.52 seconds. The store is 1.5 GiB because each card retains complete auditable raw evidence. Its 3,275-file manifest and canonical chunked semantic hashes seal at digest <code>11ccd344…6530</code>. All cards abstain; 23 additionally report fewer than ten eligible primary rows.</p>
+  <p><b>Retained verifier refusal:</b> The first independent run published no receipt because query <code>21d70343…f272</code> differed only in weighted ESS: producer <code>14.620572929755886</code>, oracle <code>14.620572929755884</code>. Diagnosis proved the oracle used <code>sum × sum</code> while the frozen contract literally requires <code>sum ** 2</code>. The original store was neither rebuilt nor modified. Correction H2 <code>977e9628…4bab</code> changes only the oracle, verifier and tests; sole-child amendment H3 <code>a88959a</code> records the opened state, failed field/value, output seal and corrected source hashes at digest <code>7311d62a…360c</code>.</p>
+  <p class="pass"><b>Independent verification:</b> With the contract-literal numerator, the separately structured oracle exactly reconstructs every one of the 3,270 cards, all 65,400 raw rows and all 3,270 summaries. It also verifies every JSON/file hash, Parquet projection, coverage count, provenance binding, HTML safety disclosure, abstention and the closed 3,275-file manifest. Verification digest is <code>5f53f14a…7c5f</code>; no predictive claims were emitted, production promotion remains false, and walk-forward design is authorized.</p>
+  <p><b>Next:</b> EC-01 through EC-04 are complete. Preregister expanding-window folds, simple baselines, novelty/stability thresholds and calibration metrics without using these query-level results to choose favorable rules. The Stockbee 25% monthly/quarterly move and preceding 4% range-expansion study remains a separate preregistered universe exercise.</p>
+</section>
 </main>
 
 <section id="reproduce">
@@ -1415,6 +1424,10 @@ git commit -m "Preregister M04R-11 candidate v2"
 .venv/bin/python -m experiments.m04r.m04r14_untouched_registry --repository /home/vinay/code/market-analogues --config /home/vinay/code/market-analogues/config/datasets.example.yaml
 .venv/bin/python -m experiments.m04r.verify_m04r14_untouched_registry --repository /home/vinay/code/market-analogues --config /home/vinay/code/market-analogues/config/datasets.example.yaml --dry-run
 .venv/bin/python -m experiments.m04r.verify_m04r14_untouched_registry --repository /home/vinay/code/market-analogues --config /home/vinay/code/market-analogues/config/datasets.example.yaml</code></pre>
+  <pre><code># T14-09 evidence cards: H0 and sole-child H1 are already frozen; outputs are create-only.
+.venv/bin/python -m experiments.m04r.m04r14_t14_09_evidence_card_store --repository /home/vinay/code/market-analogues
+# The first verifier refusal and post-open formula-spelling amendment are retained in Git.
+.venv/bin/python -m experiments.m04r.verify_m04r14_t14_09_evidence_card_store --repository /home/vinay/code/market-analogues --dry-run</code></pre>
   <p class="muted">Source datasets are read-only. Generated artifacts live under the configured artifact directory and are intentionally excluded from Git.</p>
 </section>
 </body>
