@@ -1446,6 +1446,13 @@
   <p class="pass"><b>Pre-run verification:</b> Focused synthetic build/resume/scan tests and the complete regression suite pass. Disk preflight shows 14 GiB available; the retained shards plus published generation require about 5.56 GiB at peak. The full build has not started, and no query future or final-period outcome has been opened.</p>
   <p><b>Next:</b> Commit this implementation as H0, generate and commit only its preregistration as sole-child H1, then launch the resumable full build. An independently committed verifier must pass before retrieval code may consume the generation.</p>
 </section>
+<section class="entry">
+  <h2>L-160 — Full-store v1 progress-publication refusal diagnosed</h2>
+  <p><b>Incident:</b> H0 <code>01e32f8</code> and sole-child H1 <code>eb8bfd1</code> froze v1. All 11,584 workers completed and wrote 3,786,121 main plus 35 overflow shard rows, but the parent used the harness's create-only evidence writer for mutable <code>work/PROGRESS.json</code>. Its second progress update was correctly refused with <code>FeasibilityError</code>. No <code>RESULT.json</code> exists, so v1 makes no store, performance or correctness claim.</p>
+  <p class="pass"><b>Shard audit:</b> The failure occurred after worker-pool shutdown. A separate complete audit re-read approximately 2.99 GB, validating all 11,584 metadata seals, content hashes, dtypes, record invariants, source-prefix bindings and counts. It found exactly 3,786,156 rows including all 35 overflow rows. Frozen seed-inventory digest is <code>54f9eb2c…9a0da</code>; shard inventory digest is <code>234e096c…aef2</code>.</p>
+  <p><b>V2 repair:</b> Progress now uses fsync plus atomic replacement, while contracts, results, manifests and verification receipts remain create-only. A regression performs multiple progress transitions. V2 uses a fresh output root and may consume the v1 shards only after recomputing the complete seed audit and matching its preregistered digest; it does not trust or mutate the failed root. The final content-addressed generation is independent of those source shards.</p>
+  <p><b>Boundary and next:</b> Preserve v1 unchanged as failed-run evidence. Pass the complete suite, commit the repair as a new H0, generate a sole-child v2 preregistration, then publish and independently verify the generation. Query futures and final-period outcomes remain unopened.</p>
+</section>
 </main>
 
 <section id="reproduce">
@@ -1584,9 +1591,9 @@ git commit -m "Preregister M04R-11 candidate v2"
 .venv/bin/python -m experiments.m04r.m04r14_t14_09_evidence_card_store --repository /home/vinay/code/market-analogues
 # The first verifier refusal and post-open formula-spelling amendment are retained in Git.
 .venv/bin/python -m experiments.m04r.verify_m04r14_t14_09_evidence_card_store --repository /home/vinay/code/market-analogues --dry-run</code></pre>
-  <pre><code># T14-10 WF-03B full DTW store starts only after the bounded independent receipt passes.
+  <pre><code># T14-10 WF-03B v1 is retained as a progress-publication refusal; v2 revalidates its complete shards.
 .venv/bin/python -m experiments.m04r.m04r14_t14_10_wf03b_dtw_store_full preregister --repository /home/vinay/code/market-analogues
-# Commit exactly experiments/m04r/m04r14_t14_10_wf03b_dtw_store_full_v1_preregistered.json as sole-child H1.
+# Commit exactly experiments/m04r/m04r14_t14_10_wf03b_dtw_store_full_v2_preregistered.json as sole-child H1.
 .venv/bin/python -m experiments.m04r.m04r14_t14_10_wf03b_dtw_store_full run --repository /home/vinay/code/market-analogues</code></pre>
   <p class="muted">Source datasets are read-only. Generated artifacts live under the configured artifact directory and are intentionally excluded from Git.</p>
 </section>

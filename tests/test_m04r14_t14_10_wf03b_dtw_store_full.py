@@ -13,6 +13,7 @@ from experiments.m04r.m04r14_t14_10_wf03b_dtw_store_full import (
     _full_selection,
     _scan_generation,
     _validated_shard,
+    _write_progress,
 )
 from market_analogues.causal_prefix import causal_prefix_digest
 from market_analogues.dtw_sample_store import DTW_SAMPLE_DTYPE, make_dtw_sample_record
@@ -86,3 +87,21 @@ def test_complete_scan_accounts_for_main_and_overflow() -> None:
     assert elapsed >= 0
     assert len(digest) == 64
     assert count == 2
+
+
+def test_progress_is_atomically_replaceable_not_create_only(tmp_path: Path) -> None:
+    path = tmp_path / "work" / "PROGRESS.json"
+    _write_progress(
+        path, status="building", completed=0, total=2, reused=0,
+        rows=0, overflow_rows=0,
+    )
+    _write_progress(
+        path, status="shards_complete", completed=2, total=2, reused=2,
+        rows=7, overflow_rows=1,
+    )
+    import json
+
+    value = json.loads(path.read_text())
+    assert value["status"] == "shards_complete"
+    assert value["completed_symbols"] == value["reused_symbols"] == 2
+    assert not list(path.parent.glob("*.tmp"))

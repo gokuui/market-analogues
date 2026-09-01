@@ -7,10 +7,12 @@ from dataclasses import asdict
 from hashlib import sha256
 import json
 import multiprocessing
+import os
 from pathlib import Path
 import subprocess
 from time import perf_counter
 from typing import Any, Mapping, Sequence
+from uuid import uuid4
 
 import numpy as np
 import pandas as pd
@@ -39,12 +41,18 @@ from experiments.m04r import m04r14_t14_10_wf03_feasibility as base
 from experiments.m04r import m04r14_t14_10_wf03b_dtw_store_poc as bounded
 
 
-SCHEMA = "m04r14-t14-10-wf03b-dtw-store-full-preregistration-v1"
+SCHEMA = "m04r14-t14-10-wf03b-dtw-store-full-preregistration-v2"
 OUTPUT_RELATIVE = Path(
-    "config/data/analogues/m04r14/t14-10-wf03b-dtw-store-full-v1"
+    "config/data/analogues/m04r14/t14-10-wf03b-dtw-store-full-v2"
 )
 PREREGISTRATION_RELATIVE = Path(
-    "experiments/m04r/m04r14_t14_10_wf03b_dtw_store_full_v1_preregistered.json"
+    "experiments/m04r/m04r14_t14_10_wf03b_dtw_store_full_v2_preregistered.json"
+)
+V1_FAILED_ROOT = Path(
+    "config/data/analogues/m04r14/t14-10-wf03b-dtw-store-full-v1"
+)
+V1_RUNNER_LOG = Path(
+    "config/data/analogues/m04r14/t14-10-wf03b-dtw-store-full-v1-runner.log"
 )
 BOUNDED_VERIFICATION_RELATIVE = Path(
     "config/data/analogues/m04r14/"
@@ -118,6 +126,10 @@ def build_preregistration(repository: Path) -> dict[str, Any]:
     selection = _full_selection(loaded)
     total_rows = int(loaded.manifest["row_count"])
     total_overflow = int(loaded.manifest["overflow_count"])
+    seed_inventory = _seed_inventory(repository, selection)
+    if seed_inventory["rows"] != total_rows \
+            or seed_inventory["overflow_rows"] != total_overflow:
+        raise FullStoreError("validated v1 seed counts differ from packed generation")
     state = {
         "schema_version": SCHEMA,
         "status": "frozen_before_full_store_build",
@@ -139,6 +151,7 @@ def build_preregistration(repository: Path) -> dict[str, Any]:
             "query_representation_digest": representation_input_digest(
                 query.representation
             ),
+            "validated_v1_seed": seed_inventory,
         },
         "selection": selection,
         "selection_digest": stable_hash(selection),
@@ -168,7 +181,7 @@ def build_preregistration(repository: Path) -> dict[str, Any]:
 
 def validate_preregistration(
     repository: Path, preregistration: Mapping[str, Any],
-) -> tuple[Any, dict[str, Any], Any, Any]:
+) -> tuple[Any, dict[str, Any], Any, Any, list[dict[str, Any]]]:
     base._validate_seal(preregistration, "preregistration_digest")
     loaded, verification, source, query = _prerequisites(repository)
     selection = _full_selection(loaded)
@@ -182,11 +195,14 @@ def validate_preregistration(
             + int(loaded.manifest["overflow_count"])
         ) * DTW_SAMPLE_ROW_BYTES,
     }
+    seed_inventory, seed_metadata = _validated_seed(repository, selection)
     if preregistration.get("schema_version") != SCHEMA \
             or preregistration.get("selection") != selection \
             or preregistration.get("selection_digest") != stable_hash(selection) \
             or preregistration.get("store_contract") != dtw_sample_store_contract() \
             or preregistration.get("expected") != expected \
+            or preregistration.get("inputs", {}).get("validated_v1_seed") \
+            != seed_inventory \
             or preregistration.get("inputs", {}).get(
                 "bounded_verification_digest"
             ) != verification["verification_digest"] \
@@ -207,19 +223,27 @@ def validate_preregistration(
         )
         if blob.returncode or sha256(blob.stdout).hexdigest() != digest:
             raise FullStoreError(f"full-store implementation binding differs: {path}")
-    return loaded, verification, source, query
+    return loaded, verification, source, query, seed_metadata
 
 
 def _write_progress(
     path: Path, *, status: str, completed: int, total: int,
     reused: int, rows: int, overflow_rows: int,
 ) -> None:
-    base._atomic(path, {
+    value = {
         "schema_version": "m04r14-t14-10-wf03b-full-build-progress-v1",
         "status": status, "completed_symbols": completed,
         "total_symbols": total, "reused_symbols": reused,
         "rows": rows, "overflow_rows": overflow_rows,
-    })
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f".{path.name}.{uuid4().hex}.tmp")
+    with temporary.open("w") as handle:
+        json.dump(value, handle, indent=2, sort_keys=True, allow_nan=False)
+        handle.write("\n")
+        handle.flush()
+        os.fsync(handle.fileno())
+    os.replace(temporary, path)
 
 
 def _validated_shard(
@@ -250,6 +274,104 @@ def _validated_shard(
     except Exception:
         return None
     return metadata if valid else None
+
+
+def _validated_seed(
+    repository: Path, selection: Sequence[Mapping[str, Any]],
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    root = repository / V1_FAILED_ROOT
+    contract_path = root / "CONTRACT.json"
+    failure_path = root / "PROGRESS.json"
+    runner_path = repository / V1_RUNNER_LOG
+    if root.is_symlink() or not root.is_dir() or (root / "RESULT.json").exists() \
+            or not runner_path.is_file():
+        raise FullStoreError("v1 failed seed boundary differs")
+    contract = base._read(contract_path)
+    base._validate_seal(contract, "preregistration_digest")
+    failure = base._read(failure_path)
+    if contract.get("schema_version") \
+            != "m04r14-t14-10-wf03b-dtw-store-full-preregistration-v1" \
+            or failure.get("status") != "failed:FeasibilityError" \
+            or failure.get("completed_symbols") != 0 \
+            or failure.get("total_symbols") != len(selection):
+        raise FullStoreError("v1 failed seed evidence differs")
+    shard_root = root / "work" / "shards"
+    compact = []
+    metadata_rows = []
+    rows = 0
+    overflow_rows = 0
+    for specification in selection:
+        metadata = _validated_shard(shard_root, specification)
+        if metadata is None:
+            raise FullStoreError(
+                f"v1 seed shard does not validate: {specification['symbol']}"
+            )
+        rows += int(metadata["rows"])
+        overflow_rows += int(metadata["overflow_rows"])
+        metadata_rows.append(metadata)
+        compact.append({
+            "symbol": metadata["symbol"], "symbol_id": metadata["symbol_id"],
+            "rows": metadata["rows"], "overflow_rows": metadata["overflow_rows"],
+            "rows_sha256": metadata["rows_sha256"],
+            "overflow_sha256": metadata["overflow_sha256"],
+            "shard_digest": metadata["shard_digest"],
+        })
+    state = {
+        "schema_version": "m04r14-t14-10-wf03b-v1-seed-inventory-v1",
+        "source_root": str(V1_FAILED_ROOT),
+        "contract_preregistration_digest": contract["preregistration_digest"],
+        "contract_sha256": base._sha(contract_path),
+        "failure_sha256": base._sha(failure_path),
+        "runner_log_sha256": base._sha(runner_path),
+        "symbols": len(compact), "rows": rows,
+        "overflow_rows": overflow_rows,
+        "shard_inventory_digest": stable_hash(compact),
+    }
+    return (
+        {**state, "seed_inventory_digest": stable_hash(state)},
+        metadata_rows,
+    )
+
+
+def _seed_inventory(
+    repository: Path, selection: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    return _validated_seed(repository, selection)[0]
+
+
+def _load_seed_shards(
+    repository: Path, progress_path: Path,
+    selection: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    shard_root = repository / V1_FAILED_ROOT / "work" / "shards"
+    output = []
+    rows = 0
+    overflow_rows = 0
+    _write_progress(
+        progress_path, status="validating_v1_seed", completed=0,
+        total=len(selection), reused=0, rows=0, overflow_rows=0,
+    )
+    for index, specification in enumerate(selection, start=1):
+        metadata = _validated_shard(shard_root, specification)
+        if metadata is None:
+            raise FullStoreError(
+                f"v1 seed shard changed: {specification['symbol']}"
+            )
+        output.append(metadata)
+        rows += int(metadata["rows"])
+        overflow_rows += int(metadata["overflow_rows"])
+        if index % 64 == 0 or index == len(selection):
+            _write_progress(
+                progress_path, status="validating_v1_seed", completed=index,
+                total=len(selection), reused=index, rows=rows,
+                overflow_rows=overflow_rows,
+            )
+    _write_progress(
+        progress_path, status="shards_complete", completed=len(output),
+        total=len(selection), reused=len(output), rows=rows,
+        overflow_rows=overflow_rows,
+    )
+    return output
 
 
 def _build_symbol(task: tuple[dict[str, Any], str]) -> dict[str, Any]:
@@ -417,9 +539,10 @@ def _scan_generation(query: Any, generation: Any) -> tuple[float, str, int]:
 
 def execute(repository: Path, preregistration: Mapping[str, Any]) -> dict[str, Any]:
     repository = repository.resolve(strict=True)
-    loaded, verification, source, query = validate_preregistration(
-        repository, preregistration,
-    )
+    (loaded, verification, source, query,
+     validated_seed_metadata) = validate_preregistration(
+         repository, preregistration,
+     )
     benchmark = source.load_benchmark()
     if benchmark is None:
         raise FullStoreError("full-store build requires benchmark")
@@ -443,16 +566,19 @@ def execute(repository: Path, preregistration: Mapping[str, Any]) -> dict[str, A
     lease_before = resident_file_identity_lease(base.RESIDENT_ROOT / "READY.json")
     started = perf_counter()
     try:
-        metadata = _build_shards(
-            root / "work" / "shards", preregistration["selection"],
-            source=source, benchmark=benchmark, query=query.representation,
-            query_id=query.episode_id, maximum_cutoff=maximum, packed=loaded,
+        metadata = validated_seed_metadata
+        _write_progress(
+            root / "work" / "PROGRESS.json", status="shards_complete",
+            completed=len(metadata), total=len(metadata), reused=len(metadata),
+            rows=sum(int(row["rows"]) for row in metadata),
+            overflow_rows=sum(int(row["overflow_rows"]) for row in metadata),
         )
+        shard_root = repository / V1_FAILED_ROOT / "work" / "shards"
         row_shards = []
         overflow_shards = []
         for specification in preregistration["selection"]:
             row_path, overflow_path, _metadata_path = bounded._paths(
-                root / "work" / "shards", specification["symbol"],
+                shard_root, specification["symbol"],
             )
             row_shards.append(row_path)
             overflow_shards.append(overflow_path)
@@ -462,6 +588,9 @@ def execute(repository: Path, preregistration: Mapping[str, Any]) -> dict[str, A
             "packed_generation_id": loaded.generation_id,
             "packed_provenance_digest": loaded.manifest["provenance_digest"],
             "selection_digest": preregistration["selection_digest"],
+            "v1_seed_inventory_digest": preregistration["inputs"][
+                "validated_v1_seed"
+            ]["seed_inventory_digest"],
             "query_representation_digest": preregistration["inputs"][
                 "query_representation_digest"
             ],
@@ -520,7 +649,7 @@ def execute(repository: Path, preregistration: Mapping[str, Any]) -> dict[str, A
         }
         passed = all(gates.values())
         state = {
-            "schema_version": "m04r14-t14-10-wf03b-dtw-store-full-result-v1",
+            "schema_version": "m04r14-t14-10-wf03b-dtw-store-full-result-v2",
             "status": "complete", "passed": passed, "gates": gates,
             "generation_id": generation_id,
             "generation_manifest_digest": generation.manifest["manifest_digest"],
@@ -531,6 +660,7 @@ def execute(repository: Path, preregistration: Mapping[str, Any]) -> dict[str, A
             "overflow_rows": len(generation.overflow),
             "zero_bound_rows": zero_rows,
             "shard_metadata_digest": stable_hash(metadata),
+            "reused_v1_symbols": len(metadata),
             "scan_seconds": scan_seconds, "scan_digest": scan_digest,
             "store_bytes": expected["store_bytes"],
             "store_gib": expected["store_bytes"] / 1024 ** 3,
@@ -545,7 +675,7 @@ def execute(repository: Path, preregistration: Mapping[str, Any]) -> dict[str, A
         base._atomic(root / "RESULT.json", result)
         _write_progress(
             root / "PROGRESS.json", status="complete",
-            completed=len(metadata), total=len(metadata), reused=0,
+            completed=len(metadata), total=len(metadata), reused=len(metadata),
             rows=len(generation.rows), overflow_rows=len(generation.overflow),
         )
         return result
