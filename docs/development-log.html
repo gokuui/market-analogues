@@ -1383,6 +1383,13 @@
   <p><b>Synthetic verifier:</b> Sample retention is identical under forward chunks and shuffled input and rejects conflicting duplicate IDs. The automatic gate requires zero false prunes, maximum bound excess ≤ <code>1e-12</code>, at least 25% pruning in every case and at least 35% in aggregate. Passing authorizes only construction/performance testing of the auxiliary sample store—not production or a trading claim.</p>
   <p><b>Next:</b> Commit this harness as H0, freeze its exact implementation, inputs, cases, sample rule and gates in a sole-child H1 preregistration, then run the three cases. Historical query futures, validation scores and final-period results remain unopened.</p>
 </section>
+<section class="entry">
+  <h2>L-151 — Quantized DTW bound passes the frozen real tightness gate</h2>
+  <p><b>Frozen lifecycle:</b> H0 <code>00b1eaa</code> contains the producer and automatic gate; sole-child H1 <code>ecdc7ef</code> freezes implementation, inputs, thresholds, SHA sampling and gates at preregistration digest <code>2835425e…6466da</code>. No query future, validation score or final-period outcome was available to either commit.</p>
+  <p class="pass"><b>Result:</b> The early/middle/late samples safely pruned 3,705 / 3,754 / 3,582 of 4,096 old-bound admissions: 90.45% / 91.65% / 87.45%, or 89.85% aggregate against the frozen 25%-per-case and 35%-aggregate gates. All 12,288 comparisons satisfy packed ≤ native ≤ exact and enhanced ≤ exact; false-prune count is zero. The closest enhanced-to-exact margins remain 0.166 / 0.150 / 0.180.</p>
+  <p><b>Interpretation:</b> The old 30–52% exact-admission estimates were caused primarily by the missing DTW lower-bound term, not inherent ambiguity in the price-development measure. A compact 64-sample auxiliary index is now justified for engineering and performance validation. This is not production authorization and says nothing about future returns.</p>
+  <p><b>Next:</b> Commit and run an independently structured verifier that reverse-scans the complete admitted sets, reconstructs the same SHA samples, recomputes all exact comparisons and re-evaluates the frozen gate. Only a verified receipt authorizes auxiliary-store construction.</p>
+</section>
 </main>
 
 <section id="reproduce">
