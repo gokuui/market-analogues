@@ -1346,6 +1346,13 @@
   <p><b>Independent dry run:</b> A separately structured verifier reconstructs source prefixes, query/request identity, proposal candidate/result digests, forward/reverse equality, certificate accounting and closure, temporal eligibility, distinct-symbol constraints, every leaf SHA/seal, closed inventories and root aggregates. Its dry-run digest is <code>85dc4dd6…75bb</code>; publication follows only after committing the verifier.</p>
   <p><b>Next:</b> Publish independent verification, then implement WF-03B proofs for exact price-only, deterministic random and recent-return/volatility neighbors. WF-03C must batch the 24 queries per month so one physical pack pass serves the month and run independent exact tasks across available cores.</p>
 </section>
+<section class="entry">
+  <h2>L-146 — Route-specific certified frontier substrate</h2>
+  <p><b>Problem found:</b> The existing multi-route proposal union ranks each component correctly but deliberately publishes the composite bound in <code>lower_bound</code>. That is valid for composite recall seeding, but it cannot certify a price-only result. Reusing it would make a false proof even when the neighbors looked plausible.</p>
+  <p><b>Implementation:</b> A dedicated branch-aware component scan now publishes the named safe component bound under a distinct schema and contract. It retains zero-bound overflow fallbacks, exact causal eligibility, stable score/episode-ID tie ordering, bounded memory and configurable forward/reverse threaded traversal. Composite and component certificates can no longer be confused by schema.</p>
+  <p class="pass"><b>Verification:</b> The packed-bound regression set passes, including scalar quantization safety for every component. New adversarial tie/overflow tests prove identical component candidates, bounds and result digests across 1/3/7 threads, forward/reverse traversal and different block sizes; invalid components and quotas fail closed.</p>
+  <p><b>Next:</b> Add component-specific exact completion and strict next-bound closure, then compare it with an exhaustive exact price-component oracle on synthetic universes and the three frozen probes before scaling.</p>
+</section>
 </main>
 
 <section id="reproduce">

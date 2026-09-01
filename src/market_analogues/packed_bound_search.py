@@ -25,6 +25,7 @@ from .types import stable_hash
 
 SEARCH_SCHEMA_VERSION = "m04r-global-bound-proposal-v1"
 BRANCH_AWARE_SEARCH_SCHEMA_VERSION = "m04r-global-bound-proposal-v2"
+COMPONENT_SEARCH_SCHEMA_VERSION = "m04r-global-component-bound-proposal-v1"
 BATCH_SEARCH_SCHEMA_VERSION = "m04r-global-bound-proposal-batch-v1"
 BATCH_BRANCH_AWARE_SEARCH_SCHEMA_VERSION = "m04r-global-bound-proposal-batch-v2"
 THRESHOLD_SCAN_SCHEMA_VERSION = "m04r-packed-bound-threshold-scan-v1"
@@ -121,6 +122,34 @@ class BoundProposalBatchReport:
     elapsed_seconds: float
     peak_rss_mb: float
     result_digest: str
+
+
+def packed_component_search_contract(component: str) -> dict[str, Any]:
+    """Contract for a route-specific safe-bound frontier.
+
+    Unlike the additive multi-route proposal report, ``lower_bound`` in this
+    report is the named component bound itself.  It may therefore certify an
+    exact component search when paired with component-specific completion.
+    """
+    allowed = {
+        "coarse", "stage", "price", "candle_volatility", "volume_shock",
+        "market_context", "structural",
+    }
+    if component not in allowed:
+        raise PackedBoundSearchError("component bound route is unsupported")
+    state = {
+        "schema_version": COMPONENT_SEARCH_SCHEMA_VERSION,
+        "component": component,
+        "eligibility": (
+            "quality tier before scoring; cutoff <= latest eligible cutoff; "
+            "same-symbol windows intersecting the query and query ID excluded"
+        ),
+        "ranking": "ascending (named branch-aware component lower bound, episode ID)",
+        "overflow": "unquantizable rows receive zero and cannot be omitted",
+        "lower_bound_field": "named component bound, not composite total",
+        "outcomes_or_labels_used": False,
+    }
+    return {**state, "digest": stable_hash(state)}
 
 
 @dataclass(frozen=True)
@@ -664,6 +693,118 @@ def scan_packed_bound_proposals_threaded(
         eligible_main, eligible_overflow, route_counts, quotas, block_rows,
         block_order, elapsed, peak, candidate_digest, stable_hash(deterministic),
         contract_digest if branch_aware else None, input_digest,
+    )
+
+
+def scan_packed_component_bound_proposals_threaded(
+    store_root: Path,
+    generation_id: str,
+    query: PackedBoundQuery,
+    *,
+    component: str,
+    quota: int,
+    block_rows: int = 4_096,
+    block_order: str = "forward",
+    threads: int = 4,
+    verify_content: bool = True,
+    expected_provenance_digest: str | None = None,
+) -> BoundProposalReport:
+    """Return a stable branch-aware frontier ranked by one safe component bound.
+
+    Multi-route reports intentionally retain the composite total in each
+    candidate.  A component certificate cannot use that field.  This dedicated
+    report instead stores the named route score as ``lower_bound`` and cannot be
+    mistaken for a composite frontier because its schema and contract differ.
+    """
+    contract = packed_component_search_contract(component)
+    if type(quota) is not int or isinstance(quota, bool) or quota < 1:
+        raise PackedBoundSearchError("component quota must be a positive integer")
+    if block_rows < 1 or threads < 1:
+        raise PackedBoundSearchError("block rows and threads must be positive")
+    if block_order not in {"forward", "reverse"}:
+        raise PackedBoundSearchError("block order must be forward or reverse")
+    loaded = load_packed_generation(
+        store_root, generation_id,
+        expected_provenance_digest=expected_provenance_digest,
+        verify_content=verify_content, validate_records=False,
+    )
+    symbol_id = loaded.symbols.index(query.symbol) if query.symbol in loaded.symbols else None
+    heap = _empty_entries()
+    started = perf_counter()
+    peak = _current_rss_mb()
+    eligible_main = 0
+    pack_path = (
+        loaded.root / "generations" / loaded.generation_id
+        / str(loaded.manifest["rows_file"])
+    )
+    offsets = list(range(0, len(loaded.rows), block_rows))
+    if block_order == "reverse":
+        offsets.reverse()
+    with pack_path.open("rb") as handle:
+        descriptor = handle.fileno()
+
+        def score_block(first: int) -> tuple[int, np.ndarray]:
+            numba.set_num_threads(1)
+            count = min(block_rows, len(loaded.rows) - first)
+            raw = os.pread(
+                descriptor, count * PACK_DTYPE.itemsize,
+                first * PACK_DTYPE.itemsize,
+            )
+            if len(raw) != count * PACK_DTYPE.itemsize:
+                raise PackedBoundSearchError("short component positional read")
+            block = np.frombuffer(raw, dtype=PACK_DTYPE, count=count)
+            selected = block[_eligible_mask(block, query, symbol_id)]
+            if not len(selected):
+                return 0, _empty_entries()
+            bounded = packed_branch_aware_lower_bounds(query.representation, selected)
+            scores = np.asarray(bounded.components[component], dtype=np.float64)
+            # Store the component score in both fields: _stable_bounded ranks
+            # route_score and _finalize publishes total as lower_bound.
+            return len(selected), _entries(
+                selected, scores, scores, overflow=False,
+            )
+
+        with ThreadPoolExecutor(
+            max_workers=threads, thread_name_prefix="component-bound",
+        ) as executor:
+            for eligible, entries in _bounded_ordered_thread_results(
+                executor, score_block, offsets, threads,
+            ):
+                eligible_main += eligible
+                heap = _stable_bounded(heap, entries, quota)
+                peak = max(peak, _current_rss_mb())
+    overflow = np.asarray(loaded.overflow)
+    selected_overflow = overflow[_eligible_mask(overflow, query, symbol_id)]
+    eligible_overflow = len(selected_overflow)
+    if eligible_overflow:
+        zeros = np.zeros(eligible_overflow, dtype=np.float64)
+        heap = _stable_bounded(
+            heap, _entries(selected_overflow, zeros, zeros, overflow=True), quota,
+        )
+    candidates, route_counts, candidate_digest = _finalize(
+        {component: heap}, loaded.symbols,
+    )
+    input_digest = _packed_query_input_digest(query)
+    deterministic = {
+        "schema_version": COMPONENT_SEARCH_SCHEMA_VERSION,
+        "contract_digest": contract["digest"], "component": component,
+        "generation_id": loaded.generation_id,
+        "query_episode_id": query.episode_id,
+        "rows_scanned": len(loaded.rows) + len(loaded.overflow),
+        "eligible_rows": eligible_main + eligible_overflow,
+        "eligible_main_rows": eligible_main,
+        "eligible_overflow_rows": eligible_overflow,
+        "route_counts": route_counts, "route_quotas": {component: quota},
+        "candidate_digest": candidate_digest,
+        "real_forward_outcomes_accessed": False,
+        "input_digest": input_digest,
+    }
+    return BoundProposalReport(
+        COMPONENT_SEARCH_SCHEMA_VERSION, loaded.generation_id, query.episode_id,
+        candidates, deterministic["rows_scanned"], deterministic["eligible_rows"],
+        eligible_main, eligible_overflow, route_counts, {component: quota},
+        block_rows, block_order, perf_counter() - started, peak,
+        candidate_digest, stable_hash(deterministic), contract["digest"], input_digest,
     )
 
 

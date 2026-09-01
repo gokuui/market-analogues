@@ -8,7 +8,9 @@ import numpy as np
 import pytest
 
 from market_analogues.packed_bound_search import (
-    PackedBoundQuery, PackedBoundSearchError, scan_packed_bound_proposals,
+    COMPONENT_SEARCH_SCHEMA_VERSION, PackedBoundQuery, PackedBoundSearchError,
+    packed_component_search_contract, scan_packed_bound_proposals,
+    scan_packed_component_bound_proposals_threaded,
     scan_packed_bound_proposals_many, scan_packed_bound_proposals_threaded,
     scan_packed_bound_threshold,
 )
@@ -158,6 +160,41 @@ def test_threaded_branch_aware_is_scalar_exact_across_order_blocks_threads_ties_
             verify_content=False,
         )
         _assert_semantic_report_parity(threaded, scalar)
+
+
+def test_component_frontier_publishes_component_bound_and_is_order_stable(
+    tmp_path: Path,
+) -> None:
+    root, generation, representation = _store(tmp_path)
+    query = _query(representation)
+    reports = tuple(
+        scan_packed_component_bound_proposals_threaded(
+            root, generation, query, component="price", quota=127,
+            block_rows=block_rows, block_order=order, threads=threads,
+            verify_content=False,
+        )
+        for block_rows, order, threads in (
+            (1, "forward", 1), (23, "forward", 3), (41, "reverse", 7),
+        )
+    )
+    first = reports[0]
+    assert first.schema_version == COMPONENT_SEARCH_SCHEMA_VERSION
+    assert first.contract_digest == packed_component_search_contract("price")["digest"]
+    assert first.route_quotas == {"price": 127}
+    assert first.route_counts == {"price": 127}
+    assert len(first.candidates) == 127
+    assert all(row.routes == ("price",) for row in first.candidates)
+    assert all(row.lower_bound == 0 for row in first.candidates)
+    for report in reports[1:]:
+        _assert_semantic_report_parity(report, first)
+
+    with pytest.raises(PackedBoundSearchError, match="unsupported"):
+        packed_component_search_contract("composite")
+    with pytest.raises(PackedBoundSearchError, match="positive"):
+        scan_packed_component_bound_proposals_threaded(
+            root, generation, query, component="price", quota=0,
+            verify_content=False,
+        )
 
 
 def test_threaded_branch_aware_preserves_exclusions_and_zero_or_short_heaps(
