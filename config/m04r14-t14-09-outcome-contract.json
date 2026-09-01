@@ -1,0 +1,201 @@
+{
+  "schema_version": "m04r14-t14-09-outcome-contract-v1",
+  "contract_id": "nasdaq-causal-forward-outcomes-v1",
+  "status": "frozen_before_real_forward_outcome_access",
+  "contract_digest": "2aee56f0671c7ff89e2df39cb3803b35adaae9988ce199259a7c930eab316c40",
+  "parent_contract": {
+    "contract_id": "daily-long-swing-v1",
+    "contract_digest": "8b333ac8a6cdf0df9d71d3599e25336f7db246957d3a29a925fedc0e9103fa53",
+    "source_path": "config/case-memory-contract.yaml",
+    "source_sha256": "26d33b5e4f69d20b1be1458e28c7a85e5c20554e70d0de0beced3c7e08c8aebe"
+  },
+  "retrieval_inputs": {
+    "dataset": "nasdaq",
+    "registry_digest": "e5a1024e021425cace30d2172fee426ff1e6490702ea4f30583ad056e1ca89f2",
+    "source_lock_digest": "f1b3232ed02f86c03e7106495cda1585a7fcfef2bf917f8c7254a1777195aba3",
+    "source_content_digest": "27dfa03eea244c1c13d27dcae7970707c60505141a297502de36588b6928437e",
+    "snapshot_case_manifest_digest": "bc446bde4a5e4796487fa57aee336b1bafcde15b71c7ade0fd11a373352b5ed6",
+    "snapshot_semantic_result_digest": "a8bdd370d757208075cb648eb35a81b52e872995891f12ec527fa45e804ef701",
+    "snapshot_semantic_receipt_sha256": "b94d36ebccfcfbef5abf85898a1ad6f3c2c50e845839923428d850fd25d87e77",
+    "audit_comparison_result_digest": "63bedc4c0920e775ec87b4deca919b03487094549a93d30893ac5d0055eab7b2",
+    "audit_comparison_sha256": "8afa7141f6b6db05fdf11e7743ec777d802d2c648b927af6218356ebb35abb6f",
+    "scheduled_queries": 3270,
+    "retrieved_match_rows": 65400,
+    "retrieval_must_remain_byte_identical": true
+  },
+  "scope": {
+    "decision_mode": "after_close_daily",
+    "intended_direction": "long",
+    "universe_boundary": "configured_source_instruments_at_frozen_source_lock",
+    "compute_once_key": ["dataset", "episode_id", "source_fingerprint"],
+    "join_key": ["query_episode_id", "match_rank", "matched_episode_id"],
+    "one_outcome_record_per_unique_matched_episode": true,
+    "same_symbol_acquirer_substitution": false,
+    "real_forward_outcomes_accessed_before_contract": false
+  },
+  "origin": {
+    "timestamp": "matched_episode_cutoff_session_close",
+    "origin_price": "stored_close_at_cutoff",
+    "entry_execution_assumed": false,
+    "returns_are_descriptive_not_trade_returns": true,
+    "future_rows_begin": "first_strictly_later_observed_stock_session",
+    "duplicate_timestamps": "reject_episode",
+    "non_monotonic_timestamps": "reject_episode",
+    "non_positive_ohlc": "reject_episode"
+  },
+  "session_axis": {
+    "horizon_unit": "subsequent_observed_stock_sessions",
+    "horizons": [5, 10, 20, 40, 60, 126],
+    "continuity_reference": "exact_benchmark_session_dates_between_origin_and_endpoint",
+    "missing_expected_stock_session": "metric_censored_as_suspension_or_missing_data",
+    "calendar_day_approximation_forbidden": true,
+    "weekend_or_holiday_forward_fill_forbidden": true
+  },
+  "atr": {
+    "lookback_sessions": 20,
+    "method": "simple_mean_true_range",
+    "true_range": "max(high-low,abs(high-previous_close),abs(low-previous_close))",
+    "window": "twenty_stock_sessions_ending_at_origin",
+    "minimum_rows_including_previous_close": 21,
+    "future_values_allowed": false,
+    "non_finite_or_non_positive_atr": "atr_measures_and_barriers_unavailable"
+  },
+  "primary_barrier": {
+    "horizon_sessions": 20,
+    "favorable_price": "origin_close_plus_2_atr",
+    "adverse_price": "origin_close_minus_1_atr",
+    "touch_inputs": ["stored_high", "stored_low"],
+    "labels": [
+      "favorable_first",
+      "adverse_first",
+      "ambiguous_same_first_touch_bar",
+      "no_touch",
+      "censored"
+    ],
+    "same_first_touch_bar": "ambiguous_excluded_from_directional_denominator",
+    "gap_beyond_barrier": "touch_on_that_session_without_intrabar_order_assumption",
+    "no_touch_requires_complete_horizon": true,
+    "barrier_prices_fixed_at_origin": true
+  },
+  "measures": {
+    "close_return": "endpoint_close_divided_by_origin_close_minus_1",
+    "benchmark_relative_return": "stock_gross_return_divided_by_benchmark_gross_return_minus_1",
+    "maximum_favorable_excursion": "maximum_future_high_divided_by_origin_close_minus_1",
+    "maximum_adverse_excursion": "minimum_future_low_divided_by_origin_close_minus_1",
+    "mfe_atr": "maximum_future_high_minus_origin_close_divided_by_origin_atr",
+    "mae_atr": "minimum_future_low_minus_origin_close_divided_by_origin_atr",
+    "time_to_extremes": "one_based_observed_stock_session_offset",
+    "normalized_future_path": {
+      "maximum_steps": 126,
+      "one_row_per_observed_step": true,
+      "fields": [
+        "episode_id",
+        "step",
+        "timestamp",
+        "close_return",
+        "high_return",
+        "low_return",
+        "benchmark_relative_close_return",
+        "atr_normalized_close_move"
+      ],
+      "partial_paths_preserved": true,
+      "partial_paths_excluded_from_complete_horizon_denominators": true
+    }
+  },
+  "benchmark_alignment": {
+    "benchmark": "frozen_configured_nasdaq_benchmark",
+    "origin_requires_exact_session": true,
+    "endpoint_requires_exact_session": true,
+    "path_alignment": "exact_normalized_session_timestamp",
+    "forward_fill": false,
+    "nearest_session_substitution": false,
+    "missing_benchmark_effect": "relative_measure_unavailable_stock_measure_retained"
+  },
+  "causal_embargo": {
+    "attach_outcomes_only_after_retrieval_is_frozen": true,
+    "horizon_contributes_to_query_when": "full_horizon_completion_timestamp_lte_query_cutoff",
+    "early_barrier_touch_does_not_shorten_embargo": true,
+    "newer_analogue_may_remain_visible_without_outcome": true,
+    "outcomes_may_affect_similarity_rank_or_weight": false
+  },
+  "censoring_and_limitations": {
+    "incomplete_horizon": "censored_excluded_from_that_horizon_denominator",
+    "source_end_before_horizon": "right_censored_unknown_delisting_status",
+    "known_delisting_return_available": false,
+    "missing_delisting_return_imputed": false,
+    "ticker_rename_reuse_merger_identity_available": false,
+    "corporate_action_adjustment_provenance": "unknown_propagated_as_quality_warning",
+    "split_or_dividend_repair": "forbidden_without_separate_fingerprinted_source",
+    "partial_numeric_values": "stored_for_audit_but_not_counted_as_complete",
+    "reason_precedence": [
+      "invalid_source_identity",
+      "invalid_origin",
+      "invalid_ohlc",
+      "insufficient_atr_history",
+      "suspension_or_missing_session",
+      "source_end_before_horizon",
+      "outcome_not_yet_observable",
+      "benchmark_missing_relative_only",
+      "complete"
+    ]
+  },
+  "artifacts": {
+    "episode_outcomes": "episode-outcomes.parquet",
+    "future_paths": "future-paths.parquet",
+    "query_match_links": "query-match-links.parquet",
+    "coverage": "COVERAGE.json",
+    "seal": "SEALED.json",
+    "output_policy": "create_only_atomic_then_seal",
+    "every_row_binds": [
+      "contract_digest",
+      "source_content_digest",
+      "source_fingerprint",
+      "episode_id",
+      "cutoff"
+    ],
+    "timing_excluded_from_semantic_digest": true
+  },
+  "execution": {
+    "load_each_symbol_once_per_process_partition": true,
+    "deduplicate_matched_episodes_before_computation": true,
+    "processes": 12,
+    "resume": "validate_immutable_partition_before_reuse",
+    "partition": "stable_hash_symbol_mod_processes",
+    "maximum_aggregate_rss_mib": 49152,
+    "minimum_free_disk_gib_before_start": 5
+  },
+  "verification": {
+    "synthetic_oracle_required_before_real_run": true,
+    "synthetic_cases": [
+      "exact_return_and_excursions",
+      "causal_atr",
+      "favorable_first",
+      "adverse_first",
+      "same_bar_ambiguous",
+      "complete_no_touch",
+      "incomplete_horizon",
+      "missing_benchmark",
+      "missing_stock_session",
+      "non_positive_price",
+      "future_mutation_retrieval_isolation",
+      "duplicate_episode_deduplication"
+    ],
+    "real_smoke": "preregistered_12_case_audit_sample_coverage_only",
+    "full_verifier": "independent_recomputation_of_every_episode_outcome_and_path_row",
+    "required_reconciliation": {
+      "scheduled_query_links": 65400,
+      "unexplained_missing_or_duplicate_links": 0,
+      "outcome_rows_unaccounted": 0,
+      "path_rows_unaccounted": 0
+    },
+    "real_outcome_values_cannot_change_contract_or_retrieval": true
+  },
+  "claims": {
+    "historical_descriptive_evidence_only": true,
+    "profitability_claimed": false,
+    "calibrated_probability_claimed": false,
+    "buy_or_sell_recommendation": false,
+    "survivorship_free_exchange_history_claimed": false,
+    "production_promotion_authorized": false
+  }
+}

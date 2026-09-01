@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>T14-09 causal forward outcomes — implementation plan</title>
+  <style>
+    :root{--ink:#17202a;--muted:#5d6d7e;--paper:#fff;--bg:#f3f6f7;--line:#d5d8dc;--blue:#2471a3;--green:#117864;--amber:#9a6700;--red:#b03a2e}*{box-sizing:border-box}body{font-family:system-ui,sans-serif;max-width:1220px;margin:auto;padding:2rem;background:var(--bg);color:var(--ink);line-height:1.55}header,section{background:var(--paper);border:1px solid var(--line);border-radius:11px;padding:1.4rem;margin-bottom:1rem}h1,h2{margin-top:.1rem}table{width:100%;border-collapse:collapse}th,td{text-align:left;vertical-align:top;padding:.65rem;border-bottom:1px solid var(--line)}code{background:#eef2f3;padding:.1rem .3rem;overflow-wrap:anywhere}.done{color:var(--green);font-weight:700}.open{color:var(--amber);font-weight:700}.blocked{color:var(--red);font-weight:700}.callout{border-left:5px solid var(--blue)}.warning{border-left:5px solid var(--amber)}.task{border-left:5px solid var(--blue)}li{margin:.35rem 0}
+  </style>
+</head>
+<body>
+<header>
+  <h1>T14-09 — Causal forward-outcome store</h1>
+  <p><b>Goal:</b> take the already frozen historical matches, replay what happened after each matched chart, and preserve every success, failure, ambiguous path and censored case without allowing the future to change similarity.</p>
+  <p><b>Starting evidence:</b> 3,270/3,270 shadow queries are semantically certified, and a separately rebuilt 12-query authority has exact equality at 240/240 ordered positions. Retrieval is now an immutable input—not something T14-09 may tune.</p>
+</header>
+
+<section class="warning">
+  <h2>Honest data boundary</h2>
+  <p>The configured NASDAQ files do not provide point-in-time exchange membership, verified delisting returns, permanent security identity, ticker-change history or known corporate-action adjustment provenance. Therefore a file ending early is <b>right-censored with unknown delisting status</b>; it is never silently treated as a −100% return, a zero return, or the acquiring company. Results describe the stored OHLCV universe and cannot be called survivorship-free exchange history.</p>
+</section>
+
+<section>
+  <h2>Exact outcome semantics</h2>
+  <table>
+    <tr><th>Origin</th><td>The matched episode's stored close at its cutoff. This is a descriptive reference price, not an assumed executable fill.</td></tr>
+    <tr><th>Horizons</th><td>5, 10, 20, 40, 60 and 126 subsequent observed stock sessions. Expected-session gaps are detected against the exact benchmark calendar and censored rather than stretched silently.</td></tr>
+    <tr><th>Returns</th><td>Close return, gross benchmark-relative return, MFE, MAE and ATR-normalized excursions. No calendar-day approximation or benchmark forward fill.</td></tr>
+    <tr><th>Primary event</th><td>Within 20 sessions, first touch of origin close +2 ATR versus origin close −1 ATR. If both are first touched in one daily bar, the event is ambiguous and excluded from the directional denominator.</td></tr>
+    <tr><th>ATR</th><td>Simple mean of 20 true ranges ending at the origin; the first true range requires the preceding close. No future value enters ATR.</td></tr>
+    <tr><th>Paths</th><td>Store every observed future step through 126 with raw-return, benchmark-relative and ATR-normalized coordinates. Partial paths remain auditable but never count as complete horizons.</td></tr>
+    <tr><th>Embargo</th><td>A historical match contributes at horizon H only if the complete H-session path was already observable by the query cutoff. An early barrier touch does not shorten this embargo.</td></tr>
+  </table>
+</section>
+
+<section class="callout">
+  <h2>Build once, reuse safely</h2>
+  <p>The 65,400 query-match links can repeat the same historical episode. T14-09 first deduplicates by episode and source fingerprint, loads each symbol once per stable partition, computes each future once, then joins immutable outcomes back to query/rank. This improves speed without changing a value. Raw query links, unique episode outcomes and future paths remain separate artifacts.</p>
+</section>
+
+<section class="task">
+  <h2>T09-00 — Freeze the operational contract <span class="open">IN PROGRESS</span></h2>
+  <p><b>Build:</b> machine JSON plus this readable plan. Bind the M00 charter, retrieval receipts, source lock, case manifest, all formulas, censoring precedence, artifacts, process count and claim limits.</p>
+  <p><b>Test:</b> schema and self-digest validation; reject altered upstream hashes, horizons, formulas, ambiguity policy, delisting policy, outcome-fed retrieval, or claim language.</p>
+  <p><b>Pass:</b> commit the contract before reading a single post-match source row. Later implementation is preregistered as a sole child of a clean code commit.</p>
+</section>
+
+<section class="task">
+  <h2>T09-01 — Independent synthetic outcome oracle</h2>
+  <p><b>Build:</b> a production calculator and a deliberately separate reference implementation. Cover exact returns/excursions, causal ATR, favorable/adverse first touch, same-bar ambiguity, no touch, incomplete history, missing benchmark, missing stock sessions, invalid prices and duplicate episode caching.</p>
+  <p><b>Test:</b> hand-calculated fixtures; scale invariance; future mutation changes outcomes but cannot change frozen retrieval; row-order invariance; serial/12-process equality; Parquet round trips preserve exact semantic digests.</p>
+  <p><b>Pass:</b> exact production/reference equality on every scalar, label, timestamp, censor reason and path row. No real forward value is opened during development.</p>
+</section>
+
+<section class="task">
+  <h2>T09-02 — Frozen-input inventory and 12-case real smoke</h2>
+  <p><b>Build:</b> after preregistration, open only the fixed 12-case audit sample, enumerate unique matched episodes/symbols and exercise the complete builder. Outcome values are not used to revise semantics.</p>
+  <p><b>Test:</b> all 240 query links reconcile; every match is either joined to one bound outcome record or receives one precedence-ordered reason; source fingerprints and cutoff rows reproduce; a second process layout produces identical semantic bytes/digests.</p>
+  <p><b>Pass:</b> zero unexplained links, duplicates, future leakage or silent data repair. Any implementation defect is fixed under a new recorded preregistration; outcome-dependent tuning is forbidden.</p>
+</section>
+
+<section class="task">
+  <h2>T09-03 — Complete unique-episode outcome store</h2>
+  <p><b>Build:</b> deduplicate all 65,400 links, partition symbols deterministically across 12 processes, load each source once per partition, atomically publish partition files, validate resumptions, aggregate and seal.</p>
+  <p><b>Performance:</b> use available cores and memory; no arbitrary 1.5-GB ceiling. Start only with at least 5 GiB free. Measure wall time, throughput, peak worker/tree RSS and failures, while keeping timing outside semantic digests.</p>
+  <p><b>Pass:</b> exactly 65,400 link rows; no missing/extra query/rank identity; every unique episode accounted; all path/outcome/coverage counts reconcile; source and retrieval trees remain byte-identical.</p>
+</section>
+
+<section class="task">
+  <h2>T09-04 — Independent full verification</h2>
+  <p><b>Build:</b> a verifier that does not import the producer's formula code. It reopens the frozen source, independently recomputes every unique episode and path, checks every causal embargo and verifies all Parquet schemas, digests, manifests and coverage arithmetic.</p>
+  <p><b>Adversarial tests:</b> mutate a high, endpoint close, benchmark date, ATR predecessor, censor reason, same-bar label, link rank, fingerprint or partial-path flag and require visible rejection.</p>
+  <p><b>Pass:</b> 100% row equality and zero unexplained differences. Verification failure preserves the store but blocks evidence aggregation.</p>
+</section>
+
+<section class="task">
+  <h2>T09-05 — Evidence cards, still descriptive</h2>
+  <p><b>Build:</b> for a query, show the raw 20 analogues first, complete future paths, counterexamples, censored/ambiguous counts and horizon distributions. The primary evidence panel then keeps one best episode per symbol and reports raw versus effective sample size.</p>
+  <p><b>Do not claim yet:</b> profitability, calibrated probability, or a recommendation. Regime/sector sensitivity is limited by the available point-in-time metadata and must show “unavailable” instead of inventing context.</p>
+  <p><b>Next gate:</b> preregister expanding-window folds and simple baselines before calibration. The Stockbee 25%-move/4%-range-expansion study becomes a separate universe-level empirical study after this outcome layer is sealed.</p>
+</section>
+
+<section>
+  <h2>Final user-facing output</h2>
+  <ol>
+    <li>The current chart and its exact observation cutoff.</li>
+    <li>Twenty closest earlier charts with component explanations and immutable ranks.</li>
+    <li>For each analogue, the actual normalized future path, return/MFE/MAE, barrier route and censor/data-quality status.</li>
+    <li>A descriptive distribution with raw and effective sample sizes, visible failures and uncertainty.</li>
+    <li>An explicit abstention when history is too sparse, dependent, contradictory, novel or poorly covered.</li>
+  </ol>
+  <p>This answers: <b>“Among historical states that genuinely resemble this one, what happened next?”</b> It does not answer: “What must happen next?”</p>
+</section>
+</body>
+</html>
