@@ -30,6 +30,7 @@ BATCH_SEARCH_SCHEMA_VERSION = "m04r-global-bound-proposal-batch-v1"
 BATCH_BRANCH_AWARE_SEARCH_SCHEMA_VERSION = "m04r-global-bound-proposal-batch-v2"
 THRESHOLD_SCAN_SCHEMA_VERSION = "m04r-packed-bound-threshold-scan-v1"
 BRANCH_AWARE_THRESHOLD_SCAN_SCHEMA_VERSION = "m04r-packed-bound-threshold-scan-v2"
+COMPONENT_THRESHOLD_SCAN_SCHEMA_VERSION = "m04r-packed-component-threshold-scan-v1"
 DEFAULT_ROUTE_QUOTAS: dict[str, int] = {
     # The composite route is the only authority-certified recall route.  The
     # component routes are additive proposal seeds and never replace it.
@@ -147,6 +148,20 @@ def packed_component_search_contract(component: str) -> dict[str, Any]:
         "ranking": "ascending (named branch-aware component lower bound, episode ID)",
         "overflow": "unquantizable rows receive zero and cannot be omitted",
         "lower_bound_field": "named component bound, not composite total",
+        "outcomes_or_labels_used": False,
+    }
+    return {**state, "digest": stable_hash(state)}
+
+
+def packed_component_threshold_scan_contract(component: str) -> dict[str, Any]:
+    proposal = packed_component_search_contract(component)
+    state = {
+        "schema_version": COMPONENT_THRESHOLD_SCAN_SCHEMA_VERSION,
+        "component": component,
+        "component_proposal_contract_digest": proposal["digest"],
+        "admission": "named safe component bound in (lower exclusive, upper inclusive]",
+        "ordering": "streaming physical order; admitted set digest is order-independent",
+        "overflow": "zero-bound fallback admitted only when lower is absent",
         "outcomes_or_labels_used": False,
     }
     return {**state, "digest": stable_hash(state)}
@@ -822,6 +837,7 @@ def scan_packed_bound_threshold(
     branch_aware: bool = False,
     verify_content: bool = True,
     expected_provenance_digest: str | None = None,
+    component: str | None = None,
 ) -> BoundThresholdScanReport:
     """Stream every eligible row in ``(lower, upper]`` without a global heap.
 
@@ -837,6 +853,12 @@ def scan_packed_bound_threshold(
         raise PackedBoundSearchError("block order must be forward or reverse")
     if not callable(consume):
         raise PackedBoundSearchError("threshold consumer must be callable")
+    component_contract = (
+        packed_component_threshold_scan_contract(component)
+        if component is not None else None
+    )
+    if component is not None and not branch_aware:
+        raise PackedBoundSearchError("component threshold scan requires branch-aware bounds")
     upper = float(upper_inclusive)
     lower = None if lower_exclusive is None else float(lower_exclusive)
     if np.isnan(upper) or upper < 0 or lower is not None and (
@@ -897,7 +919,9 @@ def scan_packed_bound_threshold(
             proposal = BoundProposal(
                 episode_id, loaded.symbols[numeric_symbol_id],
                 int(record["cutoff_ns"]), TIER_NAMES[quality_code],
-                float(total_value), ("composite",), overflow,
+                float(total_value),
+                ((component,) if component is not None else ("composite",)),
+                overflow,
             )
             proposals.append(proposal)
             row_hash = int(stable_hash({
@@ -935,13 +959,14 @@ def scan_packed_bound_threshold(
             eligible_main += len(selected)
             fresh = fresh_records(selected)
             if len(fresh):
-                totals = np.asarray((
-                    packed_branch_aware_lower_bounds(
-                        query.representation, fresh,
-                    ).totals
-                    if branch_aware else
-                    packed_lower_bounds(query.representation, fresh).totals
-                ), dtype=np.float64)
+                bounded = (
+                    packed_branch_aware_lower_bounds(query.representation, fresh)
+                    if branch_aware else packed_lower_bounds(query.representation, fresh)
+                )
+                totals = np.asarray(
+                    bounded.totals if component is None
+                    else bounded.components[component], dtype=np.float64,
+                )
                 if not np.isfinite(totals).all() or np.any(totals < 0):
                     raise PackedBoundSearchError(
                         "threshold scan produced an invalid packed lower bound"
@@ -977,12 +1002,14 @@ def scan_packed_bound_threshold(
     })
     minimum = None if not np.isfinite(minimum_above) else minimum_above
     schema_version = (
-        BRANCH_AWARE_THRESHOLD_SCAN_SCHEMA_VERSION
-        if branch_aware else THRESHOLD_SCAN_SCHEMA_VERSION
+        COMPONENT_THRESHOLD_SCAN_SCHEMA_VERSION if component is not None else
+        BRANCH_AWARE_THRESHOLD_SCAN_SCHEMA_VERSION if branch_aware else
+        THRESHOLD_SCAN_SCHEMA_VERSION
     )
-    contract_digest = packed_bound_threshold_scan_contract(
-        branch_aware=branch_aware,
-    )["digest"]
+    contract_digest = (
+        component_contract["digest"] if component_contract is not None else
+        packed_bound_threshold_scan_contract(branch_aware=branch_aware)["digest"]
+    )
     input_digest = _packed_query_input_digest(query)
     exclusions_digest = stable_hash(sorted(excluded_episode_ids))
     eligible_rows = eligible_main + eligible_overflow
@@ -1005,6 +1032,8 @@ def scan_packed_bound_threshold(
         "admitted_set_digest": admitted_set_digest,
         "real_forward_outcomes_accessed": False,
     }
+    if component is not None:
+        deterministic["component"] = component
     return BoundThresholdScanReport(
         schema_version, contract_digest, loaded.generation_id,
         query.episode_id, input_digest, exclusions_digest, lower, upper,

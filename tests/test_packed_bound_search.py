@@ -9,7 +9,8 @@ import pytest
 
 from market_analogues.packed_bound_search import (
     COMPONENT_SEARCH_SCHEMA_VERSION, PackedBoundQuery, PackedBoundSearchError,
-    packed_component_search_contract, scan_packed_bound_proposals,
+    packed_component_search_contract, packed_component_threshold_scan_contract,
+    scan_packed_bound_proposals,
     scan_packed_component_bound_proposals_threaded,
     scan_packed_bound_proposals_many, scan_packed_bound_proposals_threaded,
     scan_packed_bound_threshold,
@@ -476,6 +477,42 @@ def test_threshold_scan_streams_complete_tied_bands_and_is_order_independent(
         row.episode_id for row in ranked
     }
 
+
+def test_component_threshold_scan_is_complete_and_order_independent(
+    tmp_path: Path,
+) -> None:
+    root, generation, representation = _store(tmp_path, count=128)
+    query = _query(representation)
+    frontier = scan_packed_component_bound_proposals_threaded(
+        root, generation, query, component="price", quota=129,
+        threads=3, verify_content=False,
+    )
+    boundary = frontier.candidates[64].lower_bound
+    reports = []
+    admitted = []
+    for block_rows, order in ((7, "forward"), (13, "reverse")):
+        values = []
+        reports.append(scan_packed_bound_threshold(
+            root, generation, query, component="price", branch_aware=True,
+            upper_inclusive=boundary, block_rows=block_rows, block_order=order,
+            verify_content=False,
+            consume=lambda rows, output=values: output.extend(rows),
+        ))
+        admitted.append(values)
+    assert reports[0].schema_version == "m04r-packed-component-threshold-scan-v1"
+    assert reports[0].contract_digest == packed_component_threshold_scan_contract("price")["digest"]
+    assert reports[0].result_digest == reports[1].result_digest
+    assert reports[0].admitted_set_digest == reports[1].admitted_set_digest
+    assert {row.episode_id for row in admitted[0]} == {row.episode_id for row in admitted[1]}
+    assert all(row.routes == ("price",) and row.lower_bound <= boundary
+               for rows in admitted for row in rows)
+
+    with pytest.raises(PackedBoundSearchError, match="branch-aware"):
+        scan_packed_bound_threshold(
+            root, generation, query, component="price",
+            upper_inclusive=boundary, verify_content=False,
+            consume=lambda _rows: None,
+        )
 
 def test_threshold_scan_fails_closed_on_invalid_bounds_and_exclusions(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch,

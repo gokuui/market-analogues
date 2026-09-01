@@ -1361,6 +1361,13 @@
   <p><b>Durable real POC:</b> A separate create-only three-probe runner is ready. It binds the same early/middle/late registry rows and resident leases, persists forward and reverse price frontiers, records typed frontier overflow instead of returning an uncertified answer, and opens no outcome or authority path.</p>
   <p><b>Next:</b> Commit the implementation, rerun the tracked-module/full-suite checks, preregister the durable POC as a sole child and execute it. A 16,384-row overflow is evidence to add threshold-stream closure—not permission to enlarge or approximate silently.</p>
 </section>
+<section class="entry">
+  <h2>L-148 — Price-development frontier POC fails closed as designed</h2>
+  <p><b>Result:</b> Sole-child preregistration <code>8e685d0</code> froze the three real probes before price results. All three reached the 16,384-row ceiling without strict next-bound closure and published typed <code>frontier_overflow</code> receipts; result digest is <code>dc6277ef…0700</code>. No neighbor list, approximation or success claim was emitted.</p>
+  <p><b>Evidence:</b> Early/middle/late exact thresholds were 0.7549 / 1.0434 / 0.8277 while the next safe bounds were only 0.5507 / 0.8039 / 0.5897. Each case exact-completed all 16,384 frontier rows, taking 257 / 336 / 369 seconds end to end. Therefore the price component’s current safe bound is materially weaker than the composite bound; merely raising the heap ceiling is not a justified scale plan.</p>
+  <p><b>Verification before redesign:</b> A component-aware threshold scanner now streams every eligible row at or below a fixed component threshold, excludes the already exact frontier, retains zero-bound fallbacks, and emits an order-independent admitted-set digest. Synthetic tests prove complete identical admission under different forward/reverse block traversals and reject use without branch-aware bounds.</p>
+  <p><b>Next:</b> Freeze a count-only diagnostic at the three observed thresholds. If few additional rows are admitted, use exact streaming closure; if many are admitted, prove a tighter safe DTW bound (likely quantized 64-sample LB_Keogh) before further exact work. This decision is based on measured full-pack counts, not intuition.</p>
+</section>
 </main>
 
 <section id="reproduce">
