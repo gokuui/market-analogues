@@ -62,17 +62,19 @@
 </section>
 
 <section class="task">
-  <h2>T09-03 — Complete unique-episode outcome store</h2>
+  <h2>T09-03 — Complete unique-episode outcome store <span class="done">COMPLETE</span></h2>
   <p><b>Build:</b> deduplicate all 65,400 links, partition symbols deterministically across 12 processes, load each source once per partition, atomically publish partition files, validate resumptions, aggregate and seal.</p>
   <p><b>Performance:</b> use available cores and memory; no arbitrary 1.5-GB ceiling. Start only with at least 5 GiB free. Measure wall time, throughput, peak worker/tree RSS and failures, while keeping timing outside semantic digests.</p>
   <p><b>Pass:</b> exactly 65,400 link rows; no missing/extra query/rank identity; every unique episode accounted; all path/outcome/coverage counts reconcile; source and retrieval trees remain byte-identical.</p>
+  <p class="done"><b>Result:</b> H0 <code>74480df5…7cc4</code> and sole-child H1 <code>4e1fbdc8…3e23</code> freeze the full inventory. Twelve atomic/resumable partitions computed 56,378 unique episodes across 7,325 symbols and joined them to exactly 65,400 links. The aggregate sealed 338,268 outcome rows and 6,917,999 paths in 449.73 seconds at digest <code>5626b55b…1f76</code>.</p>
 </section>
 
 <section class="task">
-  <h2>T09-04 — Independent full verification</h2>
+  <h2>T09-04 — Independent full verification <span class="done">COMPLETE</span></h2>
   <p><b>Build:</b> a verifier that does not import the producer's formula code. It reopens the frozen source, independently recomputes every unique episode and path, checks every causal embargo and verifies all Parquet schemas, digests, manifests and coverage arithmetic.</p>
   <p><b>Adversarial tests:</b> mutate a high, endpoint close, benchmark date, ATR predecessor, censor reason, same-bar label, link rank, fingerprint or partial-path flag and require visible rejection.</p>
   <p><b>Pass:</b> 100% row equality and zero unexplained differences. Verification failure preserves the store but blocks evidence aggregation.</p>
+  <p class="done"><b>Result:</b> A production-formula-independent 12-process verifier recomputed every unique episode and path, checked all partitions against the aggregate, rebuilt all links/embargoes, and matched 338,268/338,268 outcome rows plus 6,917,999/6,917,999 path rows exactly. Verification digest <code>5f6d313e…e942</code> authorizes evidence cards but not production promotion.</p>
 </section>
 
 <section class="task">
