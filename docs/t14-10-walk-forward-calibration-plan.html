@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>T14-10 walk-forward calibration and falsification plan</title>
+<style>body{font-family:system-ui,sans-serif;max-width:1150px;margin:2rem auto;padding:0 1rem;color:#18212b;line-height:1.52}section{border:1px solid #d8dee6;border-radius:10px;padding:1rem 1.2rem;margin:1rem 0}table{border-collapse:collapse;width:100%}th,td{padding:.55rem;border-bottom:1px solid #ddd;text-align:left;vertical-align:top}code{overflow-wrap:anywhere}.warn{background:#fff4dc;border-left:5px solid #b9770e;padding:.8rem}.pass{color:#176b37}.open{color:#9a6700}</style></head><body>
+<h1>T14-10 — Walk-forward calibration and falsification</h1>
+<p><b>Starting point:</b> retrieval, causal outcomes and 3,270 present-cutoff descriptive cards are sealed and independently verified. Those cards answer what happened after earlier analogues; because their query cutoff is 30 March 2026 and the locked archive ends there, they cannot validate what happened after the queries themselves.</p>
+<p class="warn"><b>Boundary:</b> this gate tests whether the frozen analogue evidence was historically calibrated and more informative than simple alternatives. It does not optimize entries, exits, position sizes or profit. Current-ticker archive survivorship, unavailable delisting returns, point-in-time membership, sectors and event clusters still prevent a production-quality claim even if the research calibration passes.</p>
+
+<section><h2>WF-00 — Freeze the question before historical outcomes <span class="open">IN PROGRESS</span></h2>
+<p>Contract <code>nasdaq-analogue-walk-forward-falsification-v1</code> fixes the historical registry rule, time splits, embargo, evidence methods, baselines, targets, smoothing, proper scores, dependence-aware inference, abstention and pass/fail criteria before any historical query outcome is opened.</p>
+<p><b>Pass:</b> an independent validator binds M00, the outcome/evidence contracts, the sealed card store and its verification; rejects weaker folds, leakage, missing baselines, outcome-tuned selection, hit-rate promotion or production authorization; and records <code>historical_walk_forward_query_outcomes_opened=false</code>.</p></section>
+
+<section><h2>WF-01 — Outcome-blind historical query registry</h2>
+<p>Choose the last benchmark session of each month from January 2012 through August 2025. Select up to 24 stocks per month—four per causal prefix-quality A/B × trailing-252-session liquidity low/mid/high cell—using only the frozen digest and a SHA-256 order. Underfilled cells remain short; future availability never fills or changes a slot.</p>
+<p>The 2012–13 queries seed expanding baselines but are not scored. Scored queries run from 2014 through August 2025; August is the last month with 126 subsequent benchmark sessions before the locked 30 March 2026 source boundary. The registry must contain at least 3,000 scored queries, expose every cell shortfall, bind causal stock/benchmark prefixes and be sealed before retrieval or query futures.</p>
+<p><b>Pass:</b> independent reconstruction yields the identical cutoff, symbol, cell, prefix and hash inventory; future-bar mutation cannot change it.</p></section>
+
+<section><h2>WF-02 — Synthetic scoring and temporal oracle</h2>
+<p>Implement producer and separately structured reference calculations for three-class and directional probabilities, half-count smoothing, Brier/log scores, weighted quantiles, pinball and interval scores, reliability bins, ECE, abstention, baseline fallback, calendar-month aggregation, blocked bootstrap and Holm correction.</p>
+<p>Synthetic cases cover zero counts, censoring, ambiguity, missing measures, probability boundaries, duplicate symbols, regime fallback, novelty warm-up, unstable prefixes, tied losses and clustered months.</p>
+<p><b>Pass:</b> exact formula equality where deterministic, independently checked statistical tolerances where iterative, transformation invariance, and adversarial rejection before real historical outcomes.</p></section>
+
+<section><h2>WF-03 — Historical retrieval and baseline store</h2>
+<p>For every frozen query, run the unchanged composite search and price-only search against only causally prior candidates. Build deterministic random and recent-return/volatility-matched neighbors under the same one-symbol cap. Store all ranks, distances, components, eligibility and path references before summarizing.</p>
+<p>All methods use identical targets, censor exclusions and smoothing. Sector frequency remains explicitly unavailable; it is never replaced silently. Each query outcome is computed only after its prediction artifact is frozen.</p>
+<p><b>Pass:</b> every candidate predates the query by the frozen gap, every contributing outcome completed by the query cutoff, query outcomes never affect neighbors, all four retrieval/baseline inventories close, and producer/independent verifier agree.</p></section>
+
+<section><h2>WF-04 — Expanding evaluation and final single-open test</h2>
+<table><thead><tr><th>Block</th><th>Dates</th><th>Use</th></tr></thead><tbody>
+<tr><td>Warm-up</td><td>2012–2013</td><td>Seed prior frequencies and distance history; no scoring claim.</td></tr>
+<tr><td>Development</td><td>2014–2017</td><td>Implementation diagnostic only; frozen thresholds cannot be tuned.</td></tr>
+<tr><td>Validation 1</td><td>2018–2019</td><td>Locked expanding-window validation.</td></tr>
+<tr><td>Validation 2</td><td>2020–2021</td><td>Locked shift/stress validation.</td></tr>
+<tr><td>Validation 3</td><td>2022–2023</td><td>Locked recent validation.</td></tr>
+<tr><td>Final untouched</td><td>2024–Aug 2025</td><td>Opened once after all earlier artifacts independently verify.</td></tr>
+</tbody></table>
+<p>A 126-session purge prevents overlapping future labels from crossing a stage boundary. Scores are paired by calendar month rather than pretending stocks observed in the same market month are independent.</p>
+<p><b>Pass:</b> composite evidence has positive forced-lane multiclass Brier skill against every available baseline in the final period; Holm-adjusted one-sided paired tests beat unconditional and price-only evidence; pooled validation also beats both; no validation fold loses to unconditional; log loss and formal interval-coverage tests pass; at least 400 final queries are evaluable and at least half are non-abstained.</p></section>
+
+<section><h2>What cannot be gamed by abstention</h2>
+<p>Every evaluable query receives a forced-lane score even if novelty, sample size, instability or data quality would hide a user-facing probability. A separate selective lane reports retained coverage and risk-versus-coverage. Abstention therefore cannot manufacture a good proper score by discarding difficult failures.</p></section>
+
+<section><h2>Research decisions used</h2><table><thead><tr><th>Primary evidence</th><th>Decision</th></tr></thead><tbody>
+<tr><td><a href="https://proceedings.mlr.press/v162/zaffran22a.html">Zaffran et al. (2022), adaptive conformal predictions for time series</a></td><td>Do not import exchangeable-data coverage claims; evaluate intervals sequentially under dependence and shift.</td></tr>
+<tr><td><a href="https://proceedings.mlr.press/v266/retzlaff25a.html">Retzlaff et al. (2025), marginal and conditional coverage tests</a></td><td>Report formal marginal and conditional coverage tests and interval-score comparisons, not empirical coverage alone.</td></tr>
+<tr><td><a href="https://arxiv.org/abs/1408.1159">Carr &amp; López de Prado, backtest overfitting</a></td><td>Freeze folds, thresholds, baselines, metrics and trial count; preserve failures and prohibit same-period retuning.</td></tr>
+<tr><td><a href="https://academic.oup.com/jrssig/article/18/6/22/7038278">Bailey &amp; López de Prado, false discoveries from backtest selection</a></td><td>Use proper scores, paired tests and multiplicity correction; do not promote from hit rate or a best-looking subgroup.</td></tr>
+</tbody></table></section>
+
+<section><h2>After T14-10</h2>
+<p>If research calibration fails, keep descriptive cards and expose the failure; do not tune this final period. If it passes, <code>failed_calibration</code> may be cleared only for an equivalently locked research archive, while <code>poor_data_quality</code> and production prohibition remain until point-in-time membership, delisting returns, sector history and event-cluster controls exist. The Stockbee 25%/4% range-expansion replication remains a separate preregistered universe study.</p></section>
+</body></html>

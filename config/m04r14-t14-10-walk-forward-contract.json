@@ -1,0 +1,197 @@
+{
+  "schema_version": "m04r14-t14-10-walk-forward-contract-v1",
+  "contract_id": "nasdaq-analogue-walk-forward-falsification-v1",
+  "status": "frozen_before_historical_walk_forward_query_outcomes",
+  "upstream": {
+    "m00_contract_digest": "8b333ac8a6cdf0df9d71d3599e25336f7db246957d3a29a925fedc0e9103fa53",
+    "m00_sha256": "26d33b5e4f69d20b1be1458e28c7a85e5c20554e70d0de0beced3c7e08c8aebe",
+    "outcome_contract_digest": "2aee56f0671c7ff89e2df39cb3803b35adaae9988ce199259a7c930eab316c40",
+    "outcome_contract_sha256": "aff7525d5d3de2115c83f29f281aed3d2f691d8b11c179d0f05a257af8039b13",
+    "evidence_card_contract_digest": "3ca1d4aa23ef7c0ee9f146b74c0672c0c27457b7189174d92f933afb59f82de0",
+    "evidence_card_contract_sha256": "742797e4eb1cfae6748631a4f0e132846dd74f8d9c94a9da6a9c0ac65a94cbdb",
+    "evidence_store_result_digest": "11ccd344aaab71e70c63dd8f4e93a7b1a43c28e4e6a6ab621032d9664a356530",
+    "evidence_store_sha256": "46fc77bcc2c5440ec8056623fcaf1cabdb83c9f2db125877baa4d634cf59cb15",
+    "evidence_verification_result_digest": "5f53f14a00918469e06048ab9be6179b0ea517a251de2dfdaff6f976d2fe7c5f",
+    "evidence_verification_sha256": "b1443de724d97a1bec530890a5c3189bce903f136bef9a3dad00e0d23754bbe5"
+  },
+  "boundary": {
+    "purpose": "falsify_or_validate_historical_conditional_evidence_not_optimize_a_trading_rule",
+    "dataset_id": "nasdaq",
+    "observation_mode": "after_official_daily_close",
+    "intended_direction": "long",
+    "retrieval_and_outcome_formulas_frozen": true,
+    "trading_costs_positions_and_profit_metrics_in_scope": false,
+    "historical_membership_delisting_returns_sector_history_available": false,
+    "archive_interpretation": "configured_survivor_archive_not_point_in_time_exchange_membership",
+    "production_promotion_authorized": false
+  },
+  "query_registry": {
+    "cutoff_rule": "last_observed_nasdaq_benchmark_session_of_each_calendar_month",
+    "warmup_period": ["2012-01-01", "2013-12-31"],
+    "scored_period": ["2014-01-01", "2025-08-31"],
+    "locked_source_coverage_cutoff": "2026-03-30",
+    "maximum_cutoff_reason": "leave_126_benchmark_sessions_before_locked_source_end_2026-03-30",
+    "target_queries_per_month": 24,
+    "cells": "point_in_time_prefix_quality_A_or_B_cross_trailing_252_session_dollar_volume_low_mid_high",
+    "target_per_cell_per_month": 4,
+    "underfilled_cell_policy": "retain_shortfall_without_cross_cell_replacement",
+    "minimum_required_prior_sessions": 252,
+    "future_observations_may_affect_selection": false,
+    "selection_order": "sha256(contract_digest,dataset_id,cutoff,quality_cell,liquidity_cell,symbol)_ascending",
+    "same_symbol_across_months_allowed": true,
+    "minimum_scored_queries": 3000,
+    "registry_must_freeze_before_retrieval": true
+  },
+  "temporal_protocol": {
+    "kind": "purged_expanding_window",
+    "purge_sessions": 126,
+    "outcome_eligible_for_evidence_when": "completion_timestamp_lte_query_cutoff",
+    "folds": [
+      {"fold_id": "development", "start": "2014-01-01", "end": "2017-12-31", "role": "implementation_diagnostic_no_threshold_tuning"},
+      {"fold_id": "validation_1", "start": "2018-01-01", "end": "2019-12-31", "role": "locked_validation"},
+      {"fold_id": "validation_2", "start": "2020-01-01", "end": "2021-12-31", "role": "locked_validation"},
+      {"fold_id": "validation_3", "start": "2022-01-01", "end": "2023-12-31", "role": "locked_validation"},
+      {"fold_id": "final_untouched", "start": "2024-01-01", "end": "2025-08-31", "role": "single_open_final_test"}
+    ],
+    "final_period_open_once": true,
+    "failed_fold_cannot_be_relabelled_or_removed": true,
+    "representation_or_threshold_change_requires_new_version_and_new_final_period": true
+  },
+  "evidence_methods": {
+    "primary": "composite_top20_one_best_per_symbol_locked_rank_weight",
+    "diagnostic": "composite_top20_one_best_per_symbol_unweighted",
+    "neighbor_prefixes": [5, 10, 15, 20],
+    "same_query_symbol_excluded": true,
+    "maximum_per_matched_symbol": 1,
+    "rank_weight_formula": "2 ** (-(original_match_rank - 1) / 10)",
+    "minimum_effective_rows": 10,
+    "outcomes_cannot_affect_retrieval_rank_or_weight": true,
+    "forced_score_lane_includes_abstained_queries": true,
+    "selective_score_lane_reported_separately": true
+  },
+  "targets": {
+    "primary": {
+      "name": "twenty_session_barrier_route",
+      "classes": ["favorable_first", "adverse_first", "no_touch"],
+      "ambiguous_same_first_touch_bar": "excluded_and_reported",
+      "censored_or_incomplete": "excluded_and_reported",
+      "favorable_barrier_atr": 2.0,
+      "adverse_barrier_atr": 1.0,
+      "horizon_sessions": 20
+    },
+    "secondary_directional": {
+      "classes": ["favorable_first", "adverse_first"],
+      "no_touch_ambiguous_censored": "excluded_and_reported"
+    },
+    "continuous": ["close_return", "benchmark_relative_return", "maximum_favorable_excursion", "maximum_adverse_excursion"],
+    "continuous_horizons_sessions": [5, 10, 20, 40, 60, 126]
+  },
+  "probability_construction": {
+    "primary_multiclass": "locked_rank_weighted_empirical_mass_with_symmetric_dirichlet_half_smoothing",
+    "dirichlet_alpha_per_class": 0.5,
+    "secondary_binary": "locked_rank_weighted_empirical_mass_with_symmetric_beta_half_smoothing",
+    "beta_alpha": 0.5,
+    "no_posthoc_platt_isotonic_or_model_fit": true,
+    "probabilities_sum_to_one_tolerance": 1e-15,
+    "zero_or_one_unsmoothed_probability_forbidden": true
+  },
+  "continuous_forecasts": {
+    "quantiles": [0.1, 0.25, 0.5, 0.75, 0.9],
+    "primary_point": "weighted_median",
+    "intervals": [{"name": "central_50", "lower": 0.25, "upper": 0.75}, {"name": "central_80", "lower": 0.1, "upper": 0.9}],
+    "quantile_method": "weighted_inverted_cdf",
+    "path_point_forecast": "pointwise_weighted_median_over_observed_steps",
+    "missing_measure_policy": "exclude_only_from_its_measure_denominator"
+  },
+  "abstention": {
+    "insufficient_effective_sample": "eligible_primary_rows_less_than_10",
+    "novelty": {
+      "score": "nearest_composite_total_distance",
+      "reference": "prior_scored_queries_only",
+      "minimum_reference_queries": 250,
+      "threshold_quantile": 0.95,
+      "threshold_method": "linear_quantile"
+    },
+    "neighborhood_instability": {
+      "score": "maximum_minus_minimum_smoothed_favorable_probability_across_prefixes_5_10_15_20",
+      "maximum_allowed": 0.2
+    },
+    "contradictory_context": "reported_unavailable_until_causal_context_panel_is_separately_verified",
+    "poor_data_quality": "always_present_for_missing_membership_delisting_sector_and_event_cluster_history",
+    "failed_calibration": "always_present_until_this_contract_passes",
+    "abstention_cannot_remove_query_from_forced_score_lane": true
+  },
+  "baselines": {
+    "unconditional_market_frequency": "expanding_prior_completed_registry_query_outcomes",
+    "regime_only_frequency": {
+      "trend": "sign_of_trailing_126_session_benchmark_close_return",
+      "volatility": "trailing_20_session_benchmark_log_return_standard_deviation_tercile_using_prior_month_cutoffs",
+      "minimum_prior_same_regime": 50,
+      "fallback": "unconditional_market_frequency"
+    },
+    "deterministic_random_historical_neighbors": "twenty_causally_eligible_distinct_symbols_by_sha256_query_candidate_order",
+    "recent_return_matched_neighbors": "twenty_distinct_symbols_minimum_L1_rank_distance_on_20_and_63_session_return_and_20_session_volatility",
+    "price_only_similarity": "same_candidate_universe_constraints_and_exact_price_component_top20",
+    "sector_frequency": "unavailable_no_point_in_time_sector_history_no_substitution",
+    "all_baselines_use_identical_target_smoothing_and_censor_rules": true
+  },
+  "metrics": {
+    "primary": "multiclass_brier_score",
+    "required_probability": ["multiclass_log_loss", "binary_brier_score", "binary_log_loss", "brier_skill_score", "reliability_diagram", "equal_count_ece"],
+    "reliability_bins": 10,
+    "minimum_rows_per_reliability_bin": 30,
+    "required_continuous": ["pinball_loss", "weighted_median_absolute_error", "central_interval_score", "empirical_interval_coverage", "mean_interval_width"],
+    "required_selective": ["scored_coverage", "abstention_reason_counts", "risk_coverage_curve"],
+    "required_stability": ["per_fold", "per_calendar_year", "per_benchmark_regime", "per_quality_liquidity_cell"],
+    "hit_rate_alone_can_pass": false
+  },
+  "inference": {
+    "dependence_unit": "calendar_month_mean_loss_not_individual_stock_rows",
+    "paired_month_block_bootstrap_resamples": 10000,
+    "paired_month_block_bootstrap_seed": 20260901,
+    "paired_month_block_length": 3,
+    "diebold_mariano_hac_lags_months": 3,
+    "familywise_alpha": 0.05,
+    "multiple_comparison_correction": "holm",
+    "interval_coverage_tests": ["exact_marginal_binomial", "christoffersen_independence", "dynamic_binary_test"],
+    "failure_to_reject_is_not_stated_as_proof": true
+  },
+  "acceptance": {
+    "primary_lane": "forced_score_all_evaluable_queries",
+    "required_comparison_baselines": ["unconditional_market_frequency", "regime_only_frequency", "deterministic_random_historical_neighbors", "recent_return_matched_neighbors", "price_only_similarity"],
+    "final_multiclass_brier_skill_strictly_positive_vs_every_available_baseline": true,
+    "holm_adjusted_one_sided_loss_test_vs_unconditional_and_price_only_below": 0.05,
+    "validation_pooled_multiclass_brier_skill_strictly_positive_vs_unconditional_and_price_only": true,
+    "no_validation_fold_negative_brier_skill_vs_unconditional": true,
+    "final_multiclass_log_loss_not_worse_than_unconditional": true,
+    "nominal_interval_coverage_not_rejected_after_holm": true,
+    "minimum_final_nonabstained_fraction": 0.5,
+    "minimum_final_evaluable_queries": 400,
+    "all_leakage_manifest_and_censor_checks_pass": true,
+    "research_calibration_pass_can_be_true": true,
+    "product_calibration_pass_requires_missing_sector_membership_delisting_event_cluster_controls": true,
+    "production_promotion_authorized": false
+  },
+  "artifacts": {
+    "registry": "walk-forward-query-registry.json",
+    "raw_predictions": "raw-predictions.parquet",
+    "raw_analogues": "raw-analogue-links.parquet",
+    "baseline_predictions": "baseline-predictions.parquet",
+    "fold_metrics": "fold-metrics.parquet",
+    "calibration_bins": "calibration-bins.parquet",
+    "coverage": "COVERAGE.json",
+    "report": "index.html",
+    "seal": "SEALED.json",
+    "trial_ledger": "config/case-memory-trials.yaml"
+  },
+  "verification": {
+    "synthetic_formula_oracle_before_real_run": true,
+    "outcome_blind_registry_verification_before_retrieval": true,
+    "independent_reconstruction": true,
+    "final_period_result_opened": false,
+    "historical_walk_forward_query_outcomes_opened": false,
+    "failed_trials_append_to_ledger": true,
+    "production_promotion_authorized": false
+  },
+  "contract_digest": "2c65288b45dd79627a1e16f0a4c2d9449919d0602974d7a52440415bd7f96a8e"
+}
