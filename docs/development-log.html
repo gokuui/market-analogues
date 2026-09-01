@@ -1402,6 +1402,13 @@
   <p class="pass"><b>Correctness and speed:</b> Compiled results match scalar bounds within <code>1e-12</code> across every synthetic family and malformed order permutations fail closed. A warmed 4,096-row block completes in 27–30 ms on the eight CPUs exposed to the process, implying roughly 25–30 seconds of bound arithmetic for one 3.8-million-row query before I/O and eligibility filtering.</p>
   <p><b>Next:</b> Define the content-addressed aligned auxiliary-store contract and build a bounded multi-symbol shard POC. The POC must prove main/overflow row identity against the frozen packed generation, clean rebuild parity, corruption refusal, scalar/batch equality and measured cold/warm scans before a full build is allowed.</p>
 </section>
+<section class="entry">
+  <h2>L-154 — Immutable aligned DTW sample-store substrate</h2>
+  <p><b>Layout:</b> Each 788-byte row stores four 64-point temporal float16 channels, four stable uint8 sorting permutations, four outward float32 radii, presence bits and alignment padding. At the frozen 3,786,156-row inventory this projects to about 2.78 GiB. Retaining order permutations avoids sorting during every query while using materially less space than a second sorted float16 copy.</p>
+  <p><b>Identity:</b> Separate main and overflow arrays align one-for-one with the existing packed generation and bind its generation ID, main/overflow content hashes, counts and provenance. The auxiliary generation is itself content-addressed and immutable. File size, SHA-256, manifest self-digest, dtype, finite radii, presence zeros, true order permutations and actual sorted-center order all fail closed.</p>
+  <p class="pass"><b>Focused verification:</b> Synthetic main/overflow round-trip reproduces the scalar interval bound within <code>1e-12</code>; absent fallback rows return zero. Duplicate order entries and post-publication byte corruption are rejected. No outcome or label is present in the store contract.</p>
+  <p><b>Next:</b> Build the preregistered bounded real shard POC, including independently rebuilt parity and physical packed-row alignment, before spending the approximately sixteen-minute full-pack materialization pass.</p>
+</section>
 </main>
 
 <section id="reproduce">
