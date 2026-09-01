@@ -1368,6 +1368,14 @@
   <p><b>Verification before redesign:</b> A component-aware threshold scanner now streams every eligible row at or below a fixed component threshold, excludes the already exact frontier, retains zero-bound fallbacks, and emits an order-independent admitted-set digest. Synthetic tests prove complete identical admission under different forward/reverse block traversals and reject use without branch-aware bounds.</p>
   <p><b>Next:</b> Freeze a count-only diagnostic at the three observed thresholds. If few additional rows are admitted, use exact streaming closure; if many are admitted, prove a tighter safe DTW bound (likely quantized 64-sample LB_Keogh) before further exact work. This decision is based on measured full-pack counts, not intuition.</p>
 </section>
+<section class="entry">
+  <h2>L-149 — Full-pack counts reject exact price threshold streaming</h2>
+  <p><b>Frozen diagnostic:</b> Sole-child preregistration <code>2d073e9</code> bound the three failed frontiers, their exact thresholds and the component-aware scanner before the count results existed. Forward 4,096-row and reverse 4,097-row traversals then produced identical admitted counts and set commitments at result digest <code>26cb7776…9117</code>.</p>
+  <p><b>Measured scale:</b> Beyond the 16,384 already exact rows, early/middle/late would admit 622,587 / 854,323 / 1,894,249 more rows. Including the original frontiers, exact threshold closure would process 32.57% / 30.43% / 51.88% of each eligible universe. This decisively rejects an exact-streaming implementation for the current safe price bound.</p>
+  <p><b>Bound redesign:</b> The next proof uses all 64 samples of the four existing DTW channels without changing distance-v1. Candidate values are stored as float16 centers plus an outward float32 error radius. Joint query/interval range safely dominates the exact pair IQR or constant-series standard-deviation fallback; two-sided band-constrained interval minima divided by the maximum DTW path length safely lower-bound the exact normalized DTW. The existing 55% rigid-price bound is retained and the new DTW bound supplies only the missing 45% term.</p>
+  <p class="pass"><b>Pre-real-data safety:</b> The quantized interval proof passes every pair of the synthetic pattern families, 128 randomized finite path pairs spanning six orders of magnitude, constant and missing channels, identity, malformed-row and invalid-band cases. All comparisons enforce combined quantized bound ≤ exact price-development distance at absolute tolerance <code>1e-12</code>.</p>
+  <p><b>Next:</b> Measure bound tightness and pruning on a frozen real frontier before constructing a roughly 2-GB full-universe sample index. Promote the store design only if the real diagnostic shows material pruning; otherwise reject this compact alternative and test the next safe representation.</p>
+</section>
 </main>
 
 <section id="reproduce">
