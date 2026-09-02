@@ -1486,6 +1486,13 @@
   <p><b>Performance finding:</b> The first sequential combined scans take 108–144 seconds because packed and DTW kernels run serially and the late query has the largest eligible set. Correctness is retained; before scale, overlap the independent packed and DTW block computations across the eight CPUs and compare exact outputs and real timings. Monthly multi-query physical scans remain required.</p>
   <p><b>Boundary:</b> This is implementation and diagnostic evidence, not a frozen real-query certificate. Do not claim price-only retrieval complete until the expanded ladder passes exhaustive equality and independent verification on all three probes.</p>
 </section>
+<section class="entry">
+  <h2>L-166 — Combined-bound scanner optimized without semantic drift</h2>
+  <p><b>Implementation:</b> The scanner now evaluates aligned packed and DTW blocks concurrently across a fixed eight-thread budget, retains one score vector instead of repeatedly copying full 2,432-byte packed records into bounded heaps and performs one deterministic global selection by score and episode ID. Only the compact proposal fields are materialized after selection. The report records the kernel-thread budget while its semantic result digest remains independent of block order, block size and execution resources.</p>
+  <p class="pass"><b>Correctness:</b> Truncated-frontier tests reproduce identical candidates under one-thread forward and parallel reverse traversal, retain combined-bound safety and still match the exhaustive distinct-symbol exact oracle. The complete repository test suite passes. On the full 3,786,156-row store, the early probe exactly reproduces the prior candidate digest <code>da160b3f…d0d6d</code> and row-16,385 bound <code>0.6975942582355507</code>.</p>
+  <p><b>Performance:</b> The early real scan completes in 86.28 seconds versus the prior implementation's 108–144-second observed range. Peak RSS includes the already resident 9.2-GiB packed map and 2.98-GiB DTW map; memory is intentionally not used as a rejection criterion on this host.</p>
+  <p><b>Next:</b> Commit this verified scanner checkpoint, freeze the three-probe 16,384/32,768/65,536/131,072/262,144 closure ladder as a sole-child preregistration and execute it once with durable per-stage receipts. No historical outcome or final-period result may be opened by that harness.</p>
+</section>
 </main>
 
 <section id="reproduce">

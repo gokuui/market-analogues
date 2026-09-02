@@ -2,6 +2,7 @@ from pathlib import Path
 from dataclasses import asdict
 
 import numpy as np
+import numba
 import pandas as pd
 
 from market_analogues.dtw_component_search import (
@@ -87,10 +88,14 @@ def test_combined_component_frontier_is_safe_and_order_independent(
     reports = [
         scan_dtw_component_bound_proposals(
             packed_root, packed_generation, dtw_root, dtw_generation, query,
-            quota=6, block_rows=block_rows, block_order=order,
+            quota=4, block_rows=block_rows, block_order=order,
+            kernel_threads=threads,
             verify_content=False,
         )
-        for block_rows, order in ((2, "forward"), (5, "reverse"))
+        for block_rows, order, threads in (
+            (2, "forward", 1),
+            (5, "reverse", min(2, int(numba.config.NUMBA_NUM_THREADS))),
+        )
     ]
     assert reports[0].candidate_digest == reports[1].candidate_digest
     assert reports[0].result_digest == reports[1].result_digest
@@ -99,7 +104,7 @@ def test_combined_component_frontier_is_safe_and_order_independent(
         f"{100 + index:024x}": exact_price_component(query.representation, value)
         for index, value in enumerate(candidates)
     }
-    assert len(reports[0].candidates) == 6
+    assert len(reports[0].candidates) == 4
     assert all(
         row.lower_bound <= exact[row.episode_id] + 1e-12
         for row in reports[0].candidates

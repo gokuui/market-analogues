@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from time import perf_counter
 from typing import Any
 
 import numpy as np
+import numba
 
 from .dtw_sample_store import dtw_sample_lower_bounds, load_dtw_sample_generation
 from .component_search import (
@@ -20,8 +22,8 @@ from .packed_bound_search import (
     BoundProposal,
     PackedBoundQuery,
     _current_rss_mb,
+    _ENTRY_DTYPE,
     _eligible_mask,
-    _empty_entries,
     _entries,
     _finalize,
     _packed_query_input_digest,
@@ -57,6 +59,7 @@ class DtwComponentProposalReport:
     quota: int
     block_rows: int
     block_order: str
+    kernel_threads: int
     elapsed_seconds: float
     peak_rss_mb: float
     candidate_digest: str
@@ -146,6 +149,39 @@ def certified_dtw_component_search_contract() -> dict[str, Any]:
     return {**state, "digest": stable_hash(state)}
 
 
+def _entries_at_positions(
+    records: np.ndarray, positions: np.ndarray, scores: np.ndarray,
+) -> np.ndarray:
+    output = np.empty(len(positions), dtype=_ENTRY_DTYPE)
+    for name in ("episode_id", "cutoff_ns", "symbol_id", "quality_tier"):
+        output[name] = records[name][positions]
+    output["total"] = scores
+    output["route_score"] = scores
+    output["overflow"] = False
+    return output
+
+
+def _stable_main_positions(
+    records: np.ndarray, scores: np.ndarray, quota: int,
+) -> np.ndarray:
+    positions = np.flatnonzero(np.isfinite(scores))
+    if len(positions) <= quota:
+        return positions
+    values = scores[positions]
+    boundary = float(np.partition(values, quota - 1)[quota - 1])
+    lower = positions[values < boundary]
+    tied = positions[values == boundary]
+    needed = quota - len(lower)
+    if needed < 0 or needed > len(tied):
+        raise DtwComponentSearchError("combined stable partition accounting differs")
+    identifiers = np.frombuffer(
+        np.ascontiguousarray(records["episode_id"][tied]).tobytes(),
+        dtype=np.dtype([("high", ">u8"), ("low", ">u4")]),
+    )
+    order = np.lexsort((identifiers["low"], identifiers["high"]))
+    return np.concatenate((lower, tied[order[:needed]]))
+
+
 def scan_dtw_component_bound_proposals(
     packed_root: Path,
     packed_generation_id: str,
@@ -156,6 +192,7 @@ def scan_dtw_component_bound_proposals(
     quota: int,
     block_rows: int = 4096,
     block_order: str = "forward",
+    kernel_threads: int | None = None,
     verify_content: bool = True,
     expected_packed_provenance_digest: str | None = None,
 ) -> DtwComponentProposalReport:
@@ -165,6 +202,11 @@ def scan_dtw_component_bound_proposals(
         raise DtwComponentSearchError("combined component block size must be positive")
     if block_order not in {"forward", "reverse"}:
         raise DtwComponentSearchError("combined component order must be forward or reverse")
+    available_threads = int(numba.config.NUMBA_NUM_THREADS)
+    threads = min(8, available_threads) if kernel_threads is None else kernel_threads
+    if type(threads) is not int or isinstance(threads, bool) \
+            or threads < 1 or threads > available_threads:
+        raise DtwComponentSearchError("combined component kernel threads differ")
     packed = load_packed_generation(
         packed_root, packed_generation_id,
         expected_provenance_digest=expected_packed_provenance_digest,
@@ -183,37 +225,58 @@ def scan_dtw_component_bound_proposals(
     starts = list(range(0, len(packed.rows), block_rows))
     if block_order == "reverse":
         starts.reverse()
-    heap = _empty_entries()
+    scores = np.full(len(packed.rows), np.inf, dtype=np.float64)
     eligible_main = 0
     started = perf_counter()
     peak = _current_rss_mb()
-    for first in starts:
-        last = min(first + block_rows, len(packed.rows))
-        packed_block = np.asarray(packed.rows[first:last])
-        mask = _eligible_mask(packed_block, query, symbol_id)
-        selected = packed_block[mask]
-        eligible_main += len(selected)
-        if len(selected):
-            rigid = np.asarray(
-                packed_branch_aware_lower_bounds(
-                    query.representation, selected,
-                ).components["price"],
-                dtype=np.float64,
-            )
-            # The compiled DTW kernel is materially faster on complete aligned
-            # blocks.  Eligibility is applied after evaluation so no fancy-index
-            # copy fragments the block or changes physical alignment.
-            dtw_block = dtw_sample_lower_bounds(
-                query.representation, np.asarray(dtw.rows[first:last]),
-            )
-            combined = rigid + 0.45 * dtw_block[mask]
-            if not np.isfinite(combined).all() or np.any(combined < rigid) \
+    packed_threads = max(1, threads // 4)
+    dtw_threads = threads - packed_threads
+    parallel = dtw_threads >= 1 and threads >= 2
+
+    def packed_score(block: np.ndarray) -> np.ndarray:
+        numba.set_num_threads(packed_threads if parallel else threads)
+        return np.asarray(
+            packed_branch_aware_lower_bounds(
+                query.representation, block,
+            ).components["price"],
+            dtype=np.float64,
+        )
+
+    def dtw_score(block: np.ndarray) -> np.ndarray:
+        numba.set_num_threads(dtw_threads if parallel else threads)
+        return dtw_sample_lower_bounds(query.representation, block)
+
+    executor = ThreadPoolExecutor(max_workers=2) if parallel else None
+    try:
+        for first in starts:
+            last = min(first + block_rows, len(packed.rows))
+            packed_block = np.asarray(packed.rows[first:last])
+            dtw_block_records = np.asarray(dtw.rows[first:last])
+            mask = _eligible_mask(packed_block, query, symbol_id)
+            eligible_main += int(np.count_nonzero(mask))
+            if not np.any(mask):
+                continue
+            if executor is None:
+                rigid_all = packed_score(packed_block)
+                dtw_all = dtw_score(dtw_block_records)
+            else:
+                packed_future = executor.submit(packed_score, packed_block)
+                dtw_future = executor.submit(dtw_score, dtw_block_records)
+                rigid_all = packed_future.result()
+                dtw_all = dtw_future.result()
+            combined = rigid_all + 0.45 * dtw_all
+            if not np.isfinite(combined).all() or np.any(combined < rigid_all) \
                     or np.any(combined < 0):
                 raise DtwComponentSearchError("combined component bound is invalid")
-            heap = _stable_bounded(
-                heap, _entries(selected, combined, combined, overflow=False), quota,
-            )
-        peak = max(peak, _current_rss_mb())
+            scores[first:last][mask] = combined[mask]
+            peak = max(peak, _current_rss_mb())
+    finally:
+        if executor is not None:
+            executor.shutdown(wait=True)
+    selected_positions = _stable_main_positions(packed.rows, scores, quota)
+    heap = _entries_at_positions(
+        packed.rows, selected_positions, scores[selected_positions],
+    )
     overflow = np.asarray(packed.overflow)
     selected_overflow = overflow[_eligible_mask(overflow, query, symbol_id)]
     eligible_overflow = len(selected_overflow)
@@ -258,7 +321,7 @@ def scan_dtw_component_bound_proposals(
         dtw.generation_id, query.episode_id, input_digest, candidates,
         deterministic["rows_scanned"], deterministic["eligible_rows"],
         eligible_main, eligible_overflow, quota, block_rows, block_order,
-        float(perf_counter() - started), peak, candidate_digest,
+        threads, float(perf_counter() - started), peak, candidate_digest,
         stable_hash(deterministic),
     )
 
