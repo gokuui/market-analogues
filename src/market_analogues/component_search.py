@@ -11,9 +11,8 @@ import pandas as pd
 
 from .adapters import OHLCVSource
 from .causal_prefix import causal_prefix_digest
-from .distance import complete_representation_distance
 from .exact_batch import (
-    batch_representation_lower_bounds,
+    batch_exact_price_distances, batch_representation_lower_bounds,
     exact_representations_at_positions,
 )
 from .packed_bound_search import (
@@ -195,7 +194,8 @@ def _score_group(
     query_latest = latest_eligible_cutoff(
         query, request.minimum_history_gap_bars,
     )
-    for index, (proposal, candidate_representation) in enumerate(
+    exact_indexes: list[int] = []
+    for index, (proposal, _candidate_representation) in enumerate(
             zip(proposals, representations, strict=True)):
         episode_key = EpisodeKey(
             key, pd.Timestamp(proposal.cutoff_ns), query.key.lookback,
@@ -230,16 +230,22 @@ def _score_group(
         if native_lower > completion_threshold:
             native_pruned += 1
             continue
-        lower_components = {
-            name: float(values[index]) for name, values in bounded.components.items()
-        }
-        total, exact_components, _path = complete_representation_distance(
-            query_representation, candidate_representation,
-            float(bounded.totals[index]), lower_components,
-            float(bounded.rigid_price[index]), reconstruct_path=False,
+        exact_indexes.append(index)
+
+    exact_prices = batch_exact_price_distances(
+        query_representation,
+        [representations[index] for index in exact_indexes],
+        bounded.rigid_price[np.asarray(exact_indexes, dtype=int)],
+    )
+    for index, exact_price_value in zip(exact_indexes, exact_prices, strict=True):
+        proposal = proposals[index]
+        episode_key = EpisodeKey(
+            key, pd.Timestamp(proposal.cutoff_ns), query.key.lookback,
+            query.key.representation_version,
         )
-        exact_price = float(exact_components[PRICE_COMPONENT])
-        if not np.isfinite(total) or not np.isfinite(exact_price) \
+        native_lower = float(bounded.components[PRICE_COMPONENT][index])
+        exact_price = float(exact_price_value)
+        if not np.isfinite(exact_price) \
                 or exact_price + tolerance < native_lower \
                 or strengthened_proposal_bound \
                 and exact_price + tolerance < proposal.lower_bound:

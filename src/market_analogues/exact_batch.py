@@ -31,6 +31,146 @@ class LowerBoundBatch:
     rigid_price: np.ndarray
 
 
+_DTW_CHANNELS = ("close_path", "atr_pct", "volume_robust_z", "relative_path")
+_DTW_SAMPLES = 64
+
+
+@njit(cache=True, nogil=True)
+def _batch_exact_price_distances_compiled(
+    query: np.ndarray,
+    query_presence: np.ndarray,
+    candidates: np.ndarray,
+    candidate_presence: np.ndarray,
+    rigid_price: np.ndarray,
+    band_fraction: float,
+) -> np.ndarray:
+    """Complete distance-v1's price component without per-row allocations.
+
+    This deliberately preserves the scalar implementation's channel scaling,
+    DTW predecessor order and path-length normalization.  Parallelism remains
+    outside this kernel because production groups candidates by symbol and
+    scores those independent groups concurrently.
+    """
+    rows = len(candidates)
+    output = np.empty(rows, dtype=np.float64)
+    band = max(int(_DTW_SAMPLES * band_fraction), 1)
+    for row in range(rows):
+        included = np.zeros(len(_DTW_CHANNELS), dtype=np.bool_)
+        scales = np.ones(len(_DTW_CHANNELS), dtype=np.float64)
+        count = 0
+        for channel in range(len(_DTW_CHANNELS)):
+            if not query_presence[channel] or not candidate_presence[row, channel]:
+                continue
+            included[channel] = True
+            count += 1
+            joined = np.empty(2 * _DTW_SAMPLES, dtype=np.float64)
+            for index in range(_DTW_SAMPLES):
+                joined[index] = query[channel, index]
+                joined[_DTW_SAMPLES + index] = candidates[row, channel, index]
+            ordered = np.sort(joined)
+            q25 = .25 * ordered[31] + .75 * ordered[32]
+            q75 = .75 * ordered[95] + .25 * ordered[96]
+            scale = q75 - q25
+            if scale < 1e-8:
+                mean = 0.0
+                for value in joined:
+                    mean += value
+                mean /= len(joined)
+                squared = 0.0
+                for value in joined:
+                    delta = value - mean
+                    squared += delta * delta
+                scale = np.sqrt(squared / len(joined))
+            scales[channel] = max(scale, 1e-6)
+        if count == 0:
+            output[row] = .55 * rigid_price[row]
+            continue
+
+        previous = np.full(_DTW_SAMPLES + 1, np.inf)
+        previous_length = np.zeros(_DTW_SAMPLES + 1, dtype=np.int64)
+        previous[0] = 0.0
+        for query_index in range(1, _DTW_SAMPLES + 1):
+            current = np.full(_DTW_SAMPLES + 1, np.inf)
+            current_length = np.zeros(_DTW_SAMPLES + 1, dtype=np.int64)
+            first = max(1, query_index - band)
+            last = min(_DTW_SAMPLES, query_index + band)
+            for candidate_index in range(first, last + 1):
+                value = previous[candidate_index]
+                length = previous_length[candidate_index]
+                if current[candidate_index - 1] < value:
+                    value = current[candidate_index - 1]
+                    length = current_length[candidate_index - 1]
+                if previous[candidate_index - 1] < value:
+                    value = previous[candidate_index - 1]
+                    length = previous_length[candidate_index - 1]
+                squared = 0.0
+                for channel in range(len(_DTW_CHANNELS)):
+                    if included[channel]:
+                        left = query[channel, query_index - 1] / scales[channel]
+                        right = (
+                            candidates[row, channel, candidate_index - 1]
+                            / scales[channel]
+                        )
+                        delta = left - right
+                        squared += delta * delta
+                current[candidate_index] = value + np.sqrt(squared / count)
+                current_length[candidate_index] = length + 1
+            previous = current
+            previous_length = current_length
+        dtw = previous[_DTW_SAMPLES] / max(
+            previous_length[_DTW_SAMPLES], 1,
+        )
+        output[row] = .55 * rigid_price[row] + .45 * dtw
+    return output
+
+
+def batch_exact_price_distances(
+    query: Representation,
+    candidates: tuple[Representation, ...] | list[Representation],
+    rigid_price: np.ndarray,
+    config: DistanceConfig | None = None,
+) -> np.ndarray:
+    """Return exact distance-v1 price components for a candidate batch."""
+    config = config or DistanceConfig()
+    rows = len(candidates)
+    rigid = np.asarray(rigid_price, dtype=np.float64)
+    if rigid.shape != (rows,) or not np.isfinite(rigid).all() \
+            or np.any(rigid < 0) or not np.isfinite(config.dtw_band_fraction) \
+            or config.dtw_band_fraction < 0:
+        raise ValueError("exact price batch inputs differ")
+    if not rows:
+        return np.empty(0, dtype=np.float64)
+    query_values = np.zeros(
+        (len(_DTW_CHANNELS), _DTW_SAMPLES), dtype=np.float64,
+    )
+    query_presence = np.zeros(len(_DTW_CHANNELS), dtype=bool)
+    candidate_values = np.zeros(
+        (rows, len(_DTW_CHANNELS), _DTW_SAMPLES), dtype=np.float64,
+    )
+    candidate_presence = np.zeros((rows, len(_DTW_CHANNELS)), dtype=bool)
+    for channel, name in enumerate(_DTW_CHANNELS):
+        values = query.samples_64.get(name)
+        if values is not None:
+            array = np.asarray(values, dtype=np.float64)
+            if array.shape != (_DTW_SAMPLES,) or not np.isfinite(array).all():
+                raise ValueError(f"query exact price channel differs: {name}")
+            query_values[channel] = array
+            query_presence[channel] = True
+        for row, candidate in enumerate(candidates):
+            values = candidate.samples_64.get(name)
+            if values is None:
+                continue
+            array = np.asarray(values, dtype=np.float64)
+            if array.shape != (_DTW_SAMPLES,) or not np.isfinite(array).all():
+                raise ValueError(f"candidate exact price channel differs: {name}")
+            candidate_values[row, channel] = array
+            candidate_presence[row, channel] = True
+    return _batch_exact_price_distances_compiled(
+        query_values, query_presence, candidate_values, candidate_presence,
+        rigid, config.dtw_band_fraction,
+    )
+
+
 def _rolling_windows(rows: np.ndarray, window: int) -> np.ndarray:
     padded = np.pad(
         np.asarray(rows, dtype=float), ((0, 0), (window - 1, 0)),

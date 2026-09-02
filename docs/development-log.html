@@ -1637,6 +1637,12 @@
   <p><b>Independent oracle:</b> Twenty-four stratified queries—four from each of warmup, development, three validation folds and final untouched chart prefixes—matched independent random selection and the exhaustive non-indexed return/volatility rank implementation exactly. Forty cases containing same-symbol neighbors were reconstructed from raw prefixes and passed the strict non-overlap predicate.</p>
   <p><b>Boundary:</b> Neither the producer nor verifier opened subsequent returns, setup labels, historical query outcomes or final-period outcomes. This closes the random and return/volatility baseline retrieval lane only; combined price-plus-DTW retrieval for the same 3,936 queries remains required before outcome evaluation can begin.</p>
 </section>
+<section class="entry">
+  <h2>L-188 — Exact DTW completion moved to a compiled batch kernel</h2>
+  <p><b>Bottleneck removed:</b> Combined-component completion previously performed channel assembly, pair scaling, allocation and a compiled DTW call separately for every candidate. The new batch boundary packs each symbol group's four 64-sample channels once and completes all candidates in one no-GIL compiled loop while preserving distance-v1 scaling, stable predecessor order and path-length normalization.</p>
+  <p class="pass"><b>Correctness and speed:</b> Focused component and combined-search exhaustive-oracle tests pass, including partial/absent channel coverage. A deterministic 1,040-row benchmark measured 9.832 seconds for scalar completion and 0.042 seconds for the batch kernel (232.2×), with maximum absolute deviation <code>2.22e-16</code> and no ranking change. The complete repository test suite also passes.</p>
+  <p><b>Boundary:</b> This changes only exact distance computation after a candidate is admitted. Proposal generation and strict next-bound closure are unchanged, and no outcome or label was read.</p>
+</section>
 </main>
 
 <section id="reproduce">

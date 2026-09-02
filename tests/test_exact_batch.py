@@ -1,13 +1,17 @@
+from dataclasses import replace
 from time import perf_counter
 
 import numpy as np
 import pandas as pd
 import pytest
 
-from market_analogues.distance import representation_distance_lower_bound
+from market_analogues.distance import (
+    representation_distance, representation_distance_lower_bound,
+)
 from market_analogues.exact_batch import (
     _structural_rows, _structural_rows_reference,
-    batch_representation_lower_bounds, exact_representations_at_positions,
+    batch_exact_price_distances, batch_representation_lower_bounds,
+    exact_representations_at_positions,
     sliding_exact_representations,
 )
 from market_analogues.representation import Representation, represent
@@ -142,6 +146,44 @@ def test_exact_batch_ignores_future_benchmark_mutation() -> None:
     )
     for actual, expected in zip(changed.representations, original.representations):
         _assert_representation_equal(actual, expected)
+
+
+def test_batched_exact_price_matches_scalar_across_channel_shapes() -> None:
+    query = represent(generate_case("trend_contraction_breakout", 991).episode)
+    candidates = [
+        represent(generate_case(family, 1_000 + index).episode)
+        for index, family in enumerate((
+            "steady_trend", "rounded_base", "failed_breakout",
+            "volatile_reversal", "trend_contraction_breakout",
+        ))
+    ]
+    candidates.append(replace(
+        candidates[0],
+        samples_64={**candidates[0].samples_64, "relative_path": None},
+    ))
+    rigid = np.asarray([
+        representation_distance_lower_bound(query, candidate)[2]
+        for candidate in candidates
+    ])
+    actual = batch_exact_price_distances(query, candidates, rigid)
+    expected = np.asarray([
+        representation_distance(query, candidate)[1]["price"]
+        for candidate in candidates
+    ])
+    np.testing.assert_allclose(actual, expected, rtol=0, atol=2e-15)
+
+
+def test_batched_exact_price_handles_absent_channels_and_empty_batch() -> None:
+    original = represent(generate_case("steady_trend", 1_050).episode)
+    absent = replace(
+        original,
+        samples_64={name: None for name in original.samples_64},
+    )
+    actual = batch_exact_price_distances(absent, [absent], np.asarray([0.0]))
+    np.testing.assert_array_equal(actual, np.asarray([0.0]))
+    assert batch_exact_price_distances(
+        absent, [], np.empty(0, dtype=np.float64),
+    ).shape == (0,)
 
 
 @pytest.mark.parametrize("benchmark_mode", ["full", "partial", "missing"])
