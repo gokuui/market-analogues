@@ -1576,6 +1576,13 @@
   <p class="pass"><b>Independent verification:</b> The verifier reconstructed all 70,062 feature rows directly from raw closes with zero binary64 differences and maximum delta <code>0.0</code>. Its independent causal masks, SHA selection and scalar ordinal-rank neighbors exactly reproduce every producer result. Verification digest is <code>93468169…4d76</code>.</p>
   <p><b>Decision:</b> The full 3,786,156-row aligned feature-store build is authorized. Outcomes, labels and the final-period result remain unopened; production promotion remains false.</p>
 </section>
+<section class="entry">
+  <h2>L-179 — Full-universe baseline feature build prepared</h2>
+  <p><b>Builder:</b> A resumable eight-process harness covers all 11,584 packed symbols in immutable global order, validates every raw source prefix, builds aligned main/overflow feature shards and reuses a shard only after its seal, counts, dtype and content hashes revalidate. Durable progress is replaced atomically every 128 completed symbols.</p>
+  <p><b>Publication:</b> Ordered shards are concatenated into the content-addressed v2 feature generation. Its manifest binds the verified packed generation/provenance, bounded-verifier digest, exact row counts, full content hashes and outcome-blind contract. Publication requires all 3,786,156 rows finite, exact physical alignment and an unchanged resident lease.</p>
+  <p><b>Independent full-store verifier:</b> It rehashes the published generation, checks every shard byte-for-byte against its physical generation slice, revalidates all 11,584 source prefixes and independently reconstructs first/last feature rows per symbol plus every overflow row. Exact packed totals and outcome exclusion are terminal gates.</p>
+  <p><b>Boundary:</b> Monthly 3,936-query retrieval is not authorized until the full build and its independent verifier pass. No outcomes or labels are accessed by either harness.</p>
+</section>
 </main>
 
 <section id="reproduce">
