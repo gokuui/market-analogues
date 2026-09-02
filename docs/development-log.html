@@ -1631,6 +1631,12 @@
   <p><b>Independent oracle:</b> Four deterministic queries per fold (24 total across warmup, development, three validation folds and final untouched charts) are recomputed with independently written causal masks and random selection plus the exhaustive sort-based rank implementation—not the indexed producer path. Query feature bytes, eligible counts and both complete 20-neighbor lists must match.</p>
   <p><b>Boundary:</b> The verifier reads chart prefixes and retrieval receipts only. It has no outcome or label path and cannot authorize scoring unless every structural and stratified oracle gate passes.</p>
 </section>
+<section class="entry">
+  <h2>L-187 — All-query baseline retrieval independently verified</h2>
+  <p class="pass"><b>Result:</b> Commit <code>dbb0297</code>'s independent verifier passed in 63.1 seconds. It verified all 3,936 query receipts and all 157,440 neighbor references, including seals, feature-generation identity, symbol references, global and same-symbol causal cutoffs, deterministic-random order keys and finite hexadecimal rank distances. Verification digest is <code>fd11bf98…4c9b6</code>.</p>
+  <p><b>Independent oracle:</b> Twenty-four stratified queries—four from each of warmup, development, three validation folds and final untouched chart prefixes—matched independent random selection and the exhaustive non-indexed return/volatility rank implementation exactly. Forty cases containing same-symbol neighbors were reconstructed from raw prefixes and passed the strict non-overlap predicate.</p>
+  <p><b>Boundary:</b> Neither the producer nor verifier opened subsequent returns, setup labels, historical query outcomes or final-period outcomes. This closes the random and return/volatility baseline retrieval lane only; combined price-plus-DTW retrieval for the same 3,936 queries remains required before outcome evaluation can begin.</p>
+</section>
 </main>
 
 <section id="reproduce">
