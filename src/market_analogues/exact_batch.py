@@ -533,9 +533,10 @@ def exact_price_representations_at_positions(
         for name in names_64
     }
     empty = np.empty(0, dtype=np.float64)
+    empty_channels = pd.DataFrame()
     return tuple(
         Representation(
-            pd.DataFrame(), empty,
+            empty_channels, empty,
             {
                 name: samples[row].copy() if present[row] else None
                 for name, (samples, present) in sampled_48.items()

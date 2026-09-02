@@ -3,7 +3,9 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from market_analogues.adapters import DirectorySource, LongTableSource, SourceError
+from market_analogues.adapters import (
+    CachedOHLCVSource, DirectorySource, LongTableSource, SourceError,
+)
 from market_analogues.config import DatasetSpec
 from market_analogues.types import InstrumentKey
 
@@ -26,6 +28,28 @@ def test_adapter_never_modifies_source(directory_dataset):
     assert source.fingerprint(key) == before
 
 
+def test_explicit_batch_cache_reuses_frames_and_isolates_callers(directory_dataset):
+    spec = DatasetSpec(
+        "demo", "directory", directory_dataset, "parquet",
+        timestamp_column="date",
+    )
+    cached = CachedOHLCVSource(DirectorySource(spec), max_entries=2)
+    first = cached.load(InstrumentKey("demo", "AAA"))
+    first.loc[0, "close"] = -1
+    second = cached.load(InstrumentKey("demo", "AAA"))
+    assert second.loc[0, "close"] != -1
+    assert cached.cache_state() == {
+        "entries": 1, "max_entries": 2, "hits": 1, "misses": 1,
+    }
+    cached.load(InstrumentKey("demo", "BBB"))
+    assert cached.cache_state()["entries"] == 2
+    preload = CachedOHLCVSource(DirectorySource(spec), max_entries=None)
+    state = preload.preload(tuple(preload.instruments()), workers=2)
+    assert state == {
+        "entries": 2, "max_entries": None, "hits": 0, "misses": 2,
+    }
+
+
 def test_long_table_matches_directory(tmp_path, bars):
     frame = pd.concat([bars.assign(symbol="AAA"), bars.assign(symbol="BBB")])
     path = tmp_path / "long.parquet"
@@ -43,4 +67,3 @@ def test_missing_column_is_rejected(directory_dataset):
     source = DirectorySource(DatasetSpec("demo", "directory", directory_dataset, "parquet", timestamp_column="date"))
     with pytest.raises(SourceError, match="missing required"):
         source.load(InstrumentKey("demo", "BAD"))
-

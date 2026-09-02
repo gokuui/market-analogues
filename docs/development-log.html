@@ -1657,6 +1657,13 @@
   <p><b>Profile:</b> Rigid and DTW bound phases now take 8.0 and 12.1 seconds. Seed and final exact reconstruction take 63.6 and 56.4 seconds, identifying cross-query source reuse as the next optimization target.</p>
   <p><b>Boundary:</b> The run used only historical chart prefixes and independently verified packed/DTW stores. No subsequent return, outcome, label or final-period result was opened.</p>
 </section>
+<section class="entry">
+  <h2>L-191 — Explicit inventory cache prepared for multi-query retrieval</h2>
+  <p><b>Design:</b> Batch mode can now wrap any OHLCV source in a thread-safe LRU or inventory-sized cache, preload distinct instruments concurrently and borrow cached canonical frames through an explicit read-only interface. Default directory-source behavior remains the existing 32-symbol cache.</p>
+  <p class="pass"><b>Observed tradeoff:</b> Preloading all 12,080 NASDAQ frames took 73.0 seconds. A subsequent frozen early-case retrieval remained hexadecimal-exact and took 121.6 seconds versus 141.1 seconds without the inventory cache, at 12.6 GiB observed peak RSS on the currently exposed 31-GiB/8-CPU environment. The cache recorded 12,080 misses and 2,374 retrieval hits.</p>
+  <p><b>Further reduction:</b> Exact price projections now share one empty immutable channel placeholder instead of constructing one pandas frame per candidate and borrow cached frames without defensive copies. A 1,000-window specialized projection takes 0.359 seconds. Focused cache/isolation tests and the complete repository suite pass.</p>
+  <p><b>Boundary:</b> The cache is an execution optimization over immutable historical chart prefixes. It does not cache or expose outcomes, labels or future rows.</p>
+</section>
 </main>
 
 <section id="reproduce">

@@ -295,7 +295,7 @@ def _score(
         prepared = cache.get(symbol)
         if prepared is None:
             key = InstrumentKey(store_dataset_id, symbol)
-            bars = source.load(key)
+            bars = source.load_borrowed(key)
             if not _prefix_matches(bars, expected):
                 raise CertifiedComponentSearchError(
                     f"packed stock causal prefix is stale: {symbol}"
