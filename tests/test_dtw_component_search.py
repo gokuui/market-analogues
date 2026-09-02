@@ -35,6 +35,18 @@ from market_analogues.search import latest_eligible_cutoff
 from market_analogues.types import EpisodeKey, InstrumentKey, SearchQuery
 
 
+class _CountingDirectorySource(DirectorySource):
+    def __init__(self, spec: DatasetSpec):
+        super().__init__(spec)
+        self.load_counts: dict[str, int] = {}
+
+    def load(self, key: InstrumentKey) -> pd.DataFrame:
+        self.load_counts[key.source_symbol] = (
+            self.load_counts.get(key.source_symbol, 0) + 1
+        )
+        return super().load(key)
+
+
 def _stores(tmp_path: Path):
     query = represent(generate_case("trend_contraction_breakout", 170_000).episode)
     candidates = [
@@ -129,7 +141,7 @@ def test_certified_combined_component_matches_exhaustive_oracle(
 ) -> None:
     benchmark_path = directory_dataset / "MARKET.parquet"
     bars.to_parquet(benchmark_path, index=False)
-    source = DirectorySource(DatasetSpec(
+    source = _CountingDirectorySource(DatasetSpec(
         "test", "directory", directory_dataset, "parquet",
         timestamp_column="date",
         benchmark=BenchmarkSpec(benchmark_path, timestamp_column="date"),
@@ -200,6 +212,7 @@ def test_certified_combined_component_matches_exhaustive_oracle(
         dtw_root, [main_shard], [overflow_shard],
         packed_manifest=packed.manifest, provenance={"purpose": "oracle"},
     )
+    source.load_counts.clear()
     result = certified_dtw_component_search(
         query, source, request, packed_root, packed_generation,
         dtw_root, dtw_generation, store_dataset_id="test",
@@ -224,3 +237,7 @@ def test_certified_combined_component_matches_exhaustive_oracle(
         or result.certificate.next_lower_bound > result.certificate.stop_threshold
     assert result.certificate.contract_digest \
         == certified_dtw_component_search_contract()["digest"]
+    # The query prefix needs one load of AAA; exact completion then prepares
+    # each candidate symbol once even though its frontier takes multiple batches.
+    assert source.load_counts["AAA"] <= 2
+    assert source.load_counts["BBB"] <= 1

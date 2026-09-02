@@ -420,6 +420,7 @@ def certified_dtw_component_search(
     evaluated: set[str] = set()
     exact_evaluated = 0
     maximum_excess = 0.0
+    prepared_cache: dict[str, Any] = {}
     rounds = []
     frontier_rows = initial_frontier_rows
     threshold = float("inf")
@@ -439,6 +440,7 @@ def certified_dtw_component_search(
                     manifest=packed.manifest, completion_threshold=threshold,
                     tolerance=tolerance, workers=workers, benchmark=benchmark,
                     strengthened_proposal_bound=True,
+                    prepared_cache=prepared_cache,
                 )
             except CertifiedComponentSearchError as exc:
                 raise DtwComponentSearchError(

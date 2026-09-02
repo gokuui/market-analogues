@@ -97,6 +97,12 @@ class _CompactComponentScore:
     instrument: InstrumentKey
 
 
+@dataclass(frozen=True)
+class _PreparedComponentSymbol:
+    frame: pd.DataFrame
+    positions: dict[int, int]
+
+
 def certified_component_search_contract(component: str = PRICE_COMPONENT) -> dict[str, object]:
     if component != PRICE_COMPONENT:
         raise CertifiedComponentSearchError("only the exact price component is implemented")
@@ -143,25 +149,17 @@ def _score_group(
     *,
     query: Episode,
     query_representation: Representation,
-    source: OHLCVSource,
     request: SearchQuery,
     benchmark: pd.DataFrame,
     store_dataset_id: str,
-    expected_prefix: dict[str, object],
-    maximum_candidate_cutoff: pd.Timestamp,
+    prepared: _PreparedComponentSymbol,
     completion_threshold: float,
     tolerance: float,
     strengthened_proposal_bound: bool = False,
 ) -> tuple[list[_CompactComponentScore], int, float]:
     key = InstrumentKey(store_dataset_id, symbol)
-    bars = source.load(key)
-    if not _prefix_matches(bars, expected_prefix):
-        raise CertifiedComponentSearchError(f"packed stock causal prefix is stale: {symbol}")
-    latest = min(latest_eligible_cutoff(query, request.minimum_history_gap_bars),
-                 maximum_candidate_cutoff)
-    frame = bars[bars.timestamp <= latest].reset_index(drop=True)
-    positions = {int(pd.Timestamp(value).value): index
-                 for index, value in enumerate(frame.timestamp)}
+    frame = prepared.frame
+    positions = prepared.positions
     requested: list[int] = []
     for proposal in proposals:
         position = positions.get(proposal.cutoff_ns)
@@ -231,6 +229,7 @@ def _score(
     completion_threshold: float, tolerance: float, workers: int,
     benchmark: pd.DataFrame,
     strengthened_proposal_bound: bool = False,
+    prepared_cache: dict[str, _PreparedComponentSymbol] | None = None,
 ) -> tuple[list[_CompactComponentScore], int, float]:
     grouped: dict[str, list[BoundProposal]] = {}
     for proposal in proposals:
@@ -244,17 +243,36 @@ def _score(
     if not _prefix_matches(benchmark, benchmark_prefix):
         raise CertifiedComponentSearchError("packed benchmark causal prefix is stale")
     maximum_cutoff = pd.Timestamp(str(benchmark_prefix["requested_cutoff"]))
+    cache = {} if prepared_cache is None else prepared_cache
 
     def one(item: tuple[str, list[BoundProposal]]):
         symbol, rows = item
         expected = prefixes.get(symbol)
         if type(expected) is not dict:
             raise CertifiedComponentSearchError(f"missing packed prefix: {symbol}")
+        prepared = cache.get(symbol)
+        if prepared is None:
+            key = InstrumentKey(store_dataset_id, symbol)
+            bars = source.load(key)
+            if not _prefix_matches(bars, expected):
+                raise CertifiedComponentSearchError(
+                    f"packed stock causal prefix is stale: {symbol}"
+                )
+            latest = min(
+                latest_eligible_cutoff(query, request.minimum_history_gap_bars),
+                maximum_cutoff,
+            )
+            frame = bars[bars.timestamp <= latest].reset_index(drop=True)
+            prepared = _PreparedComponentSymbol(
+                frame,
+                {int(pd.Timestamp(value).value): index
+                 for index, value in enumerate(frame.timestamp)},
+            )
+            cache[symbol] = prepared
         return _score_group(
             symbol, tuple(rows), query=query, query_representation=query_representation,
-            source=source, request=request, benchmark=benchmark,
-            store_dataset_id=store_dataset_id, expected_prefix=expected,
-            maximum_candidate_cutoff=maximum_cutoff,
+            request=request, benchmark=benchmark, store_dataset_id=store_dataset_id,
+            prepared=prepared,
             completion_threshold=completion_threshold, tolerance=tolerance,
             strengthened_proposal_bound=strengthened_proposal_bound,
         )
@@ -389,6 +407,7 @@ def certified_component_search(
     native_pruned = 0
     exact_evaluated = 0
     maximum_excess = 0.0
+    prepared_cache: dict[str, _PreparedComponentSymbol] = {}
     rounds: list[ComponentCompletionRound] = []
     frontier_rows = initial_frontier_rows
     threshold = float("inf")
@@ -403,6 +422,7 @@ def certified_component_search(
                 source=source, request=request, store_dataset_id=store_dataset_id,
                 manifest=loaded.manifest, completion_threshold=threshold,
                 tolerance=tolerance, workers=workers, benchmark=benchmark,
+                prepared_cache=prepared_cache,
             )
             evaluated.update(row.episode_id for row in pending)
             scored.update({row.match.episode_key.id: row for row in values})

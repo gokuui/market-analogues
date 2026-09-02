@@ -1493,6 +1493,14 @@
   <p><b>Performance:</b> The early real scan completes in 86.28 seconds versus the prior implementation's 108–144-second observed range. Peak RSS includes the already resident 9.2-GiB packed map and 2.98-GiB DTW map; memory is intentionally not used as a rejection criterion on this host.</p>
   <p><b>Next:</b> Commit this verified scanner checkpoint, freeze the three-probe 16,384/32,768/65,536/131,072/262,144 closure ladder as a sole-child preregistration and execute it once with durable per-stage receipts. No historical outcome or final-period result may be opened by that harness.</p>
 </section>
+<section class="entry">
+  <h2>L-167 — Exact closure cache and durable 262k ladder prepared</h2>
+  <p><b>Exact-stage optimization:</b> Expanded frontiers can revisit the same symbol in multiple rounds. Exact component completion now retains each validated causal symbol frame and timestamp-position index for the lifetime of one query, rather than relying on the directory adapter's 32-symbol file cache and repeatedly reading/reindexing evicted symbols. The cache is query-local, does not alter representations or distances and deliberately spends available memory to reduce repeated I/O.</p>
+  <p><b>Frozen experiment design:</b> A resumable three-probe harness scans a 262,145-row combined-bound proposal in forward 4,096-row and reverse 4,097-row blocks, requires exact candidate identity, then attempts strict closure at the fixed 16,384/32,768/65,536/131,072/262,144 ladder with eight exact workers. Each attempt publishes create-only start, proposal-summary, exact/failure and terminal receipts; resume accepts only a terminal whose referenced attempt hash and semantic seal revalidate.</p>
+  <p><b>Fail-closed gates:</b> Success requires 20 distinct-symbol matches, strict next-bound closure, maximum lower-bound excess at most <code>1e-12</code>, unchanged resident lease and zero process swap. Exhausting 262,144 rows publishes a typed frontier-overflow result, not neighbors. The harness accepts no outcome or authority path and binds the independently verified DTW generation, resident packed identity, complete query row and all runtime source hashes.</p>
+  <p class="pass"><b>Verification:</b> Focused tests prove fixed ladder/quota semantics, execution-independent proposal comparison, terminal-to-attempt revalidation and one-load-per-symbol caching across multiple exact batches. The complete repository test suite passes. An initial direct <code>pytest</code> command was rejected during collection because it omitted the repository namespace path; the established <code>python -m pytest</code> invocation ran the complete gate successfully.</p>
+  <p><b>Next:</b> Commit this implementation as H0, generate and commit only the preregistration as sole-child H1, then run the durable ladder without opening historical outcomes.</p>
+</section>
 </main>
 
 <section id="reproduce">
