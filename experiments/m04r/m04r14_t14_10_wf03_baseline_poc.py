@@ -42,12 +42,12 @@ from market_analogues.types import InstrumentKey, stable_hash
 from experiments.m04r import m04r14_t14_10_wf03_feasibility as base
 
 
-SCHEMA = "m04r14-t14-10-wf03-baseline-poc-preregistration-v1"
+SCHEMA = "m04r14-t14-10-wf03-baseline-poc-preregistration-v2"
 OUTPUT_RELATIVE = Path(
-    "config/data/analogues/m04r14/t14-10-wf03-baseline-poc-v1"
+    "config/data/analogues/m04r14/t14-10-wf03-baseline-poc-v2"
 )
 PREREGISTRATION_RELATIVE = Path(
-    "experiments/m04r/m04r14_t14_10_wf03_baseline_poc_preregistered.json"
+    "experiments/m04r/m04r14_t14_10_wf03_baseline_poc_v2_preregistered.json"
 )
 SYMBOLS = 128
 WORKERS = 8
@@ -184,7 +184,7 @@ def _build_symbol(task: tuple[dict[str, Any], str]) -> dict[str, Any]:
     _write_array(rows_path, main_features)
     _write_array(overflow_path, overflow_features)
     state = {
-        "schema_version": "m04r14-wf03-baseline-poc-shard-v1",
+        "schema_version": "m04r14-wf03-baseline-poc-shard-v2",
         "symbol": symbol,
         "symbol_id": symbol_id,
         "source_prefix": prefix,
@@ -424,7 +424,7 @@ def execute(repository: Path, preregistration: Mapping[str, Any]) -> dict[str, A
     if not all(gates.values()):
         raise BaselinePocError("bounded baseline terminal gate differs")
     state = {
-        "schema_version": "m04r14-t14-10-wf03-baseline-poc-result-v1",
+        "schema_version": "m04r14-t14-10-wf03-baseline-poc-result-v2",
         "status": "complete",
         "passed": True,
         "gates": gates,

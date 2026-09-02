@@ -23,7 +23,7 @@ from experiments.m04r import m04r14_t14_10_wf03_feasibility as base
 
 
 OUTPUT_RELATIVE = Path(
-    "config/data/analogues/m04r14/t14-10-wf03-baseline-poc-v1-verification"
+    "config/data/analogues/m04r14/t14-10-wf03-baseline-poc-v2-verification"
 )
 
 
@@ -274,7 +274,7 @@ def verify(repository: Path) -> dict[str, Any]:
     if not all(gates.values()) or not math.isfinite(maximum_delta):
         raise BaselinePocVerificationError("independent baseline gates differ")
     state = {
-        "schema_version": "m04r14-t14-10-wf03-baseline-poc-verification-v1",
+        "schema_version": "m04r14-t14-10-wf03-baseline-poc-verification-v2",
         "status": "complete",
         "passed": True,
         "gates": gates,

@@ -19,7 +19,7 @@ from .types import stable_hash
 
 
 FEATURE_DTYPE = np.dtype([("values", "<f8", (3,))], align=False)
-SCHEMA_VERSION = "wf03-return-volatility-feature-store-v1"
+SCHEMA_VERSION = "wf03-return-volatility-feature-store-v2"
 
 
 class BaselineFeatureStoreError(ValueError):
@@ -38,7 +38,11 @@ def baseline_feature_store_contract() -> dict[str, Any]:
     state = {
         "schema_version": SCHEMA_VERSION,
         "row_bytes": FEATURE_DTYPE.itemsize,
-        "dtype": FEATURE_DTYPE.descr,
+        "dtype": [
+            [descriptor[0], descriptor[1], list(descriptor[2])]
+            if len(descriptor) == 3 else [descriptor[0], descriptor[1]]
+            for descriptor in FEATURE_DTYPE.descr
+        ],
         "features": ["return_20", "return_63", "log_return_volatility_20"],
         "invalid": "all three binary64 values are NaN; partial/non-finite rows forbidden",
         "alignment": "one physical row per bound-store main and overflow row",

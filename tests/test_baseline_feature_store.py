@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import numpy as np
@@ -68,3 +69,10 @@ def test_packed_feature_builder_preserves_order_and_last_duplicate() -> None:
 
     with pytest.raises(BaselineFeatureStoreError, match="inputs differ"):
         features_for_packed_records(frame, np.asarray([1], dtype=np.int64))
+
+
+def test_feature_contract_is_strict_json_roundtrip_stable() -> None:
+    from market_analogues.baseline_feature_store import baseline_feature_store_contract
+
+    contract = baseline_feature_store_contract()
+    assert json.loads(json.dumps(contract, allow_nan=False)) == contract

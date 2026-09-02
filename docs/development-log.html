@@ -1556,6 +1556,12 @@
   <p class="pass"><b>Preflight:</b> Ten focused tests pass. The real resident generation and all three probes reconstruct in 13.83 seconds. The frozen sampling rule selects 128 of 11,584 symbols, 70,040 main rows and 22 overflow rows, including two eligible overflow symbols. Full packed-store eligibility is vectorized rather than looping across every symbol.</p>
   <p><b>Boundary:</b> No historical outcome, setup label or final-period result is accepted or opened. The full 3,786,156-row feature build remains unauthorized until this bounded producer is preregistered, run and independently verified.</p>
 </section>
+<section class="entry">
+  <h2>L-176 — V1 baseline preregistration correctly refuses noncanonical contract</h2>
+  <p><b>Retained refusal:</b> H0 <code>274f984</code> and sole-child H1 <code>766cdf9</code> froze the v1 bounded gate. Before creating an output directory, runtime validation refused because NumPy's in-memory dtype descriptor used tuples while its strict JSON representation used lists. Selection digest <code>92128263…2bbb</code>, all 128 symbols and all three probe IDs were unchanged; only contract round-trip equality failed.</p>
+  <p><b>Repair:</b> The feature-store contract is versioned to v2 and now emits an explicitly JSON-native field descriptor. A strict JSON round-trip test prevents recurrence. The v1 preregistration and Git lineage remain retained, while the v2 POC uses fresh preregistration, output and verification paths.</p>
+  <p><b>Boundary:</b> No v1 result directory was created and no outcome or label was opened. V2 must pass the complete repository suite and receive a new H0/H1 freeze before execution.</p>
+</section>
 </main>
 
 <section id="reproduce">
