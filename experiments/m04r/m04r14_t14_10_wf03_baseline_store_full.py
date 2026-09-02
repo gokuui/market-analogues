@@ -105,15 +105,28 @@ def _prerequisites(repository: Path) -> tuple[Any, Any, dict[str, Any]]:
 
 
 def full_selection(loaded: Any) -> list[dict[str, Any]]:
+    symbol_count = len(loaded.symbols)
+    main_counts = np.bincount(
+        np.asarray(loaded.rows["symbol_id"], dtype=np.int64),
+        minlength=symbol_count,
+    )
+    overflow_counts = np.bincount(
+        np.asarray(loaded.overflow["symbol_id"], dtype=np.int64),
+        minlength=symbol_count,
+    )
+    if len(main_counts) != symbol_count or len(overflow_counts) != symbol_count:
+        raise FullBaselineStoreError("full baseline symbol ID differs")
+    main_starts = np.concatenate(([0], np.cumsum(main_counts[:-1])))
+    overflow_starts = np.concatenate(([0], np.cumsum(overflow_counts[:-1])))
     output = []
     for symbol_id, symbol in enumerate(loaded.symbols):
-        main = bounded._slice(loaded.rows, symbol_id)
-        overflow = bounded._slice(loaded.overflow, symbol_id)
         output.append({
             "symbol": symbol,
             "symbol_id": symbol_id,
-            "rows": len(main),
-            "overflow_rows": len(overflow),
+            "main_start": int(main_starts[symbol_id]),
+            "overflow_start": int(overflow_starts[symbol_id]),
+            "rows": int(main_counts[symbol_id]),
+            "overflow_rows": int(overflow_counts[symbol_id]),
             "source_prefix": loaded.manifest["provenance"]["source_prefixes"][symbol],
         })
     if sum(row["rows"] for row in output) != len(loaded.rows) \
@@ -245,12 +258,14 @@ def _build_symbol(task: tuple[dict[str, Any], str]) -> dict[str, Any]:
     if prefix != specification["source_prefix"]:
         raise FullBaselineStoreError(f"full baseline source changed: {symbol}")
     frame = frame[frame.timestamp <= _MAXIMUM].reset_index(drop=True)
-    main = features_for_packed_records(
-        frame, bounded._slice(_PACKED.rows, symbol_id),
-    )
-    overflow = features_for_packed_records(
-        frame, bounded._slice(_PACKED.overflow, symbol_id),
-    )
+    main_start = int(specification["main_start"])
+    overflow_start = int(specification["overflow_start"])
+    main = features_for_packed_records(frame, _PACKED.rows[
+        main_start:main_start + int(specification["rows"])
+    ])
+    overflow = features_for_packed_records(frame, _PACKED.overflow[
+        overflow_start:overflow_start + int(specification["overflow_rows"])
+    ])
     rows_path, overflow_path, metadata_path = bounded._paths(root, symbol)
     rows_path.parent.mkdir(parents=True, exist_ok=True)
     bounded._write_array(rows_path, main)

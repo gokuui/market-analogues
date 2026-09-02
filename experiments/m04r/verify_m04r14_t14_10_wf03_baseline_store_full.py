@@ -55,8 +55,14 @@ def _verify_symbol(specification: dict[str, Any]) -> dict[str, Any]:
     if asdict(causal_prefix_digest(frame, _MAXIMUM)) != specification["source_prefix"]:
         raise FullBaselineVerificationError(f"full baseline source differs: {symbol}")
     frame = frame[frame.timestamp <= _MAXIMUM].reset_index(drop=True)
-    main_records = bounded._slice(_PACKED.rows, symbol_id)
-    overflow_records = bounded._slice(_PACKED.overflow, symbol_id)
+    main_first = int(specification["main_start"])
+    overflow_first = int(specification["overflow_start"])
+    main_records = _PACKED.rows[
+        main_first:main_first + int(specification["rows"])
+    ]
+    overflow_records = _PACKED.overflow[
+        overflow_first:overflow_first + int(specification["overflow_rows"])
+    ]
     rows_path, overflow_path, metadata_path = bounded._paths(_SHARD_ROOT, symbol)
     metadata = base._read(metadata_path)
     base._validate_seal(metadata, "shard_digest")
@@ -64,12 +70,6 @@ def _verify_symbol(specification: dict[str, Any]) -> dict[str, Any]:
     shard_overflow = np.fromfile(overflow_path, dtype=FEATURE_DTYPE)
     validate_feature_records(shard_main)
     validate_feature_records(shard_overflow)
-    main_first = int(np.searchsorted(
-        _PACKED.rows["symbol_id"], symbol_id, side="left",
-    ))
-    overflow_first = int(np.searchsorted(
-        _PACKED.overflow["symbol_id"], symbol_id, side="left",
-    ))
     if not np.array_equal(
         shard_main, _FEATURES.rows[main_first:main_first + len(main_records)],
     ) or not np.array_equal(

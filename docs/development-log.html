@@ -1582,6 +1582,7 @@
   <p><b>Publication:</b> Ordered shards are concatenated into the content-addressed v2 feature generation. Its manifest binds the verified packed generation/provenance, bounded-verifier digest, exact row counts, full content hashes and outcome-blind contract. Publication requires all 3,786,156 rows finite, exact physical alignment and an unchanged resident lease.</p>
   <p><b>Independent full-store verifier:</b> It rehashes the published generation, checks every shard byte-for-byte against its physical generation slice, revalidates all 11,584 source prefixes and independently reconstructs first/last feature rows per symbol plus every overflow row. Exact packed totals and outcome exclusion are terminal gates.</p>
   <p><b>Boundary:</b> Monthly 3,936-query retrieval is not authorized until the full build and its independent verifier pass. No outcomes or labels are accessed by either harness.</p>
+  <p><b>Pre-freeze optimization:</b> A diagnostic preregistration was stopped before publication after repeated binary searches over the wide strided packed map exceeded 90 seconds. Full selection now makes one sequential <code>bincount</code> pass and freezes each main/overflow start offset and count; workers and the verifier use direct physical slices.</p>
 </section>
 </main>
 

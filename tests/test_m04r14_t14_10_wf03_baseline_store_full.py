@@ -38,8 +38,10 @@ def test_full_selection_covers_every_physical_row() -> None:
         }}},
     )
     selection = subject.full_selection(loaded)
-    assert [(row["symbol_id"], row["rows"], row["overflow_rows"])
-            for row in selection] == [(0, 1, 0), (1, 1, 1)]
+    assert [(
+        row["symbol_id"], row["main_start"], row["overflow_start"],
+        row["rows"], row["overflow_rows"],
+    ) for row in selection] == [(0, 0, 0, 1, 0), (1, 1, 0, 1, 1)]
 
 
 def test_full_worker_builds_and_revalidates_feature_shard(
@@ -57,7 +59,9 @@ def test_full_worker_builds_and_revalidates_feature_shard(
         overflow=np.empty(0, dtype=OVERFLOW_DTYPE),
     )
     specification = {
-        "symbol": "XYZ", "symbol_id": 0, "rows": 1, "overflow_rows": 0,
+        "symbol": "XYZ", "symbol_id": 0,
+        "main_start": 0, "overflow_start": 0,
+        "rows": 1, "overflow_rows": 0,
         "source_prefix": asdict(causal_prefix_digest(frame, timestamps[-1])),
     }
     monkeypatch.setattr(subject, "_SOURCE", source)
