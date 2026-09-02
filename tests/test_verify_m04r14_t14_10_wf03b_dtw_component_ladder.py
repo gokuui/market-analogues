@@ -3,6 +3,7 @@ from types import SimpleNamespace
 import numpy as np
 
 from experiments.m04r.verify_m04r14_t14_10_wf03b_dtw_component_ladder import (
+    EXACT_TOLERANCE,
     _eligibility,
 )
 from market_analogues.packed_bound_store import OVERFLOW_DTYPE
@@ -21,3 +22,9 @@ def test_independent_eligibility_excludes_future_query_and_overlap() -> None:
         query_start_ns=4,
     )
     assert _eligibility(rows, query, 7).tolist() == [True, False, False, False, False]
+
+
+def test_raw_exact_tolerance_is_stric_but_covers_binary64_order() -> None:
+    assert abs(float.fromhex("0x1.76f4275146604p-1")
+               - float.fromhex("0x1.76f4275146602p-1")) <= EXACT_TOLERANCE
+    assert abs(1.0 - (1.0 + 2e-12)) > EXACT_TOLERANCE

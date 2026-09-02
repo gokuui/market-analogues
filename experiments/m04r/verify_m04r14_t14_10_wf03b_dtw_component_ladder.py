@@ -30,13 +30,13 @@ from experiments.m04r import m04r14_t14_10_wf03_feasibility as base
 from experiments.m04r import m04r14_t14_10_wf03b_dtw_component_ladder as producer
 
 
-SCHEMA = "m04r14-dtw-component-ladder-verification-preregistration-v1"
+SCHEMA = "m04r14-dtw-component-ladder-verification-preregistration-v2"
 PREREGISTRATION_RELATIVE = Path(
-    "experiments/m04r/verify_m04r14_t14_10_wf03b_dtw_component_ladder_preregistered.json"
+    "experiments/m04r/verify_m04r14_t14_10_wf03b_dtw_component_ladder_v2_preregistered.json"
 )
 OUTPUT_RELATIVE = Path(
     "config/data/analogues/m04r14/"
-    "t14-10-wf03b-dtw-component-ladder-v1-verification"
+    "t14-10-wf03b-dtw-component-ladder-v1-verification-v2"
 )
 RUNTIME_FILES = (
     "experiments/m04r/verify_m04r14_t14_10_wf03b_dtw_component_ladder.py",
@@ -48,6 +48,7 @@ RUNTIME_FILES = (
     "src/market_analogues/representation.py",
 )
 BLOCK_ROWS = 4_093
+EXACT_TOLERANCE = 1e-12
 
 
 class LadderVerificationError(RuntimeError):
@@ -96,6 +97,7 @@ def build_preregistration(repository: Path) -> dict[str, Any]:
             "reverse_block_rows": BLOCK_ROWS,
             "independent_complete_threshold_scan": True,
             "raw_exact_matches_recomputed": 60,
+            "raw_exact_absolute_tolerance_hex": EXACT_TOLERANCE.hex(),
             "output_root": str(target.resolve()),
         },
         "claims": {
@@ -270,6 +272,7 @@ def _verify_case(repository: Path, packed: Any, dtw: Any, ordinal: int,
     )
     query_representation = represent(query)
     exact_rows = []
+    exact_differences = []
     for row in matches:
         candidate = build_episode(
             source, InstrumentKey("nasdaq", row["symbol"]), row["cutoff"],
@@ -278,9 +281,12 @@ def _verify_case(repository: Path, packed: Any, dtw: Any, ordinal: int,
         value = float(representation_distance(
             query_representation, represent(candidate),
         )[1]["price"])
-        if candidate.key.id != row["episode_id"] or value.hex() != row["distance_hex"]:
+        expected = float.fromhex(row["distance_hex"])
+        difference = abs(value - expected)
+        if candidate.key.id != row["episode_id"] or difference > EXACT_TOLERANCE:
             raise LadderVerificationError("raw exact match differs")
-        exact_rows.append((row["episode_id"], value.hex()))
+        exact_rows.append((row["episode_id"], row["distance_hex"], value.hex()))
+        exact_differences.append(difference)
     input_digest = stable_hash({
         "query_stock_prefix": asdict(causal_prefix_digest(
             source.load(query.key.instrument), query.key.cutoff,
@@ -333,6 +339,8 @@ def _verify_case(repository: Path, packed: Any, dtw: Any, ordinal: int,
         "threshold_hex": threshold.hex(),
         "threshold_audit": audit,
         "exact_match_digest": stable_hash(exact_rows),
+        "raw_exact_non_bitwise_count": sum(value > 0 for value in exact_differences),
+        "raw_exact_maximum_absolute_difference": max(exact_differences, default=0.0),
     }
 
 
@@ -355,7 +363,7 @@ def execute(repository: Path, preregistration: Mapping[str, Any]) -> dict[str, A
         for ordinal, (label, query_id, _symbol, _cutoff) in enumerate(base.PROBES)
     ]
     state = {
-        "schema_version": "m04r14-dtw-component-ladder-verification-v1",
+        "schema_version": "m04r14-dtw-component-ladder-verification-v2",
         "status": "verified", "passed": True,
         "producer_result_digest": preregistration["inputs"]["producer_result_digest"],
         "cases": cases, "case_digest": stable_hash(cases),

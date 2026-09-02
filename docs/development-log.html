@@ -1509,6 +1509,12 @@
   <p><b>Performance result:</b> Exact stages take 642.8 / 603.6 / 1,177.1 seconds and average only about 1.3 cores even with eight workers. Sampling shows Python/Pandas timestamp dictionary preparation is GIL-bound while most CPUs are idle. Correctness is established, but this scalar implementation is not acceptable for 3,936-query scale. Replace per-symbol Python timestamp dictionaries with vectorized sorted-timestamp lookup and prove semantic identity before monthly batching.</p>
   <p><b>Next:</b> Independently verify every seal, frozen lineage, proposal parity, certificate digest, threshold closure and a raw exact-match sample. Only then mark combined price-development retrieval complete and proceed to the random and recent-return/volatility baselines.</p>
 </section>
+<section class="entry">
+  <h2>L-169 — Independent verifier v1 refuses binary64 path-order equality</h2>
+  <p><b>Retained refusal:</b> Verifier H0 <code>7c0ec1e</code> and sole-child H1 <code>dbefeda</code> froze bitwise raw exact-distance equality. The first run completed the early reverse threshold scan, then refused on CHCO because the producer's requested-position batch path returned <code>0x1.76f4275146604p-1</code> while the independent scalar episode path returned <code>0x1.76f4275146602p-1</code>. No verification directory or receipt was published.</p>
+  <p><b>Diagnosis:</b> A complete diagnostic recomputed all 60 published matches. Fifty-seven are bit-identical; CHCO and two late matches differ by one or two binary64 ULPs. Maximum absolute difference is <code>2.220446049250313e-16</code>; none exceeds <code>1e-12</code>. IDs, bars and formulas agree. The discrepancy is floating operation order, not a different neighbor or unsafe bound.</p>
+  <p><b>V2 correction:</b> Preserve v1 unchanged. V2 uses a fresh preregistration and receipt root, requires the existing frozen <code>1e-12</code> exact-distance tolerance, and publishes both the non-bitwise count and maximum difference. Threshold counts, lower-bound closure, certificate digests, identities and seals remain exact.</p>
+</section>
 </main>
 
 <section id="reproduce">
