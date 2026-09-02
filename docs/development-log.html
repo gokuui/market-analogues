@@ -1543,6 +1543,12 @@
   <p class="pass"><b>Tests:</b> Round-trip main/overflow publication, wholly missing rows, changed packed identity, partial missingness and empty-array mapping pass. No full-universe feature generation has been built yet.</p>
   <p><b>Next:</b> Implement a bounded raw-data builder that proves physical symbol-slice alignment, direct feature reconstruction, resumable shard publication and exact rank-neighbor equality before full-universe construction.</p>
 </section>
+<section class="entry">
+  <h2>L-174 — Vectorized baseline feature extraction fixed</h2>
+  <p><b>Kernel:</b> Arbitrary packed cutoff positions are evaluated together through 64-session strided windows. The kernel computes exact 20/63-session returns and final-20-log-return sample volatility, marks any nonpositive/non-finite window wholly missing and rejects invalid positions. The scalar API delegates to the same canonical kernel.</p>
+  <p class="pass"><b>Gate:</b> Random positive price paths at boundary, adjacent, interior and final positions are bit-identical to separately sliced scalar NumPy formulas at zero tolerance. Empty positions and short scalar histories behave explicitly.</p>
+  <p><b>Next:</b> Use this kernel in the bounded physical-alignment POC, independently reconstruct a deterministic raw sample and compare vector rank neighbors with a shuffled exhaustive oracle before authorizing a full feature generation.</p>
+</section>
 </main>
 
 <section id="reproduce">

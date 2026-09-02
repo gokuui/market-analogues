@@ -4,6 +4,7 @@ from market_analogues.baseline_neighbors import (
     baseline_neighbor_contract,
     deterministic_random_neighbors,
     recent_return_volatility,
+    recent_return_volatility_at_positions,
     recent_return_volatility_neighbors,
 )
 
@@ -18,6 +19,22 @@ def test_recent_features_use_frozen_windows() -> None:
     np.testing.assert_allclose(observed[:2], [np.exp(.20) - 1, np.exp(.63) - 1])
     assert observed[2] < 1e-15
     assert np.isnan(recent_return_volatility(np.ones(63))).all()
+
+
+def test_vector_recent_features_match_independent_windows() -> None:
+    rng = np.random.default_rng(221)
+    close = np.exp(np.cumsum(rng.normal(0, .02, 180)))
+    positions = np.asarray([63, 64, 90, 179], dtype=np.int64)
+    observed = recent_return_volatility_at_positions(close, positions)
+    expected = []
+    for position in positions:
+        window = close[position - 63:position + 1]
+        expected.append([
+            window[-1] / window[-21] - 1,
+            window[-1] / window[0] - 1,
+            np.std(np.diff(np.log(window[-21:])), ddof=1),
+        ])
+    np.testing.assert_allclose(observed, expected, rtol=0, atol=0)
 
 
 def test_random_neighbors_are_permutation_invariant_and_distinct() -> None:

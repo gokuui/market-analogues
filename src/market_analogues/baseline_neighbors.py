@@ -50,16 +50,36 @@ def baseline_neighbor_contract() -> dict[str, Any]:
 
 def recent_return_volatility(close: np.ndarray) -> np.ndarray:
     values = np.asarray(close, dtype=np.float64)
-    if values.ndim != 1 or len(values) < 64 or not np.isfinite(values[-64:]).all() \
-            or np.any(values[-64:] <= 0):
+    if values.ndim != 1 or len(values) < 64:
         return np.full(3, np.nan, dtype=np.float64)
-    log_returns = np.diff(np.log(values[-21:]))
-    output = np.asarray([
-        values[-1] / values[-21] - 1.0,
-        values[-1] / values[-64] - 1.0,
-        np.std(log_returns, ddof=1),
-    ], dtype=np.float64)
-    return output if np.isfinite(output).all() else np.full(3, np.nan)
+    return recent_return_volatility_at_positions(
+        values, np.asarray([len(values) - 1], dtype=np.int64),
+    )[0]
+
+
+def recent_return_volatility_at_positions(
+    close: np.ndarray, positions: np.ndarray,
+) -> np.ndarray:
+    values = np.asarray(close, dtype=np.float64)
+    requested = np.asarray(positions)
+    if values.ndim != 1 or requested.ndim != 1 \
+            or requested.dtype.kind not in "iu" \
+            or len(requested) and (int(np.min(requested)) < 63
+                                   or int(np.max(requested)) >= len(values)):
+        raise BaselineNeighborError("return/volatility feature positions differ")
+    if not len(requested):
+        return np.empty((0, 3), dtype=np.float64)
+    windows = np.lib.stride_tricks.sliding_window_view(values, 64)[requested - 63]
+    valid = np.isfinite(windows).all(axis=1) & (windows > 0).all(axis=1)
+    output = np.full((len(requested), 3), np.nan, dtype=np.float64)
+    if np.any(valid):
+        selected = windows[valid]
+        output[valid, 0] = selected[:, -1] / selected[:, -21] - 1.0
+        output[valid, 1] = selected[:, -1] / selected[:, 0] - 1.0
+        output[valid, 2] = np.std(
+            np.diff(np.log(selected[:, -21:]), axis=1), axis=1, ddof=1,
+        )
+    return output
 
 
 def _digest(domain: bytes, query_id: str, value: bytes) -> bytes:
