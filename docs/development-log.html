@@ -1569,6 +1569,13 @@
   <p><b>Repair:</b> V3 projects both packed lanes into one explicit 25-byte neighbor-metadata dtype before concatenation. A regression test combines real packed and overflow dtypes and asserts exact field order and values. Producer and independent verifier use the same physical projection format but retain separately implemented eligibility and neighbor calculations.</p>
   <p><b>Boundary:</b> No v2 neighbor result, outcome, label or final-period result was published or opened. V3 receives fresh preregistration, producer and verification paths.</p>
 </section>
+<section class="entry">
+  <h2>L-178 — Bounded real baseline producer and independent verifier pass</h2>
+  <p><b>Frozen lineage:</b> V3 implementation H0 <code>d556724</code> and sole-child preregistration H1 <code>b68a70a</code> bind 128 symbols, 70,040 main rows, 22 overflow rows, three probes and the v2 canonical feature-store contract. Selection digest remains <code>92128263…2bbb</code>.</p>
+  <p class="pass"><b>Producer:</b> In 31.55 seconds, every feature row was finite and physically aligned. Early/middle/late expose 44,889 / 60,553 / 69,007 eligible episodes. Deterministic-random and rank-L1 each returned 20 distinct-symbol neighbors for every probe, exactly unchanged by seeded shuffled traversal. Result digest is <code>ca909ff3…01cf</code>.</p>
+  <p class="pass"><b>Independent verification:</b> The verifier reconstructed all 70,062 feature rows directly from raw closes with zero binary64 differences and maximum delta <code>0.0</code>. Its independent causal masks, SHA selection and scalar ordinal-rank neighbors exactly reproduce every producer result. Verification digest is <code>93468169…4d76</code>.</p>
+  <p><b>Decision:</b> The full 3,786,156-row aligned feature-store build is authorized. Outcomes, labels and the final-period result remain unopened; production promotion remains false.</p>
+</section>
 </main>
 
 <section id="reproduce">
