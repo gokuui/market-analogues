@@ -1562,6 +1562,13 @@
   <p><b>Repair:</b> The feature-store contract is versioned to v2 and now emits an explicitly JSON-native field descriptor. A strict JSON round-trip test prevents recurrence. The v1 preregistration and Git lineage remain retained, while the v2 POC uses fresh preregistration, output and verification paths.</p>
   <p><b>Boundary:</b> No v1 result directory was created and no outcome or label was opened. V2 must pass the complete repository suite and receive a new H0/H1 freeze before execution.</p>
 </section>
+<section class="entry">
+  <h2>L-177 — V2 feature build exposes missing overflow metadata projection</h2>
+  <p><b>Retained refusal:</b> Replacement H0 <code>50a09a1</code> and sole-child H1 <code>a800400</code> passed canonical contract validation and built all 128 real feature shards. Before neighbor retrieval or terminal publication, NumPy refused to concatenate packed main and overflow records because their physical structured dtypes intentionally differ. The v2 directory retains its contract and completed shards but has no <code>RESULT.json</code>.</p>
+  <p><b>Diagnosis:</b> Both lanes expose the same four fields needed by baseline retrieval—episode ID, cutoff, symbol ID and quality tier—but the main lane also carries bound features while overflow is metadata-only. A bounded test covered each lane independently and missed their combined handoff.</p>
+  <p><b>Repair:</b> V3 projects both packed lanes into one explicit 25-byte neighbor-metadata dtype before concatenation. A regression test combines real packed and overflow dtypes and asserts exact field order and values. Producer and independent verifier use the same physical projection format but retain separately implemented eligibility and neighbor calculations.</p>
+  <p><b>Boundary:</b> No v2 neighbor result, outcome, label or final-period result was published or opened. V3 receives fresh preregistration, producer and verification paths.</p>
+</section>
 </main>
 
 <section id="reproduce">

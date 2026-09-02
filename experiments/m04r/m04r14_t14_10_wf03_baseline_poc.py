@@ -42,15 +42,21 @@ from market_analogues.types import InstrumentKey, stable_hash
 from experiments.m04r import m04r14_t14_10_wf03_feasibility as base
 
 
-SCHEMA = "m04r14-t14-10-wf03-baseline-poc-preregistration-v2"
+SCHEMA = "m04r14-t14-10-wf03-baseline-poc-preregistration-v3"
 OUTPUT_RELATIVE = Path(
-    "config/data/analogues/m04r14/t14-10-wf03-baseline-poc-v2"
+    "config/data/analogues/m04r14/t14-10-wf03-baseline-poc-v3"
 )
 PREREGISTRATION_RELATIVE = Path(
-    "experiments/m04r/m04r14_t14_10_wf03_baseline_poc_v2_preregistered.json"
+    "experiments/m04r/m04r14_t14_10_wf03_baseline_poc_v3_preregistered.json"
 )
 SYMBOLS = 128
 WORKERS = 8
+NEIGHBOR_RECORD_DTYPE = np.dtype([
+    ("episode_id", "V12"),
+    ("cutoff_ns", "<i8"),
+    ("symbol_id", "<u4"),
+    ("quality_tier", "u1"),
+])
 RUNTIME_FILES = (
     "experiments/m04r/m04r14_t14_10_wf03_baseline_poc.py",
     "experiments/m04r/m04r14_t14_10_wf03_feasibility.py",
@@ -93,6 +99,17 @@ def _row_digest(records: np.ndarray) -> str:
         "cutoff_ns": int(row["cutoff_ns"]),
         "quality_tier": int(row["quality_tier"]),
     } for row in records])
+
+
+def _neighbor_records(records: np.ndarray) -> np.ndarray:
+    required = set(NEIGHBOR_RECORD_DTYPE.fields or ())
+    if records.ndim != 1 or records.dtype.fields is None \
+            or not required.issubset(records.dtype.fields):
+        raise BaselinePocError("packed neighbor metadata differs")
+    output = np.empty(len(records), dtype=NEIGHBOR_RECORD_DTYPE)
+    for field in NEIGHBOR_RECORD_DTYPE.names or ():
+        output[field] = records[field]
+    return output
 
 
 def select_symbols(loaded: Any, earliest_query: Any, count: int = SYMBOLS) -> list[dict[str, Any]]:
@@ -184,7 +201,7 @@ def _build_symbol(task: tuple[dict[str, Any], str]) -> dict[str, Any]:
     _write_array(rows_path, main_features)
     _write_array(overflow_path, overflow_features)
     state = {
-        "schema_version": "m04r14-wf03-baseline-poc-shard-v2",
+        "schema_version": "m04r14-wf03-baseline-poc-shard-v3",
         "symbol": symbol,
         "symbol_id": symbol_id,
         "source_prefix": prefix,
@@ -224,16 +241,16 @@ def _load_arrays(
                 or metadata["overflow_sha256"] != base._sha(overflow_path) \
                 or len(main) != row["rows"] or len(overflow) != row["overflow_rows"]:
             raise BaselinePocError("baseline shard differs")
-        record_main.append(_slice(loaded.rows, symbol_id))
-        record_overflow.append(_slice(loaded.overflow, symbol_id))
+        record_main.append(_neighbor_records(_slice(loaded.rows, symbol_id)))
+        record_overflow.append(_neighbor_records(_slice(loaded.overflow, symbol_id)))
         feature_main.append(main)
         feature_overflow.append(overflow)
     concatenate = lambda rows, dtype: (
         np.concatenate(rows) if rows else np.empty(0, dtype=dtype)
     )
     return (
-        concatenate(record_main, loaded.rows.dtype),
-        concatenate(record_overflow, loaded.overflow.dtype),
+        concatenate(record_main, NEIGHBOR_RECORD_DTYPE),
+        concatenate(record_overflow, NEIGHBOR_RECORD_DTYPE),
         concatenate(feature_main, FEATURE_DTYPE),
         concatenate(feature_overflow, FEATURE_DTYPE),
     )
@@ -424,7 +441,7 @@ def execute(repository: Path, preregistration: Mapping[str, Any]) -> dict[str, A
     if not all(gates.values()):
         raise BaselinePocError("bounded baseline terminal gate differs")
     state = {
-        "schema_version": "m04r14-t14-10-wf03-baseline-poc-result-v2",
+        "schema_version": "m04r14-t14-10-wf03-baseline-poc-result-v3",
         "status": "complete",
         "passed": True,
         "gates": gates,

@@ -37,6 +37,17 @@ def test_slice_retains_physical_symbol_order() -> None:
     assert subject._slice(rows, 3)["cutoff_ns"].tolist() == [1]
 
 
+def test_main_and_overflow_project_to_one_neighbor_dtype() -> None:
+    main = _records(PACK_DTYPE, [(0, 1), (1, 2)])
+    overflow = _records(OVERFLOW_DTYPE, [(2, 3)])
+    combined = np.concatenate((
+        subject._neighbor_records(main), subject._neighbor_records(overflow),
+    ))
+    assert combined.dtype == subject.NEIGHBOR_RECORD_DTYPE
+    assert combined["symbol_id"].tolist() == [0, 1, 2]
+    assert combined["cutoff_ns"].tolist() == [1, 2, 3]
+
+
 def test_selection_is_deterministic_and_earliest_eligible() -> None:
     symbols = tuple(f"S{value:03d}" for value in range(30))
     rows = _records(PACK_DTYPE, [(value, 5) for value in range(30)])
