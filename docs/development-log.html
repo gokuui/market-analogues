@@ -1618,6 +1618,19 @@
   <p><b>Repair:</b> V2 uses an explicit query-symbol lookup returning an ID or <code>None</code>, with a regression test for both present and absent cases and fresh preregistration/output schemas. The partial v1 receipts remain retained and are not reused.</p>
   <p><b>Boundary:</b> No forward outcome, label or final-period result was accessed. V2 must pass its code gates and new H0/H1 freeze before execution.</p>
 </section>
+<section class="entry">
+  <h2>L-185 — All 3,936 baseline query receipts published</h2>
+  <p><b>Frozen lineage:</b> Repaired H0 <code>e88d001</code> and sole-child H1 <code>7e9cfdb</code> bind the verified 90.9-MB feature generation, registry digest, all ordered query IDs, eight-worker execution and absent-symbol semantics. V1's 245 partial receipts remain isolated and unused.</p>
+  <p class="pass"><b>Result:</b> V2 published all 3,936 create-only query receipts across 164 months in 628.0 seconds, including exactly 3,360 scored and 576 warmup queries. Eligible inventory ranges from 657,644 to 3,696,244 historical episodes. The shared rank index built in 6.27 seconds; result digest is <code>becb098e…1d5c</code>.</p>
+  <p><b>Boundary:</b> Receipts contain only query metadata, eligibility counts and 20 deterministic-random plus 20 return/volatility neighbors. No subsequent return, setup label, historical outcome or final-period outcome was opened. Independent batch verification is still required before baseline retrieval is marked complete.</p>
+</section>
+<section class="entry">
+  <h2>L-186 — Independent all-query baseline verifier prepared</h2>
+  <p><b>Complete structural audit:</b> The verifier revalidates the frozen producer Git blobs, its own clean runtime blob, full feature-generation content and every one of 3,936 case seals. All 157,440 neighbor references must resolve to the immutable packed inventory with matching symbol, cutoff at or before the query's eligibility boundary, distinct-symbol count and valid random order key or finite hexadecimal rank distance.</p>
+  <p><b>Overlap audit:</b> Any published neighbor sharing the query symbol triggers raw query reconstruction and must end strictly before the query window begins. This closes the same-symbol causal predicate without loading all query files unnecessarily.</p>
+  <p><b>Independent oracle:</b> Four deterministic queries per fold (24 total across warmup, development, three validation folds and final untouched charts) are recomputed with independently written causal masks and random selection plus the exhaustive sort-based rank implementation—not the indexed producer path. Query feature bytes, eligible counts and both complete 20-neighbor lists must match.</p>
+  <p><b>Boundary:</b> The verifier reads chart prefixes and retrieval receipts only. It has no outcome or label path and cannot authorize scoring unless every structural and stratified oracle gate passes.</p>
+</section>
 </main>
 
 <section id="reproduce">
