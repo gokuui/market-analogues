@@ -1604,6 +1604,13 @@
   <p><b>Rank optimization:</b> Three global feature/episode-ID orders are built once. Each query computes exact causal ordinal ranks through cumulative eligible masks, includes the query's insertion shift and ID tie rule, reduces to the exact minimum <code>(distance, episode ID)</code> per symbol and sorts only symbol winners. Random/tied synthetic data and shuffled traversal exactly match the exhaustive implementation.</p>
   <p class="pass"><b>Real parity and performance:</b> Building the reusable full index takes 5.51 seconds. The late indexed query takes 0.598 seconds versus 7.124 seconds exhaustive (11.9×), returning the exact same 20 neighbors. No approximation, outcome or label is involved.</p>
 </section>
+<section class="entry">
+  <h2>L-183 — All-3,936-query baseline batch prepared</h2>
+  <p><b>Architecture:</b> One parent loads the independently verified packed/feature generations and builds three immutable global rank orders, then eight forked workers reconstruct the 3,936 frozen registry queries. Each worker applies the exact 60-session causal gap and emits 20 distinct deterministic-random plus 20 distinct indexed rank-L1 neighbors into a create-only sealed query receipt.</p>
+  <p><b>Durability:</b> Query receipts bind case/query identity and feature generation. Resume accepts only a valid seal with exact upstream identity and neighbor counts. Atomic progress advances every 24 completed queries (one month-equivalent); the root terminal commits ordered case seals/hashes without embedding outcomes.</p>
+  <p class="pass"><b>Real worker POC:</b> The actual first 2012 registry query builds in 0.644 seconds after a 6.50-second full rank index, exposes 1,671,846 eligible episodes, returns 20 neighbors from both methods and reloads the same sealed receipt on resume. Eight focused contract/parity tests pass.</p>
+  <p><b>Boundary:</b> This batch includes warmup, development, validation and final query charts but opens no subsequent return, label or setup outcome. The result authorizes only independent retrieval verification, not outcome scoring.</p>
+</section>
 </main>
 
 <section id="reproduce">
