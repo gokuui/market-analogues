@@ -1688,6 +1688,12 @@
   <p class="fail"><b>Measured rejection:</b> The frozen OHAI result remained hexadecimal-exact, but elapsed time regressed to 291.5 seconds. Only 529 same-symbol rows and 1,318 globally bounded rows were avoided, while repeated per-symbol projection across batches dominated execution. The experiment therefore failed its performance purpose.</p>
   <p><b>Disposition:</b> The progressive implementation was fully removed. Exact completion remains one grouped pass over every candidate at or below the certified seed threshold. This negative result is retained here to prevent an unsupported retry.</p>
 </section>
+<section class="entry">
+  <h2>L-196 — Durable all-query combined retrieval producer prepared</h2>
+  <p><b>Execution contract:</b> The 3,936 frozen registry queries run sequentially, each using all eight exposed CPUs, one inventory-sized immutable source cache and one batch-lifetime prepared numeric-array cache. The exact seed is frozen at 2,048 rows from the authority-exact timing ladder. Each completed query is published as a create-only sealed receipt and progress is atomically replaced after every query, so interruption can lose only the active query.</p>
+  <p><b>Correctness boundaries:</b> Resume independently validates each case seal, query/fold/upstream identities, certificate count relations, strict rigid and combined bound closure, exact distinct-symbol ordering, final threshold, and a reconstructed staged-search result digest. Packed resident and DTW file identities are rechecked after every newly computed case; any identity drift or process swap refuses publication. Runtime dependencies include no outcome or label module.</p>
+  <p class="pass"><b>Pre-scale evidence:</b> Ten dedicated contract/refusal tests plus the staged-search tests pass. The receipt validator also accepts the real frozen OHAI certificate and independently reconstructs authority result digest <code>7af4efe6…7f46</code>. The complete repository suite passes 999/999 and the HTML/diff checks are clean. H0/H1 freezing remains required before launch.</p>
+</section>
 </main>
 
 <section id="reproduce">
