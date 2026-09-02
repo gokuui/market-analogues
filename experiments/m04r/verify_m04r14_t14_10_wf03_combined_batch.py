@@ -28,7 +28,7 @@ from experiments.m04r import m04r14_t14_10_wf03b_dtw_component_ladder as ladder
 
 OUTPUT_RELATIVE = Path(
     "config/data/analogues/m04r14/"
-    "t14-10-wf03-combined-batch-v2-verification"
+    "t14-10-wf03-combined-batch-v3-verification"
 )
 AUTHORITY_RELATIVE = Path(
     "config/data/analogues/m04r14/t14-10-wf03b-dtw-component-ladder-v1/"
@@ -102,7 +102,7 @@ def select_rerun_sample(rows: Sequence[Mapping[str, Any]]) -> list[str]:
     for fold in sorted(grouped):
         ordered = sorted(grouped[fold], key=lambda row: (
             stable_hash({
-                "purpose": "wf03-combined-independent-rerun-v2",
+                "purpose": "wf03-combined-independent-rerun-v3",
                 "fold": fold, "query_id": row["episode_id"],
             }),
             row["episode_id"],
@@ -144,7 +144,7 @@ def _independent_case(
     value: Mapping[str, Any], row: Mapping[str, Any],
     preregistration: Mapping[str, Any], records: np.ndarray,
     symbols: tuple[str, ...], id_order: np.ndarray, sorted_ids: np.ndarray,
-    source: Any,
+    source: Any, attempts: Mapping[str, Mapping[str, Any]],
 ) -> dict[str, Any]:
     if not _seal_valid(value, "case_digest"):
         raise CombinedBatchVerificationError("combined case seal differs")
@@ -155,14 +155,18 @@ def _independent_case(
         semantic = {
             "query_id": value["query_id"], "case_id": value["case_id"],
             "packed_generation_id": value["packed_generation_id"],
+            "packed_content_digest": value["packed_content_digest"],
             "dtw_generation_id": value["dtw_generation_id"],
+            "dtw_semantic_identity_digest": value[
+                "dtw_semantic_identity_digest"
+            ],
             "certificate_result_digest": certificate["result_digest"],
             "matches": matches,
         }
         rigid_minimum = certificate["minimum_rigid_pruned"]
         combined_minimum = certificate["minimum_combined_pruned"]
         predicates = (
-            value["schema_version"] == "m04r14-wf03-combined-batch-case-v2",
+            value["schema_version"] == "m04r14-wf03-combined-batch-case-v3",
             value["status"] == "complete",
             value["query_id"] == row["episode_id"],
             value["case_id"] == row["case_id"],
@@ -173,7 +177,20 @@ def _independent_case(
             value["preregistration_digest"]
                 == preregistration["preregistration_digest"],
             value["packed_generation_id"] == base.GENERATION_ID,
+            value["packed_content_digest"]
+                == preregistration["inputs"]["packed_content_digest"],
             value["dtw_generation_id"] == ladder.DTW_GENERATION_ID,
+            value["dtw_semantic_identity_digest"]
+                == preregistration["inputs"]["dtw_semantic_identity_digest"],
+            value["attempt_id"] in attempts,
+            value["resident_attempt_lease_digest"]
+                == attempts[value["attempt_id"]][
+                    "resident_attempt_lease_digest"
+                ],
+            value["dtw_attempt_identity_digest"]
+                == attempts[value["attempt_id"]][
+                    "dtw_attempt_identity_digest"
+                ],
             value["contract_digest"] == preregistration["contract"]["digest"],
             value["outcomes_or_labels_used"] is False,
             value["historical_walk_forward_query_outcomes_opened"] is False,
@@ -260,6 +277,69 @@ def _independent_case(
     }
 
 
+def _attempt_bindings(
+    root: Path, preregistration: Mapping[str, Any],
+) -> dict[str, dict[str, Any]]:
+    attempts_root = root / "attempts"
+    if attempts_root.is_symlink() or not attempts_root.is_dir():
+        raise CombinedBatchVerificationError("combined attempts root differs")
+    output = {}
+    for path in attempts_root.iterdir():
+        try:
+            ordinal = int(path.name.removeprefix("attempt-"))
+        except ValueError:
+            ordinal = 0
+        if path.is_symlink() or not path.is_dir() or ordinal < 1 \
+                or path.name != f"attempt-{ordinal:04d}":
+            raise CombinedBatchVerificationError("combined attempt layout differs")
+        names = {value.name for value in path.iterdir()}
+        unexpected = names - {
+            "RUN_STARTED.json", "INTERRUPTED.json", "COMPLETE.json",
+        }
+        if unexpected and not all(name.startswith(".wf03-") for name in unexpected):
+            raise CombinedBatchVerificationError("combined attempt files differ")
+        started_path = path / "RUN_STARTED.json"
+        if not started_path.exists():
+            if not names or unexpected == names:
+                continue
+            raise CombinedBatchVerificationError("combined attempt start is absent")
+        started = base._read(started_path)
+        if not _seal_valid(started, "attempt_digest") or not all((
+            started.get("schema_version")
+                == "m04r14-wf03-combined-batch-attempt-v3",
+            started.get("status") == "running",
+            started.get("attempt_id") == path.name,
+            started.get("preregistration_digest")
+                == preregistration["preregistration_digest"],
+            started.get("packed_content_digest")
+                == preregistration["inputs"]["packed_content_digest"],
+            started.get("dtw_semantic_identity_digest")
+                == preregistration["inputs"]["dtw_semantic_identity_digest"],
+        )):
+            raise CombinedBatchVerificationError("combined attempt start differs")
+        terminals = [
+            candidate for candidate in ("INTERRUPTED.json", "COMPLETE.json")
+            if (path / candidate).exists()
+        ]
+        if len(terminals) > 1:
+            raise CombinedBatchVerificationError("combined attempt terminals differ")
+        if terminals:
+            terminal = base._read(path / terminals[0])
+            if not _seal_valid(terminal, "attempt_digest") \
+                    or terminal.get("attempt_id") != path.name \
+                    or terminal.get("status") != (
+                        "interrupted" if terminals[0] == "INTERRUPTED.json"
+                        else "complete"
+                    ):
+                raise CombinedBatchVerificationError(
+                    "combined attempt terminal differs"
+                )
+        output[path.name] = started
+    if not output:
+        raise CombinedBatchVerificationError("combined attempts are absent")
+    return output
+
+
 def _rerun_matches(result: Any) -> list[dict[str, Any]]:
     return [{
         "episode_id": match.episode_key.id,
@@ -335,6 +415,8 @@ def verify(repository: Path) -> dict[str, Any]:
         raise CombinedBatchVerificationError("combined producer contract differs")
     result = base._read(root / "RESULT.json")
     if not _seal_valid(result, "result_digest") or not all((
+        result.get("schema_version")
+            == "m04r14-t14-10-wf03-combined-batch-result-v3",
         result.get("status") == "complete", result.get("passed") is True,
         result.get("queries") == 3_936,
         result.get("scored_queries") == 3_360,
@@ -346,7 +428,9 @@ def verify(repository: Path) -> dict[str, Any]:
     )):
         raise CombinedBatchVerificationError("combined producer terminal differs")
 
-    resident = base._resident()
+    resident = producer._ensure_resident(
+        repository, preregistration["inputs"]["packed_content_digest"],
+    )
     packed = load_packed_generation(
         Path(resident["store_root"]), base.GENERATION_ID,
         expected_provenance_digest=base.PROVENANCE_DIGEST,
@@ -364,6 +448,22 @@ def verify(repository: Path) -> dict[str, Any]:
         load_config(repository / base.CONFIG_RELATIVE).datasets["nasdaq"]
     )
     cases_root = root / "cases"
+    attempts = _attempt_bindings(root, preregistration)
+    expected_case_names = {
+        f"{row['episode_id']}.json" for row in registry["queries_data"]
+    }
+    observed_case_paths = [
+        path for path in cases_root.iterdir()
+        if not path.name.startswith(".wf03-")
+    ]
+    if {path.name for path in observed_case_paths} != expected_case_names \
+            or any(path.is_symlink() or not path.is_file()
+                   for path in observed_case_paths) \
+            or result.get("terminal_attempt_id") not in attempts \
+            or result.get("attempts") != len(tuple(
+                (root / "attempts").iterdir()
+            )):
+        raise CombinedBatchVerificationError("combined terminal layout differs")
     observations = []
     case_manifest = []
     semantic_digests = []
@@ -372,7 +472,7 @@ def verify(repository: Path) -> dict[str, Any]:
         value = base._read(path)
         observations.append(_independent_case(
             value, row, preregistration, records, packed.symbols,
-            id_order, sorted_ids, source,
+            id_order, sorted_ids, source, attempts,
         ))
         case_manifest.append({
             "query_id": value["query_id"], "case_digest": value["case_digest"],
@@ -419,7 +519,7 @@ def verify(repository: Path) -> dict[str, Any]:
         "outcomes_or_labels_excluded": True,
     }
     state = {
-        "schema_version": "m04r14-t14-10-wf03-combined-batch-verification-v2",
+        "schema_version": "m04r14-t14-10-wf03-combined-batch-verification-v3",
         "status": "complete", "passed": all(gates.values()), "gates": gates,
         "producer_result_digest": result["result_digest"],
         "preregistration_digest": preregistration["preregistration_digest"],

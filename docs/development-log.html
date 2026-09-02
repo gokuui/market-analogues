@@ -1707,6 +1707,13 @@
   <p class="pass"><b>Exactness and performance:</b> All 30 focused exact-batch/staged-search tests pass. A 50,000-row missing-data interpolation gate is bit-for-bit equal and 3.64× faster. Frozen OHAI cold/warm searches are authority-exact with the same deterministic 2,048-seed digest; cold time is 87.0 seconds and warm time is 48.5 seconds, versus 62.7 seconds for the prior warm path—a 23% end-to-end improvement. The expanded focused producer/verifier/kernel matrix passes 45/45 and the complete repository suite passes 1,010/1,010.</p>
   <p><b>V1 disposition:</b> The initial full producer was intentionally interrupted after 12 create-only receipts and 953.9 seconds when observed throughput projected to several days. Its tree remains retained as partial evidence and will not be resumed or relabeled. V2 uses a fresh output and preregistration lineage; no v1 receipt is reused.</p>
 </section>
+<section class="entry">
+  <h2>L-199 — All-query combined retrieval made restart- and reboot-safe</h2>
+  <p><b>V2 flaw and disposition:</b> Review found that v2 preregistration bound the volatile tmpfs READY digest and physical file identities. A process restart on the same host was safe, but a host reboot removes <code>/dev/shm</code> and necessarily creates new paths/inodes, so valid completed receipts could not be resumed under their frozen contract. V2 was intentionally stopped after four sealed cases and 345.1 seconds. Those receipts remain retained as partial evidence and are neither relabeled nor reused by v3.</p>
+  <p><b>V3 recovery contract:</b> Preregistration now binds durable packed and DTW semantic content. Every launch either reuses an exactly unchanged, previously fully validated physical lease; fully validates an untrusted existing mirror; completes validation after a generation was atomically copied but READY was not published; or reconstructs the missing tmpfs mirror from the verified durable generation. Correctly named abandoned copy staging is reclaimed before capacity checks, while linked, malformed or unrecognized entries fail closed. Each launch has a create-only attempt receipt, and every case records its originating attempt lease. Resumption validates the complete case seal, semantic content and attempt lineage but permits physical identities to differ across attempts. A nonblocking OS producer lock refuses concurrent launches and is automatically released by process death or reboot.</p>
+  <p><b>Attempt-local safety:</b> Packed and DTW physical identities are checked after every newly computed query. Any in-attempt path, device, inode, size, timestamp or mode drift refuses case publication. Semantic case digests deliberately exclude attempt-local physical identities, so the same exact retrieval remains semantically stable across a reboot. Outcome, label and final-period data remain unopened.</p>
+  <p class="pass"><b>Correctness and measured performance:</b> An end-to-end synthetic interruption test proves that attempt 2 can use a different resident lease, preserve attempt 1's sealed case byte-for-byte, compute only the missing case and publish the aggregate. Real-data full validation of the 9.2-GB generation passed content, record, lease and DTW identity gates in 204.0 seconds (164.7 resident, 3.2 packed records, 36.2 DTW). The common unchanged-lease restart path completed its generation preflight in 0.097 seconds. All 40 focused tests and all 1,018 repository tests pass; <code>git diff --check</code> is clean. Retrieval math, pruning, top-20 ordering and numeric tolerance are unchanged.</p>
+</section>
 </main>
 
 <section id="reproduce">
@@ -1852,6 +1859,13 @@ git commit -m "Preregister M04R-11 candidate v2"
 # Commit the verifier implementation before its sole-child preregistration.
 .venv/bin/python -m experiments.m04r.verify_m04r14_t14_10_wf03b_dtw_store_full preregister --repository /home/vinay/code/market-analogues
 .venv/bin/python -m experiments.m04r.verify_m04r14_t14_10_wf03b_dtw_store_full run --repository /home/vinay/code/market-analogues</code></pre>
+  <pre><code># T14-10 all-query combined v3: v1/v2 partial trees are retained and never reused.
+# Commit implementation, tests and this log as clean H0 before preregistration.
+.venv/bin/python -m experiments.m04r.m04r14_t14_10_wf03_combined_batch preregister --repository /home/vinay/code/market-analogues
+# Commit exactly experiments/m04r/m04r14_t14_10_wf03_combined_batch_v3_preregistered.json as sole-child H1.
+.venv/bin/python -m experiments.m04r.m04r14_t14_10_wf03_combined_batch run --repository /home/vinay/code/market-analogues
+# The same run command resumes after a process restart or host reboot; it validates/rebuilds tmpfs automatically.
+.venv/bin/python -m experiments.m04r.verify_m04r14_t14_10_wf03_combined_batch --repository /home/vinay/code/market-analogues</code></pre>
   <p class="muted">Source datasets are read-only. Generated artifacts live under the configured artifact directory and are intentionally excluded from Git.</p>
 </section>
 </body>

@@ -7,6 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from experiments.m04r import verify_m04r14_t14_10_wf03_combined_batch as subject
+from experiments.m04r import m04r14_t14_10_wf03_feasibility as base
 
 
 def test_rerun_sample_is_deterministic_and_fold_stratified() -> None:
@@ -76,3 +77,35 @@ def test_certificate_digest_is_sensitive_to_matches_and_bounds() -> None:
     assert subject._certificate_digest(certificate, changed_matches) != first
     certificate["rigid_bound_admitted"] = 79
     assert subject._certificate_digest(certificate, matches) != first
+
+
+def test_attempt_bindings_accept_restart_with_new_physical_lease(
+    tmp_path: Path,
+) -> None:
+    preregistration = {
+        "preregistration_digest": "a" * 64,
+        "inputs": {
+            "packed_content_digest": "b" * 64,
+            "dtw_semantic_identity_digest": "c" * 64,
+        },
+    }
+    attempts = tmp_path / "attempts"
+    (attempts / "attempt-0001").mkdir(parents=True)
+    (attempts / "attempt-0002").mkdir()
+    (attempts / "attempt-0003").mkdir()
+    for number, lease in ((1, "d" * 64), (2, "e" * 64)):
+        path = attempts / f"attempt-{number:04d}"
+        started = base._sealed({
+            "schema_version": "m04r14-wf03-combined-batch-attempt-v3",
+            "status": "running", "attempt_id": path.name,
+            "preregistration_digest": "a" * 64,
+            "packed_content_digest": "b" * 64,
+            "dtw_semantic_identity_digest": "c" * 64,
+            "resident_attempt_lease_digest": lease,
+            "dtw_attempt_identity_digest": str(number) * 64,
+        }, "attempt_digest")
+        base._atomic(path / "RUN_STARTED.json", started)
+    bindings = subject._attempt_bindings(tmp_path, preregistration)
+    assert set(bindings) == {"attempt-0001", "attempt-0002"}
+    assert bindings["attempt-0001"]["resident_attempt_lease_digest"] \
+        != bindings["attempt-0002"]["resident_attempt_lease_digest"]

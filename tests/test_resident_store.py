@@ -136,6 +136,50 @@ def test_validate_existing_seals_without_recopy(tmp_path: Path) -> None:
     assert rows.stat().st_mtime_ns == original
 
 
+def test_copy_reclaims_only_valid_abandoned_staging_directory(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source"
+    resident = tmp_path / "resident"
+    resident.mkdir()
+    generation, provenance = _generation(source)
+    info = _mountinfo(tmp_path, resident)
+    mirror = resident / "mirror"
+    abandoned = mirror / ".building" / ("a" * 32)
+    abandoned.mkdir(parents=True)
+    (abandoned / "partial.bin").write_bytes(b"partial")
+    result = prepare_resident_mirror(
+        source, mirror, generation,
+        expected_provenance_digest=provenance, reserve_bytes=0,
+        mountinfo_path=info,
+    )
+    assert result["mode"] == "copy-and-validate"
+    assert not abandoned.exists()
+    assert (mirror / "READY.json").is_file()
+
+
+def test_copy_refuses_unrecognized_staging_instead_of_deleting_it(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source"
+    resident = tmp_path / "resident"
+    resident.mkdir()
+    generation, provenance = _generation(source)
+    info = _mountinfo(tmp_path, resident)
+    mirror = resident / "mirror"
+    unexpected = mirror / ".building" / "do-not-delete"
+    unexpected.mkdir(parents=True)
+    marker = unexpected / "marker"
+    marker.write_text("preserve")
+    with pytest.raises(ResidentStoreError, match="unexpected entry"):
+        prepare_resident_mirror(
+            source, mirror, generation,
+            expected_provenance_digest=provenance, reserve_bytes=0,
+            mountinfo_path=info,
+        )
+    assert marker.read_text() == "preserve"
+
+
 @pytest.mark.parametrize(
     "failure", ["non_tmpfs", "capacity", "provenance", "tamper"],
 )

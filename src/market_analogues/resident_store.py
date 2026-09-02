@@ -302,6 +302,22 @@ def _exclusive_lock(mirror: Path) -> Iterator[None]:
         os.close(descriptor)
 
 
+def _reclaim_abandoned_builds(mirror_store: Path) -> None:
+    build_parent = mirror_store.parent / ".building"
+    if build_parent.exists() or build_parent.is_symlink():
+        _plain_directory(build_parent, mirror_store.parent)
+        for abandoned in build_parent.iterdir():
+            if (
+                len(abandoned.name) != 32
+                or any(value not in _HEX for value in abandoned.name)
+            ):
+                raise ResidentStoreError(
+                    "resident staging contains an unexpected entry"
+                )
+            _plain_directory(abandoned, build_parent)
+            shutil.rmtree(abandoned)
+
+
 def _copy_generation(
     source_store: Path, mirror_store: Path, generation_id: str,
     manifest: Mapping[str, Any],
@@ -309,10 +325,9 @@ def _copy_generation(
     final = mirror_store / "generations" / generation_id
     if final.exists() or final.is_symlink():
         raise ResidentStoreError("generation exists; use validate-existing mode")
+    _reclaim_abandoned_builds(mirror_store)
     build_parent = mirror_store.parent / ".building"
-    if build_parent.exists() or build_parent.is_symlink():
-        _plain_directory(build_parent, mirror_store.parent)
-    else:
+    if not build_parent.exists():
         build_parent.mkdir()
     build_root = build_parent / uuid4().hex
     staged = build_root / "store" / "generations" / generation_id
@@ -653,13 +668,15 @@ def _prepare_observed(
             int(manifest["rows_bytes"]) + int(manifest["overflow_bytes"])
             + source_files["manifest"].stat().st_size
         )
+        store, ready_path = mirror / "store", mirror / "READY.json"
+        if not validate_existing:
+            _reclaim_abandoned_builds(store)
         capacity_before = _capacity_binding(mirror)
         required = physical_bytes + reserve_bytes
         if capacity_before["capacity_bytes"] < required:
             raise ResidentStoreError("tmpfs logical capacity is insufficient")
         if validate_existing and capacity_before["available_bytes"] < reserve_bytes:
             raise ResidentStoreError("tmpfs available capacity is below caller reserve")
-        store, ready_path = mirror / "store", mirror / "READY.json"
         if ready_path.is_symlink():
             raise ResidentStoreError("resident READY must not be a symlink")
         if not validate_existing and ready_path.exists():

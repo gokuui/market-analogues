@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import asdict
+import fcntl
 from hashlib import sha256
 import json
 import os
@@ -21,20 +22,31 @@ from market_analogues.dtw_component_search import (
     certified_staged_dtw_component_search,
     staged_dtw_component_search_contract,
 )
+from market_analogues.dtw_sample_store import load_dtw_sample_generation
 from market_analogues.episodes import build_episode
+from market_analogues.packed_bound_store import load_packed_generation
+from market_analogues.resident_store import (
+    CONTENT_SCHEMA_VERSION,
+    observe_ready_strict, prepare_resident_mirror_observed,
+    resident_file_identity_lease,
+)
 from market_analogues.types import InstrumentKey, SearchQuery, stable_hash
 
 from experiments.m04r import m04r14_t14_10_wf03_feasibility as base
 from experiments.m04r import m04r14_t14_10_wf03b_dtw_component_ladder as ladder
 
 
-SCHEMA = "m04r14-t14-10-wf03-combined-batch-preregistration-v2"
+SCHEMA = "m04r14-t14-10-wf03-combined-batch-preregistration-v3"
 OUTPUT_RELATIVE = Path(
-    "config/data/analogues/m04r14/t14-10-wf03-combined-batch-v2"
+    "config/data/analogues/m04r14/t14-10-wf03-combined-batch-v3"
 )
 PREREGISTRATION_RELATIVE = Path(
-    "experiments/m04r/m04r14_t14_10_wf03_combined_batch_v2_preregistered.json"
+    "experiments/m04r/m04r14_t14_10_wf03_combined_batch_v3_preregistered.json"
 )
+PACKED_SOURCE_STORE_RELATIVE = Path(
+    "config/data/analogues/poc/m04r/packed-bound-full/store"
+)
+RESIDENT_RESERVE_BYTES = 1024 ** 3
 BASELINE_VERIFICATION_RELATIVE = Path(
     "config/data/analogues/m04r14/"
     "t14-10-wf03-baseline-batch-v2-verification/VERIFIED.json"
@@ -57,12 +69,28 @@ RUNTIME_FILES = (
     "src/market_analogues/packed_bound_search.py",
     "src/market_analogues/packed_bound_store.py",
     "src/market_analogues/representation.py",
+    "src/market_analogues/resident_store.py",
     "src/market_analogues/search.py",
 )
 
 
 class CombinedBatchError(RuntimeError):
     pass
+
+
+def _is_digest(value: Any) -> bool:
+    return type(value) is str and len(value) == 64 \
+        and set(value).issubset("0123456789abcdef")
+
+
+def _is_attempt_id(value: Any) -> bool:
+    if type(value) is not str or not value.startswith("attempt-"):
+        return False
+    try:
+        ordinal = int(value.removeprefix("attempt-"))
+    except ValueError:
+        return False
+    return ordinal >= 1 and value == f"attempt-{ordinal:04d}"
 
 
 def _git(repository: Path, *args: str) -> str:
@@ -104,7 +132,7 @@ def _file_identity(path: Path) -> dict[str, int | str]:
     }
 
 
-def _dtw_identity(repository: Path) -> dict[str, Any]:
+def _dtw_physical_identity(repository: Path) -> dict[str, Any]:
     root = repository / ladder.DTW_ROOT_RELATIVE / "generations" \
         / ladder.DTW_GENERATION_ID
     files = {
@@ -112,6 +140,139 @@ def _dtw_identity(repository: Path) -> dict[str, Any]:
         for name in ("manifest.json", "dtw-samples.bin", "dtw-overflow-samples.bin")
     }
     return {"files": files, "digest": stable_hash(files)}
+
+
+def _packed_semantic_identity(repository: Path) -> dict[str, Any]:
+    root = repository / PACKED_SOURCE_STORE_RELATIVE / "generations" \
+        / base.GENERATION_ID
+    manifest_path = root / "manifest.json"
+    manifest = base._read(manifest_path)
+    names = {
+        "manifest": {
+            "bytes": manifest_path.stat().st_size,
+            "sha256": base._sha(manifest_path),
+        },
+        "rows": {
+            "bytes": int(manifest["rows_bytes"]),
+            "sha256": str(manifest["rows_sha256"]),
+        },
+        "overflow": {
+            "bytes": int(manifest["overflow_bytes"]),
+            "sha256": str(manifest["overflow_sha256"]),
+        },
+    }
+    content = {
+        "schema_version": CONTENT_SCHEMA_VERSION,
+        "generation_id": base.GENERATION_ID,
+        "provenance_digest": str(manifest["provenance_digest"]),
+        "manifest_digest": str(manifest["manifest_digest"]),
+        "pack_contract_digest": str(manifest["pack_contract_digest"]),
+        "quantized_bound_contract_digest": str(
+            manifest["quantized_bound_contract_digest"]
+        ),
+        "physical_generation_bytes": sum(
+            int(value["bytes"]) for value in names.values()
+        ),
+        "source_files": names,
+        "mirror_files": names,
+    }
+    if content["generation_id"] != content["manifest_digest"] \
+            or content["provenance_digest"] != base.PROVENANCE_DIGEST:
+        raise CombinedBatchError("durable packed semantic identity differs")
+    return {"content": content, "content_digest": stable_hash(content)}
+
+
+def _dtw_semantic_identity(repository: Path) -> dict[str, Any]:
+    root = repository / ladder.DTW_ROOT_RELATIVE / "generations" \
+        / ladder.DTW_GENERATION_ID
+    manifest_path = root / "manifest.json"
+    manifest = base._read(manifest_path)
+    state = {
+        "manifest_sha256": base._sha(manifest_path),
+        "manifest_digest": manifest["manifest_digest"],
+        "provenance_digest": manifest["provenance_digest"],
+        "contract_digest": manifest["contract_digest"],
+        "rows_bytes": manifest["rows_bytes"],
+        "rows_sha256": manifest["rows_sha256"],
+        "overflow_bytes": manifest["overflow_bytes"],
+        "overflow_sha256": manifest["overflow_sha256"],
+        "packed_generation": manifest["packed_generation"],
+    }
+    if state["manifest_digest"] != ladder.DTW_GENERATION_ID \
+            or state["packed_generation"]["manifest_digest"] != base.GENERATION_ID:
+        raise CombinedBatchError("durable DTW semantic identity differs")
+    return {"state": state, "digest": stable_hash(state)}
+
+
+def _ensure_resident(
+    repository: Path, expected_content_digest: str,
+    trusted_attempts: Mapping[str, Mapping[str, Any]] | None = None,
+) -> dict[str, Any]:
+    source_store = repository / PACKED_SOURCE_STORE_RELATIVE
+    ready_path = base.RESIDENT_ROOT / "READY.json"
+    generation_path = (
+        base.RESIDENT_ROOT / "store" / "generations" / base.GENERATION_ID
+    )
+    validate_existing = (
+        ready_path.exists() and not ready_path.is_symlink()
+    ) or (generation_path.exists() and not generation_path.is_symlink())
+    if ready_path.exists() and not ready_path.is_symlink():
+        observed = observe_ready_strict(ready_path)
+        lease = resident_file_identity_lease(ready_path)
+        trusted = next((
+            (attempt_id, attempt) for attempt_id, attempt in (
+                trusted_attempts or {}
+            ).items()
+            if attempt.get("packed_content_digest") == expected_content_digest
+            and attempt.get("resident_ready_digest") == observed["ready_digest"]
+            and attempt.get("resident_attempt_lease_digest")
+                == lease["lease_digest"]
+        ), None)
+        if trusted is not None and observed["content_digest"] \
+                == lease["content_digest"] == expected_content_digest:
+            validation = {
+                "schema_version": "m04r14-resident-lease-reuse-observation-v1",
+                "trusted_attempt_id": trusted[0],
+                "content_digest": expected_content_digest,
+                "ready_digest": observed["ready_digest"],
+                "lease_digest": lease["lease_digest"],
+            }
+            validation["observation_digest"] = stable_hash(validation)
+            return {
+                "mode": "reused-fully-validated-unchanged-lease",
+                "root": str(base.RESIDENT_ROOT.resolve()),
+                "store_root": str((base.RESIDENT_ROOT / "store").resolve()),
+                "content_digest": expected_content_digest,
+                "ready_digest": observed["ready_digest"],
+                "ready_file_sha256": observed["ready_file_sha256"],
+                "lease": lease,
+                "validation_observation": validation,
+            }
+    ready, observation = prepare_resident_mirror_observed(
+        source_store, base.RESIDENT_ROOT, base.GENERATION_ID,
+        expected_provenance_digest=base.PROVENANCE_DIGEST,
+        reserve_bytes=RESIDENT_RESERVE_BYTES,
+        validate_existing=validate_existing,
+    )
+    observed = observe_ready_strict(ready_path)
+    lease = resident_file_identity_lease(ready_path)
+    if ready["content_digest"] != expected_content_digest \
+            or observed["content_digest"] != expected_content_digest \
+            or lease["content_digest"] != expected_content_digest:
+        raise CombinedBatchError("restored resident semantic content differs")
+    return {
+        "mode": (
+            "validated-existing" if validate_existing
+            else "restored-after-restart"
+        ),
+        "root": str(base.RESIDENT_ROOT.resolve()),
+        "store_root": str((base.RESIDENT_ROOT / "store").resolve()),
+        "content_digest": expected_content_digest,
+        "ready_digest": observed["ready_digest"],
+        "ready_file_sha256": observed["ready_file_sha256"],
+        "lease": lease,
+        "validation_observation": observation,
+    }
 
 
 def _verified_inputs(repository: Path) -> tuple[dict[str, Any], dict[str, Any]]:
@@ -142,8 +303,8 @@ def build_preregistration(repository: Path) -> dict[str, Any]:
     registry, _by_id = base._registry(repository)
     dtw_result, dtw_verification = _verified_inputs(repository)
     baseline_verification = base._read(repository / BASELINE_VERIFICATION_RELATIVE)
-    resident = base._resident()
-    dtw_identity = _dtw_identity(repository)
+    packed_semantic = _packed_semantic_identity(repository)
+    dtw_semantic = _dtw_semantic_identity(repository)
     rows = registry["queries_data"]
     head = _git(repository, "rev-parse", "HEAD")
     state = {
@@ -161,15 +322,14 @@ def build_preregistration(repository: Path) -> dict[str, Any]:
             ]),
             "packed_generation_id": base.GENERATION_ID,
             "packed_provenance_digest": base.PROVENANCE_DIGEST,
-            "resident_content_digest": resident["content_digest"],
-            "resident_ready_digest": resident["ready_digest"],
+            "packed_content_digest": packed_semantic["content_digest"],
             "dtw_generation_id": ladder.DTW_GENERATION_ID,
             "dtw_result_digest": dtw_result["result_digest"],
             "dtw_verification_digest": dtw_verification["verification_digest"],
             "dtw_verification_sha256": base._sha(
                 repository / ladder.DTW_VERIFICATION_RELATIVE
             ),
-            "dtw_file_identity_digest": dtw_identity["digest"],
+            "dtw_semantic_identity_digest": dtw_semantic["digest"],
             "baseline_verification_digest": baseline_verification[
                 "verification_digest"
             ],
@@ -196,14 +356,23 @@ def build_preregistration(repository: Path) -> dict[str, Any]:
             "tolerance_hex": TOLERANCE.hex(),
             "case_publication": "create-only sealed query JSON",
             "progress_publication": "atomic after every completed query",
-            "resume": "accept only fully validated sealed query receipts",
+            "attempt_publication": "create-only per-process attempt receipts",
+            "resident_restore": (
+                "fully validate existing tmpfs mirror or reconstruct it from "
+                "the fully verified durable packed generation"
+            ),
+            "resume": (
+                "accept only fully validated sealed query receipts bound to "
+                "durable semantic content; physical leases are attempt-local"
+            ),
             "output_root": str(output.resolve()),
         },
         "gates": {
             "all_query_certificates_close": True,
             "twenty_distinct_symbols_per_query": True,
             "strict_bound_closure": True,
-            "resident_and_dtw_file_identity_unchanged": True,
+            "durable_packed_and_dtw_semantic_content_unchanged": True,
+            "resident_and_dtw_physical_identity_unchanged_within_attempt": True,
             "zero_process_swap": True,
             "outcomes_or_labels_excluded": True,
             "independent_verification_required": True,
@@ -225,32 +394,52 @@ def validate_preregistration(
     registry, by_id = base._registry(repository)
     dtw_result, dtw_verification = _verified_inputs(repository)
     baseline_verification = base._read(repository / BASELINE_VERIFICATION_RELATIVE)
-    resident = base._resident()
+    packed_semantic = _packed_semantic_identity(repository)
+    dtw_semantic = _dtw_semantic_identity(repository)
     rows = registry["queries_data"]
     expected = value.get("inputs", {})
     if not all((
         value.get("schema_version") == SCHEMA,
         value.get("status") == "frozen_before_all_query_combined_retrieval",
         expected.get("registry_digest") == registry["registry_digest"],
+        expected.get("registry_sha256")
+            == base._sha(repository / base.REGISTRY_FILE),
         expected.get("query_ids_digest") == stable_hash([
             row["episode_id"] for row in rows
         ]),
         expected.get("packed_generation_id") == base.GENERATION_ID,
         expected.get("packed_provenance_digest") == base.PROVENANCE_DIGEST,
-        expected.get("resident_content_digest") == resident["content_digest"],
-        expected.get("resident_ready_digest") == resident["ready_digest"],
+        expected.get("packed_content_digest")
+            == packed_semantic["content_digest"],
         expected.get("dtw_generation_id") == ladder.DTW_GENERATION_ID,
         expected.get("dtw_result_digest") == dtw_result["result_digest"],
         expected.get("dtw_verification_digest")
             == dtw_verification["verification_digest"],
-        expected.get("dtw_file_identity_digest")
-            == _dtw_identity(repository)["digest"],
+        expected.get("dtw_verification_sha256")
+            == base._sha(repository / ladder.DTW_VERIFICATION_RELATIVE),
+        expected.get("dtw_semantic_identity_digest")
+            == dtw_semantic["digest"],
         expected.get("baseline_verification_digest")
             == baseline_verification["verification_digest"],
+        expected.get("baseline_verification_sha256")
+            == base._sha(repository / BASELINE_VERIFICATION_RELATIVE),
+        value.get("inventory") == {
+            "queries": len(rows),
+            "scored_queries": sum(bool(row["scored"]) for row in rows),
+            "warmup_queries": sum(not bool(row["scored"]) for row in rows),
+            "months": len({row["cutoff"] for row in rows}),
+        },
         value.get("execution", {}).get("query_concurrency") == 1,
         value.get("execution", {}).get("threads_per_query") == THREADS,
+        value.get("execution", {}).get("preload_workers") == PRELOAD_WORKERS,
         value.get("execution", {}).get("seed_rows") == SEED_ROWS,
+        value.get("execution", {}).get("block_rows") == BLOCK_ROWS,
+        value.get("execution", {}).get("top_k") == TOP_K,
+        value.get("execution", {}).get("tolerance_hex") == TOLERANCE.hex(),
+        value.get("execution", {}).get("output_root")
+            == str((repository / OUTPUT_RELATIVE).resolve()),
         value.get("contract") == staged_dtw_component_search_contract(),
+        set(value.get("runtime_files", {})) == set(RUNTIME_FILES),
     )):
         raise CombinedBatchError("combined batch preregistration differs")
     commit = value.get("implementation_commit")
@@ -285,7 +474,11 @@ def _case_semantic_state(value: Mapping[str, Any]) -> dict[str, Any]:
         "query_id": value["query_id"],
         "case_id": value["case_id"],
         "packed_generation_id": value["packed_generation_id"],
+        "packed_content_digest": value["packed_content_digest"],
         "dtw_generation_id": value["dtw_generation_id"],
+        "dtw_semantic_identity_digest": value[
+            "dtw_semantic_identity_digest"
+        ],
         "certificate_result_digest": value["certificate"]["result_digest"],
         "matches": value["matches"],
     }
@@ -341,7 +534,7 @@ def _validate_case(
         minimum_rigid = certificate["minimum_rigid_pruned"]
         minimum_combined = certificate["minimum_combined_pruned"]
         valid = all((
-            value["schema_version"] == "m04r14-wf03-combined-batch-case-v2",
+            value["schema_version"] == "m04r14-wf03-combined-batch-case-v3",
             value["status"] == "complete",
             value["query_id"] == row["episode_id"],
             value["case_id"] == row["case_id"],
@@ -353,7 +546,14 @@ def _validate_case(
             value["preregistration_digest"]
                 == preregistration["preregistration_digest"],
             value["packed_generation_id"] == base.GENERATION_ID,
+            value["packed_content_digest"]
+                == preregistration["inputs"]["packed_content_digest"],
             value["dtw_generation_id"] == ladder.DTW_GENERATION_ID,
+            value["dtw_semantic_identity_digest"]
+                == preregistration["inputs"]["dtw_semantic_identity_digest"],
+            _is_attempt_id(value["attempt_id"]),
+            _is_digest(value["resident_attempt_lease_digest"]),
+            _is_digest(value["dtw_attempt_identity_digest"]),
             value["contract_digest"] == preregistration["contract"]["digest"],
             value["outcomes_or_labels_used"] is False,
             value["historical_walk_forward_query_outcomes_opened"] is False,
@@ -402,15 +602,109 @@ def _validate_case(
 def _existing_case(
     path: Path, row: Mapping[str, Any], preregistration: Mapping[str, Any],
 ) -> dict[str, Any] | None:
+    if path.is_symlink():
+        raise CombinedBatchError("combined batch case is linked or non-regular")
     if not path.exists():
         return None
+    if not path.is_file():
+        raise CombinedBatchError("combined batch case is linked or non-regular")
     return _validate_case(base._read(path), row, preregistration)
+
+
+def _next_attempt(root: Path) -> Path:
+    attempts = root / "attempts"
+    attempts.mkdir(parents=True, exist_ok=True)
+    if attempts.is_symlink():
+        raise CombinedBatchError("combined batch attempts root is linked")
+    ordinals = []
+    for path in attempts.iterdir():
+        if path.is_symlink() or not path.is_dir() \
+                or not path.name.startswith("attempt-"):
+            raise CombinedBatchError("malformed combined batch attempt")
+        try:
+            ordinal = int(path.name.removeprefix("attempt-"))
+        except ValueError as exc:
+            raise CombinedBatchError("malformed combined batch attempt") from exc
+        if ordinal < 1 or path.name != f"attempt-{ordinal:04d}":
+            raise CombinedBatchError("malformed combined batch attempt")
+        ordinals.append(ordinal)
+    target = attempts / f"attempt-{max(ordinals, default=0) + 1:04d}"
+    target.mkdir()
+    return target
+
+
+def _attempt_history(
+    root: Path, preregistration: Mapping[str, Any],
+) -> dict[str, dict[str, Any]]:
+    attempts = root / "attempts"
+    if not attempts.exists():
+        return {}
+    if attempts.is_symlink() or not attempts.is_dir():
+        raise CombinedBatchError("combined batch attempts root differs")
+    output = {}
+    for path in attempts.iterdir():
+        if path.is_symlink() or not path.is_dir() or not _is_attempt_id(path.name):
+            raise CombinedBatchError("malformed combined batch attempt")
+        names = {value.name for value in path.iterdir()}
+        if not names:
+            continue
+        unexpected = names - {
+            "RUN_STARTED.json", "INTERRUPTED.json", "COMPLETE.json",
+        }
+        if unexpected and not all(name.startswith(".wf03-") for name in unexpected):
+            raise CombinedBatchError("combined batch attempt files differ")
+        if "RUN_STARTED.json" not in names:
+            if unexpected == names:
+                continue
+            raise CombinedBatchError("combined batch attempt start is absent")
+        started = base._read(path / "RUN_STARTED.json")
+        base._validate_seal(started, "attempt_digest")
+        if not all((
+            started.get("schema_version")
+                == "m04r14-wf03-combined-batch-attempt-v3",
+            started.get("status") == "running",
+            started.get("attempt_id") == path.name,
+            started.get("preregistration_digest")
+                == preregistration["preregistration_digest"],
+            started.get("packed_content_digest")
+                == preregistration["inputs"]["packed_content_digest"],
+            started.get("dtw_semantic_identity_digest")
+                == preregistration["inputs"]["dtw_semantic_identity_digest"],
+            _is_digest(started.get("resident_attempt_lease_digest")),
+            _is_digest(started.get("dtw_attempt_identity_digest")),
+        )):
+            raise CombinedBatchError("combined batch attempt start differs")
+        terminals = names & {"INTERRUPTED.json", "COMPLETE.json"}
+        if len(terminals) > 1:
+            raise CombinedBatchError("combined batch attempt terminals differ")
+        if terminals:
+            terminal_name = next(iter(terminals))
+            terminal = base._read(path / terminal_name)
+            base._validate_seal(terminal, "attempt_digest")
+            if terminal.get("attempt_id") != path.name or terminal.get("status") \
+                    != ("complete" if terminal_name == "COMPLETE.json"
+                        else "interrupted"):
+                raise CombinedBatchError("combined batch attempt terminal differs")
+        output[path.name] = started
+    return output
+
+
+def _validate_case_attempt(
+    value: Mapping[str, Any], attempts: Mapping[str, Mapping[str, Any]],
+) -> None:
+    attempt = attempts.get(str(value.get("attempt_id")))
+    if attempt is None or value.get("resident_attempt_lease_digest") \
+            != attempt.get("resident_attempt_lease_digest") \
+            or value.get("dtw_attempt_identity_digest") \
+            != attempt.get("dtw_attempt_identity_digest"):
+        raise CombinedBatchError("combined batch case attempt binding differs")
 
 
 def _run_case(
     row: Mapping[str, Any], *, source: CachedOHLCVSource,
     prepared_symbols: dict[str, Any], packed_root: Path, dtw_root: Path,
-    resident_lease_digest: str, dtw_identity_digest: str,
+    packed_content_digest: str, resident_lease_digest: str,
+    dtw_identity_digest: str, attempt_id: str,
     repository: Path, preregistration: Mapping[str, Any], cases_root: Path,
 ) -> dict[str, Any]:
     path = _case_path(cases_root, str(row["episode_id"]))
@@ -436,12 +730,13 @@ def _run_case(
         tolerance=TOLERANCE, verify_content=False,
         prepared_symbol_cache=prepared_symbols,
     )
-    current_lease = base.resident_file_identity_lease(
+    current_lease = resident_file_identity_lease(
         base.RESIDENT_ROOT / "READY.json"
     )
-    if current_lease["lease_digest"] != resident_lease_digest \
-            or _dtw_identity(repository)["digest"] != dtw_identity_digest:
-        raise CombinedBatchError("combined batch immutable input identity changed")
+    if current_lease["content_digest"] != packed_content_digest \
+            or current_lease["lease_digest"] != resident_lease_digest \
+            or _dtw_physical_identity(repository)["digest"] != dtw_identity_digest:
+        raise CombinedBatchError("combined batch attempt input identity changed")
     swap_kib = int(
         Path("/proc/self/status").read_text().split("VmSwap:")[1].split()[0]
     )
@@ -450,7 +745,7 @@ def _run_case(
     matches = _matches(result)
     certificate = asdict(result.certificate)
     state = {
-        "schema_version": "m04r14-wf03-combined-batch-case-v2",
+        "schema_version": "m04r14-wf03-combined-batch-case-v3",
         "status": "complete",
         "case_id": row["case_id"],
         "query_id": row["episode_id"],
@@ -461,7 +756,14 @@ def _run_case(
         "scored": bool(row["scored"]),
         "preregistration_digest": preregistration["preregistration_digest"],
         "packed_generation_id": base.GENERATION_ID,
+        "packed_content_digest": packed_content_digest,
         "dtw_generation_id": ladder.DTW_GENERATION_ID,
+        "dtw_semantic_identity_digest": preregistration["inputs"][
+            "dtw_semantic_identity_digest"
+        ],
+        "attempt_id": attempt_id,
+        "resident_attempt_lease_digest": resident_lease_digest,
+        "dtw_attempt_identity_digest": dtw_identity_digest,
         "contract_digest": preregistration["contract"]["digest"],
         "certificate": certificate,
         "matches": matches,
@@ -481,7 +783,9 @@ def _run_case(
     return sealed
 
 
-def execute(repository: Path, preregistration: Mapping[str, Any]) -> dict[str, Any]:
+def _execute_locked(
+    repository: Path, preregistration: Mapping[str, Any],
+) -> dict[str, Any]:
     started = perf_counter()
     repository = repository.resolve(strict=True)
     registry, _by_id = validate_preregistration(repository, preregistration)
@@ -489,74 +793,160 @@ def execute(repository: Path, preregistration: Mapping[str, Any]) -> dict[str, A
     if root.is_symlink() or root.exists() and not root.is_dir():
         raise CombinedBatchError("combined batch output path differs")
     if root.exists():
-        if base._read(root / "CONTRACT.json") != preregistration:
+        contract_path = root / "CONTRACT.json"
+        if not contract_path.exists() and not any(root.iterdir()):
+            base._atomic(contract_path, preregistration)
+        if base._read(contract_path) != preregistration:
             raise CombinedBatchError("combined batch resume contract differs")
         if (root / "RESULT.json").exists():
             result = base._read(root / "RESULT.json")
             base._validate_seal(result)
-            if result.get("passed") is not True or result.get("queries") != 3_936:
+            if not all((
+                result.get("schema_version")
+                    == "m04r14-t14-10-wf03-combined-batch-result-v3",
+                result.get("passed") is True,
+                result.get("queries") == 3_936,
+                result.get("preregistration_digest")
+                    == preregistration["preregistration_digest"],
+                result.get("packed_content_digest")
+                    == preregistration["inputs"]["packed_content_digest"],
+            )):
                 raise CombinedBatchError("combined batch terminal differs")
             return result
     else:
         root.mkdir(parents=True)
         base._atomic(root / "CONTRACT.json", preregistration)
-        base._atomic(root / "RUN_STARTED.json", base._sealed({
-            "schema_version": "m04r14-wf03-combined-batch-run-v2",
-            "status": "running",
-            "preregistration_digest": preregistration["preregistration_digest"],
-            "created_at": base._now(),
-        }))
     cases_root = root / "cases"
     cases_root.mkdir(exist_ok=True)
-    resident = base._resident()
+    if cases_root.is_symlink():
+        raise CombinedBatchError("combined batch cases root is linked")
+    rows = registry["queries_data"]
+    existing_results = []
+    attempt_history = _attempt_history(root, preregistration)
+    for row in rows:
+        value = _existing_case(
+            _case_path(cases_root, str(row["episode_id"])), row,
+            preregistration,
+        )
+        if value is not None:
+            _validate_case_attempt(value, attempt_history)
+            existing_results.append(value)
+    resident = _ensure_resident(
+        repository, preregistration["inputs"]["packed_content_digest"],
+        attempt_history,
+    )
     resident_lease_digest = resident["lease"]["lease_digest"]
-    dtw_identity_digest = _dtw_identity(repository)["digest"]
     packed_root = Path(resident["store_root"])
     dtw_root = repository / ladder.DTW_ROOT_RELATIVE
-    raw_source = source_from_spec(
-        load_config(repository / base.CONFIG_RELATIVE).datasets["nasdaq"]
+    dtw_identity_before = _dtw_physical_identity(repository)
+    unchanged_resident = (
+        resident["mode"] == "reused-fully-validated-unchanged-lease"
     )
-    source = CachedOHLCVSource(raw_source, max_entries=None)
-    preload_started = perf_counter()
-    source.preload(tuple(raw_source.instruments()), workers=PRELOAD_WORKERS)
-    preload_seconds = perf_counter() - preload_started
-    prepared_symbols: dict[str, Any] = {}
-    rows = registry["queries_data"]
+    trusted_dtw = any(
+        attempt.get("dtw_semantic_identity_digest")
+            == preregistration["inputs"]["dtw_semantic_identity_digest"]
+        and attempt.get("dtw_attempt_identity_digest")
+            == dtw_identity_before["digest"]
+        for attempt in attempt_history.values()
+    )
+    packed = load_packed_generation(
+        packed_root, base.GENERATION_ID,
+        expected_provenance_digest=base.PROVENANCE_DIGEST,
+        verify_content=False, validate_records=not unchanged_resident,
+    )
+    load_dtw_sample_generation(
+        dtw_root, ladder.DTW_GENERATION_ID,
+        packed_manifest=packed.manifest, verify_content=not trusted_dtw,
+        validate_records=not trusted_dtw,
+    )
+    current_lease = resident_file_identity_lease(
+        base.RESIDENT_ROOT / "READY.json"
+    )
+    dtw_identity_after = _dtw_physical_identity(repository)
+    if current_lease["lease_digest"] != resident_lease_digest \
+            or dtw_identity_after["digest"] != dtw_identity_before["digest"]:
+        raise CombinedBatchError("combined batch startup input identity changed")
+    dtw_identity_digest = dtw_identity_after["digest"]
+    attempt = _next_attempt(root)
+    attempt_id = attempt.name
+    base._atomic(attempt / "RUN_STARTED.json", base._sealed({
+        "schema_version": "m04r14-wf03-combined-batch-attempt-v3",
+        "status": "running", "attempt_id": attempt_id,
+        "preregistration_digest": preregistration["preregistration_digest"],
+        "packed_content_digest": resident["content_digest"],
+        "resident_mode": resident["mode"],
+        "dtw_validation_mode": (
+            "reused-fully-validated-unchanged-identity" if trusted_dtw
+            else "full-content-and-record-validation"
+        ),
+        "resident_ready_digest": resident["ready_digest"],
+        "resident_attempt_lease_digest": resident_lease_digest,
+        "resident_validation_observation_digest": resident[
+            "validation_observation"
+        ]["observation_digest"],
+        "dtw_semantic_identity_digest": preregistration["inputs"][
+            "dtw_semantic_identity_digest"
+        ],
+        "dtw_attempt_identity_digest": dtw_identity_digest,
+        "receipts_reused_at_start": len(existing_results),
+        "created_at": base._now(),
+    }, "attempt_digest"))
     results = []
-    for completed, row in enumerate(rows, start=1):
-        try:
+    current_row: Mapping[str, Any] | None = None
+    try:
+        raw_source = source_from_spec(
+            load_config(repository / base.CONFIG_RELATIVE).datasets["nasdaq"]
+        )
+        source = CachedOHLCVSource(raw_source, max_entries=None)
+        preload_started = perf_counter()
+        source.preload(tuple(raw_source.instruments()), workers=PRELOAD_WORKERS)
+        preload_seconds = perf_counter() - preload_started
+        prepared_symbols: dict[str, Any] = {}
+        for completed, row in enumerate(rows, start=1):
+            current_row = row
             value = _run_case(
                 row, source=source, prepared_symbols=prepared_symbols,
                 packed_root=packed_root, dtw_root=dtw_root,
+                packed_content_digest=resident["content_digest"],
                 resident_lease_digest=resident_lease_digest,
                 dtw_identity_digest=dtw_identity_digest,
+                attempt_id=attempt_id,
                 repository=repository, preregistration=preregistration,
                 cases_root=cases_root,
             )
-        except Exception as exc:
+            results.append(value)
             _replace_json(root / "PROGRESS.json", {
-                "schema_version": "m04r14-wf03-combined-batch-progress-v2",
-                "status": "interrupted",
-                "completed_queries": len(results),
+                "schema_version": "m04r14-wf03-combined-batch-progress-v3",
+                "status": "running" if completed < len(rows) else "publishing",
+                "attempt_id": attempt_id,
+                "completed_queries": completed,
                 "total_queries": len(rows),
-                "next_query_id": row["episode_id"],
-                "error_type": type(exc).__name__,
-                "error": str(exc),
+                "completed_month_equivalents": completed // 24,
+                "last_query_id": value["query_id"],
+                "last_case_digest": value["case_digest"],
+                "prepared_symbols": len(prepared_symbols),
+                "source_cache_state": source.cache_state(),
+                "elapsed_seconds": perf_counter() - started,
             })
-            raise
-        results.append(value)
+    except BaseException as exc:
         _replace_json(root / "PROGRESS.json", {
-            "schema_version": "m04r14-wf03-combined-batch-progress-v2",
-            "status": "running" if completed < len(rows) else "publishing",
-            "completed_queries": completed,
+            "schema_version": "m04r14-wf03-combined-batch-progress-v3",
+            "status": "interrupted", "attempt_id": attempt_id,
+            "completed_queries": len(results),
             "total_queries": len(rows),
-            "completed_month_equivalents": completed // 24,
-            "last_query_id": value["query_id"],
-            "last_case_digest": value["case_digest"],
-            "prepared_symbols": len(prepared_symbols),
-            "source_cache_state": source.cache_state(),
-            "elapsed_seconds": perf_counter() - started,
+            "next_query_id": (
+                current_row["episode_id"] if current_row is not None else None
+            ),
+            "error_type": type(exc).__name__, "error": str(exc),
         })
+        base._atomic(attempt / "INTERRUPTED.json", base._sealed({
+            "schema_version": "m04r14-wf03-combined-batch-attempt-v3",
+            "status": "interrupted", "attempt_id": attempt_id,
+            "completed_queries": len(results),
+            "error_type": type(exc).__name__, "error": str(exc),
+            "created_at": base._now(),
+        }, "attempt_digest"))
+        raise
     if [value["query_id"] for value in results] != [
         row["episode_id"] for row in rows
     ]:
@@ -567,7 +957,7 @@ def execute(repository: Path, preregistration: Mapping[str, Any]) -> dict[str, A
         "sha256": base._sha(_case_path(cases_root, value["query_id"])),
     } for value in results]
     state = {
-        "schema_version": "m04r14-t14-10-wf03-combined-batch-result-v2",
+        "schema_version": "m04r14-t14-10-wf03-combined-batch-result-v3",
         "status": "complete",
         "passed": True,
         "queries": len(results),
@@ -576,6 +966,7 @@ def execute(repository: Path, preregistration: Mapping[str, Any]) -> dict[str, A
         "months": preregistration["inventory"]["months"],
         "preregistration_digest": preregistration["preregistration_digest"],
         "packed_generation_id": base.GENERATION_ID,
+        "packed_content_digest": resident["content_digest"],
         "dtw_generation_id": ladder.DTW_GENERATION_ID,
         "case_manifest_digest": stable_hash(case_manifest),
         "case_semantic_digest": stable_hash([
@@ -597,17 +988,56 @@ def execute(repository: Path, preregistration: Mapping[str, Any]) -> dict[str, A
         "final_period_result_opened": False,
         "production_promotion_authorized": False,
         "independent_verification_authorized": True,
+        "terminal_attempt_id": attempt_id,
+        "attempts": len(tuple((root / "attempts").iterdir())),
     }
     result = base._sealed(state)
     base._atomic(root / "RESULT.json", result)
+    base._atomic(attempt / "COMPLETE.json", base._sealed({
+        "schema_version": "m04r14-wf03-combined-batch-attempt-v3",
+        "status": "complete", "attempt_id": attempt_id,
+        "queries": len(results),
+        "receipts_reused_at_start": len(existing_results),
+        "receipts_computed": len(results) - len(existing_results),
+        "result_digest": result["result_digest"],
+        "created_at": base._now(),
+    }, "attempt_digest"))
     _replace_json(root / "PROGRESS.json", {
-        "schema_version": "m04r14-wf03-combined-batch-progress-v2",
+        "schema_version": "m04r14-wf03-combined-batch-progress-v3",
         "status": "complete", "completed_queries": len(results),
+        "attempt_id": attempt_id,
         "total_queries": len(results),
         "completed_month_equivalents": preregistration["inventory"]["months"],
         "result_digest": result["result_digest"],
     })
     return result
+
+
+def execute(repository: Path, preregistration: Mapping[str, Any]) -> dict[str, Any]:
+    repository = repository.resolve(strict=True)
+    output = repository / OUTPUT_RELATIVE
+    lock_path = output.with_name(f"{output.name}.lock")
+    if lock_path.is_symlink():
+        raise CombinedBatchError("combined batch producer lock is linked")
+    flags = os.O_RDWR | os.O_CREAT | os.O_CLOEXEC
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    descriptor = os.open(lock_path, flags, 0o600)
+    try:
+        if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+            raise CombinedBatchError("combined batch producer lock is not regular")
+        try:
+            fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as exc:
+            raise CombinedBatchError(
+                "another combined batch producer is already running"
+            ) from exc
+        try:
+            return _execute_locked(repository, preregistration)
+        finally:
+            fcntl.flock(descriptor, fcntl.LOCK_UN)
+    finally:
+        os.close(descriptor)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
