@@ -1529,6 +1529,13 @@
   <p><b>Performance:</b> A 6,539-bar timestamp microbenchmark is 84.3× faster than Python dictionary construction. On the full early query, proposal scan takes 84.22 seconds and exact closure 362.88 seconds versus the frozen 642.79 seconds: a 43.5% exact-stage reduction. Sampling still shows only about 1.35 cores, so thread-level scalar completion is improved but not the 3,936-query scale architecture.</p>
   <p><b>Next:</b> Full-gate and commit this semantics-preserving optimization. Implement deterministic-random and recent-return/volatility baselines, then use month-level shared scans and process-level query parallelism; evaluate compiled multi-candidate DTW only under an exact-parity POC.</p>
 </section>
+<section class="entry">
+  <h2>L-172 — Outcome-blind neighbor baseline semantics implemented</h2>
+  <p><b>Deterministic random:</b> Eligible symbols are ordered by domain-separated SHA-256 of query ID and symbol; within each selected symbol, eligible episodes are ordered by a separate query/episode hash. This produces up to 20 distinct-symbol historical neighbors without using a distance, label or outcome and is invariant to physical input order.</p>
+  <p><b>Recent return/volatility:</b> Each 64-session prefix yields 20-session close return, 63-session close return and sample standard deviation of the final 20 log returns. For a query, each feature receives a normalized ordinal rank among all causally eligible episodes plus the query, with value then episode-ID tie-breaking. Exact unweighted L1 rank distance is ordered by distance/episode ID and constrained to one episode per symbol.</p>
+  <p class="pass"><b>Pre-store gates:</b> Synthetic tests verify exact window formulas, missing/invalid refusal, random permutation invariance, distinct-symbol selection and equality of vectorized rank-L1 results with a separately written scalar ordinal oracle including repeated-symbol competition and non-finite exclusion. The contract explicitly records that no outcomes or labels are used.</p>
+  <p><b>Next:</b> Build an immutable float64 three-feature generation aligned one-for-one with the packed main/overflow rows. First verify byte alignment, raw reconstruction, rank/permutation equality and three-probe performance on a bounded store; only then publish the full 3,786,156-row feature store.</p>
+</section>
 </main>
 
 <section id="reproduce">
