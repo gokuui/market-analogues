@@ -1591,6 +1591,12 @@
   <p><b>Repair:</b> A typed boundary selector now returns no probes for zero rows, one probe for one row and both endpoints for multiple rows. All three cases receive a regression test. The verifier is not part of the frozen producer runtime, so this repair does not alter or invalidate the producer lineage. Before work, the repaired verifier now revalidates the producer's frozen Git blobs and binds its own clean commit and runtime blob into its receipt.</p>
   <p><b>Boundary:</b> No full verification receipt exists yet. Monthly retrieval remains unauthorized until the repaired independent verifier completes.</p>
 </section>
+<section class="entry">
+  <h2>L-181 — Full baseline feature generation independently verified</h2>
+  <p class="pass"><b>Verification:</b> Clean verifier commit <code>38d29eb</code> revalidated the producer preregistration and every frozen runtime blob, full generation hashes, all 11,584 shard receipts and source prefixes, and exact packed counts of 3,786,121 main plus 35 overflow rows. Every shard is byte-identical to its physical published-generation slice.</p>
+  <p class="pass"><b>Raw audit:</b> First/last main rows for every nonempty symbol and every overflow row produced 62,931 independently reconstructed binary64 feature values. All are bit-identical with maximum delta <code>0.0</code>. Verification digest is <code>1f461f2a…8bae</code>; generation remains <code>83bb03f3…b423</code>.</p>
+  <p><b>Decision:</b> Full deterministic-random and recent-return/volatility baseline storage is correctness-complete and the outcome-blind 3,936-query monthly committee retrieval stage is authorized. Historical outcomes, setup labels and the final period remain unopened.</p>
+</section>
 </main>
 
 <section id="reproduce">
