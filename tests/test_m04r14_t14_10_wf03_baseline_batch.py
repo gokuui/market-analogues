@@ -17,11 +17,16 @@ def test_case_path_accepts_only_episode_identifiers(tmp_path: Path) -> None:
         subject._case_path(tmp_path, "../unsafe")
 
 
+def test_query_symbol_lookup_matches_packed_absent_symbol_semantics() -> None:
+    assert subject._query_symbol_id(("A", "B"), "B") == 1
+    assert subject._query_symbol_id(("A", "B"), "MISSING") is None
+
+
 def test_valid_case_requires_seal_binding_and_neighbor_counts(tmp_path: Path) -> None:
     row = {"episode_id": "b" * 24, "case_id": "case-b"}
     path = subject._case_path(tmp_path, row["episode_id"])
     state = {
-        "schema_version": "m04r14-wf03-baseline-batch-case-v1",
+        "schema_version": "m04r14-wf03-baseline-batch-case-v2",
         "query_id": row["episode_id"], "case_id": row["case_id"],
         "feature_generation_id": "generation",
         "outcomes_or_labels_used": False,

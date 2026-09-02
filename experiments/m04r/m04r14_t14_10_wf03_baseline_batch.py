@@ -36,12 +36,12 @@ from experiments.m04r import m04r14_t14_10_wf03_baseline_store_full as feature_s
 from experiments.m04r import m04r14_t14_10_wf03_feasibility as base
 
 
-SCHEMA = "m04r14-t14-10-wf03-baseline-batch-preregistration-v1"
+SCHEMA = "m04r14-t14-10-wf03-baseline-batch-preregistration-v2"
 OUTPUT_RELATIVE = Path(
-    "config/data/analogues/m04r14/t14-10-wf03-baseline-batch-v1"
+    "config/data/analogues/m04r14/t14-10-wf03-baseline-batch-v2"
 )
 PREREGISTRATION_RELATIVE = Path(
-    "experiments/m04r/m04r14_t14_10_wf03_baseline_batch_preregistered.json"
+    "experiments/m04r/m04r14_t14_10_wf03_baseline_batch_v2_preregistered.json"
 )
 FEATURE_RESULT_RELATIVE = feature_store.OUTPUT_RELATIVE / "RESULT.json"
 FEATURE_VERIFICATION_RELATIVE = Path(
@@ -95,6 +95,13 @@ def _case_path(root: Path, query_id: str) -> Path:
     if len(query_id) != 24 or any(value not in "0123456789abcdef" for value in query_id):
         raise BaselineBatchError("baseline batch query ID differs")
     return root / f"{query_id}.json"
+
+
+def _query_symbol_id(symbols: tuple[str, ...], symbol: str) -> int | None:
+    try:
+        return symbols.index(symbol)
+    except ValueError:
+        return None
 
 
 def _replace_json(path: Path, value: Mapping[str, Any]) -> None:
@@ -218,7 +225,7 @@ def _valid_case(path: Path, row: Mapping[str, Any], generation_id: str) -> dict[
         value = base._read(path)
         base._validate_seal(value, "case_digest")
         valid = all((
-            value["schema_version"] == "m04r14-wf03-baseline-batch-case-v1",
+            value["schema_version"] == "m04r14-wf03-baseline-batch-case-v2",
             value["query_id"] == row["episode_id"],
             value["case_id"] == row["case_id"],
             value["feature_generation_id"] == generation_id,
@@ -254,10 +261,10 @@ def _run_query(task: tuple[dict[str, Any], str]) -> dict[str, Any]:
         latest_eligible_ns=int(latest.value),
         quality_tiers=("A", "B"),
     )
-    try:
-        symbol_id = _SYMBOLS.index(query.symbol)
-    except ValueError as exc:
-        raise BaselineBatchError("baseline query symbol is absent from packed store") from exc
+    # This exactly matches the packed proposal scanner.  A query instrument can
+    # be absent from the historical store; in that case same-symbol overlap is
+    # impossible and no symbol-specific exclusion is applied.
+    symbol_id = _query_symbol_id(_SYMBOLS, query.symbol)
     eligible = _eligible_mask(_RECORDS, query, symbol_id)
     query_features = recent_return_volatility(
         episode.bars["close"].to_numpy(dtype=np.float64)
@@ -276,7 +283,7 @@ def _run_query(task: tuple[dict[str, Any], str]) -> dict[str, Any]:
             or len({value.symbol for value in rank_rows}) != TOP_K:
         raise BaselineBatchError("baseline batch distinct-neighbor gate differs")
     state = {
-        "schema_version": "m04r14-wf03-baseline-batch-case-v1",
+        "schema_version": "m04r14-wf03-baseline-batch-case-v2",
         "status": "complete",
         "case_id": row["case_id"],
         "query_id": episode.key.id,
@@ -359,7 +366,7 @@ def execute(repository: Path, preregistration: Mapping[str, Any]) -> dict[str, A
             results.append(result)
             if completed % 24 == 0 or completed == len(tasks):
                 _replace_json(root / "PROGRESS.json", {
-                    "schema_version": "m04r14-wf03-baseline-batch-progress-v1",
+                    "schema_version": "m04r14-wf03-baseline-batch-progress-v2",
                     "status": "running" if completed < len(tasks) else "publishing",
                     "completed_queries": completed,
                     "total_queries": len(tasks),
@@ -373,7 +380,7 @@ def execute(repository: Path, preregistration: Mapping[str, Any]) -> dict[str, A
         "sha256": base._sha(_case_path(cases_root, row["query_id"])),
     } for row in results]
     state = {
-        "schema_version": "m04r14-t14-10-wf03-baseline-batch-result-v1",
+        "schema_version": "m04r14-t14-10-wf03-baseline-batch-result-v2",
         "status": "complete",
         "passed": True,
         "queries": len(results),
@@ -398,7 +405,7 @@ def execute(repository: Path, preregistration: Mapping[str, Any]) -> dict[str, A
     result = base._sealed(state)
     base._atomic(root / "RESULT.json", result)
     _replace_json(root / "PROGRESS.json", {
-        "schema_version": "m04r14-wf03-baseline-batch-progress-v1",
+        "schema_version": "m04r14-wf03-baseline-batch-progress-v2",
         "status": "complete",
         "completed_queries": len(results),
         "total_queries": len(results),

@@ -1611,6 +1611,13 @@
   <p class="pass"><b>Real worker POC:</b> The actual first 2012 registry query builds in 0.644 seconds after a 6.50-second full rank index, exposes 1,671,846 eligible episodes, returns 20 neighbors from both methods and reloads the same sealed receipt on resume. Eight focused contract/parity tests pass.</p>
   <p><b>Boundary:</b> This batch includes warmup, development, validation and final query charts but opens no subsequent return, label or setup outcome. The result authorizes only independent retrieval verification, not outcome scoring.</p>
 </section>
+<section class="entry">
+  <h2>L-184 — V1 baseline batch retains absent-query-symbol refusal</h2>
+  <p><b>Retained refusal:</b> H0 <code>cbe6b97</code> and sole-child H1 <code>817cb3a</code> published 245 sealed outcome-blind cases (durable progress through 216 ordered queries) before encountering a registry query symbol absent from the packed historical dictionary. The worker raised instead of applying the packed scanner's established absent-symbol semantics; no root result was published.</p>
+  <p><b>Diagnosis:</b> Query eligibility only needs a packed symbol ID to exclude overlapping episodes of that same symbol. If the query symbol is absent from the candidate dictionary, such candidates cannot exist, so the correct packed-scanner behavior is <code>symbol_id=None</code> with no same-symbol exclusion. All global cutoff, episode-ID and quality gates still apply.</p>
+  <p><b>Repair:</b> V2 uses an explicit query-symbol lookup returning an ID or <code>None</code>, with a regression test for both present and absent cases and fresh preregistration/output schemas. The partial v1 receipts remain retained and are not reused.</p>
+  <p><b>Boundary:</b> No forward outcome, label or final-period result was accessed. V2 must pass its code gates and new H0/H1 freeze before execution.</p>
+</section>
 </main>
 
 <section id="reproduce">
