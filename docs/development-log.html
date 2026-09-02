@@ -1536,6 +1536,13 @@
   <p class="pass"><b>Pre-store gates:</b> Synthetic tests verify exact window formulas, missing/invalid refusal, random permutation invariance, distinct-symbol selection and equality of vectorized rank-L1 results with a separately written scalar ordinal oracle including repeated-symbol competition and non-finite exclusion. The contract explicitly records that no outcomes or labels are used.</p>
   <p><b>Next:</b> Build an immutable float64 three-feature generation aligned one-for-one with the packed main/overflow rows. First verify byte alignment, raw reconstruction, rank/permutation equality and three-probe performance on a bounded store; only then publish the full 3,786,156-row feature store.</p>
 </section>
+<section class="entry">
+  <h2>L-173 — Return/volatility feature-store substrate implemented</h2>
+  <p><b>Layout:</b> Each packed main and overflow episode receives one aligned 24-byte row containing three little-endian binary64 values. Invalid source windows use three NaNs; partial missingness and infinities fail closed. Binary64 is intentional because rank order—not approximate magnitude—defines the frozen baseline distance.</p>
+  <p><b>Identity:</b> The manifest binds the packed generation/provenance, feature and neighbor contracts, exact main/overflow counts, content hashes and outcome-blind provenance. Generation identity is the canonical hash of that state. Loading rechecks manifest identity, packed binding, sizes, optional complete hashes and record invariants.</p>
+  <p class="pass"><b>Tests:</b> Round-trip main/overflow publication, wholly missing rows, changed packed identity, partial missingness and empty-array mapping pass. No full-universe feature generation has been built yet.</p>
+  <p><b>Next:</b> Implement a bounded raw-data builder that proves physical symbol-slice alignment, direct feature reconstruction, resumable shard publication and exact rank-neighbor equality before full-universe construction.</p>
+</section>
 </main>
 
 <section id="reproduce">
