@@ -9,8 +9,12 @@ import tempfile
 from typing import Any, Iterable
 
 import numpy as np
+import pandas as pd
 
-from .baseline_neighbors import baseline_neighbor_contract
+from .baseline_neighbors import (
+    baseline_neighbor_contract,
+    recent_return_volatility_at_positions,
+)
 from .types import stable_hash
 
 
@@ -61,6 +65,42 @@ def validate_feature_records(records: np.ndarray) -> None:
     missing = np.isnan(values).all(axis=1)
     if not np.all(valid | missing):
         raise BaselineFeatureStoreError("feature record finiteness differs")
+
+
+def features_for_packed_records(
+    frame: pd.DataFrame, records: np.ndarray,
+) -> np.ndarray:
+    fields = records.dtype.fields
+    if "timestamp" not in frame or "close" not in frame \
+            or records.ndim != 1 or fields is None or "cutoff_ns" not in fields:
+        raise BaselineFeatureStoreError("feature build inputs differ")
+    output = np.empty(len(records), dtype=FEATURE_DTYPE)
+    output["values"] = np.nan
+    if not len(records):
+        return output
+    timestamps = np.ascontiguousarray(
+        frame["timestamp"].to_numpy(dtype="datetime64[ns]").view(np.int64)
+    )
+    if len(timestamps) != len(frame) \
+            or len(timestamps) > 1 and np.any(timestamps[1:] < timestamps[:-1]):
+        raise BaselineFeatureStoreError("feature source timestamps are not ordered")
+    cutoffs = np.asarray(records["cutoff_ns"], dtype=np.int64)
+    positions = np.searchsorted(timestamps, cutoffs, side="right") - 1
+    found = positions >= 0
+    valid_positions = np.flatnonzero(found)
+    found[valid_positions] = (
+        timestamps[positions[valid_positions]] == cutoffs[valid_positions]
+    )
+    if not np.all(found):
+        raise BaselineFeatureStoreError("packed feature cutoff is absent from source")
+    buildable = positions >= 63
+    if np.any(buildable):
+        close = frame["close"].to_numpy(dtype=np.float64)
+        output["values"][buildable] = recent_return_volatility_at_positions(
+            close, positions[buildable].astype(np.int64),
+        )
+    validate_feature_records(output)
+    return output
 
 
 def _sha(path: Path) -> str:
