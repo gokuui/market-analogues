@@ -16,6 +16,7 @@ from market_analogues.quantized_bound import (
     _joined_iqr_compiled, _joined_iqr_sorted_compiled,
     branch_aware_prepared_quantized_array_lower_bounds,
     branch_aware_quantized_batch_lower_bounds,
+    branch_aware_quantized_price_lower_bounds,
     branch_aware_quantized_bound_contract,
     branch_aware_quantized_representation_lower_bound,
     prepare_quantized_bound_arrays, prepared_quantized_array_lower_bounds,
@@ -109,6 +110,24 @@ def test_quantized_bound_matches_independent_reference_and_is_safe_for_all_famil
         assert branch_batch.totals[index] == pytest.approx(
             branch_scalar.total, abs=2e-12,
         )
+
+
+def test_price_only_bound_is_bit_exact_with_full_branch_aware_kernel() -> None:
+    representations = [
+        represent(generate_case(name, 801 + index).episode)
+        for index, name in enumerate(sorted(FAMILIES))
+    ]
+    rows = [quantize_bound_row(value) for value in representations]
+    expected = branch_aware_quantized_batch_lower_bounds(
+        representations[0], rows,
+    ).components["price"]
+    actual = branch_aware_quantized_price_lower_bounds(
+        representations[0],
+        np.stack([row.samples_48 for row in rows]),
+        np.stack([row.presence for row in rows]),
+        np.stack([row.error_radii for row in rows]),
+    )
+    np.testing.assert_array_equal(actual, expected)
 
 
 def test_compiled_joined_iqr_exactly_matches_combined_percentiles() -> None:

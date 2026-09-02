@@ -16,6 +16,7 @@ from .quantized_bound import (
     ERROR_VALUE_COUNT, PACKED_ROW_BYTES, PreparedQuantizedBoundArrays,
     QuantizedBoundRow, QuantizedLowerBoundBatch,
     branch_aware_prepared_quantized_array_lower_bounds,
+    branch_aware_quantized_price_lower_bounds,
     prepare_quantized_bound_arrays, prepared_quantized_array_lower_bounds,
     quantized_bound_contract,
 )
@@ -185,6 +186,20 @@ def packed_branch_aware_lower_bounds(
 ) -> QuantizedLowerBoundBatch:
     return prepared_packed_branch_aware_lower_bounds(
         query, prepare_packed_lower_bound_records(records),
+    )
+
+
+def packed_branch_aware_price_lower_bounds(
+    query: Representation, records: np.ndarray,
+) -> np.ndarray:
+    if records.dtype != PACK_DTYPE:
+        raise PackedBoundStoreError("record dtype differs from packed contract")
+    presence = np.unpackbits(
+        np.asarray(records["presence"], dtype=np.uint8),
+        axis=1, bitorder="little",
+    )[:, :len(SAMPLES_48_NAMES)].astype(bool)
+    return branch_aware_quantized_price_lower_bounds(
+        query, records["samples_48"], presence, records["error_radii"],
     )
 
 

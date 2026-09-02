@@ -529,6 +529,108 @@ def branch_aware_prepared_quantized_array_lower_bounds(
     )
 
 
+def branch_aware_quantized_price_lower_bounds(
+    query: Representation,
+    samples: np.ndarray,
+    presence: np.ndarray,
+    radii: np.ndarray,
+) -> np.ndarray:
+    """Evaluate only the safe distance-v1 price bound.
+
+    Component retrieval does not consume coarse, stage, structural or the
+    other fifteen 48-sample channels.  Avoiding those computations is exact:
+    the returned values are the same branch-aware ``components["price"]``
+    values produced by the full lower-bound kernel.
+    """
+    price_names = GROUPS["price"]
+    indexes = np.asarray(
+        [SAMPLES_48_NAMES.index(name) for name in price_names], dtype=int,
+    )
+    sample_values = np.asarray(samples)[:, indexes].astype(np.float64)
+    presence_values = np.asarray(presence, dtype=bool)[:, indexes]
+    radius_values = np.asarray(radii, dtype=np.float64)
+    rows = len(sample_values)
+    if not all((
+        sample_values.shape == (rows, len(price_names), 48),
+        presence_values.shape == (rows, len(price_names)),
+        radius_values.shape == (rows, ERROR_VALUE_COUNT),
+        np.isfinite(sample_values).all(), np.isfinite(radius_values).all(),
+        np.all(radius_values >= 0),
+    )):
+        raise QuantizedBoundError("quantized price-bound batch differs")
+    if not rows:
+        return np.empty(0, dtype=np.float64)
+    query_samples = np.zeros((len(price_names), 48), dtype=np.float64)
+    query_presence = np.zeros(len(price_names), dtype=bool)
+    for index, name in enumerate(price_names):
+        values = query.samples_48.get(name)
+        if values is None:
+            continue
+        values = np.asarray(values, dtype=np.float64)
+        if values.shape != (48,) or not np.isfinite(values).all():
+            raise QuantizedBoundError(f"query price-bound channel differs: {name}")
+        query_samples[index] = values
+        query_presence[index] = True
+    joined_iqr = _joined_iqr_compiled(sample_values, query_samples)
+    rms = radius_values[:, 1:1 + len(SAMPLES_48_NAMES)][:, indexes]
+    maximum = radius_values[
+        :, 1 + len(SAMPLES_48_NAMES):1 + 2 * len(SAMPLES_48_NAMES)
+    ][:, indexes]
+    distances: list[np.ndarray] = []
+    included: list[np.ndarray] = []
+    for index in range(len(price_names)):
+        candidate_present = presence_values[:, index]
+        if not query_presence[index]:
+            distances.append(np.where(candidate_present, 2.0, 0.0))
+            included.append(candidate_present)
+            continue
+        stored = sample_values[:, index]
+        query_values = query_samples[index]
+        observed = np.sqrt(np.mean(
+            (stored - query_values) ** 2, axis=1,
+        ))
+        numerator = np.maximum(observed - rms[:, index], 0.0)
+        raw_iqr_upper = joined_iqr[:, index] + 2.0 * maximum[:, index]
+        iqr_upper = np.nextafter(raw_iqr_upper, np.inf)
+        iqr_lower = np.nextafter(
+            joined_iqr[:, index] - 2.0 * maximum[:, index], -np.inf,
+        )
+        denominator = np.maximum(iqr_upper, 1e-6)
+        needs_std = iqr_lower < 1e-8
+        if np.any(needs_std):
+            selected = stored[needs_std]
+            joined = np.c_[
+                selected, np.broadcast_to(query_values, selected.shape),
+            ]
+            std_upper = np.nextafter(
+                np.std(joined, axis=1)
+                + rms[needs_std, index] / np.sqrt(2.0),
+                np.inf,
+            )
+            fallback_certain = iqr_upper[needs_std] < 1e-8
+            denominator[needs_std] = np.where(
+                fallback_certain,
+                np.maximum(std_upper, 1e-6),
+                np.maximum.reduce((
+                    iqr_upper[needs_std], std_upper,
+                    np.full(np.sum(needs_std), 1e-6),
+                )),
+            )
+        value = numerator / denominator
+        value[~candidate_present] = 2.0
+        distances.append(value)
+        included.append(np.ones(rows, dtype=bool))
+    included_count = np.sum(included, axis=0)
+    rigid = np.divide(
+        np.sum(distances, axis=0), included_count,
+        out=np.zeros(rows, dtype=np.float64), where=included_count > 0,
+    )
+    output = .55 * rigid
+    if not np.isfinite(output).all() or np.any(output < 0):
+        raise QuantizedBoundError("quantized price bound is non-finite")
+    return output
+
+
 def _prepared_quantized_array_lower_bounds(
     query: Representation,
     prepared: PreparedQuantizedBoundArrays,

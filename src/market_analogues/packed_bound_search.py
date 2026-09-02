@@ -14,7 +14,7 @@ import numpy as np
 
 from .packed_bound_store import (
     PACK_DTYPE, TIER_CODES, TIER_NAMES, load_packed_generation, packed_lower_bounds,
-    packed_branch_aware_lower_bounds,
+    packed_branch_aware_lower_bounds, packed_branch_aware_price_lower_bounds,
     packed_bound_store_contract, prepare_packed_lower_bound_records,
     prepared_packed_branch_aware_lower_bounds, prepared_packed_lower_bounds,
 )
@@ -771,8 +771,12 @@ def scan_packed_component_bound_proposals_threaded(
             selected = block[_eligible_mask(block, query, symbol_id)]
             if not len(selected):
                 return 0, _empty_entries()
-            bounded = packed_branch_aware_lower_bounds(query.representation, selected)
-            scores = np.asarray(bounded.components[component], dtype=np.float64)
+            scores = np.asarray(
+                packed_branch_aware_price_lower_bounds(
+                    query.representation, selected,
+                ),
+                dtype=np.float64,
+            )
             # Store the component score in both fields: _stable_bounded ranks
             # route_score and _finalize publishes total as lower_bound.
             return len(selected), _entries(
@@ -959,14 +963,21 @@ def scan_packed_bound_threshold(
             eligible_main += len(selected)
             fresh = fresh_records(selected)
             if len(fresh):
-                bounded = (
-                    packed_branch_aware_lower_bounds(query.representation, fresh)
-                    if branch_aware else packed_lower_bounds(query.representation, fresh)
-                )
-                totals = np.asarray(
-                    bounded.totals if component is None
-                    else bounded.components[component], dtype=np.float64,
-                )
+                if component == "price" and branch_aware:
+                    totals = np.asarray(
+                        packed_branch_aware_price_lower_bounds(
+                            query.representation, fresh,
+                        ), dtype=np.float64,
+                    )
+                else:
+                    bounded = (
+                        packed_branch_aware_lower_bounds(query.representation, fresh)
+                        if branch_aware else packed_lower_bounds(query.representation, fresh)
+                    )
+                    totals = np.asarray(
+                        bounded.totals if component is None
+                        else bounded.components[component], dtype=np.float64,
+                    )
                 if not np.isfinite(totals).all() or np.any(totals < 0):
                     raise PackedBoundSearchError(
                         "threshold scan produced an invalid packed lower bound"

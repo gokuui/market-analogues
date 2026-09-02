@@ -30,7 +30,9 @@ from .packed_bound_search import (
     _stable_bounded,
     packed_component_search_contract,
 )
-from .packed_bound_store import load_packed_generation, packed_branch_aware_lower_bounds
+from .packed_bound_store import (
+    load_packed_generation, packed_branch_aware_price_lower_bounds,
+)
 from .representation import represent, representation_input_digest
 from .search import latest_eligible_cutoff
 from .types import AnalogueMatch, Episode, SearchQuery, stable_hash
@@ -236,9 +238,7 @@ def scan_dtw_component_bound_proposals(
     def packed_score(block: np.ndarray) -> np.ndarray:
         numba.set_num_threads(packed_threads if parallel else threads)
         return np.asarray(
-            packed_branch_aware_lower_bounds(
-                query.representation, block,
-            ).components["price"],
+            packed_branch_aware_price_lower_bounds(query.representation, block),
             dtype=np.float64,
         )
 

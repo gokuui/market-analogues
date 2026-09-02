@@ -1643,6 +1643,12 @@
   <p class="pass"><b>Correctness and speed:</b> Focused component and combined-search exhaustive-oracle tests pass, including partial/absent channel coverage. A deterministic 1,040-row benchmark measured 9.832 seconds for scalar completion and 0.042 seconds for the batch kernel (232.2×), with maximum absolute deviation <code>2.22e-16</code> and no ranking change. The complete repository test suite also passes.</p>
   <p><b>Boundary:</b> This changes only exact distance computation after a candidate is admitted. Proposal generation and strict next-bound closure are unchanged, and no outcome or label was read.</p>
 </section>
+<section class="entry">
+  <h2>L-189 — Price-component packed bound no longer computes unrelated channels</h2>
+  <p><b>Optimization:</b> Price-only proposal and threshold scans now evaluate exactly the six distance-v1 price channels. They no longer unpack or compute coarse, stage, structural, candle/volatility, volume/shock or market-context bounds that cannot affect price-component ranking.</p>
+  <p class="pass"><b>Parity and speed:</b> The specialized branch-aware result is bit-for-bit equal to the full kernel's price component in synthetic family coverage and a real 65,536-row packed slice. That real slice improved from 1.521 to 0.395 seconds (3.85×). Focused search tests and the complete repository suite pass.</p>
+  <p><b>Boundary:</b> Composite retrieval still uses every component. This specialization changes neither eligibility nor the price lower-bound formula and opens no outcome or label.</p>
+</section>
 </main>
 
 <section id="reproduce">
