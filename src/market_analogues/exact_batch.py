@@ -513,14 +513,42 @@ def exact_price_representations_at_positions(
         name: pd.to_numeric(frame[name], errors="coerce").to_numpy(float)
         for name in ("open", "high", "low", "close", "volume")
     }
-    indices = (
-        requested[:, None] - lookback + 1 + np.arange(lookback, dtype=int)
-    )
     benchmark_values = align_benchmark_close(frame, benchmark)
+    return exact_price_representations_from_arrays_at_positions(
+        values["open"], values["high"], values["low"], values["close"],
+        values["volume"], benchmark_values, positions=requested,
+        lookback=lookback,
+    )
+
+
+def exact_price_representations_from_arrays_at_positions(
+    open_values: np.ndarray,
+    high_values: np.ndarray,
+    low_values: np.ndarray,
+    close_values: np.ndarray,
+    volume_values: np.ndarray,
+    benchmark_values: np.ndarray,
+    *,
+    positions: np.ndarray,
+    lookback: int,
+) -> tuple[Representation, ...]:
+    """Array-native exact-price projection for a prepared immutable symbol."""
+    requested = np.asarray(positions, dtype=int)
+    arrays = tuple(np.asarray(value, dtype=np.float64) for value in (
+        open_values, high_values, low_values, close_values, volume_values,
+        benchmark_values,
+    ))
+    lengths = {len(value) for value in arrays}
+    if requested.ndim != 1 or lookback < 2 or not len(requested) \
+            or len(np.unique(requested)) != len(requested) or len(lengths) != 1 \
+            or any(value.ndim != 1 for value in arrays) \
+            or np.any(requested < lookback - 1) \
+            or np.any(requested >= len(arrays[0])):
+        raise ValueError("prepared exact-price positions differ")
+    indices = requested[:, None] - lookback + 1 + np.arange(lookback, dtype=int)
     channels = _exact_price_channels_from_rows(
-        values["open"][indices], values["high"][indices],
-        values["low"][indices], values["close"][indices],
-        values["volume"][indices], benchmark_values[indices],
+        arrays[0][indices], arrays[1][indices], arrays[2][indices],
+        arrays[3][indices], arrays[4][indices], arrays[5][indices],
     )
     names_48 = GROUPS["price"]
     names_64 = _DTW_CHANNELS

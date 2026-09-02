@@ -1670,6 +1670,24 @@
   <p><b>Acceptance:</b> All four staged certificates must complete with zero process swap and no outcome/label access. The included OHAI authority must reproduce all 20 frozen scalar episode IDs, symbols, cutoffs and hexadecimal distances exactly. Timing, cache state and peak RSS are observational and excluded from semantic case digests.</p>
   <p><b>Decision boundary:</b> This POC selects the safe concurrency policy for the durable 3,936-query producer. It cannot authorize outcome evaluation or production promotion.</p>
 </section>
+<section class="entry">
+  <h2>L-193 — Four-query outer concurrency rejected as the production default</h2>
+  <p><b>Frozen execution:</b> The preregistered March 2014 POC completed four simultaneous queries with two inner threads each against one preloaded 12,080-symbol cache. All four certificates closed, the frozen OHAI authority reproduced all 20 episode IDs and hexadecimal distances exactly, process swap remained zero and neither outcomes nor labels were opened.</p>
+  <p><b>Measured result:</b> Inventory preload took 74.8 seconds and the concurrent query phase took 408.8 seconds. Individual queries took 150.3–408.4 seconds and observed peak RSS reached 38,402.9 MiB. The immutable result digest is <code>fb2628d6…b479</code>.</p>
+  <p><b>Decision:</b> Four outer queries competing for two threads each provide insufficient throughput benefit for their memory and per-query latency cost. This tested configuration is retained as evidence but rejected as the durable producer default; sequential queries may instead reuse prepared data while each query uses all exposed compute.</p>
+</section>
+<section class="entry">
+  <h2>L-194 — Exact symbol preparation is reusable across sequential queries</h2>
+  <p><b>Optimization:</b> Exact completion now converts each immutable symbol to timestamp, OHLCV and benchmark-aligned NumPy arrays once and accepts an explicit batch-lifetime prepared-symbol cache. Later queries reuse those arrays while independently reconstructing their requested windows. Cached entries retain and recheck both stock and benchmark causal-prefix bindings; the generic source interface remains supported.</p>
+  <p class="pass"><b>Exactness and speed:</b> Two consecutive frozen OHAI searches produced the same authority-exact result digest <code>7af4efe6…7f46</code>. The first took 127.8 seconds and the reused query took 69.8 seconds. A warm exact seed ladder kept all 20 results hexadecimal-exact; 2,048 seed rows was fastest at 62.7 seconds versus 62.9 for 512, 66.6 for 8,192 and 70.4 for 16,384.</p>
+  <p><b>Verification:</b> A repeated-query regression proves equal matches and no candidate-symbol source reloads after preparation. Focused cache, exact-batch and combined-search tests pass 29/29; the complete repository suite passes 989/989 and <code>git diff --check</code> is clean.</p>
+</section>
+<section class="entry">
+  <h2>L-195 — Progressive exact completion tested and rejected</h2>
+  <p><b>Hypothesis:</b> Process combined-bound candidates in increasing batches, recompute the distinct-symbol threshold after each batch and skip later candidates above the tighter threshold.</p>
+  <p class="fail"><b>Measured rejection:</b> The frozen OHAI result remained hexadecimal-exact, but elapsed time regressed to 291.5 seconds. Only 529 same-symbol rows and 1,318 globally bounded rows were avoided, while repeated per-symbol projection across batches dominated execution. The experiment therefore failed its performance purpose.</p>
+  <p><b>Disposition:</b> The progressive implementation was fully removed. Exact completion remains one grouped pass over every candidate at or below the certified seed threshold. This negative result is retained here to prevent an unsupported retry.</p>
+</section>
 </main>
 
 <section id="reproduce">

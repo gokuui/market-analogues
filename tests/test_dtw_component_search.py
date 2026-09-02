@@ -222,11 +222,12 @@ def test_certified_combined_component_matches_exhaustive_oracle(
     assert source.load_counts["AAA"] <= 2
     assert source.load_counts["BBB"] <= 1
     source.load_counts.clear()
+    prepared_symbols = {}
     staged = certified_staged_dtw_component_search(
         query, source, request, packed_root, packed_generation,
         dtw_root, dtw_generation, store_dataset_id="test",
         seed_rows=20, block_rows=13, rigid_threads=2, dtw_threads=2,
-        exact_workers=2,
+        exact_workers=2, prepared_symbol_cache=prepared_symbols,
     )
     expected = []
     seen = set()
@@ -261,3 +262,13 @@ def test_certified_combined_component_matches_exhaustive_oracle(
     # each candidate symbol once even though its frontier takes multiple batches.
     assert source.load_counts["AAA"] <= 2
     assert source.load_counts["BBB"] <= 1
+    assert set(prepared_symbols) == {"AAA", "BBB"}
+    source.load_counts.clear()
+    repeated = certified_staged_dtw_component_search(
+        query, source, request, packed_root, packed_generation,
+        dtw_root, dtw_generation, store_dataset_id="test",
+        seed_rows=20, block_rows=13, rigid_threads=2, dtw_threads=2,
+        exact_workers=2, prepared_symbol_cache=prepared_symbols,
+    )
+    assert repeated.matches == staged.matches
+    assert source.load_counts == {"AAA": 1}

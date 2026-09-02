@@ -402,6 +402,7 @@ def certified_staged_dtw_component_search(
     exact_workers: int = 8,
     tolerance: float = 1e-12,
     verify_content: bool = True,
+    prepared_symbol_cache: dict[str, Any] | None = None,
 ) -> CertifiedStagedDtwComponentResult:
     """Certify exact price neighbours with a retained two-bound cascade.
 
@@ -503,7 +504,9 @@ def certified_staged_dtw_component_search(
     seed_proposals, _seed_counts, _seed_digest = _finalize(
         {"price": seed_heap}, packed.symbols,
     )
-    prepared_cache: dict[str, Any] = {}
+    prepared_cache: dict[str, Any] = (
+        {} if prepared_symbol_cache is None else prepared_symbol_cache
+    )
     seed_values, seed_native_pruned, seed_excess = _score(
         seed_proposals, query=query, query_representation=query_representation,
         source=source, request=request, store_dataset_id=store_dataset_id,

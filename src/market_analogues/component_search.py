@@ -11,9 +11,10 @@ import pandas as pd
 
 from .adapters import OHLCVSource
 from .causal_prefix import causal_prefix_digest
+from .context import align_benchmark_close
 from .exact_batch import (
     batch_exact_price_distances, batch_exact_rigid_price_distances,
-    exact_price_representations_at_positions,
+    exact_price_representations_from_arrays_at_positions,
 )
 from .packed_bound_search import (
     COMPONENT_SEARCH_SCHEMA_VERSION,
@@ -98,8 +99,15 @@ class _CompactComponentScore:
 
 @dataclass(frozen=True)
 class _PreparedComponentSymbol:
-    frame: pd.DataFrame
     timestamp_ns: np.ndarray
+    open_values: np.ndarray
+    high_values: np.ndarray
+    low_values: np.ndarray
+    close_values: np.ndarray
+    volume_values: np.ndarray
+    benchmark_values: np.ndarray
+    source_prefix: dict[str, object]
+    benchmark_prefix: dict[str, object]
 
 
 def _positions_at_cutoffs(timestamp_ns: np.ndarray, cutoff_ns: np.ndarray) -> np.ndarray:
@@ -172,7 +180,6 @@ def _score_group(
     strengthened_proposal_bound: bool = False,
 ) -> tuple[list[_CompactComponentScore], int, float]:
     key = InstrumentKey(store_dataset_id, symbol)
-    frame = prepared.frame
     requested_array = _positions_at_cutoffs(
         prepared.timestamp_ns,
         np.fromiter((row.cutoff_ns for row in proposals), dtype=np.int64),
@@ -180,8 +187,10 @@ def _score_group(
     if np.any(requested_array + 1 < query.key.lookback):
         raise CertifiedComponentSearchError("cannot reconstruct component proposal cutoff")
     requested = requested_array.tolist()
-    representations = exact_price_representations_at_positions(
-        frame, benchmark, positions=np.asarray(requested, dtype=int),
+    representations = exact_price_representations_from_arrays_at_positions(
+        prepared.open_values, prepared.high_values, prepared.low_values,
+        prepared.close_values, prepared.volume_values,
+        prepared.benchmark_values, positions=np.asarray(requested, dtype=int),
         lookback=query.key.lookback,
     )
     if len(representations) != len(proposals):
@@ -300,18 +309,25 @@ def _score(
                 raise CertifiedComponentSearchError(
                     f"packed stock causal prefix is stale: {symbol}"
                 )
-            latest = min(
-                latest_eligible_cutoff(query, request.minimum_history_gap_bars),
-                maximum_cutoff,
-            )
-            frame = bars[bars.timestamp <= latest].reset_index(drop=True)
+            numeric = {
+                name: pd.to_numeric(bars[name], errors="coerce").to_numpy(float)
+                for name in ("open", "high", "low", "close", "volume")
+            }
             prepared = _PreparedComponentSymbol(
-                frame,
                 np.ascontiguousarray(
-                    frame["timestamp"].to_numpy(dtype="datetime64[ns]").view(np.int64)
+                    bars["timestamp"].to_numpy(dtype="datetime64[ns]").view(np.int64)
                 ),
+                numeric["open"], numeric["high"], numeric["low"],
+                numeric["close"], numeric["volume"],
+                align_benchmark_close(bars, benchmark), dict(expected),
+                dict(benchmark_prefix),
             )
             cache[symbol] = prepared
+        elif prepared.source_prefix != expected \
+                or prepared.benchmark_prefix != benchmark_prefix:
+            raise CertifiedComponentSearchError(
+                f"prepared component prefix binding differs: {symbol}"
+            )
         return _score_group(
             symbol, tuple(rows), query=query, query_representation=query_representation,
             request=request, benchmark=benchmark, store_dataset_id=store_dataset_id,
