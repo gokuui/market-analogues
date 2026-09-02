@@ -9,9 +9,9 @@ from market_analogues.distance import (
     representation_distance, representation_distance_lower_bound,
 )
 from market_analogues.exact_batch import (
-    _structural_rows, _structural_rows_reference,
-    batch_exact_price_distances, batch_representation_lower_bounds,
-    exact_representations_at_positions,
+    _structural_rows, _structural_rows_reference, batch_exact_price_distances,
+    batch_exact_rigid_price_distances, batch_representation_lower_bounds,
+    exact_price_representations_at_positions, exact_representations_at_positions,
     sliding_exact_representations,
 )
 from market_analogues.representation import Representation, represent
@@ -184,6 +184,39 @@ def test_batched_exact_price_handles_absent_channels_and_empty_batch() -> None:
     assert batch_exact_price_distances(
         absent, [], np.empty(0, dtype=np.float64),
     ).shape == (0,)
+
+
+def test_specialized_exact_price_projection_is_exactly_equal() -> None:
+    case = generate_case("volatile_reversal", 1_080, n=420)
+    positions = np.asarray([251, 279, 331, 400])
+    complete = exact_representations_at_positions(
+        case.episode.bars, case.episode.benchmark,
+        positions=positions, lookback=252,
+    )
+    specialized = exact_price_representations_at_positions(
+        case.episode.bars, case.episode.benchmark,
+        positions=positions, lookback=252,
+    )
+    query = complete[-1]
+    for full, price in zip(complete, specialized, strict=True):
+        for name, values in price.samples_48.items():
+            np.testing.assert_array_equal(values, full.samples_48[name])
+        for name, values in price.samples_64.items():
+            np.testing.assert_array_equal(values, full.samples_64[name])
+    expected_rigid = batch_representation_lower_bounds(
+        query, list(complete[:-1]),
+    ).rigid_price
+    actual_rigid = batch_exact_rigid_price_distances(
+        query, list(specialized[:-1]),
+    )
+    np.testing.assert_array_equal(actual_rigid, expected_rigid)
+    np.testing.assert_array_equal(
+        batch_exact_price_distances(query, list(specialized[:-1]), actual_rigid),
+        np.asarray([
+            representation_distance(query, candidate)[1]["price"]
+            for candidate in complete[:-1]
+        ]),
+    )
 
 
 @pytest.mark.parametrize("benchmark_mode", ["full", "partial", "missing"])

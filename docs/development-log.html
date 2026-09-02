@@ -1649,6 +1649,14 @@
   <p class="pass"><b>Parity and speed:</b> The specialized branch-aware result is bit-for-bit equal to the full kernel's price component in synthetic family coverage and a real 65,536-row packed slice. That real slice improved from 1.521 to 0.395 seconds (3.85×). Focused search tests and the complete repository suite pass.</p>
   <p><b>Boundary:</b> Composite retrieval still uses every component. This specialization changes neither eligibility nor the price lower-bound formula and opens no outcome or label.</p>
 </section>
+<section class="entry">
+  <h2>L-190 — Exact staged price-plus-DTW search closes the real authority 6.67× faster</h2>
+  <p><b>Certified cascade:</b> The staged search exactly completes a stable 16,384-row rigid-price-bound seed to establish a finite top-20 upper bound, retains every eligible rigid bound equal to or below it, evaluates the stronger DTW bound only for those rows, and exactly completes every combined bound equal to or below it. Only strict-greater-than rows are pruned, preserving ties and distinct-symbol selection.</p>
+  <p><b>Specialized reconstruction:</b> Component completion now materializes only the six 48-sample rigid-price channels and four 64-sample DTW channels it consumes. Unit coverage proves these projections, rigid distances and completed price distances are bit-identical to full distance-v1 representations.</p>
+  <p class="pass"><b>Real authority parity:</b> On the frozen early case, all 20 episode IDs, ordering and hexadecimal distances exactly match the prior scalar combined result. The cascade classified 1,961,577 eligible rows, admitted 638,971 past rigid price, admitted 72,531 past combined DTW and exactly completed 72,646 rows including the seed. End-to-end time fell from 941.3 to 141.1 seconds (6.67× overall); against the first staged implementation it fell from 218.4 to 141.1 seconds. The complete repository suite passes.</p>
+  <p><b>Profile:</b> Rigid and DTW bound phases now take 8.0 and 12.1 seconds. Seed and final exact reconstruction take 63.6 and 56.4 seconds, identifying cross-query source reuse as the next optimization target.</p>
+  <p><b>Boundary:</b> The run used only historical chart prefixes and independently verified packed/DTW stores. No subsequent return, outcome, label or final-period result was opened.</p>
+</section>
 </main>
 
 <section id="reproduce">

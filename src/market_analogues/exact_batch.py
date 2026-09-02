@@ -68,8 +68,10 @@ def _batch_exact_price_distances_compiled(
                 joined[index] = query[channel, index]
                 joined[_DTW_SAMPLES + index] = candidates[row, channel, index]
             ordered = np.sort(joined)
-            q25 = .25 * ordered[31] + .75 * ordered[32]
-            q75 = .75 * ordered[95] + .25 * ordered[96]
+            # NumPy's default linear percentile interpolates from the lower
+            # value; retain that operation order for scalar bit parity.
+            q25 = ordered[31] + (ordered[32] - ordered[31]) * .75
+            q75 = ordered[95] + (ordered[96] - ordered[95]) * .25
             scale = q75 - q25
             if scale < 1e-8:
                 mean = 0.0
@@ -168,6 +170,52 @@ def batch_exact_price_distances(
     return _batch_exact_price_distances_compiled(
         query_values, query_presence, candidate_values, candidate_presence,
         rigid, config.dtw_band_fraction,
+    )
+
+
+def batch_exact_rigid_price_distances(
+    query: Representation,
+    candidates: tuple[Representation, ...] | list[Representation],
+) -> np.ndarray:
+    """Return the exact pre-DTW rigid price distance for a candidate batch."""
+    rows = len(candidates)
+    if not rows:
+        return np.empty(0, dtype=np.float64)
+    distances: list[np.ndarray] = []
+    included: list[np.ndarray] = []
+    for name in GROUPS["price"]:
+        query_values = query.samples_48.get(name)
+        candidate_values = [candidate.samples_48.get(name) for candidate in candidates]
+        present = np.asarray([values is not None for values in candidate_values])
+        if query_values is None:
+            distances.append(np.where(present, 2.0, 0.0))
+            included.append(present)
+            continue
+        query_array = np.asarray(query_values, dtype=np.float64)
+        if query_array.shape != (48,) or not np.isfinite(query_array).all():
+            raise ValueError(f"query rigid price channel differs: {name}")
+        matrix = np.stack([
+            np.asarray(values, dtype=np.float64)
+            if values is not None else np.zeros(48, dtype=np.float64)
+            for values in candidate_values
+        ])
+        if matrix.shape != (rows, 48) or not np.isfinite(matrix).all():
+            raise ValueError(f"candidate rigid price channel differs: {name}")
+        joined = np.c_[matrix, np.broadcast_to(query_array, matrix.shape)]
+        quartiles = np.percentile(joined, [75, 25], axis=1)
+        scale = quartiles[0] - quartiles[1]
+        scale = np.where(scale < 1e-8, np.std(joined, axis=1), scale)
+        scale = np.maximum(scale, 1e-6)
+        values = np.sqrt(np.mean(
+            ((matrix - query_array) / scale[:, None]) ** 2, axis=1,
+        ))
+        values[~present] = 2.0
+        distances.append(values)
+        included.append(np.ones(rows, dtype=bool))
+    count = np.sum(included, axis=0)
+    return np.divide(
+        np.sum(distances, axis=0), count,
+        out=np.zeros(rows, dtype=np.float64), where=count > 0,
     )
 
 
@@ -400,6 +448,106 @@ def exact_representations_at_positions(
         values["volume"][indices], benchmark_values[indices],
     )
     return materialize_exact_representations(channels)
+
+
+def _exact_price_channels_from_rows(
+    open_rows: np.ndarray,
+    high_rows: np.ndarray,
+    low_rows: np.ndarray,
+    close_rows: np.ndarray,
+    volume_rows: np.ndarray,
+    benchmark_rows: np.ndarray,
+) -> dict[str, np.ndarray]:
+    """Build only channels consumed by distance-v1's exact price component."""
+    previous_close = _previous(close_rows)
+    true_range = np.fmax.reduce([
+        high_rows - low_rows,
+        np.abs(high_rows - previous_close),
+        np.abs(low_rows - previous_close),
+    ])
+    atr = _rolling_mean(true_range, 14, 5)
+    stock_return = _log_ratio(close_rows, previous_close)
+    context = _benchmark_channel_rows(benchmark_rows)
+    relative_return = stock_return - context["benchmark_return"]
+    relative_path = np.cumsum(
+        np.where(np.isfinite(relative_return), relative_return, 0), axis=1,
+    )
+    relative_path[~np.isfinite(context["benchmark_return"])] = np.nan
+    channels = {
+        "close_path": _log_ratio(close_rows, close_rows[:, :1]),
+        "return": stock_return,
+        "overnight": _log_ratio(open_rows, previous_close),
+        "intraday": _log_ratio(close_rows, open_rows),
+        "distance_high_63": close_rows / _rolling_extreme(
+            close_rows, 63, 20, maximum=True,
+        ) - 1,
+        "distance_ma_20": close_rows / _rolling_mean(
+            close_rows, 20, 10,
+        ) - 1,
+        "atr_pct": atr / close_rows,
+        "volume_robust_z": _rolling_robust_z(
+            np.log(np.clip(volume_rows, EPS, None)), 20,
+        ),
+        "relative_path": relative_path,
+    }
+    return {
+        name: np.where(np.isfinite(rows), rows, np.nan)
+        for name, rows in channels.items()
+    }
+
+
+def exact_price_representations_at_positions(
+    frame: pd.DataFrame,
+    benchmark: pd.DataFrame | None,
+    *,
+    positions: np.ndarray,
+    lookback: int,
+) -> tuple[Representation, ...]:
+    """Materialize only the nine sampled channels required by exact price."""
+    requested = np.asarray(positions, dtype=int)
+    if requested.ndim != 1 or lookback < 2 or not len(requested) \
+            or len(np.unique(requested)) != len(requested) \
+            or np.any(requested < lookback - 1) or np.any(requested >= len(frame)):
+        raise ValueError("requested exact-price positions differ")
+    values = {
+        name: pd.to_numeric(frame[name], errors="coerce").to_numpy(float)
+        for name in ("open", "high", "low", "close", "volume")
+    }
+    indices = (
+        requested[:, None] - lookback + 1 + np.arange(lookback, dtype=int)
+    )
+    benchmark_values = align_benchmark_close(frame, benchmark)
+    channels = _exact_price_channels_from_rows(
+        values["open"][indices], values["high"][indices],
+        values["low"][indices], values["close"][indices],
+        values["volume"][indices], benchmark_values[indices],
+    )
+    names_48 = GROUPS["price"]
+    names_64 = _DTW_CHANNELS
+    sampled_48 = {
+        name: _resample_rows(channels[name], 48, optional=True)
+        for name in names_48
+    }
+    sampled_64 = {
+        name: _resample_rows(channels[name], 64, optional=True)
+        for name in names_64
+    }
+    empty = np.empty(0, dtype=np.float64)
+    return tuple(
+        Representation(
+            pd.DataFrame(), empty,
+            {
+                name: samples[row].copy() if present[row] else None
+                for name, (samples, present) in sampled_48.items()
+            },
+            {
+                name: samples[row].copy() if present[row] else None
+                for name, (samples, present) in sampled_64.items()
+            },
+            empty, empty,
+        )
+        for row in range(len(requested))
+    )
 
 
 def _resample_rows(

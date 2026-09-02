@@ -12,8 +12,8 @@ import pandas as pd
 from .adapters import OHLCVSource
 from .causal_prefix import causal_prefix_digest
 from .exact_batch import (
-    batch_exact_price_distances, batch_representation_lower_bounds,
-    exact_representations_at_positions,
+    batch_exact_price_distances, batch_exact_rigid_price_distances,
+    exact_price_representations_at_positions,
 )
 from .packed_bound_search import (
     COMPONENT_SEARCH_SCHEMA_VERSION,
@@ -180,13 +180,16 @@ def _score_group(
     if np.any(requested_array + 1 < query.key.lookback):
         raise CertifiedComponentSearchError("cannot reconstruct component proposal cutoff")
     requested = requested_array.tolist()
-    representations = exact_representations_at_positions(
+    representations = exact_price_representations_at_positions(
         frame, benchmark, positions=np.asarray(requested, dtype=int),
         lookback=query.key.lookback,
     )
     if len(representations) != len(proposals):
         raise CertifiedComponentSearchError("component representation batch differs")
-    bounded = batch_representation_lower_bounds(query_representation, representations)
+    rigid_price = batch_exact_rigid_price_distances(
+        query_representation, representations,
+    )
+    native_price = .55 * rigid_price
     output: list[_CompactComponentScore] = []
     native_pruned = 0
     maximum_excess = 0.0
@@ -219,7 +222,7 @@ def _score_group(
                 or (not request.cross_dataset
                     and key.dataset_id != query.key.instrument.dataset_id):
             raise CertifiedComponentSearchError("component proposal eligibility changed")
-        native_lower = float(bounded.components[PRICE_COMPONENT][index])
+        native_lower = float(native_price[index])
         excess = proposal.lower_bound - native_lower
         if not np.isfinite(native_lower) or native_lower < 0 \
                 or not np.isfinite(excess) \
@@ -235,7 +238,7 @@ def _score_group(
     exact_prices = batch_exact_price_distances(
         query_representation,
         [representations[index] for index in exact_indexes],
-        bounded.rigid_price[np.asarray(exact_indexes, dtype=int)],
+        rigid_price[np.asarray(exact_indexes, dtype=int)],
     )
     for index, exact_price_value in zip(exact_indexes, exact_prices, strict=True):
         proposal = proposals[index]
@@ -243,7 +246,7 @@ def _score_group(
             key, pd.Timestamp(proposal.cutoff_ns), query.key.lookback,
             query.key.representation_version,
         )
-        native_lower = float(bounded.components[PRICE_COMPONENT][index])
+        native_lower = float(native_price[index])
         exact_price = float(exact_price_value)
         if not np.isfinite(exact_price) \
                 or exact_price + tolerance < native_lower \

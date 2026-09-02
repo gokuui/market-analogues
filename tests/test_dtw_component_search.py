@@ -6,9 +6,9 @@ import numba
 import pandas as pd
 
 from market_analogues.dtw_component_search import (
-    certified_dtw_component_search,
+    certified_dtw_component_search, certified_staged_dtw_component_search,
     certified_dtw_component_search_contract,
-    dtw_component_search_contract,
+    dtw_component_search_contract, staged_dtw_component_search_contract,
     scan_dtw_component_bound_proposals,
 )
 from market_analogues.adapters import DirectorySource
@@ -219,6 +219,15 @@ def test_certified_combined_component_matches_exhaustive_oracle(
         initial_frontier_rows=1000, maximum_frontier_rows=1000,
         seed_rows=20, block_rows=13, workers=2,
     )
+    assert source.load_counts["AAA"] <= 2
+    assert source.load_counts["BBB"] <= 1
+    source.load_counts.clear()
+    staged = certified_staged_dtw_component_search(
+        query, source, request, packed_root, packed_generation,
+        dtw_root, dtw_generation, store_dataset_id="test",
+        seed_rows=20, block_rows=13, rigid_threads=2, dtw_threads=2,
+        exact_workers=2,
+    )
     expected = []
     seen = set()
     for distance, episode_id, symbol in sorted(exact):
@@ -237,6 +246,17 @@ def test_certified_combined_component_matches_exhaustive_oracle(
         or result.certificate.next_lower_bound > result.certificate.stop_threshold
     assert result.certificate.contract_digest \
         == certified_dtw_component_search_contract()["digest"]
+    assert [row.episode_key.id for row in staged.matches] \
+        == [row[0] for row in expected]
+    np.testing.assert_allclose(
+        [row.total_distance for row in staged.matches],
+        [row[1] for row in expected], rtol=0, atol=1e-12,
+    )
+    assert staged.certificate.contract_digest \
+        == staged_dtw_component_search_contract()["digest"]
+    assert staged.certificate.final_threshold <= staged.certificate.seed_threshold
+    assert staged.certificate.rigid_bound_admitted \
+        >= staged.certificate.combined_bound_admitted
     # The query prefix needs one load of AAA; exact completion then prepares
     # each candidate symbol once even though its frontier takes multiple batches.
     assert source.load_counts["AAA"] <= 2

@@ -28,6 +28,7 @@ from .packed_bound_search import (
     _finalize,
     _packed_query_input_digest,
     _stable_bounded,
+    _bounded_ordered_thread_results,
     packed_component_search_contract,
 )
 from .packed_bound_store import (
@@ -106,6 +107,41 @@ class CertifiedDtwComponentResult:
     certificate: DtwComponentCertificate
 
 
+@dataclass(frozen=True)
+class StagedDtwComponentCertificate:
+    schema_version: str
+    contract_digest: str
+    packed_generation_id: str
+    dtw_generation_id: str
+    query_episode_id: str
+    input_digest: str
+    eligible_candidates: int
+    seed_rows: int
+    rigid_bound_evaluated: int
+    rigid_bound_admitted: int
+    dtw_bound_evaluated: int
+    combined_bound_admitted: int
+    exact_evaluated: int
+    native_bound_pruned: int
+    seed_threshold: float
+    final_threshold: float
+    minimum_rigid_pruned: float | None
+    minimum_combined_pruned: float | None
+    maximum_bound_excess: float
+    result_digest: str
+    rigid_seconds: float
+    seed_exact_seconds: float
+    dtw_seconds: float
+    final_exact_seconds: float
+    elapsed_seconds: float
+
+
+@dataclass(frozen=True)
+class CertifiedStagedDtwComponentResult:
+    matches: tuple[AnalogueMatch, ...]
+    certificate: StagedDtwComponentCertificate
+
+
 def dtw_component_search_contract() -> dict[str, Any]:
     state = {
         "schema_version": SCHEMA_VERSION,
@@ -144,6 +180,29 @@ def certified_dtw_component_search_contract() -> dict[str, Any]:
         "completion": (
             "exactly score the combined-bound frontier and stop only when the next "
             "combined bound is strictly above the constrained top-20 threshold"
+        ),
+        "selection": "ascending (exact price distance, episode ID), one row per symbol",
+        "outcomes_or_labels_used": False,
+    }
+    return {**state, "digest": stable_hash(state)}
+
+
+def staged_dtw_component_search_contract() -> dict[str, Any]:
+    state = {
+        "schema_version": "certified-staged-dtw-component-search-v1",
+        "component": "price",
+        "price_bound_contract_digest": packed_component_search_contract(
+            "price"
+        )["digest"],
+        "combined_bound_contract_digest": dtw_component_search_contract()["digest"],
+        "seed": (
+            "exactly complete a stable prefix ordered by the safe rigid-price "
+            "bound to establish a finite distinct-symbol top-k upper bound"
+        ),
+        "closure": (
+            "retain every eligible rigid bound at or below the seed threshold; "
+            "evaluate its combined DTW bound; exactly complete every combined "
+            "bound at or below that threshold; prune only strict greater-than"
         ),
         "selection": "ascending (exact price distance, episode ID), one row per symbol",
         "outcomes_or_labels_used": False,
@@ -324,6 +383,278 @@ def scan_dtw_component_bound_proposals(
         threads, float(perf_counter() - started), peak, candidate_digest,
         stable_hash(deterministic),
     )
+
+
+def certified_staged_dtw_component_search(
+    query: Episode,
+    source: OHLCVSource,
+    request: SearchQuery,
+    packed_root: Path,
+    packed_generation_id: str,
+    dtw_root: Path,
+    dtw_generation_id: str,
+    *,
+    store_dataset_id: str,
+    seed_rows: int = 16_384,
+    block_rows: int = 4_096,
+    rigid_threads: int = 8,
+    dtw_threads: int = 8,
+    exact_workers: int = 8,
+    tolerance: float = 1e-12,
+    verify_content: bool = True,
+) -> CertifiedStagedDtwComponentResult:
+    """Certify exact price neighbours with a retained two-bound cascade.
+
+    A finite exact threshold from the cheapest safe-bound prefix lets the
+    expensive DTW bound skip every row already excluded by rigid price.  All
+    equality boundaries are retained and exact completion uses the same
+    distinct-symbol selector as the scalar certified search.
+    """
+    available_threads = int(numba.config.NUMBA_NUM_THREADS)
+    if request.max_per_instrument != 1 or request.deduplicate_overlaps is not True:
+        raise DtwComponentSearchError("staged search requires one row per symbol")
+    if store_dataset_id != query.key.instrument.dataset_id and not request.cross_dataset:
+        raise DtwComponentSearchError("cross-dataset staged search is not authorized")
+    if any(type(value) is not int or isinstance(value, bool) or value < 1 for value in (
+        seed_rows, block_rows, rigid_threads, dtw_threads, exact_workers,
+    )) or rigid_threads > available_threads or dtw_threads > available_threads \
+            or seed_rows < request.top_k or not np.isfinite(tolerance) \
+            or tolerance < 0:
+        raise DtwComponentSearchError("staged search controls differ")
+    started = perf_counter()
+    packed = load_packed_generation(
+        packed_root, packed_generation_id, verify_content=verify_content,
+        validate_records=False,
+    )
+    dtw = load_dtw_sample_generation(
+        dtw_root, dtw_generation_id, packed_manifest=packed.manifest,
+        verify_content=verify_content, validate_records=verify_content,
+    )
+    if len(packed.rows) != len(dtw.rows) \
+            or len(packed.overflow) != len(dtw.overflow):
+        raise DtwComponentSearchError("staged store alignment differs")
+    benchmark = source.load_benchmark()
+    if benchmark is None:
+        raise DtwComponentSearchError("staged search requires benchmark context")
+    query_representation = represent(query)
+    packed_query = PackedBoundQuery(
+        query.key.id, query.key.instrument.source_symbol,
+        int(query.bars.timestamp.iloc[0].value),
+        int(latest_eligible_cutoff(
+            query, request.minimum_history_gap_bars,
+        ).value),
+        query_representation, request.quality_tiers,
+    )
+    symbol_id = (
+        packed.symbols.index(packed_query.symbol)
+        if packed_query.symbol in packed.symbols else None
+    )
+    rigid_scores = np.full(len(packed.rows), np.inf, dtype=np.float64)
+    eligible_main = 0
+    offsets = range(0, len(packed.rows), block_rows)
+
+    def rigid_block(first: int) -> tuple[int, np.ndarray, np.ndarray]:
+        numba.set_num_threads(1)
+        last = min(first + block_rows, len(packed.rows))
+        records = np.asarray(packed.rows[first:last])
+        mask = _eligible_mask(records, packed_query, symbol_id)
+        positions = np.flatnonzero(mask)
+        values = (
+            packed_branch_aware_price_lower_bounds(
+                query_representation, records[positions],
+            ) if len(positions) else np.empty(0, dtype=np.float64)
+        )
+        return first, positions, values
+
+    with ThreadPoolExecutor(
+        max_workers=rigid_threads, thread_name_prefix="staged-rigid-bound",
+    ) as executor:
+        for first, positions, values in _bounded_ordered_thread_results(
+            executor, rigid_block, offsets, rigid_threads,
+        ):
+            rigid_scores[first + positions] = values
+            eligible_main += len(positions)
+    rigid_finished = perf_counter()
+
+    overflow = np.asarray(packed.overflow)
+    eligible_overflow_records = overflow[
+        _eligible_mask(overflow, packed_query, symbol_id)
+    ]
+    eligible_overflow = len(eligible_overflow_records)
+    eligible_candidates = eligible_main + eligible_overflow
+    if eligible_candidates < request.top_k:
+        raise DtwComponentSearchError("staged search has fewer eligible rows than top-k")
+
+    seed_positions = _stable_main_positions(
+        packed.rows, rigid_scores, min(seed_rows, eligible_main),
+    )
+    seed_heap = _entries_at_positions(
+        packed.rows, seed_positions, rigid_scores[seed_positions],
+    )
+    if eligible_overflow:
+        zeros = np.zeros(eligible_overflow, dtype=np.float64)
+        seed_heap = _stable_bounded(
+            seed_heap,
+            _entries(
+                eligible_overflow_records, zeros, zeros, overflow=True,
+            ),
+            min(seed_rows, eligible_candidates),
+        )
+    seed_proposals, _seed_counts, _seed_digest = _finalize(
+        {"price": seed_heap}, packed.symbols,
+    )
+    prepared_cache: dict[str, Any] = {}
+    seed_values, seed_native_pruned, seed_excess = _score(
+        seed_proposals, query=query, query_representation=query_representation,
+        source=source, request=request, store_dataset_id=store_dataset_id,
+        manifest=packed.manifest, completion_threshold=float("inf"),
+        tolerance=tolerance, workers=exact_workers, benchmark=benchmark,
+        strengthened_proposal_bound=False, prepared_cache=prepared_cache,
+    )
+    seed_finished = perf_counter()
+    if seed_native_pruned:
+        raise DtwComponentSearchError("staged seed unexpectedly pruned")
+    scored = {row.match.episode_key.id: row for row in seed_values}
+    seed_selected = _select(scored.values(), request.top_k)
+    if len(seed_selected) != request.top_k:
+        raise DtwComponentSearchError("staged seed lacks distinct-symbol top-k")
+    seed_threshold = float(seed_selected[-1].total_distance)
+    rigid_admitted_positions = np.flatnonzero(rigid_scores <= seed_threshold)
+    rigid_pruned_values = rigid_scores[
+        np.isfinite(rigid_scores) & (rigid_scores > seed_threshold)
+    ]
+    minimum_rigid_pruned = (
+        float(np.min(rigid_pruned_values)) if len(rigid_pruned_values) else None
+    )
+
+    combined_positions: list[np.ndarray] = []
+    combined_values: list[np.ndarray] = []
+    minimum_combined_pruned = float("inf")
+    numba.set_num_threads(dtw_threads)
+    for first in range(0, len(rigid_admitted_positions), block_rows):
+        positions = rigid_admitted_positions[first:first + block_rows]
+        dtw_values = dtw_sample_lower_bounds(
+            query_representation, np.asarray(dtw.rows[positions]),
+        )
+        values = rigid_scores[positions] + .45 * dtw_values
+        if not np.isfinite(values).all() or np.any(values < rigid_scores[positions]):
+            raise DtwComponentSearchError("staged combined bound is invalid")
+        admitted = values <= seed_threshold
+        if np.any(admitted):
+            combined_positions.append(positions[admitted])
+            combined_values.append(values[admitted])
+        if np.any(~admitted):
+            minimum_combined_pruned = min(
+                minimum_combined_pruned, float(np.min(values[~admitted])),
+            )
+    dtw_finished = perf_counter()
+    retained_positions = (
+        np.concatenate(combined_positions)
+        if combined_positions else np.empty(0, dtype=int)
+    )
+    retained_values = (
+        np.concatenate(combined_values)
+        if combined_values else np.empty(0, dtype=np.float64)
+    )
+    final_heap = _entries_at_positions(
+        packed.rows, retained_positions, retained_values,
+    )
+    if eligible_overflow:
+        zeros = np.zeros(eligible_overflow, dtype=np.float64)
+        final_heap = np.concatenate((
+            final_heap,
+            _entries(
+                eligible_overflow_records, zeros, zeros, overflow=True,
+            ),
+        ))
+    final_proposals, _final_counts, _final_digest = _finalize(
+        {"price": final_heap}, packed.symbols,
+    )
+    pending = [
+        row for row in final_proposals if row.episode_id not in scored
+    ]
+    values, native_pruned, completion_excess = _score(
+        pending, query=query, query_representation=query_representation,
+        source=source, request=request, store_dataset_id=store_dataset_id,
+        manifest=packed.manifest, completion_threshold=seed_threshold,
+        tolerance=tolerance, workers=exact_workers, benchmark=benchmark,
+        strengthened_proposal_bound=True, prepared_cache=prepared_cache,
+    )
+    exact_finished = perf_counter()
+    scored.update({row.match.episode_key.id: row for row in values})
+    selected = _select(scored.values(), request.top_k)
+    if len(selected) != request.top_k:
+        raise DtwComponentSearchError("staged exact completion underfilled top-k")
+    final_threshold = float(selected[-1].total_distance)
+    if final_threshold > seed_threshold + tolerance \
+            or minimum_rigid_pruned is not None \
+            and minimum_rigid_pruned <= seed_threshold \
+            or np.isfinite(minimum_combined_pruned) \
+            and minimum_combined_pruned <= seed_threshold:
+        raise DtwComponentSearchError("staged strict-bound closure differs")
+    contract = staged_dtw_component_search_contract()
+    input_digest = stable_hash({
+        "query_stock_prefix": asdict(causal_prefix_digest(
+            source.load(query.key.instrument), query.key.cutoff,
+        )),
+        "query_representation_digest": representation_input_digest(
+            query_representation,
+        ),
+        "request": asdict(request),
+        "packed_generation_id": packed.generation_id,
+        "packed_provenance_digest": packed.manifest["provenance_digest"],
+        "dtw_generation_id": dtw.generation_id,
+        "dtw_provenance_digest": dtw.manifest["provenance_digest"],
+        "contract_digest": contract["digest"],
+    })
+    exact_evaluated = len(seed_values) + len(values)
+    deterministic = {
+        "schema_version": contract["schema_version"],
+        "contract_digest": contract["digest"],
+        "packed_generation_id": packed.generation_id,
+        "dtw_generation_id": dtw.generation_id,
+        "query_episode_id": query.key.id, "input_digest": input_digest,
+        "eligible_candidates": eligible_candidates,
+        "seed_rows": len(seed_proposals),
+        "rigid_bound_evaluated": eligible_candidates,
+        "rigid_bound_admitted": len(rigid_admitted_positions) + eligible_overflow,
+        "dtw_bound_evaluated": len(rigid_admitted_positions),
+        "combined_bound_admitted": len(final_proposals),
+        "exact_evaluated": exact_evaluated,
+        "native_bound_pruned": native_pruned,
+        "seed_threshold_hex": seed_threshold.hex(),
+        "final_threshold_hex": final_threshold.hex(),
+        "minimum_rigid_pruned_hex": (
+            minimum_rigid_pruned.hex() if minimum_rigid_pruned is not None else None
+        ),
+        "minimum_combined_pruned_hex": (
+            minimum_combined_pruned.hex()
+            if np.isfinite(minimum_combined_pruned) else None
+        ),
+        "maximum_bound_excess_hex": max(
+            seed_excess, completion_excess,
+        ).hex(),
+        "matches": [{
+            "episode_id": row.episode_key.id,
+            "distance_hex": row.total_distance.hex(),
+        } for row in selected],
+        "outcomes_or_labels_used": False,
+    }
+    result_digest = stable_hash(deterministic)
+    certificate = StagedDtwComponentCertificate(
+        str(contract["schema_version"]), str(contract["digest"]),
+        packed.generation_id, dtw.generation_id, query.key.id, input_digest,
+        eligible_candidates, len(seed_proposals), eligible_candidates,
+        len(rigid_admitted_positions) + eligible_overflow,
+        len(rigid_admitted_positions), len(final_proposals), exact_evaluated,
+        native_pruned, seed_threshold, final_threshold, minimum_rigid_pruned,
+        (minimum_combined_pruned if np.isfinite(minimum_combined_pruned) else None),
+        max(seed_excess, completion_excess), result_digest,
+        rigid_finished - started, seed_finished - rigid_finished,
+        dtw_finished - seed_finished, exact_finished - dtw_finished,
+        float(perf_counter() - started),
+    )
+    return CertifiedStagedDtwComponentResult(tuple(selected), certificate)
 
 
 def certified_dtw_component_search(
