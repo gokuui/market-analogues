@@ -4,9 +4,11 @@ from __future__ import annotations
 import argparse
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import asdict
+from hashlib import sha256
 import json
 import multiprocessing
 from pathlib import Path
+import subprocess
 from time import perf_counter
 from typing import Any, Sequence
 
@@ -43,6 +45,12 @@ _SHARD_ROOT: Path | None = None
 
 class FullBaselineVerificationError(RuntimeError):
     pass
+
+
+def _boundary_probes(count: int) -> list[int]:
+    if type(count) is not int or isinstance(count, bool) or count < 0:
+        raise FullBaselineVerificationError("full baseline probe count differs")
+    return [] if count == 0 else sorted({0, count - 1})
 
 
 def _verify_symbol(specification: dict[str, Any]) -> dict[str, Any]:
@@ -83,9 +91,7 @@ def _verify_symbol(specification: dict[str, Any]) -> dict[str, Any]:
             or not (metadata["overflow_rows"] == specification["overflow_rows"]
                     == len(overflow_records)):
         raise FullBaselineVerificationError("full baseline shard receipt differs")
-    main_probes = sorted(set(
-        value for value in (0, len(main_records) - 1) if value >= 0
-    ))
+    main_probes = _boundary_probes(len(main_records))
     overflow_probes = list(range(len(overflow_records)))
     maximum_delta = 0.0
     non_bitwise = 0
@@ -124,6 +130,18 @@ def _verify_symbol(specification: dict[str, Any]) -> dict[str, Any]:
 def verify(repository: Path) -> dict[str, Any]:
     started = perf_counter()
     repository = repository.resolve(strict=True)
+    if producer._git(repository, "status", "--porcelain"):
+        raise FullBaselineVerificationError("full baseline verifier requires clean commit")
+    verifier_commit = producer._git(repository, "rev-parse", "HEAD")
+    verifier_relative = str(Path(__file__).resolve().relative_to(repository))
+    verifier_sha256 = base._sha(repository / verifier_relative)
+    verifier_blob = subprocess.run(
+        ["git", "show", f"{verifier_commit}:{verifier_relative}"],
+        cwd=repository, capture_output=True, check=False,
+    )
+    if verifier_blob.returncode \
+            or sha256(verifier_blob.stdout).hexdigest() != verifier_sha256:
+        raise FullBaselineVerificationError("full baseline verifier Git binding differs")
     root = repository / producer.OUTPUT_RELATIVE
     preregistration = base._read(repository / producer.PREREGISTRATION_RELATIVE)
     base._validate_seal(preregistration, "preregistration_digest")
@@ -133,11 +151,9 @@ def verify(repository: Path) -> dict[str, Any]:
             or result.get("independent_verification_authorized") is not True \
             or result.get("outcomes_or_labels_used") is not False:
         raise FullBaselineVerificationError("full baseline producer result differs")
-    loaded, source, verification = producer._prerequisites(repository)
-    if verification["verification_digest"] != preregistration["inputs"][
-        "bounded_verification_digest"
-    ]:
-        raise FullBaselineVerificationError("bounded verification binding differs")
+    loaded, source, selection = producer.validate_preregistration(
+        repository, preregistration,
+    )
     generation = load_feature_generation(
         root / "store", result["generation_id"],
         packed_manifest=loaded.manifest, verify_content=True,
@@ -154,7 +170,7 @@ def verify(repository: Path) -> dict[str, Any]:
         max_workers=WORKERS, mp_context=multiprocessing.get_context("fork"),
     ) as executor:
         observations = list(executor.map(
-            _verify_symbol, preregistration["selection"], chunksize=8,
+            _verify_symbol, selection, chunksize=8,
         ))
     observations.sort(key=lambda row: row["symbol_id"])
     maximum_delta = max(row["maximum_delta"] for row in observations)
@@ -184,6 +200,8 @@ def verify(repository: Path) -> dict[str, Any]:
         "gates": gates,
         "producer_result_digest": result["result_digest"],
         "preregistration_digest": preregistration["preregistration_digest"],
+        "verifier_commit": verifier_commit,
+        "verifier_runtime_sha256": verifier_sha256,
         "generation_id": generation.generation_id,
         "symbols_verified": len(observations),
         "rows_verified": rows,

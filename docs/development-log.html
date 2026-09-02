@@ -1584,6 +1584,13 @@
   <p><b>Boundary:</b> Monthly 3,936-query retrieval is not authorized until the full build and its independent verifier pass. No outcomes or labels are accessed by either harness.</p>
   <p><b>Pre-freeze optimization:</b> A diagnostic preregistration was stopped before publication after repeated binary searches over the wide strided packed map exceeded 90 seconds. Full selection now makes one sequential <code>bincount</code> pass and freezes each main/overflow start offset and count; workers and the verifier use direct physical slices.</p>
 </section>
+<section class="entry">
+  <h2>L-180 — Full feature generation passes; verifier retains empty-slice refusal</h2>
+  <p class="pass"><b>Producer:</b> H0 <code>4b06373</code> and sole-child H1 <code>35a966c</code> built all 11,584 symbols in 63.94 seconds. The content-addressed generation <code>83bb03f3…b423</code> contains exactly 3,786,121 main and 35 overflow rows (90,867,744 bytes), all finite and physically aligned, with unchanged resident identity. Result digest is <code>f8cf29a5…3e67</code>.</p>
+  <p><b>Retained verifier refusal:</b> Before publishing any receipt, the full verifier encountered a symbol with zero main episodes. Its first/last sampler incorrectly produced index zero for the empty array and raised <code>IndexError</code>. Store hashes and producer gates had already passed; the fault is confined to verification sampling.</p>
+  <p><b>Repair:</b> A typed boundary selector now returns no probes for zero rows, one probe for one row and both endpoints for multiple rows. All three cases receive a regression test. The verifier is not part of the frozen producer runtime, so this repair does not alter or invalidate the producer lineage. Before work, the repaired verifier now revalidates the producer's frozen Git blobs and binds its own clean commit and runtime blob into its receipt.</p>
+  <p><b>Boundary:</b> No full verification receipt exists yet. Monthly retrieval remains unauthorized until the repaired independent verifier completes.</p>
+</section>
 </main>
 
 <section id="reproduce">

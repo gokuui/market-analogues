@@ -10,6 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from experiments.m04r import m04r14_t14_10_wf03_baseline_store_full as subject
+from experiments.m04r import verify_m04r14_t14_10_wf03_baseline_store_full as verifier
 from market_analogues.causal_prefix import causal_prefix_digest
 from market_analogues.packed_bound_store import OVERFLOW_DTYPE, PACK_DTYPE, TIER_CODES
 
@@ -42,6 +43,12 @@ def test_full_selection_covers_every_physical_row() -> None:
         row["symbol_id"], row["main_start"], row["overflow_start"],
         row["rows"], row["overflow_rows"],
     ) for row in selection] == [(0, 0, 0, 1, 0), (1, 1, 0, 1, 1)]
+
+
+def test_full_verifier_boundary_probes_cover_empty_one_and_many() -> None:
+    assert verifier._boundary_probes(0) == []
+    assert verifier._boundary_probes(1) == [0]
+    assert verifier._boundary_probes(5) == [0, 4]
 
 
 def test_full_worker_builds_and_revalidates_feature_shard(
