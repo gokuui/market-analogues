@@ -21,6 +21,12 @@ class BaselineNeighbor:
     order_key: str
 
 
+@dataclass(frozen=True)
+class BaselineRankIndex:
+    orders: tuple[np.ndarray, np.ndarray, np.ndarray]
+    finite: np.ndarray
+
+
 def baseline_neighbor_contract() -> dict[str, Any]:
     state = {
         "schema_version": "wf03-baseline-neighbors-v1",
@@ -119,22 +125,26 @@ def deterministic_random_neighbors(
     )
     if type(top_k) is not int or isinstance(top_k, bool) or top_k < 1:
         raise BaselineNeighborError("random baseline top-k differs")
+    positions = np.flatnonzero(mask)
+    eligible_symbols = np.unique(symbol_values[positions])
+    ordered_symbols = sorted((int(value) for value in eligible_symbols), key=lambda value: (
+        _digest(b"wf03-random-symbol-v1", query_id, symbols[value].encode()),
+        symbols[value],
+    ))[:top_k]
+    selected_symbols = np.zeros(len(symbols), dtype=np.bool_)
+    selected_symbols[ordered_symbols] = True
     best: dict[int, tuple[bytes, bytes]] = {}
-    for position in np.flatnonzero(mask):
+    for position in positions[selected_symbols[symbol_values[positions]]]:
         raw = bytes(ids[position])
         symbol_id = int(symbol_values[position])
         key = _digest(b"wf03-random-episode-v1", query_id, raw)
         current = best.get(symbol_id)
         if current is None or (key, raw) < current:
             best[symbol_id] = (key, raw)
-    ordered_symbols = sorted(best, key=lambda value: (
-        _digest(b"wf03-random-symbol-v1", query_id, symbols[value].encode()),
-        symbols[value],
-    ))
     return tuple(BaselineNeighbor(
         best[symbol_id][1].hex(), symbols[symbol_id], None,
         best[symbol_id][0].hex(),
-    ) for symbol_id in ordered_symbols[:top_k])
+    ) for symbol_id in ordered_symbols)
 
 
 def _ordinal_ranks_with_query(
@@ -153,6 +163,108 @@ def _ordinal_ranks_with_query(
     ranks = np.empty(n + 1, dtype=np.float64)
     ranks[order] = np.arange(n + 1, dtype=np.float64) / max(n, 1)
     return ranks[:n], float(ranks[n])
+
+
+def _identifier_fields(episode_ids: np.ndarray) -> np.ndarray:
+    return np.frombuffer(
+        np.ascontiguousarray(episode_ids, dtype="V12").tobytes(),
+        dtype=np.dtype([("high", ">u8"), ("low", ">u4")]),
+    )
+
+
+def build_baseline_rank_index(
+    features: np.ndarray, episode_ids: np.ndarray,
+) -> BaselineRankIndex:
+    matrix = np.asarray(features, dtype=np.float64)
+    ids = np.asarray(episode_ids)
+    if matrix.ndim != 2 or matrix.shape[1:] != (3,) \
+            or ids.ndim != 1 or len(ids) != len(matrix) or ids.dtype.itemsize != 12:
+        raise BaselineNeighborError("return/volatility rank-index arrays differ")
+    finite = np.isfinite(matrix).all(axis=1)
+    if np.any(np.isfinite(matrix).any(axis=1) != finite):
+        raise BaselineNeighborError("return/volatility rank-index finiteness differs")
+    positions = np.flatnonzero(finite)
+    identifiers = _identifier_fields(ids[positions])
+    orders = tuple(
+        positions[np.lexsort((
+            identifiers["low"], identifiers["high"], matrix[positions, column],
+        ))].astype(np.int64, copy=False)
+        for column in range(3)
+    )
+    return BaselineRankIndex(orders, finite)
+
+
+def indexed_recent_return_volatility_neighbors(
+    index: BaselineRankIndex,
+    features: np.ndarray,
+    episode_ids: np.ndarray,
+    symbol_ids: np.ndarray,
+    eligible: np.ndarray,
+    symbols: tuple[str, ...],
+    query_features: np.ndarray,
+    query_id: str,
+    *,
+    top_k: int = 20,
+) -> tuple[BaselineNeighbor, ...]:
+    ids, symbol_values, mask = _validate_arrays(
+        episode_ids, symbol_ids, eligible, symbols,
+    )
+    matrix = np.asarray(features, dtype=np.float64)
+    query = np.asarray(query_features, dtype=np.float64)
+    if matrix.shape != (len(ids), 3) or query.shape != (3,) \
+            or index.finite.shape != (len(ids),) or index.finite.dtype != np.bool_ \
+            or len(index.orders) != 3 \
+            or type(top_k) is not int or isinstance(top_k, bool) or top_k < 1 \
+            or not np.isfinite(query).all():
+        raise BaselineNeighborError("indexed return/volatility arrays differ")
+    mask = mask & index.finite
+    positions = np.flatnonzero(mask)
+    count = len(positions)
+    if not count:
+        return ()
+    distance = np.zeros(len(ids), dtype=np.float64)
+    query_raw = np.void(bytes.fromhex(query_id))
+    for column, order in enumerate(index.orders):
+        if order.ndim != 1 or order.dtype.kind not in "iu" \
+                or len(order) != int(index.finite.sum()):
+            raise BaselineNeighborError("return/volatility rank-index order differs")
+        sorted_eligible = mask[order]
+        cumulative = np.cumsum(sorted_eligible, dtype=np.int64)
+        sorted_values = matrix[order, column]
+        left = int(np.searchsorted(sorted_values, query[column], side="left"))
+        right = int(np.searchsorted(sorted_values, query[column], side="right"))
+        equal_ids = np.ascontiguousarray(ids[order[left:right]], dtype="V12")
+        insertion = left + int(np.searchsorted(equal_ids, query_raw, side="left"))
+        query_less = int(cumulative[insertion - 1]) if insertion else 0
+        query_rank = query_less / max(count, 1)
+        candidate_sorted_positions = np.flatnonzero(sorted_eligible)
+        candidate_order = order[candidate_sorted_positions]
+        candidate_ranks = (
+            np.arange(count, dtype=np.float64)
+            + (candidate_sorted_positions >= insertion)
+        ) / max(count, 1)
+        distance[candidate_order] += np.abs(candidate_ranks - query_rank)
+    selected_symbols = symbol_values[positions].astype(np.int64, copy=False)
+    minima = np.full(len(symbols), np.inf, dtype=np.float64)
+    np.minimum.at(minima, selected_symbols, distance[positions])
+    tied = positions[distance[positions] == minima[selected_symbols]]
+    tied_identifiers = _identifier_fields(ids[tied])
+    tied_order = np.lexsort((
+        tied_identifiers["low"], tied_identifiers["high"], symbol_values[tied],
+    ))
+    ordered_tied = tied[tied_order]
+    _unique_symbols, first = np.unique(
+        symbol_values[ordered_tied], return_index=True,
+    )
+    best = ordered_tied[first]
+    best_identifiers = _identifier_fields(ids[best])
+    ranking = np.lexsort((
+        best_identifiers["low"], best_identifiers["high"], distance[best],
+    ))
+    return tuple(BaselineNeighbor(
+        bytes(ids[position]).hex(), symbols[int(symbol_values[position])],
+        float(distance[position]), "",
+    ) for position in best[ranking[:top_k]])
 
 
 def recent_return_volatility_neighbors(

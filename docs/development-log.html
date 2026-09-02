@@ -1597,6 +1597,13 @@
   <p class="pass"><b>Raw audit:</b> First/last main rows for every nonempty symbol and every overflow row produced 62,931 independently reconstructed binary64 feature values. All are bit-identical with maximum delta <code>0.0</code>. Verification digest is <code>1f461f2a…8bae</code>; generation remains <code>83bb03f3…b423</code>.</p>
   <p><b>Decision:</b> Full deterministic-random and recent-return/volatility baseline storage is correctness-complete and the outcome-blind 3,936-query monthly committee retrieval stage is authorized. Historical outcomes, setup labels and the final period remain unopened.</p>
 </section>
+<section class="entry">
+  <h2>L-182 — Exact baseline retrieval accelerated for monthly scale</h2>
+  <p><b>Measured baseline:</b> On the late 3,683,053-eligible-row query, the original deterministic-random path took 6.59 seconds and exhaustive rank-L1 took 7.66 seconds. Eight-process execution across 3,936 queries would therefore remain near two hours.</p>
+  <p><b>Random optimization:</b> Symbol ordering is independent of episode ordering, so the exact algorithm first hashes all eligible symbols, retains the first 20, then hashes episodes only within those symbols. An independently written exhaustive oracle reproduces exact episode, symbol and order-key outputs. The real late query falls to 0.108 seconds (about 61×).</p>
+  <p><b>Rank optimization:</b> Three global feature/episode-ID orders are built once. Each query computes exact causal ordinal ranks through cumulative eligible masks, includes the query's insertion shift and ID tie rule, reduces to the exact minimum <code>(distance, episode ID)</code> per symbol and sorts only symbol winners. Random/tied synthetic data and shuffled traversal exactly match the exhaustive implementation.</p>
+  <p class="pass"><b>Real parity and performance:</b> Building the reusable full index takes 5.51 seconds. The late indexed query takes 0.598 seconds versus 7.124 seconds exhaustive (11.9×), returning the exact same 20 neighbors. No approximation, outcome or label is involved.</p>
+</section>
 </main>
 
 <section id="reproduce">

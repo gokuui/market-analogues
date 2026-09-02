@@ -1,8 +1,11 @@
 import numpy as np
+from hashlib import sha256
 
 from market_analogues.baseline_neighbors import (
     baseline_neighbor_contract,
+    build_baseline_rank_index,
     deterministic_random_neighbors,
+    indexed_recent_return_volatility_neighbors,
     recent_return_volatility,
     recent_return_volatility_at_positions,
     recent_return_volatility_neighbors,
@@ -53,6 +56,38 @@ def test_random_neighbors_are_permutation_invariant_and_distinct() -> None:
     assert baseline_neighbor_contract()["outcomes_or_labels_used"] is False
 
 
+def test_random_symbol_first_optimization_matches_exhaustive_oracle() -> None:
+    rng = np.random.default_rng(991)
+    symbols = tuple(f"S{value:03d}" for value in range(100))
+    symbol_ids = np.repeat(np.arange(100, dtype=np.uint32), 31)
+    ids = _ids(len(symbol_ids))
+    eligible = rng.random(len(ids)) > .18
+    query_id = f"{88_001:024x}"
+
+    def digest(domain: bytes, value: bytes) -> bytes:
+        result = sha256()
+        result.update(domain); result.update(b"\0")
+        result.update(bytes.fromhex(query_id)); result.update(b"\0")
+        result.update(value)
+        return result.digest()
+
+    best = {}
+    for position in np.flatnonzero(eligible):
+        symbol_id = int(symbol_ids[position]); raw = bytes(ids[position])
+        key = digest(b"wf03-random-episode-v1", raw)
+        if symbol_id not in best or (key, raw) < best[symbol_id]:
+            best[symbol_id] = (key, raw)
+    ordered = sorted(best, key=lambda value: (
+        digest(b"wf03-random-symbol-v1", symbols[value].encode()), symbols[value],
+    ))[:20]
+    expected = [(best[value][1].hex(), symbols[value], best[value][0].hex())
+                for value in ordered]
+    observed = deterministic_random_neighbors(
+        ids, symbol_ids, eligible, symbols, query_id,
+    )
+    assert [(row.episode_id, row.symbol, row.order_key) for row in observed] == expected
+
+
 def test_rank_l1_neighbors_match_scalar_ordinal_oracle() -> None:
     ids = _ids(7)
     symbol_ids = np.asarray([0, 0, 1, 2, 3, 4, 5])
@@ -85,3 +120,33 @@ def test_rank_l1_neighbors_match_scalar_ordinal_oracle() -> None:
         seen.add(symbol); expected.append((bytes(ids[position]).hex(), float(distance[position])))
         if len(expected) == 4: break
     assert [(row.episode_id, row.distance) for row in observed] == expected
+
+
+def test_indexed_rank_neighbors_exactly_match_exhaustive_sort() -> None:
+    rng = np.random.default_rng(1138)
+    count = 2200
+    ids = _ids(count)
+    symbol_ids = rng.integers(0, 137, count, dtype=np.uint32)
+    symbols = tuple(f"S{value:03d}" for value in range(137))
+    features = rng.normal(size=(count, 3))
+    features[:12] = np.asarray([.5, -.5, 1.])
+    features[-3:] = np.nan
+    eligible = rng.random(count) > .22
+    query = np.asarray([.5, .1, -.2])
+    query_id = f"{44_321:024x}"
+    expected = recent_return_volatility_neighbors(
+        features, ids, symbol_ids, eligible, symbols, query, query_id,
+    )
+    index = build_baseline_rank_index(features, ids)
+    observed = indexed_recent_return_volatility_neighbors(
+        index, features, ids, symbol_ids, eligible, symbols, query, query_id,
+    )
+    assert observed == expected
+
+    order = rng.permutation(count)
+    shuffled_index = build_baseline_rank_index(features[order], ids[order])
+    shuffled = indexed_recent_return_volatility_neighbors(
+        shuffled_index, features[order], ids[order], symbol_ids[order],
+        eligible[order], symbols, query, query_id,
+    )
+    assert shuffled == expected
