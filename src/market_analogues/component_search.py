@@ -28,7 +28,7 @@ from .packed_bound_search import (
 )
 from .packed_bound_store import load_packed_generation
 from .representation import Representation, represent, representation_input_digest
-from .search import eligible, latest_eligible_cutoff
+from .search import latest_eligible_cutoff
 from .types import AnalogueMatch, Episode, EpisodeKey, InstrumentKey, SearchQuery, stable_hash
 
 
@@ -100,7 +100,22 @@ class _CompactComponentScore:
 @dataclass(frozen=True)
 class _PreparedComponentSymbol:
     frame: pd.DataFrame
-    positions: dict[int, int]
+    timestamp_ns: np.ndarray
+
+
+def _positions_at_cutoffs(timestamp_ns: np.ndarray, cutoff_ns: np.ndarray) -> np.ndarray:
+    if timestamp_ns.ndim != 1 or cutoff_ns.ndim != 1 \
+            or timestamp_ns.dtype != np.int64 or cutoff_ns.dtype != np.int64:
+        raise CertifiedComponentSearchError("component timestamp arrays differ")
+    # The former dictionary comprehension retained the last row for a duplicate
+    # timestamp.  Right-sided search preserves that exact behavior.
+    positions = np.searchsorted(timestamp_ns, cutoff_ns, side="right") - 1
+    valid = positions >= 0
+    if np.any(valid):
+        valid[valid] &= timestamp_ns[positions[valid]] == cutoff_ns[valid]
+    if not np.all(valid):
+        raise CertifiedComponentSearchError("cannot reconstruct component proposal cutoff")
+    return positions
 
 
 def certified_component_search_contract(component: str = PRICE_COMPONENT) -> dict[str, object]:
@@ -159,13 +174,13 @@ def _score_group(
 ) -> tuple[list[_CompactComponentScore], int, float]:
     key = InstrumentKey(store_dataset_id, symbol)
     frame = prepared.frame
-    positions = prepared.positions
-    requested: list[int] = []
-    for proposal in proposals:
-        position = positions.get(proposal.cutoff_ns)
-        if position is None or position + 1 < query.key.lookback:
-            raise CertifiedComponentSearchError("cannot reconstruct component proposal cutoff")
-        requested.append(position)
+    requested_array = _positions_at_cutoffs(
+        prepared.timestamp_ns,
+        np.fromiter((row.cutoff_ns for row in proposals), dtype=np.int64),
+    )
+    if np.any(requested_array + 1 < query.key.lookback):
+        raise CertifiedComponentSearchError("cannot reconstruct component proposal cutoff")
+    requested = requested_array.tolist()
     representations = exact_representations_at_positions(
         frame, benchmark, positions=np.asarray(requested, dtype=int),
         lookback=query.key.lookback,
@@ -176,15 +191,33 @@ def _score_group(
     output: list[_CompactComponentScore] = []
     native_pruned = 0
     maximum_excess = 0.0
+    query_start_ns = int(query.bars.timestamp.iloc[0].value)
+    query_latest = latest_eligible_cutoff(
+        query, request.minimum_history_gap_bars,
+    )
     for index, (proposal, candidate_representation) in enumerate(
             zip(proposals, representations, strict=True)):
-        position = requested[index]
-        window = frame.iloc[position - query.key.lookback + 1:position + 1].reset_index(drop=True)
-        episode = Episode(EpisodeKey(
+        episode_key = EpisodeKey(
             key, pd.Timestamp(proposal.cutoff_ns), query.key.lookback,
             query.key.representation_version,
-        ), window, benchmark, proposal.quality_tier)
-        if episode.key.id != proposal.episode_id or not eligible(query, episode, request):
+        )
+        # The packed proposal already applied these predicates.  Recheck them
+        # directly without materializing a 252-row DataFrame and Episode for
+        # every exact candidate; only the immutable key and tier reach output.
+        same_instrument_overlap = (
+            key == query.key.instrument
+            and proposal.cutoff_ns >= query_start_ns
+        )
+        if episode_key.id != proposal.episode_id \
+                or episode_key.id == query.key.id \
+                or episode_key.cutoff >= query.key.cutoff \
+                or episode_key.cutoff > query_latest \
+                or same_instrument_overlap \
+                or proposal.quality_tier not in request.quality_tiers \
+                or (request.search_datasets
+                    and key.dataset_id not in request.search_datasets) \
+                or (not request.cross_dataset
+                    and key.dataset_id != query.key.instrument.dataset_id):
             raise CertifiedComponentSearchError("component proposal eligibility changed")
         native_lower = float(bounded.components[PRICE_COMPONENT][index])
         excess = proposal.lower_bound - native_lower
@@ -216,8 +249,8 @@ def _score_group(
                 maximum_excess, proposal.lower_bound - exact_price,
             )
         output.append(_CompactComponentScore(AnalogueMatch(
-            episode.key, exact_price, {PRICE_COMPONENT: exact_price}, [],
-            episode.quality_tier, episode.quality_issues,
+            episode_key, exact_price, {PRICE_COMPONENT: exact_price}, [],
+            proposal.quality_tier, (),
         ), key))
     return output, native_pruned, maximum_excess
 
@@ -265,8 +298,9 @@ def _score(
             frame = bars[bars.timestamp <= latest].reset_index(drop=True)
             prepared = _PreparedComponentSymbol(
                 frame,
-                {int(pd.Timestamp(value).value): index
-                 for index, value in enumerate(frame.timestamp)},
+                np.ascontiguousarray(
+                    frame["timestamp"].to_numpy(dtype="datetime64[ns]").view(np.int64)
+                ),
             )
             cache[symbol] = prepared
         return _score_group(

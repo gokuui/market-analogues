@@ -1522,6 +1522,13 @@
   <p class="pass"><b>Receipt:</b> Verification digest <code>32136611…683fd</code> passes in 449.59 seconds and binds producer result <code>d3b84404…bfb0fc</code>. Historical outcomes and the final period remain unopened; production promotion remains false.</p>
   <p><b>Decision and next:</b> The combined safe-bound exact retrieval mechanism is correctness-complete on exhaustive synthetic universes and the three full real-universe probes. It is not scale-performance-complete: exact preparation averages only 1.3 cores. Vectorize timestamp lookup, verify exact identity and utilization, then implement the deterministic-random and recent-return/volatility baselines before monthly batching.</p>
 </section>
+<section class="entry">
+  <h2>L-171 — Exact preparation reduced without changing the real certificate</h2>
+  <p><b>Optimization:</b> Query-local symbol preparation now stores contiguous nanosecond timestamps and resolves proposal cutoffs with right-sided vectorized search, exactly preserving the former dictionary's last-duplicate behavior. Exact scoring rechecks all packed eligibility predicates directly from immutable keys and metadata instead of creating a 252-row Pandas window and <code>Episode</code> object for every admitted candidate; published quality issues remain the same empty tuple used by the prior constructor path.</p>
+  <p class="pass"><b>Correctness:</b> Focused exhaustive component/DTW oracles pass. A real early-query development rerun evaluates the same 72,531 bounds, returns all 20 frozen IDs and binary64 distances exactly, preserves threshold <code>0.7548992679361688</code> and reports zero bound excess.</p>
+  <p><b>Performance:</b> A 6,539-bar timestamp microbenchmark is 84.3× faster than Python dictionary construction. On the full early query, proposal scan takes 84.22 seconds and exact closure 362.88 seconds versus the frozen 642.79 seconds: a 43.5% exact-stage reduction. Sampling still shows only about 1.35 cores, so thread-level scalar completion is improved but not the 3,936-query scale architecture.</p>
+  <p><b>Next:</b> Full-gate and commit this semantics-preserving optimization. Implement deterministic-random and recent-return/volatility baselines, then use month-level shared scans and process-level query parallelism; evaluate compiled multi-candidate DTW only under an exact-parity POC.</p>
+</section>
 </main>
 
 <section id="reproduce">

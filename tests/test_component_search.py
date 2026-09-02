@@ -9,6 +9,7 @@ from market_analogues.adapters import DirectorySource
 from market_analogues.causal_prefix import causal_prefix_digest
 from market_analogues.component_search import (
     CertifiedComponentSearchError,
+    _positions_at_cutoffs,
     certified_component_search,
     certified_component_search_contract,
 )
@@ -25,6 +26,14 @@ from market_analogues.quantized_bound import quantize_bound_row
 from market_analogues.representation import represent
 from market_analogues.search import latest_eligible_cutoff
 from market_analogues.types import EpisodeKey, InstrumentKey, SearchQuery
+
+
+def test_vector_timestamp_lookup_preserves_last_duplicate_semantics() -> None:
+    timestamps = np.asarray([10, 20, 20, 30], dtype=np.int64)
+    cutoffs = np.asarray([20, 10, 30], dtype=np.int64)
+    assert _positions_at_cutoffs(timestamps, cutoffs).tolist() == [2, 0, 3]
+    with pytest.raises(CertifiedComponentSearchError, match="proposal cutoff"):
+        _positions_at_cutoffs(timestamps, np.asarray([21], dtype=np.int64))
 
 
 def test_certified_price_component_matches_exhaustive_distinct_symbol_oracle(
