@@ -1664,6 +1664,12 @@
   <p><b>Further reduction:</b> Exact price projections now share one empty immutable channel placeholder instead of constructing one pandas frame per candidate and borrow cached frames without defensive copies. A 1,000-window specialized projection takes 0.359 seconds. Focused cache/isolation tests and the complete repository suite pass.</p>
   <p><b>Boundary:</b> The cache is an execution optimization over immutable historical chart prefixes. It does not cache or expose outcomes, labels or future rows.</p>
 </section>
+<section class="entry">
+  <h2>L-192 — Same-month combined-retrieval concurrency POC prepared</h2>
+  <p><b>Scope:</b> Four frozen March 2014 development queries spanning four registry liquidity cells will run concurrently against one preloaded canonical source cache. Each query receives two of the eight exposed CPUs for rigid bounds, DTW bounds and exact completion; output order remains registry order.</p>
+  <p><b>Acceptance:</b> All four staged certificates must complete with zero process swap and no outcome/label access. The included OHAI authority must reproduce all 20 frozen scalar episode IDs, symbols, cutoffs and hexadecimal distances exactly. Timing, cache state and peak RSS are observational and excluded from semantic case digests.</p>
+  <p><b>Decision boundary:</b> This POC selects the safe concurrency policy for the durable 3,936-query producer. It cannot authorize outcome evaluation or production promotion.</p>
+</section>
 </main>
 
 <section id="reproduce">
