@@ -28,7 +28,7 @@ from experiments.m04r import m04r14_t14_10_wf03b_dtw_component_ladder as ladder
 
 OUTPUT_RELATIVE = Path(
     "config/data/analogues/m04r14/"
-    "t14-10-wf03-combined-batch-v1-verification"
+    "t14-10-wf03-combined-batch-v2-verification"
 )
 AUTHORITY_RELATIVE = Path(
     "config/data/analogues/m04r14/t14-10-wf03b-dtw-component-ladder-v1/"
@@ -102,7 +102,7 @@ def select_rerun_sample(rows: Sequence[Mapping[str, Any]]) -> list[str]:
     for fold in sorted(grouped):
         ordered = sorted(grouped[fold], key=lambda row: (
             stable_hash({
-                "purpose": "wf03-combined-independent-rerun-v1",
+                "purpose": "wf03-combined-independent-rerun-v2",
                 "fold": fold, "query_id": row["episode_id"],
             }),
             row["episode_id"],
@@ -162,7 +162,7 @@ def _independent_case(
         rigid_minimum = certificate["minimum_rigid_pruned"]
         combined_minimum = certificate["minimum_combined_pruned"]
         predicates = (
-            value["schema_version"] == "m04r14-wf03-combined-batch-case-v1",
+            value["schema_version"] == "m04r14-wf03-combined-batch-case-v2",
             value["status"] == "complete",
             value["query_id"] == row["episode_id"],
             value["case_id"] == row["case_id"],
@@ -419,7 +419,7 @@ def verify(repository: Path) -> dict[str, Any]:
         "outcomes_or_labels_excluded": True,
     }
     state = {
-        "schema_version": "m04r14-t14-10-wf03-combined-batch-verification-v1",
+        "schema_version": "m04r14-t14-10-wf03-combined-batch-verification-v2",
         "status": "complete", "passed": all(gates.values()), "gates": gates,
         "producer_result_digest": result["result_digest"],
         "preregistration_digest": preregistration["preregistration_digest"],

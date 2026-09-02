@@ -49,7 +49,7 @@ def valid_case() -> dict:
         "minimum_combined_pruned": 1.2,
     }
     value = {
-        "schema_version": "m04r14-wf03-combined-batch-case-v1",
+        "schema_version": "m04r14-wf03-combined-batch-case-v2",
         "status": "complete", "query_id": "a" * 24, "case_id": "case-a",
         "symbol": "AAA", "cutoff": "2020-01-31T00:00:00",
         "fold_id": "development", "fold_role": "development", "scored": True,

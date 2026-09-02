@@ -9,11 +9,15 @@ from market_analogues.distance import (
     representation_distance, representation_distance_lower_bound,
 )
 from market_analogues.exact_batch import (
-    _structural_rows, _structural_rows_reference, batch_exact_price_distances,
+    _resample_rows, _structural_rows, _structural_rows_reference,
+    batch_exact_price_array_distances, batch_exact_price_distances,
+    batch_exact_rigid_price_array_distances,
     batch_exact_rigid_price_distances, batch_representation_lower_bounds,
+    exact_price_arrays_from_arrays_at_positions,
     exact_price_representations_at_positions, exact_representations_at_positions,
     sliding_exact_representations,
 )
+from market_analogues.context import align_benchmark_close
 from market_analogues.representation import Representation, represent
 from market_analogues.synthetic import generate_case
 from market_analogues.types import Episode, EpisodeKey, InstrumentKey
@@ -128,6 +132,33 @@ def test_compiled_structural_rows_exactly_match_python_reference() -> None:
         )
 
 
+@pytest.mark.parametrize(("width", "count"), [(252, 48), (91, 64), (48, 64)])
+@pytest.mark.parametrize("optional", [False, True])
+def test_compiled_resampling_is_bit_exact_to_numpy_rows(
+    width: int, count: int, optional: bool,
+) -> None:
+    rng = np.random.default_rng(20260902 + width + count)
+    rows = rng.normal(size=(97, width))
+    rows[rng.random(rows.shape) < .08] = np.nan
+    rows[0] = np.nan
+    rows[1, :max(2, width // 6)] = 1.0
+    rows[1, max(2, width // 6):] = np.nan
+    actual, actual_presence = _resample_rows(rows, count, optional=optional)
+    source = np.arange(width)
+    target = np.linspace(0, width - 1, count)
+    minimum = max(3, width // 5)
+    expected = np.zeros((len(rows), count))
+    expected_presence = np.zeros(len(rows), dtype=bool)
+    for index, values in enumerate(rows):
+        valid = np.isfinite(values)
+        if optional and valid.sum() < minimum or not valid.any():
+            continue
+        expected[index] = np.interp(target, source[valid], values[valid])
+        expected_presence[index] = True
+    np.testing.assert_array_equal(actual, expected)
+    np.testing.assert_array_equal(actual_presence, expected_presence)
+
+
 def test_exact_batch_ignores_future_benchmark_mutation() -> None:
     case = generate_case("rounded_base", 11, n=320)
     cutoff_position = 240
@@ -197,6 +228,14 @@ def test_specialized_exact_price_projection_is_exactly_equal() -> None:
         case.episode.bars, case.episode.benchmark,
         positions=positions, lookback=252,
     )
+    bars = case.episode.bars
+    arrays = exact_price_arrays_from_arrays_at_positions(
+        *(bars[name].to_numpy(float) for name in (
+            "open", "high", "low", "close", "volume"
+        )),
+        align_benchmark_close(bars, case.episode.benchmark),
+        positions=positions, lookback=252,
+    )
     query = complete[-1]
     for full, price in zip(complete, specialized, strict=True):
         for name, values in price.samples_48.items():
@@ -210,12 +249,30 @@ def test_specialized_exact_price_projection_is_exactly_equal() -> None:
         query, list(specialized[:-1]),
     )
     np.testing.assert_array_equal(actual_rigid, expected_rigid)
+    direct_rigid = batch_exact_rigid_price_array_distances(
+        query, type(arrays)(
+            arrays.samples_48[:-1], arrays.presence_48[:-1],
+            arrays.samples_64[:-1], arrays.presence_64[:-1],
+        ),
+    )
+    np.testing.assert_array_equal(direct_rigid, actual_rigid)
     np.testing.assert_array_equal(
         batch_exact_price_distances(query, list(specialized[:-1]), actual_rigid),
         np.asarray([
             representation_distance(query, candidate)[1]["price"]
             for candidate in complete[:-1]
         ]),
+    )
+    np.testing.assert_array_equal(
+        batch_exact_price_array_distances(
+            query, type(arrays)(
+                arrays.samples_48[:-1], arrays.presence_48[:-1],
+                arrays.samples_64[:-1], arrays.presence_64[:-1],
+            ), direct_rigid,
+        ),
+        batch_exact_price_distances(
+            query, list(specialized[:-1]), actual_rigid,
+        ),
     )
 
 

@@ -13,8 +13,10 @@ from .adapters import OHLCVSource
 from .causal_prefix import causal_prefix_digest
 from .context import align_benchmark_close
 from .exact_batch import (
-    batch_exact_price_distances, batch_exact_rigid_price_distances,
-    exact_price_representations_from_arrays_at_positions,
+    ExactPriceArrays,
+    batch_exact_price_array_distances,
+    batch_exact_rigid_price_array_distances,
+    exact_price_arrays_from_arrays_at_positions,
 )
 from .packed_bound_search import (
     COMPONENT_SEARCH_SCHEMA_VERSION,
@@ -187,15 +189,15 @@ def _score_group(
     if np.any(requested_array + 1 < query.key.lookback):
         raise CertifiedComponentSearchError("cannot reconstruct component proposal cutoff")
     requested = requested_array.tolist()
-    representations = exact_price_representations_from_arrays_at_positions(
+    representations = exact_price_arrays_from_arrays_at_positions(
         prepared.open_values, prepared.high_values, prepared.low_values,
         prepared.close_values, prepared.volume_values,
         prepared.benchmark_values, positions=np.asarray(requested, dtype=int),
         lookback=query.key.lookback,
     )
-    if len(representations) != len(proposals):
+    if len(representations.samples_48) != len(proposals):
         raise CertifiedComponentSearchError("component representation batch differs")
-    rigid_price = batch_exact_rigid_price_distances(
+    rigid_price = batch_exact_rigid_price_array_distances(
         query_representation, representations,
     )
     native_price = .55 * rigid_price
@@ -207,8 +209,7 @@ def _score_group(
         query, request.minimum_history_gap_bars,
     )
     exact_indexes: list[int] = []
-    for index, (proposal, _candidate_representation) in enumerate(
-            zip(proposals, representations, strict=True)):
+    for index, proposal in enumerate(proposals):
         episode_key = EpisodeKey(
             key, pd.Timestamp(proposal.cutoff_ns), query.key.lookback,
             query.key.representation_version,
@@ -244,10 +245,15 @@ def _score_group(
             continue
         exact_indexes.append(index)
 
-    exact_prices = batch_exact_price_distances(
-        query_representation,
-        [representations[index] for index in exact_indexes],
-        rigid_price[np.asarray(exact_indexes, dtype=int)],
+    exact_index_array = np.asarray(exact_indexes, dtype=int)
+    exact_prices = batch_exact_price_array_distances(
+        query_representation, ExactPriceArrays(
+            representations.samples_48[exact_index_array],
+            representations.presence_48[exact_index_array],
+            representations.samples_64[exact_index_array],
+            representations.presence_64[exact_index_array],
+        ),
+        rigid_price[exact_index_array],
     )
     for index, exact_price_value in zip(exact_indexes, exact_prices, strict=True):
         proposal = proposals[index]

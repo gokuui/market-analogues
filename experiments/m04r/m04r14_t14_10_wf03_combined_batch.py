@@ -28,12 +28,12 @@ from experiments.m04r import m04r14_t14_10_wf03_feasibility as base
 from experiments.m04r import m04r14_t14_10_wf03b_dtw_component_ladder as ladder
 
 
-SCHEMA = "m04r14-t14-10-wf03-combined-batch-preregistration-v1"
+SCHEMA = "m04r14-t14-10-wf03-combined-batch-preregistration-v2"
 OUTPUT_RELATIVE = Path(
-    "config/data/analogues/m04r14/t14-10-wf03-combined-batch-v1"
+    "config/data/analogues/m04r14/t14-10-wf03-combined-batch-v2"
 )
 PREREGISTRATION_RELATIVE = Path(
-    "experiments/m04r/m04r14_t14_10_wf03_combined_batch_preregistered.json"
+    "experiments/m04r/m04r14_t14_10_wf03_combined_batch_v2_preregistered.json"
 )
 BASELINE_VERIFICATION_RELATIVE = Path(
     "config/data/analogues/m04r14/"
@@ -341,7 +341,7 @@ def _validate_case(
         minimum_rigid = certificate["minimum_rigid_pruned"]
         minimum_combined = certificate["minimum_combined_pruned"]
         valid = all((
-            value["schema_version"] == "m04r14-wf03-combined-batch-case-v1",
+            value["schema_version"] == "m04r14-wf03-combined-batch-case-v2",
             value["status"] == "complete",
             value["query_id"] == row["episode_id"],
             value["case_id"] == row["case_id"],
@@ -450,7 +450,7 @@ def _run_case(
     matches = _matches(result)
     certificate = asdict(result.certificate)
     state = {
-        "schema_version": "m04r14-wf03-combined-batch-case-v1",
+        "schema_version": "m04r14-wf03-combined-batch-case-v2",
         "status": "complete",
         "case_id": row["case_id"],
         "query_id": row["episode_id"],
@@ -501,7 +501,7 @@ def execute(repository: Path, preregistration: Mapping[str, Any]) -> dict[str, A
         root.mkdir(parents=True)
         base._atomic(root / "CONTRACT.json", preregistration)
         base._atomic(root / "RUN_STARTED.json", base._sealed({
-            "schema_version": "m04r14-wf03-combined-batch-run-v1",
+            "schema_version": "m04r14-wf03-combined-batch-run-v2",
             "status": "running",
             "preregistration_digest": preregistration["preregistration_digest"],
             "created_at": base._now(),
@@ -535,7 +535,7 @@ def execute(repository: Path, preregistration: Mapping[str, Any]) -> dict[str, A
             )
         except Exception as exc:
             _replace_json(root / "PROGRESS.json", {
-                "schema_version": "m04r14-wf03-combined-batch-progress-v1",
+                "schema_version": "m04r14-wf03-combined-batch-progress-v2",
                 "status": "interrupted",
                 "completed_queries": len(results),
                 "total_queries": len(rows),
@@ -546,7 +546,7 @@ def execute(repository: Path, preregistration: Mapping[str, Any]) -> dict[str, A
             raise
         results.append(value)
         _replace_json(root / "PROGRESS.json", {
-            "schema_version": "m04r14-wf03-combined-batch-progress-v1",
+            "schema_version": "m04r14-wf03-combined-batch-progress-v2",
             "status": "running" if completed < len(rows) else "publishing",
             "completed_queries": completed,
             "total_queries": len(rows),
@@ -567,7 +567,7 @@ def execute(repository: Path, preregistration: Mapping[str, Any]) -> dict[str, A
         "sha256": base._sha(_case_path(cases_root, value["query_id"])),
     } for value in results]
     state = {
-        "schema_version": "m04r14-t14-10-wf03-combined-batch-result-v1",
+        "schema_version": "m04r14-t14-10-wf03-combined-batch-result-v2",
         "status": "complete",
         "passed": True,
         "queries": len(results),
@@ -601,7 +601,7 @@ def execute(repository: Path, preregistration: Mapping[str, Any]) -> dict[str, A
     result = base._sealed(state)
     base._atomic(root / "RESULT.json", result)
     _replace_json(root / "PROGRESS.json", {
-        "schema_version": "m04r14-wf03-combined-batch-progress-v1",
+        "schema_version": "m04r14-wf03-combined-batch-progress-v2",
         "status": "complete", "completed_queries": len(results),
         "total_queries": len(results),
         "completed_month_equivalents": preregistration["inventory"]["months"],

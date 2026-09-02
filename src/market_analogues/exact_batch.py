@@ -31,6 +31,14 @@ class LowerBoundBatch:
     rigid_price: np.ndarray
 
 
+@dataclass(frozen=True)
+class ExactPriceArrays:
+    samples_48: np.ndarray
+    presence_48: np.ndarray
+    samples_64: np.ndarray
+    presence_64: np.ndarray
+
+
 _DTW_CHANNELS = ("close_path", "atr_pct", "volume_robust_z", "relative_path")
 _DTW_SAMPLES = 64
 
@@ -173,6 +181,45 @@ def batch_exact_price_distances(
     )
 
 
+def batch_exact_price_array_distances(
+    query: Representation,
+    candidates: ExactPriceArrays,
+    rigid_price: np.ndarray,
+    config: DistanceConfig | None = None,
+) -> np.ndarray:
+    """Complete exact price distance directly from packed sampled arrays."""
+    config = config or DistanceConfig()
+    rows = len(candidates.samples_64)
+    rigid = np.asarray(rigid_price, dtype=np.float64)
+    if candidates.samples_64.shape != (rows, len(_DTW_CHANNELS), _DTW_SAMPLES) \
+            or candidates.presence_64.shape != (rows, len(_DTW_CHANNELS)) \
+            or rigid.shape != (rows,) or not np.isfinite(rigid).all() \
+            or np.any(rigid < 0) or not np.isfinite(config.dtw_band_fraction) \
+            or config.dtw_band_fraction < 0:
+        raise ValueError("exact price array inputs differ")
+    if not rows:
+        return np.empty(0, dtype=np.float64)
+    query_values = np.zeros(
+        (len(_DTW_CHANNELS), _DTW_SAMPLES), dtype=np.float64,
+    )
+    query_presence = np.zeros(len(_DTW_CHANNELS), dtype=bool)
+    for channel, name in enumerate(_DTW_CHANNELS):
+        values = query.samples_64.get(name)
+        if values is None:
+            continue
+        array = np.asarray(values, dtype=np.float64)
+        if array.shape != (_DTW_SAMPLES,) or not np.isfinite(array).all():
+            raise ValueError(f"query exact price channel differs: {name}")
+        query_values[channel] = array
+        query_presence[channel] = True
+    if not np.isfinite(candidates.samples_64).all():
+        raise ValueError("candidate exact price arrays differ")
+    return _batch_exact_price_distances_compiled(
+        query_values, query_presence, candidates.samples_64,
+        candidates.presence_64, rigid, config.dtw_band_fraction,
+    )
+
+
 def batch_exact_rigid_price_distances(
     query: Representation,
     candidates: tuple[Representation, ...] | list[Representation],
@@ -201,6 +248,50 @@ def batch_exact_rigid_price_distances(
         ])
         if matrix.shape != (rows, 48) or not np.isfinite(matrix).all():
             raise ValueError(f"candidate rigid price channel differs: {name}")
+        joined = np.c_[matrix, np.broadcast_to(query_array, matrix.shape)]
+        quartiles = np.percentile(joined, [75, 25], axis=1)
+        scale = quartiles[0] - quartiles[1]
+        scale = np.where(scale < 1e-8, np.std(joined, axis=1), scale)
+        scale = np.maximum(scale, 1e-6)
+        values = np.sqrt(np.mean(
+            ((matrix - query_array) / scale[:, None]) ** 2, axis=1,
+        ))
+        values[~present] = 2.0
+        distances.append(values)
+        included.append(np.ones(rows, dtype=bool))
+    count = np.sum(included, axis=0)
+    return np.divide(
+        np.sum(distances, axis=0), count,
+        out=np.zeros(rows, dtype=np.float64), where=count > 0,
+    )
+
+
+def batch_exact_rigid_price_array_distances(
+    query: Representation,
+    candidates: ExactPriceArrays,
+) -> np.ndarray:
+    """Return exact rigid price distance from packed sampled arrays."""
+    rows = len(candidates.samples_48)
+    names = GROUPS["price"]
+    if candidates.samples_48.shape != (rows, len(names), 48) \
+            or candidates.presence_48.shape != (rows, len(names)) \
+            or not np.isfinite(candidates.samples_48).all():
+        raise ValueError("candidate rigid price arrays differ")
+    if not rows:
+        return np.empty(0, dtype=np.float64)
+    distances: list[np.ndarray] = []
+    included: list[np.ndarray] = []
+    for channel, name in enumerate(names):
+        query_values = query.samples_48.get(name)
+        present = candidates.presence_48[:, channel]
+        if query_values is None:
+            distances.append(np.where(present, 2.0, 0.0))
+            included.append(present)
+            continue
+        query_array = np.asarray(query_values, dtype=np.float64)
+        if query_array.shape != (48,) or not np.isfinite(query_array).all():
+            raise ValueError(f"query rigid price channel differs: {name}")
+        matrix = candidates.samples_48[:, channel]
         joined = np.c_[matrix, np.broadcast_to(query_array, matrix.shape)]
         quartiles = np.percentile(joined, [75, 25], axis=1)
         scale = quartiles[0] - quartiles[1]
@@ -533,6 +624,43 @@ def exact_price_representations_from_arrays_at_positions(
     lookback: int,
 ) -> tuple[Representation, ...]:
     """Array-native exact-price projection for a prepared immutable symbol."""
+    packed = exact_price_arrays_from_arrays_at_positions(
+        open_values, high_values, low_values, close_values, volume_values,
+        benchmark_values, positions=positions, lookback=lookback,
+    )
+    empty = np.empty(0, dtype=np.float64)
+    empty_channels = pd.DataFrame()
+    return tuple(
+        Representation(
+            empty_channels, empty,
+            {
+                name: packed.samples_48[row, channel].copy()
+                if packed.presence_48[row, channel] else None
+                for channel, name in enumerate(GROUPS["price"])
+            },
+            {
+                name: packed.samples_64[row, channel].copy()
+                if packed.presence_64[row, channel] else None
+                for channel, name in enumerate(_DTW_CHANNELS)
+            },
+            empty, empty,
+        )
+        for row in range(len(packed.samples_48))
+    )
+
+
+def exact_price_arrays_from_arrays_at_positions(
+    open_values: np.ndarray,
+    high_values: np.ndarray,
+    low_values: np.ndarray,
+    close_values: np.ndarray,
+    volume_values: np.ndarray,
+    benchmark_values: np.ndarray,
+    *,
+    positions: np.ndarray,
+    lookback: int,
+) -> ExactPriceArrays:
+    """Project requested windows directly into dense exact-price arrays."""
     requested = np.asarray(positions, dtype=int)
     arrays = tuple(np.asarray(value, dtype=np.float64) for value in (
         open_values, high_values, low_values, close_values, volume_values,
@@ -560,36 +688,32 @@ def exact_price_representations_from_arrays_at_positions(
         name: _resample_rows(channels[name], 64, optional=True)
         for name in names_64
     }
-    empty = np.empty(0, dtype=np.float64)
-    empty_channels = pd.DataFrame()
-    return tuple(
-        Representation(
-            empty_channels, empty,
-            {
-                name: samples[row].copy() if present[row] else None
-                for name, (samples, present) in sampled_48.items()
-            },
-            {
-                name: samples[row].copy() if present[row] else None
-                for name, (samples, present) in sampled_64.items()
-            },
-            empty, empty,
-        )
-        for row in range(len(requested))
+    return ExactPriceArrays(
+        np.ascontiguousarray(np.stack([
+            sampled_48[name][0] for name in names_48
+        ], axis=1)),
+        np.ascontiguousarray(np.stack([
+            sampled_48[name][1] for name in names_48
+        ], axis=1)),
+        np.ascontiguousarray(np.stack([
+            sampled_64[name][0] for name in names_64
+        ], axis=1)),
+        np.ascontiguousarray(np.stack([
+            sampled_64[name][1] for name in names_64
+        ], axis=1)),
     )
 
 
-def _resample_rows(
+@njit(cache=True, nogil=True)
+def _resample_rows_compiled(
     rows: np.ndarray,
-    count: int,
-    *,
+    source_positions: np.ndarray,
+    target_positions: np.ndarray,
+    minimum: int,
     optional: bool,
 ) -> tuple[np.ndarray, np.ndarray]:
-    sampled = np.zeros((len(rows), count), dtype=float)
-    present = np.zeros(len(rows), dtype=bool)
-    source_positions = np.arange(rows.shape[1])
-    target_positions = np.linspace(0, rows.shape[1] - 1, count)
-    minimum = max(3, rows.shape[1] // 5)
+    sampled = np.zeros((len(rows), len(target_positions)), dtype=np.float64)
+    present = np.zeros(len(rows), dtype=np.bool_)
     for row, values in enumerate(rows):
         valid = np.isfinite(values)
         if optional and valid.sum() < minimum:
@@ -601,6 +725,24 @@ def _resample_rows(
         )
         present[row] = True
     return sampled, present
+
+
+def _resample_rows(
+    rows: np.ndarray,
+    count: int,
+    *,
+    optional: bool,
+) -> tuple[np.ndarray, np.ndarray]:
+    # Construct these grids with NumPy outside Numba.  Numba's linspace has
+    # slightly different last-bit rounding; passing NumPy's exact grids into
+    # the compiled loop preserves scalar np.interp output bit-for-bit.
+    source_positions = np.arange(rows.shape[1])
+    target_positions = np.linspace(0, rows.shape[1] - 1, count)
+    minimum = max(3, rows.shape[1] // 5)
+    return _resample_rows_compiled(
+        np.asarray(rows, dtype=np.float64), source_positions,
+        target_positions, minimum, optional,
+    )
 
 
 def _stage_rows(channels: dict[str, np.ndarray], stages: int = 12) -> np.ndarray:
