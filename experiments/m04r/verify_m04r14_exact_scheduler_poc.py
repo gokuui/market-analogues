@@ -377,13 +377,19 @@ def _cgroup_cpu_configuration() -> dict[str, Any]:
         raise VerificationError("cgroup v2 CPU binding is unavailable") from exc
     cgroup_root = Path("/sys/fs/cgroup")
     current = (cgroup_root / unified.lstrip("/")).resolve(strict=True)
-    def inherited(name: str) -> tuple[Path, str]:
+    def inherited(
+        name: str, required_keys: frozenset[str] = frozenset(),
+    ) -> tuple[Path, str]:
         candidate = current
         while candidate == cgroup_root or cgroup_root in candidate.parents:
             path = candidate / name
             try: raw = path.read_text().strip()
             except OSError: raw = ""
-            if raw: return path, raw
+            if raw:
+                try: keys = {line.split()[0] for line in raw.splitlines()}
+                except (IndexError, TypeError) as exc:
+                    raise VerificationError(f"cgroup {name} is malformed") from exc
+                if not required_keys or required_keys <= keys: return path, raw
             if candidate == cgroup_root: break
             candidate = candidate.parent
         raise VerificationError(f"cgroup {name} binding is unavailable")
@@ -393,7 +399,9 @@ def _cgroup_cpu_configuration() -> dict[str, Any]:
     if len(maximum) != 2:
         raise VerificationError("cgroup cpu.max is malformed")
     quota = None if maximum[0] == "max" else int(maximum[0]); period = int(maximum[1])
-    stat_path, _ = inherited("cpu.stat")
+    stat_path, _ = inherited("cpu.stat", frozenset({
+        "usage_usec", "nr_periods", "nr_throttled", "throttled_usec",
+    }))
     if (quota is not None and quota <= 0) or period <= 0:
         raise VerificationError("cgroup cpu.max is invalid")
     return {"schema_version": "m04r14-cgroup-cpu-configuration-v1",

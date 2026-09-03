@@ -26,7 +26,7 @@ from market_analogues.dtw_sample_store import (
 )
 from market_analogues.packed_bound_search import PackedBoundQuery
 from market_analogues.packed_bound_store import (
-    OVERFLOW_DTYPE,
+    OVERFLOW_DTYPE, make_overflow_record,
     make_packed_record,
     write_packed_generation,
 )
@@ -171,9 +171,9 @@ def test_adaptive_seed_expands_stable_prefix_until_symbols_are_diverse() -> None
         == "989bb4268fa38c7b8c4407c5ae15beb89292caa3029fb72807462f52c0be7224"
     adaptive_contract = staged_dtw_component_search_contract(adaptive_seed=True)
     assert adaptive_contract["schema_version"] \
-        == "certified-adaptive-staged-dtw-component-search-v2"
+        == "certified-adaptive-staged-dtw-component-search-v3"
     assert adaptive_contract["digest"] \
-        == "14957dac821a9a8f4c8d703984acff4dbc1eab622e782f8aa8ca45bfad2463ec"
+        == "2fcebe06b76382e28560bb2779d0e00920dc18f7da9c169c04c086092ee7bf09"
     with pytest.raises(ValueError, match="adaptive seed policy must be boolean"):
         staged_dtw_component_search_contract(adaptive_seed=1)  # type: ignore[arg-type]
 
@@ -196,6 +196,39 @@ def test_adaptive_seed_reports_genuinely_insufficient_symbol_universe() -> None:
             initial_seed_rows=2, eligible_main=8, eligible_candidates=8,
             top_k=2, adaptive_seed=True,
         )
+
+
+def test_adaptive_seed_expands_across_stable_overflow_ties() -> None:
+    representation = represent(generate_case("rounded_base", 813).episode)
+    records = np.concatenate([
+        make_packed_record(
+            f"{index + 1:024x}", index + 1, 0, "A",
+            quantize_bound_row(representation),
+        )
+        for index in range(4)
+    ])
+    overflow = np.concatenate([
+        make_overflow_record("000000000000000000000005", 5, 1, "A"),
+        make_overflow_record("000000000000000000000006", 6, 2, "A"),
+    ])
+    fixed, fixed_distinct = _staged_seed_proposals(
+        records, np.zeros(4), overflow, ("AAA", "BBB", "CCC"),
+        initial_seed_rows=2, eligible_main=4, eligible_candidates=6,
+        top_k=3, adaptive_seed=False,
+    )
+    adaptive, adaptive_distinct = _staged_seed_proposals(
+        records, np.zeros(4), overflow, ("AAA", "BBB", "CCC"),
+        initial_seed_rows=2, eligible_main=4, eligible_candidates=6,
+        top_k=3, adaptive_seed=True,
+    )
+    assert [row.episode_id for row in fixed] == [
+        "000000000000000000000001", "000000000000000000000002",
+    ]
+    assert fixed_distinct == 1
+    assert [row.episode_id for row in adaptive] == [
+        f"{index:024x}" for index in range(1, 7)
+    ]
+    assert adaptive_distinct == 3
 
 
 def test_certified_combined_component_matches_exhaustive_oracle(

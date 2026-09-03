@@ -5,8 +5,10 @@ import argparse
 from dataclasses import asdict
 import fcntl
 from hashlib import sha256
+from importlib.metadata import version
 import json
 import os
+import platform
 from pathlib import Path
 import resource
 import stat
@@ -36,12 +38,12 @@ from experiments.m04r import m04r14_t14_10_wf03_feasibility as base
 from experiments.m04r import m04r14_t14_10_wf03b_dtw_component_ladder as ladder
 
 
-SCHEMA = "m04r14-t14-10-wf03-combined-batch-preregistration-v4"
+SCHEMA = "m04r14-t14-10-wf03-combined-batch-preregistration-v5"
 OUTPUT_RELATIVE = Path(
-    "config/data/analogues/m04r14/t14-10-wf03-combined-batch-v4"
+    "config/data/analogues/m04r14/t14-10-wf03-combined-batch-v5"
 )
 PREREGISTRATION_RELATIVE = Path(
-    "experiments/m04r/m04r14_t14_10_wf03_combined_batch_v4_preregistered.json"
+    "experiments/m04r/m04r14_t14_10_wf03_combined_batch_v5_preregistered.json"
 )
 PACKED_SOURCE_STORE_RELATIVE = Path(
     "config/data/analogues/poc/m04r/packed-bound-full/store"
@@ -57,21 +59,24 @@ BLOCK_ROWS = 4_096
 THREADS = 8
 PRELOAD_WORKERS = 8
 TOLERANCE = 1e-12
+MINIMUM_EFFECTIVE_CPUS = 8
+MINIMUM_TOTAL_MEMORY_KIB = 64 * 1024 * 1024
+MINIMUM_AVAILABLE_MEMORY_KIB = 32 * 1024 * 1024
+RUNTIME_PACKAGES = (
+    "llvmlite", "numba", "numpy", "pandas", "pyarrow", "PyYAML",
+)
+_RUNTIME_REPOSITORY = Path(__file__).resolve().parents[2]
+_PACKAGE_RUNTIME_FILES = tuple(
+    str(path.relative_to(_RUNTIME_REPOSITORY))
+    for path in sorted((_RUNTIME_REPOSITORY / "src" / "market_analogues").rglob("*.py"))
+)
 RUNTIME_FILES = (
+    "config/datasets.example.yaml",
     "experiments/m04r/m04r14_t14_10_wf03_combined_batch.py",
     "experiments/m04r/m04r14_t14_10_wf03_feasibility.py",
-    "src/market_analogues/adapters.py",
-    "src/market_analogues/component_search.py",
-    "src/market_analogues/dtw_component_search.py",
-    "src/market_analogues/dtw_interval_bound.py",
-    "src/market_analogues/dtw_sample_store.py",
-    "src/market_analogues/exact_batch.py",
-    "src/market_analogues/packed_bound_search.py",
-    "src/market_analogues/packed_bound_store.py",
-    "src/market_analogues/representation.py",
-    "src/market_analogues/resident_store.py",
-    "src/market_analogues/search.py",
-)
+    "experiments/m04r/m04r14_t14_10_wf03b_dtw_component_ladder.py",
+    "pyproject.toml",
+) + _PACKAGE_RUNTIME_FILES
 
 
 class CombinedBatchError(RuntimeError):
@@ -103,6 +108,84 @@ def _git(repository: Path, *args: str) -> str:
     return result.stdout.strip()
 
 
+def _runtime_environment() -> dict[str, Any]:
+    return {
+        "python_implementation": platform.python_implementation(),
+        "python_version": platform.python_version(),
+        "machine": platform.machine(),
+        "packages": {name: version(name) for name in RUNTIME_PACKAGES},
+    }
+
+
+def _resource_observation() -> dict[str, int]:
+    process = {}
+    for line in Path("/proc/self/status").read_text().splitlines():
+        name, separator, remainder = line.partition(":")
+        if separator and name in {"VmRSS", "VmHWM", "VmSwap"}:
+            process[name] = int(remainder.split()[0])
+    memory = {}
+    for line in Path("/proc/meminfo").read_text().splitlines():
+        name, separator, remainder = line.partition(":")
+        if separator and name in {"MemTotal", "MemAvailable"}:
+            memory[name] = int(remainder.split()[0])
+    if set(process) != {"VmRSS", "VmHWM", "VmSwap"} \
+            or set(memory) != {"MemTotal", "MemAvailable"}:
+        raise CombinedBatchError("combined batch resource observation differs")
+    effective_cpus = len(os.sched_getaffinity(0)) \
+        if hasattr(os, "sched_getaffinity") else int(os.cpu_count() or 0)
+    return {
+        "effective_cpus": effective_cpus,
+        "memory_total_kib": memory["MemTotal"],
+        "memory_available_kib": memory["MemAvailable"],
+        "process_rss_kib": process["VmRSS"],
+        "process_peak_rss_kib": process["VmHWM"],
+        "process_swap_kib": process["VmSwap"],
+    }
+
+
+def _require_resources(stage: str) -> dict[str, int]:
+    observation = _resource_observation()
+    failures = []
+    if observation["effective_cpus"] < MINIMUM_EFFECTIVE_CPUS:
+        failures.append(
+            f"cpus={observation['effective_cpus']}<{MINIMUM_EFFECTIVE_CPUS}"
+        )
+    if observation["memory_total_kib"] < MINIMUM_TOTAL_MEMORY_KIB:
+        failures.append(
+            "total-memory-kib="
+            f"{observation['memory_total_kib']}<{MINIMUM_TOTAL_MEMORY_KIB}"
+        )
+    if observation["memory_available_kib"] < MINIMUM_AVAILABLE_MEMORY_KIB:
+        failures.append(
+            "available-memory-kib="
+            f"{observation['memory_available_kib']}"
+            f"<{MINIMUM_AVAILABLE_MEMORY_KIB}"
+        )
+    if observation["process_swap_kib"] != 0:
+        failures.append(f"process-swap-kib={observation['process_swap_kib']}!=0")
+    if failures:
+        raise CombinedBatchError(
+            f"combined batch resources differ at {stage}: {', '.join(failures)}"
+        )
+    return observation
+
+
+def _well_formed_resource_observation(value: Any) -> bool:
+    return type(value) is dict and set(value) == {
+        "effective_cpus", "memory_total_kib", "memory_available_kib",
+        "process_rss_kib", "process_peak_rss_kib", "process_swap_kib",
+    } and all(type(item) is int and item >= 0 for item in value.values()) \
+        and value["process_peak_rss_kib"] >= value["process_rss_kib"]
+
+
+def _valid_resource_observation(value: Any) -> bool:
+    return _well_formed_resource_observation(value) \
+        and value["effective_cpus"] >= MINIMUM_EFFECTIVE_CPUS \
+        and value["memory_total_kib"] >= MINIMUM_TOTAL_MEMORY_KIB \
+        and value["memory_available_kib"] >= MINIMUM_AVAILABLE_MEMORY_KIB \
+        and value["process_swap_kib"] == 0
+
+
 def _case_path(root: Path, query_id: str) -> Path:
     if len(query_id) != 24 \
             or any(value not in "0123456789abcdef" for value in query_id):
@@ -118,6 +201,11 @@ def _replace_json(path: Path, value: Mapping[str, Any]) -> None:
         handle.flush()
         os.fsync(handle.fileno())
     os.replace(temporary, path)
+    directory = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        os.fsync(directory)
+    finally:
+        os.close(directory)
 
 
 def _file_identity(path: Path) -> dict[str, int | str]:
@@ -311,6 +399,7 @@ def build_preregistration(repository: Path) -> dict[str, Any]:
         "schema_version": SCHEMA,
         "status": "frozen_before_all_query_combined_retrieval",
         "implementation_commit": head,
+        "runtime_environment": _runtime_environment(),
         "runtime_files": {
             path: base._sha(repository / path) for path in RUNTIME_FILES
         },
@@ -351,7 +440,7 @@ def build_preregistration(repository: Path) -> dict[str, Any]:
             "source_cache_max_entries": None,
             "prepared_symbol_cache": "batch lifetime",
             "initial_seed_rows": SEED_ROWS,
-            "seed_policy": "geometric stable-prefix expansion for top-k symbols",
+            "seed_policy": "doubling stable-prefix expansion for top-k symbols",
             "maximum_seed_rows": "eligible candidates",
             "block_rows": BLOCK_ROWS,
             "top_k": TOP_K,
@@ -367,6 +456,16 @@ def build_preregistration(repository: Path) -> dict[str, Any]:
                 "accept only fully validated sealed query receipts bound to "
                 "durable semantic content; physical leases are attempt-local"
             ),
+            "resource_preflight": {
+                "minimum_effective_cpus": MINIMUM_EFFECTIVE_CPUS,
+                "minimum_total_memory_kib": MINIMUM_TOTAL_MEMORY_KIB,
+                "minimum_available_memory_kib": MINIMUM_AVAILABLE_MEMORY_KIB,
+                "process_swap_kib": 0,
+                "stages": [
+                    "before-resident", "after-resident", "after-preload",
+                    "before-each-new-query", "after-each-new-query",
+                ],
+            },
             "output_root": str(output.resolve()),
         },
         "gates": {
@@ -392,6 +491,8 @@ def build_preregistration(repository: Path) -> dict[str, Any]:
 def validate_preregistration(
     repository: Path, value: Mapping[str, Any],
 ) -> tuple[dict[str, Any], dict[str, Any]]:
+    if _git(repository, "status", "--porcelain"):
+        raise CombinedBatchError("combined batch execution requires clean commit")
     base._validate_seal(value, "preregistration_digest")
     registry, by_id = base._registry(repository)
     dtw_result, dtw_verification = _verified_inputs(repository)
@@ -436,7 +537,7 @@ def validate_preregistration(
         value.get("execution", {}).get("preload_workers") == PRELOAD_WORKERS,
         value.get("execution", {}).get("initial_seed_rows") == SEED_ROWS,
         value.get("execution", {}).get("seed_policy")
-            == "geometric stable-prefix expansion for top-k symbols",
+            == "doubling stable-prefix expansion for top-k symbols",
         value.get("execution", {}).get("maximum_seed_rows")
             == "eligible candidates",
         value.get("execution", {}).get("block_rows") == BLOCK_ROWS,
@@ -444,8 +545,19 @@ def validate_preregistration(
         value.get("execution", {}).get("tolerance_hex") == TOLERANCE.hex(),
         value.get("execution", {}).get("output_root")
             == str((repository / OUTPUT_RELATIVE).resolve()),
+        value.get("execution", {}).get("resource_preflight") == {
+            "minimum_effective_cpus": MINIMUM_EFFECTIVE_CPUS,
+            "minimum_total_memory_kib": MINIMUM_TOTAL_MEMORY_KIB,
+            "minimum_available_memory_kib": MINIMUM_AVAILABLE_MEMORY_KIB,
+            "process_swap_kib": 0,
+            "stages": [
+                "before-resident", "after-resident", "after-preload",
+                "before-each-new-query", "after-each-new-query",
+            ],
+        },
         value.get("contract")
             == staged_dtw_component_search_contract(adaptive_seed=True),
+        value.get("runtime_environment") == _runtime_environment(),
         set(value.get("runtime_files", {})) == set(RUNTIME_FILES),
     )):
         raise CombinedBatchError("combined batch preregistration differs")
@@ -489,6 +601,16 @@ def _case_semantic_state(value: Mapping[str, Any]) -> dict[str, Any]:
         "certificate_result_digest": value["certificate"]["result_digest"],
         "matches": value["matches"],
     }
+
+
+def _valid_adaptive_seed_rows(actual: Any, eligible: Any) -> bool:
+    if type(actual) is not int or type(eligible) is not int \
+            or actual < TOP_K or eligible < actual:
+        return False
+    quota = min(SEED_ROWS, eligible)
+    while quota < actual:
+        quota = min(eligible, quota * 2)
+    return quota == actual
 
 
 def _certificate_result_digest(
@@ -540,8 +662,9 @@ def _validate_case(
         distances = [float.fromhex(item["distance_hex"]) for item in matches]
         minimum_rigid = certificate["minimum_rigid_pruned"]
         minimum_combined = certificate["minimum_combined_pruned"]
+        observation = value["resource_observation"]
         valid = all((
-            value["schema_version"] == "m04r14-wf03-combined-batch-case-v4",
+            value["schema_version"] == "m04r14-wf03-combined-batch-case-v5",
             value["status"] == "complete",
             value["query_id"] == row["episode_id"],
             value["case_id"] == row["case_id"],
@@ -565,13 +688,18 @@ def _validate_case(
             value["outcomes_or_labels_used"] is False,
             value["historical_walk_forward_query_outcomes_opened"] is False,
             value["final_period_result_opened"] is False,
+            value["process_swap_kib"] == 0,
+            _valid_resource_observation(observation),
+            observation["process_swap_kib"] == value["process_swap_kib"],
             certificate["schema_version"]
                 == preregistration["contract"]["schema_version"],
             certificate["query_episode_id"] == row["episode_id"],
             certificate["packed_generation_id"] == base.GENERATION_ID,
             certificate["dtw_generation_id"] == ladder.DTW_GENERATION_ID,
             certificate["contract_digest"] == preregistration["contract"]["digest"],
-            certificate["seed_rows"] >= TOP_K,
+            _valid_adaptive_seed_rows(
+                certificate["seed_rows"], certificate["eligible_candidates"],
+            ),
             certificate["rigid_bound_evaluated"]
                 == certificate["eligible_candidates"],
             certificate["rigid_bound_admitted"]
@@ -668,7 +796,7 @@ def _attempt_history(
         base._validate_seal(started, "attempt_digest")
         if not all((
             started.get("schema_version")
-                == "m04r14-wf03-combined-batch-attempt-v4",
+                == "m04r14-wf03-combined-batch-attempt-v5",
             started.get("status") == "running",
             started.get("attempt_id") == path.name,
             started.get("preregistration_digest")
@@ -679,6 +807,26 @@ def _attempt_history(
                 == preregistration["inputs"]["dtw_semantic_identity_digest"],
             _is_digest(started.get("resident_attempt_lease_digest")),
             _is_digest(started.get("dtw_attempt_identity_digest")),
+            _is_digest(started.get("resident_ready_digest")),
+            _is_digest(started.get("resident_validation_observation_digest")),
+            started.get("resident_mode") in {
+                "reused-fully-validated-unchanged-lease",
+                "validated-existing", "restored-after-restart",
+            },
+            started.get("dtw_validation_mode") in {
+                "reused-fully-validated-unchanged-identity",
+                "full-content-and-record-validation",
+            },
+            type(started.get("receipts_reused_at_start")) is int,
+            0 <= started.get("receipts_reused_at_start", -1)
+                <= preregistration["inventory"]["queries"],
+            type(started.get("created_at")) is str,
+            _valid_resource_observation(
+                started.get("initial_resource_observation")
+            ),
+            _valid_resource_observation(
+                started.get("after_resident_resource_observation")
+            ),
         )):
             raise CombinedBatchError("combined batch attempt start differs")
         terminals = names & {"INTERRUPTED.json", "COMPLETE.json"}
@@ -688,11 +836,49 @@ def _attempt_history(
             terminal_name = next(iter(terminals))
             terminal = base._read(path / terminal_name)
             base._validate_seal(terminal, "attempt_digest")
-            if terminal.get("attempt_id") != path.name or terminal.get("status") \
-                    != ("complete" if terminal_name == "COMPLETE.json"
-                        else "interrupted"):
+            common_valid = all((
+                terminal.get("schema_version")
+                    == "m04r14-wf03-combined-batch-attempt-v5",
+                terminal.get("attempt_id") == path.name,
+                terminal.get("status")
+                    == ("complete" if terminal_name == "COMPLETE.json"
+                        else "interrupted"),
+                type(terminal.get("created_at")) is str,
+            ))
+            if terminal_name == "COMPLETE.json":
+                terminal_valid = all((
+                    common_valid,
+                    terminal.get("queries")
+                        == preregistration["inventory"]["queries"],
+                    type(terminal.get("receipts_reused_at_start")) is int,
+                    type(terminal.get("receipts_computed")) is int,
+                    terminal.get("receipts_reused_at_start", -1) >= 0,
+                    terminal.get("receipts_computed", -1) >= 0,
+                    terminal.get("receipts_reused_at_start", 0)
+                        + terminal.get("receipts_computed", 0)
+                        == terminal.get("queries"),
+                    _is_digest(terminal.get("result_digest")),
+                ))
+            else:
+                completed = terminal.get("completed_queries")
+                terminal_valid = all((
+                    common_valid,
+                    type(completed) is int and not isinstance(completed, bool),
+                    0 <= completed <= preregistration["inventory"]["queries"],
+                    type(terminal.get("error_type")) is str,
+                    type(terminal.get("error")) is str,
+                    _well_formed_resource_observation(
+                        terminal.get("resource_observation")
+                    ),
+                ))
+            if not terminal_valid:
                 raise CombinedBatchError("combined batch attempt terminal differs")
-        output[path.name] = started
+            output[path.name] = {
+                **started, "_terminal_name": terminal_name,
+                "_terminal": terminal,
+            }
+        else:
+            output[path.name] = started
     return output
 
 
@@ -705,6 +891,103 @@ def _validate_case_attempt(
             or value.get("dtw_attempt_identity_digest") \
             != attempt.get("dtw_attempt_identity_digest"):
         raise CombinedBatchError("combined batch case attempt binding differs")
+
+
+def _validate_terminal_result(
+    value: Mapping[str, Any], results: Sequence[Mapping[str, Any]],
+    preregistration: Mapping[str, Any], root: Path,
+    attempts: Mapping[str, Mapping[str, Any]],
+) -> dict[str, Any]:
+    try:
+        base._validate_seal(value)
+        case_manifest = [{
+            "query_id": row["query_id"], "case_digest": row["case_digest"],
+            "sha256": base._sha(_case_path(root / "cases", row["query_id"])),
+        } for row in results]
+        seed_rows = [row["certificate"]["seed_rows"] for row in results]
+        terminal_attempt = attempts.get(str(value["terminal_attempt_id"]))
+        valid = all((
+            value["schema_version"]
+                == "m04r14-t14-10-wf03-combined-batch-result-v5",
+            value["status"] == "complete", value["passed"] is True,
+            value["queries"] == preregistration["inventory"]["queries"],
+            value["scored_queries"]
+                == preregistration["inventory"]["scored_queries"],
+            value["warmup_queries"]
+                == preregistration["inventory"]["warmup_queries"],
+            value["months"] == preregistration["inventory"]["months"],
+            value["preregistration_digest"]
+                == preregistration["preregistration_digest"],
+            value["packed_generation_id"] == base.GENERATION_ID,
+            value["packed_content_digest"]
+                == preregistration["inputs"]["packed_content_digest"],
+            value["dtw_generation_id"] == ladder.DTW_GENERATION_ID,
+            value["case_manifest_digest"] == stable_hash(case_manifest),
+            value["case_semantic_digest"] == stable_hash([
+                row["semantic_digest"] for row in results
+            ]),
+            value["minimum_eligible_candidates"] == min(
+                row["certificate"]["eligible_candidates"] for row in results
+            ),
+            value["maximum_eligible_candidates"] == max(
+                row["certificate"]["eligible_candidates"] for row in results
+            ),
+            value["maximum_seed_rows"] == max(seed_rows),
+            value["expanded_seed_queries"]
+                == sum(row > SEED_ROWS for row in seed_rows),
+            _valid_resource_observation(
+                value["post_preload_resource_observation"]
+            ),
+            value["outcomes_or_labels_used"] is False,
+            value["historical_walk_forward_query_outcomes_opened"] is False,
+            value["final_period_result_opened"] is False,
+            value["production_promotion_authorized"] is False,
+            value["independent_verification_authorized"] is True,
+            _is_attempt_id(value["terminal_attempt_id"]),
+            terminal_attempt is not None,
+            value["attempts"] == len(attempts),
+        ))
+    except (KeyError, TypeError, ValueError):
+        valid = False
+    if not valid:
+        raise CombinedBatchError("combined batch terminal result differs")
+    return dict(value)
+
+
+def _reconcile_terminal_publication(
+    root: Path, result: Mapping[str, Any],
+    results: Sequence[Mapping[str, Any]],
+    attempts: Mapping[str, Mapping[str, Any]],
+) -> None:
+    attempt_id = str(result["terminal_attempt_id"])
+    attempt_state = attempts[attempt_id]
+    terminal_name = attempt_state.get("_terminal_name")
+    if terminal_name == "INTERRUPTED.json":
+        raise CombinedBatchError("combined batch result attempt was interrupted")
+    if terminal_name == "COMPLETE.json":
+        if attempt_state["_terminal"].get("result_digest") \
+                != result["result_digest"]:
+            raise CombinedBatchError("combined batch completion result differs")
+    elif terminal_name is None:
+        computed = sum(row["attempt_id"] == attempt_id for row in results)
+        base._atomic(root / "attempts" / attempt_id / "COMPLETE.json", base._sealed({
+            "schema_version": "m04r14-wf03-combined-batch-attempt-v5",
+            "status": "complete", "attempt_id": attempt_id,
+            "queries": len(results),
+            "receipts_reused_at_start": len(results) - computed,
+            "receipts_computed": computed,
+            "result_digest": result["result_digest"],
+            "created_at": base._now(),
+        }, "attempt_digest"))
+    else:
+        raise CombinedBatchError("combined batch result attempt terminal differs")
+    _replace_json(root / "PROGRESS.json", {
+        "schema_version": "m04r14-wf03-combined-batch-progress-v5",
+        "status": "complete", "completed_queries": len(results),
+        "attempt_id": attempt_id, "total_queries": len(results),
+        "completed_month_equivalents": len({row["cutoff"] for row in results}),
+        "result_digest": result["result_digest"],
+    })
 
 
 def _run_case(
@@ -745,15 +1028,12 @@ def _run_case(
             or current_lease["lease_digest"] != resident_lease_digest \
             or _dtw_physical_identity(repository)["digest"] != dtw_identity_digest:
         raise CombinedBatchError("combined batch attempt input identity changed")
-    swap_kib = int(
-        Path("/proc/self/status").read_text().split("VmSwap:")[1].split()[0]
-    )
-    if swap_kib != 0:
-        raise CombinedBatchError("combined batch process used swap")
+    resource_observation = _require_resources("after-each-new-query")
+    swap_kib = resource_observation["process_swap_kib"]
     matches = _matches(result)
     certificate = asdict(result.certificate)
     state = {
-        "schema_version": "m04r14-wf03-combined-batch-case-v4",
+        "schema_version": "m04r14-wf03-combined-batch-case-v5",
         "status": "complete",
         "case_id": row["case_id"],
         "query_id": row["episode_id"],
@@ -777,6 +1057,7 @@ def _run_case(
         "matches": matches,
         "elapsed_seconds": perf_counter() - started,
         "process_swap_kib": swap_kib,
+        "resource_observation": resource_observation,
         "peak_rss_mb": resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024,
         "source_cache_state": source.cache_state(),
         "prepared_symbols": len(prepared_symbols),
@@ -798,6 +1079,7 @@ def _execute_locked(
     repository = repository.resolve(strict=True)
     registry, _by_id = validate_preregistration(repository, preregistration)
     root = repository / OUTPUT_RELATIVE
+    terminal_result: dict[str, Any] | None = None
     if root.is_symlink() or root.exists() and not root.is_dir():
         raise CombinedBatchError("combined batch output path differs")
     if root.exists():
@@ -807,20 +1089,7 @@ def _execute_locked(
         if base._read(contract_path) != preregistration:
             raise CombinedBatchError("combined batch resume contract differs")
         if (root / "RESULT.json").exists():
-            result = base._read(root / "RESULT.json")
-            base._validate_seal(result)
-            if not all((
-                result.get("schema_version")
-                    == "m04r14-t14-10-wf03-combined-batch-result-v4",
-                result.get("passed") is True,
-                result.get("queries") == 3_936,
-                result.get("preregistration_digest")
-                    == preregistration["preregistration_digest"],
-                result.get("packed_content_digest")
-                    == preregistration["inputs"]["packed_content_digest"],
-            )):
-                raise CombinedBatchError("combined batch terminal differs")
-            return result
+            terminal_result = base._read(root / "RESULT.json")
     else:
         root.mkdir(parents=True)
         base._atomic(root / "CONTRACT.json", preregistration)
@@ -829,6 +1098,14 @@ def _execute_locked(
     if cases_root.is_symlink():
         raise CombinedBatchError("combined batch cases root is linked")
     rows = registry["queries_data"]
+    expected_case_names = {f"{row['episode_id']}.json" for row in rows}
+    unexpected_cases = {
+        path.name for path in cases_root.iterdir()
+        if not path.name.startswith(".wf03-")
+        and path.name not in expected_case_names
+    }
+    if unexpected_cases:
+        raise CombinedBatchError("combined batch cases layout differs")
     existing_results = []
     attempt_history = _attempt_history(root, preregistration)
     for row in rows:
@@ -839,6 +1116,20 @@ def _execute_locked(
         if value is not None:
             _validate_case_attempt(value, attempt_history)
             existing_results.append(value)
+    if terminal_result is not None:
+        if len(existing_results) != len(rows) or [
+            value["query_id"] for value in existing_results
+        ] != [row["episode_id"] for row in rows]:
+            raise CombinedBatchError("combined batch terminal cases differ")
+        result = _validate_terminal_result(
+            terminal_result, existing_results, preregistration, root,
+            attempt_history,
+        )
+        _reconcile_terminal_publication(
+            root, result, existing_results, attempt_history,
+        )
+        return result
+    initial_resources = _require_resources("before-resident")
     resident = _ensure_resident(
         repository, preregistration["inputs"]["packed_content_digest"],
         attempt_history,
@@ -874,11 +1165,12 @@ def _execute_locked(
     if current_lease["lease_digest"] != resident_lease_digest \
             or dtw_identity_after["digest"] != dtw_identity_before["digest"]:
         raise CombinedBatchError("combined batch startup input identity changed")
+    after_resident_resources = _require_resources("after-resident")
     dtw_identity_digest = dtw_identity_after["digest"]
     attempt = _next_attempt(root)
     attempt_id = attempt.name
     base._atomic(attempt / "RUN_STARTED.json", base._sealed({
-        "schema_version": "m04r14-wf03-combined-batch-attempt-v4",
+        "schema_version": "m04r14-wf03-combined-batch-attempt-v5",
         "status": "running", "attempt_id": attempt_id,
         "preregistration_digest": preregistration["preregistration_digest"],
         "packed_content_digest": resident["content_digest"],
@@ -897,10 +1189,14 @@ def _execute_locked(
         ],
         "dtw_attempt_identity_digest": dtw_identity_digest,
         "receipts_reused_at_start": len(existing_results),
+        "initial_resource_observation": initial_resources,
+        "after_resident_resource_observation": after_resident_resources,
         "created_at": base._now(),
     }, "attempt_digest"))
     results = []
     current_row: Mapping[str, Any] | None = None
+    preload_seconds: float | None = None
+    post_preload_resources: dict[str, int] | None = None
     try:
         raw_source = source_from_spec(
             load_config(repository / base.CONFIG_RELATIVE).datasets["nasdaq"]
@@ -909,9 +1205,14 @@ def _execute_locked(
         preload_started = perf_counter()
         source.preload(tuple(raw_source.instruments()), workers=PRELOAD_WORKERS)
         preload_seconds = perf_counter() - preload_started
+        post_preload_resources = _require_resources("after-preload")
         prepared_symbols: dict[str, Any] = {}
+        existing_ids = {value["query_id"] for value in existing_results}
+        maximum_seed_rows = SEED_ROWS
         for completed, row in enumerate(rows, start=1):
             current_row = row
+            if row["episode_id"] not in existing_ids:
+                _require_resources("before-each-new-query")
             value = _run_case(
                 row, source=source, prepared_symbols=prepared_symbols,
                 packed_root=packed_root, dtw_root=dtw_root,
@@ -923,8 +1224,11 @@ def _execute_locked(
                 cases_root=cases_root,
             )
             results.append(value)
+            maximum_seed_rows = max(
+                maximum_seed_rows, value["certificate"]["seed_rows"],
+            )
             _replace_json(root / "PROGRESS.json", {
-                "schema_version": "m04r14-wf03-combined-batch-progress-v4",
+                "schema_version": "m04r14-wf03-combined-batch-progress-v5",
                 "status": "running" if completed < len(rows) else "publishing",
                 "attempt_id": attempt_id,
                 "completed_queries": completed,
@@ -933,12 +1237,19 @@ def _execute_locked(
                 "last_query_id": value["query_id"],
                 "last_case_digest": value["case_digest"],
                 "prepared_symbols": len(prepared_symbols),
+                "last_seed_rows": value["certificate"]["seed_rows"],
+                "maximum_seed_rows": maximum_seed_rows,
+                "expanded_seed_queries": sum(
+                    item["certificate"]["seed_rows"] > SEED_ROWS
+                    for item in results
+                ),
                 "source_cache_state": source.cache_state(),
                 "elapsed_seconds": perf_counter() - started,
             })
     except BaseException as exc:
+        failure_resources = _resource_observation()
         _replace_json(root / "PROGRESS.json", {
-            "schema_version": "m04r14-wf03-combined-batch-progress-v4",
+            "schema_version": "m04r14-wf03-combined-batch-progress-v5",
             "status": "interrupted", "attempt_id": attempt_id,
             "completed_queries": len(results),
             "total_queries": len(rows),
@@ -946,12 +1257,17 @@ def _execute_locked(
                 current_row["episode_id"] if current_row is not None else None
             ),
             "error_type": type(exc).__name__, "error": str(exc),
+            "preload_seconds": preload_seconds,
+            "resource_observation": failure_resources,
+            "elapsed_seconds": perf_counter() - started,
         })
         base._atomic(attempt / "INTERRUPTED.json", base._sealed({
-            "schema_version": "m04r14-wf03-combined-batch-attempt-v4",
+            "schema_version": "m04r14-wf03-combined-batch-attempt-v5",
             "status": "interrupted", "attempt_id": attempt_id,
             "completed_queries": len(results),
             "error_type": type(exc).__name__, "error": str(exc),
+            "preload_seconds": preload_seconds,
+            "resource_observation": failure_resources,
             "created_at": base._now(),
         }, "attempt_digest"))
         raise
@@ -965,7 +1281,7 @@ def _execute_locked(
         "sha256": base._sha(_case_path(cases_root, value["query_id"])),
     } for value in results]
     state = {
-        "schema_version": "m04r14-t14-10-wf03-combined-batch-result-v4",
+        "schema_version": "m04r14-t14-10-wf03-combined-batch-result-v5",
         "status": "complete",
         "passed": True,
         "queries": len(results),
@@ -986,7 +1302,14 @@ def _execute_locked(
         "maximum_eligible_candidates": max(
             value["certificate"]["eligible_candidates"] for value in results
         ),
+        "maximum_seed_rows": max(
+            value["certificate"]["seed_rows"] for value in results
+        ),
+        "expanded_seed_queries": sum(
+            value["certificate"]["seed_rows"] > SEED_ROWS for value in results
+        ),
         "preload_seconds": preload_seconds,
+        "post_preload_resource_observation": post_preload_resources,
         "elapsed_seconds": perf_counter() - started,
         "peak_rss_mb": resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024,
         "source_cache_state": source.cache_state(),
@@ -997,12 +1320,12 @@ def _execute_locked(
         "production_promotion_authorized": False,
         "independent_verification_authorized": True,
         "terminal_attempt_id": attempt_id,
-        "attempts": len(tuple((root / "attempts").iterdir())),
+        "attempts": len(attempt_history) + 1,
     }
     result = base._sealed(state)
     base._atomic(root / "RESULT.json", result)
     base._atomic(attempt / "COMPLETE.json", base._sealed({
-        "schema_version": "m04r14-wf03-combined-batch-attempt-v4",
+        "schema_version": "m04r14-wf03-combined-batch-attempt-v5",
         "status": "complete", "attempt_id": attempt_id,
         "queries": len(results),
         "receipts_reused_at_start": len(existing_results),
@@ -1011,7 +1334,7 @@ def _execute_locked(
         "created_at": base._now(),
     }, "attempt_digest"))
     _replace_json(root / "PROGRESS.json", {
-        "schema_version": "m04r14-wf03-combined-batch-progress-v4",
+        "schema_version": "m04r14-wf03-combined-batch-progress-v5",
         "status": "complete", "completed_queries": len(results),
         "attempt_id": attempt_id,
         "total_queries": len(results),

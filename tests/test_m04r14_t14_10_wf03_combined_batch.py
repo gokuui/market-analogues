@@ -22,6 +22,10 @@ def preregistration() -> dict:
             "packed_content_digest": "1" * 64,
             "dtw_semantic_identity_digest": "2" * 64,
         },
+        "inventory": {
+            "queries": 2, "scored_queries": 2, "warmup_queries": 0,
+            "months": 1,
+        },
     }
 
 
@@ -33,6 +37,50 @@ def row() -> dict:
     }
 
 
+def resource_observation() -> dict:
+    return {
+        "effective_cpus": subject.MINIMUM_EFFECTIVE_CPUS,
+        "memory_total_kib": subject.MINIMUM_TOTAL_MEMORY_KIB,
+        "memory_available_kib": subject.MINIMUM_AVAILABLE_MEMORY_KIB,
+        "process_rss_kib": 100, "process_peak_rss_kib": 100,
+        "process_swap_kib": 0,
+    }
+
+
+def test_runtime_freeze_covers_direct_and_transitive_inputs() -> None:
+    assert {
+        "config/datasets.example.yaml",
+        "experiments/m04r/m04r14_t14_10_wf03b_dtw_component_ladder.py",
+        "pyproject.toml",
+        "src/market_analogues/causal_prefix.py",
+        "src/market_analogues/config.py",
+        "src/market_analogues/context.py",
+        "src/market_analogues/distance.py",
+        "src/market_analogues/episodes.py",
+        "src/market_analogues/quantized_bound.py",
+        "src/market_analogues/structural.py",
+        "src/market_analogues/types.py",
+    }.issubset(subject.RUNTIME_FILES)
+    assert set(subject._runtime_environment()["packages"]) \
+        == set(subject.RUNTIME_PACKAGES)
+
+
+@pytest.mark.parametrize(("field", "value", "message"), (
+    ("effective_cpus", 7, "cpus="),
+    ("memory_total_kib", 1, "total-memory-kib="),
+    ("memory_available_kib", 1, "available-memory-kib="),
+    ("process_swap_kib", 1, "process-swap-kib="),
+))
+def test_resource_preflight_fails_early_with_exact_observation(
+    monkeypatch, field: str, value: int, message: str,
+) -> None:
+    observation = resource_observation()
+    observation[field] = value
+    monkeypatch.setattr(subject, "_resource_observation", lambda: observation)
+    with pytest.raises(subject.CombinedBatchError, match=message):
+        subject._require_resources("test-stage")
+
+
 def valid_case() -> dict:
     certificate = {
         "schema_version": "staged",
@@ -42,12 +90,12 @@ def valid_case() -> dict:
         "contract_digest": "contract",
         "input_digest": "input",
         "eligible_candidates": 100,
-        "seed_rows": 20,
+        "seed_rows": 100,
         "rigid_bound_evaluated": 100,
         "rigid_bound_admitted": 80,
         "dtw_bound_evaluated": 75,
         "combined_bound_admitted": 30,
-        "exact_evaluated": 40,
+        "exact_evaluated": 100,
         "native_bound_pruned": 0,
         "maximum_bound_excess": 0.0,
         "seed_threshold": 1.0,
@@ -56,7 +104,7 @@ def valid_case() -> dict:
         "minimum_combined_pruned": 1.2,
     }
     value = {
-        "schema_version": "m04r14-wf03-combined-batch-case-v4",
+        "schema_version": "m04r14-wf03-combined-batch-case-v5",
         "status": "complete", "query_id": "a" * 24, "case_id": "case-a",
         "symbol": "AAA", "cutoff": "2020-01-31T00:00:00",
         "fold_id": "development", "fold_role": "development", "scored": True,
@@ -77,6 +125,8 @@ def valid_case() -> dict:
         "outcomes_or_labels_used": False,
         "historical_walk_forward_query_outcomes_opened": False,
         "final_period_result_opened": False,
+        "process_swap_kib": 0,
+        "resource_observation": resource_observation(),
     }
     certificate["result_digest"] = subject._certificate_result_digest(
         certificate, value["matches"]
@@ -105,6 +155,7 @@ def test_valid_case_closes_all_structural_and_semantic_gates() -> None:
     lambda value: value["certificate"].update(minimum_rigid_pruned=1.0),
     lambda value: value.update(outcomes_or_labels_used=True),
     lambda value: value.update(preregistration_digest="changed"),
+    lambda value: value.update(process_swap_kib=1),
 ))
 def test_case_validation_rejects_semantic_drift(mutation) -> None:
     value = valid_case()
@@ -150,6 +201,111 @@ def test_case_semantics_survive_new_physical_attempt_identity() -> None:
     second = base._sealed(second, "case_digest")
     assert second["semantic_digest"] == first["semantic_digest"]
     assert subject._validate_case(second, row(), preregistration()) == second
+
+
+def test_terminal_result_crash_window_is_validated_and_reconciled(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "batch"
+    cases = root / "cases"
+    cases.mkdir(parents=True)
+    first = valid_case()
+    second = dict(first)
+    second.pop("case_digest")
+    second.update({
+        "query_id": "b" * 24, "case_id": "case-b", "symbol": "BBB",
+    })
+    second["certificate"] = dict(second["certificate"])
+    second["certificate"]["query_episode_id"] = "b" * 24
+    second["certificate"]["result_digest"] = subject._certificate_result_digest(
+        second["certificate"], second["matches"],
+    )
+    second["semantic_digest"] = base.stable_hash(
+        subject._case_semantic_state(second)
+    )
+    second = base._sealed(second, "case_digest")
+    for value in (first, second):
+        base._atomic(cases / f"{value['query_id']}.json", value)
+    results = [first, second]
+    case_manifest = [{
+        "query_id": value["query_id"], "case_digest": value["case_digest"],
+        "sha256": base._sha(cases / f"{value['query_id']}.json"),
+    } for value in results]
+    state = {
+        "schema_version": "m04r14-t14-10-wf03-combined-batch-result-v5",
+        "status": "complete", "passed": True, "queries": 2,
+        "scored_queries": 2, "warmup_queries": 0, "months": 1,
+        "preregistration_digest": "pre",
+        "packed_generation_id": base.GENERATION_ID,
+        "packed_content_digest": "1" * 64,
+        "dtw_generation_id": ladder.DTW_GENERATION_ID,
+        "case_manifest_digest": base.stable_hash(case_manifest),
+        "case_semantic_digest": base.stable_hash([
+            value["semantic_digest"] for value in results
+        ]),
+        "minimum_eligible_candidates": 100,
+        "maximum_eligible_candidates": 100,
+        "maximum_seed_rows": 100, "expanded_seed_queries": 0,
+        "preload_seconds": 1.0,
+        "post_preload_resource_observation": resource_observation(),
+        "peak_rss_mb": 1.0, "source_cache_state": {},
+        "prepared_symbols": 2,
+        "outcomes_or_labels_used": False,
+        "historical_walk_forward_query_outcomes_opened": False,
+        "final_period_result_opened": False,
+        "production_promotion_authorized": False,
+        "independent_verification_authorized": True,
+        "terminal_attempt_id": "attempt-0001", "attempts": 1,
+    }
+    result = base._sealed(state)
+    attempts = {"attempt-0001": {
+        "resident_attempt_lease_digest": "3" * 64,
+        "dtw_attempt_identity_digest": "4" * 64,
+    }}
+    assert subject._validate_terminal_result(
+        result, results, preregistration(), root, attempts,
+    ) == result
+    attempt = root / "attempts" / "attempt-0001"
+    attempt.mkdir(parents=True)
+    base._atomic(attempt / "RUN_STARTED.json", base._sealed({
+        "schema_version": "m04r14-wf03-combined-batch-attempt-v5",
+        "status": "running", "attempt_id": "attempt-0001",
+        "preregistration_digest": "pre",
+        "packed_content_digest": "1" * 64,
+        "resident_mode": "restored-after-restart",
+        "dtw_validation_mode": "full-content-and-record-validation",
+        "resident_ready_digest": "5" * 64,
+        "resident_attempt_lease_digest": "3" * 64,
+        "resident_validation_observation_digest": "6" * 64,
+        "dtw_semantic_identity_digest": "2" * 64,
+        "dtw_attempt_identity_digest": "4" * 64,
+        "receipts_reused_at_start": 0,
+        "initial_resource_observation": resource_observation(),
+        "after_resident_resource_observation": resource_observation(),
+        "created_at": "2026-01-01T00:00:00+00:00",
+    }, "attempt_digest"))
+    subject._reconcile_terminal_publication(root, result, results, attempts)
+    complete = base._read(attempt / "COMPLETE.json")
+    assert complete["result_digest"] == result["result_digest"]
+    assert complete["receipts_computed"] == 2
+    attempts["attempt-0001"].update({
+        "_terminal_name": "COMPLETE.json", "_terminal": complete,
+    })
+    subject._reconcile_terminal_publication(root, result, results, attempts)
+    assert base._read(root / "PROGRESS.json")["status"] == "complete"
+    history = subject._attempt_history(root, preregistration())
+    assert history["attempt-0001"]["_terminal_name"] == "COMPLETE.json"
+
+
+def test_attempt_history_ignores_only_empty_crash_window_directory(
+    tmp_path: Path,
+) -> None:
+    attempts = tmp_path / "attempts"
+    (attempts / "attempt-0001").mkdir(parents=True)
+    assert subject._attempt_history(tmp_path, preregistration()) == {}
+    (attempts / "attempt-0001" / "unexpected").write_text("partial")
+    with pytest.raises(subject.CombinedBatchError, match="files differ"):
+        subject._attempt_history(tmp_path, preregistration())
 
 
 def test_resident_restore_uses_content_not_previous_physical_identity(
@@ -214,11 +370,8 @@ def test_execute_resumes_sealed_cases_under_a_new_attempt_lease(
 ) -> None:
     rows = [row(), {**row(), "episode_id": "b" * 24, "case_id": "case-b",
                     "symbol": "BBB"}]
-    pre = {
-        **preregistration(),
-        "inventory": {"months": 1},
-    }
-    output = Path("output-v4")
+    pre = preregistration()
+    output = Path("output-v5")
     leases = iter(("3" * 64, "5" * 64))
     current_lease = {"value": ""}
     startup_options = []
@@ -301,6 +454,9 @@ def test_execute_resumes_sealed_cases_under_a_new_attempt_lease(
                         SimpleNamespace(instruments=lambda: ("AAA", "BBB")))
     monkeypatch.setattr(subject, "CachedOHLCVSource", FakeSource)
     monkeypatch.setattr(subject, "_run_case", run_case)
+    monkeypatch.setattr(subject, "_require_resources", lambda stage:
+                        resource_observation())
+    monkeypatch.setattr(subject, "_resource_observation", resource_observation)
 
     with pytest.raises(RuntimeError, match="simulated restart"):
         subject.execute(tmp_path, pre)
@@ -326,8 +482,8 @@ def test_execute_resumes_sealed_cases_under_a_new_attempt_lease(
 def test_execute_refuses_a_concurrent_producer_before_validation(
     tmp_path: Path, monkeypatch,
 ) -> None:
-    monkeypatch.setattr(subject, "OUTPUT_RELATIVE", Path("output-v4"))
-    lock = tmp_path / "output-v4.lock"
+    monkeypatch.setattr(subject, "OUTPUT_RELATIVE", Path("output-v5"))
+    lock = tmp_path / "output-v5.lock"
     descriptor = os.open(lock, os.O_RDWR | os.O_CREAT, 0o600)
     try:
         fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)

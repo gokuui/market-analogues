@@ -194,7 +194,7 @@ def staged_dtw_component_search_contract(
         raise DtwComponentSearchError("adaptive seed policy must be boolean")
     if adaptive_seed:
         state = {
-            "schema_version": "certified-adaptive-staged-dtw-component-search-v2",
+            "schema_version": "certified-adaptive-staged-dtw-component-search-v3",
             "component": "price",
             "price_bound_contract_digest": packed_component_search_contract(
                 "price"
@@ -204,9 +204,9 @@ def staged_dtw_component_search_contract(
             ],
             "seed": (
                 "begin with the requested stable rigid-price-bound prefix and "
-                "geometrically expand that prefix until it contains distinct "
-                "eligible symbols for top-k; exactly complete the final prefix "
-                "once to establish a finite upper bound"
+                "double that prefix, capped by the eligible-candidate count, "
+                "until it contains distinct eligible symbols for top-k; exactly "
+                "complete the final prefix once to establish a finite upper bound"
             ),
             "closure": (
                 "retain every eligible rigid bound at or below the seed threshold; "

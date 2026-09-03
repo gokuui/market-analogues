@@ -1292,7 +1292,9 @@ def _cgroup_cpu_snapshot() -> dict[str, Any]:
     cgroup_root = Path("/sys/fs/cgroup")
     current = (cgroup_root / unified.lstrip("/")).resolve(strict=True)
 
-    def inherited(name: str) -> tuple[Path, str]:
+    def inherited(
+        name: str, required_keys: frozenset[str] = frozenset(),
+    ) -> tuple[Path, str]:
         candidate = current
         while candidate == cgroup_root or cgroup_root in candidate.parents:
             path = candidate / name
@@ -1301,7 +1303,12 @@ def _cgroup_cpu_snapshot() -> dict[str, Any]:
             except OSError:
                 raw = ""
             if raw:
-                return path, raw
+                try:
+                    keys = {line.split()[0] for line in raw.splitlines()}
+                except (IndexError, TypeError) as exc:
+                    raise SchedulerError(f"cgroup {name} is malformed") from exc
+                if not required_keys or required_keys <= keys:
+                    return path, raw
             if candidate == cgroup_root:
                 break
             candidate = candidate.parent
@@ -1316,7 +1323,10 @@ def _cgroup_cpu_snapshot() -> dict[str, Any]:
     period = int(maximum[1])
     if (quota is not None and quota <= 0) or period <= 0:
         raise SchedulerError("cgroup cpu.max is invalid")
-    stat_path, stat_raw = inherited("cpu.stat")
+    required_stat = frozenset({
+        "usage_usec", "nr_periods", "nr_throttled", "throttled_usec",
+    })
+    stat_path, stat_raw = inherited("cpu.stat", required_stat)
     try:
         cpu_stat = {
             key: int(value) for key, value in (
@@ -1325,8 +1335,8 @@ def _cgroup_cpu_snapshot() -> dict[str, Any]:
         }
     except (ValueError, TypeError) as exc:
         raise SchedulerError("cgroup cpu.stat is malformed") from exc
-    if not {"usage_usec", "nr_periods", "nr_throttled", "throttled_usec"} \
-            <= set(cpu_stat) or any(value < 0 for value in cpu_stat.values()):
+    if not required_stat <= set(cpu_stat) \
+            or any(value < 0 for value in cpu_stat.values()):
         raise SchedulerError("cgroup cpu.stat fields differ")
     return {
         "configuration": {

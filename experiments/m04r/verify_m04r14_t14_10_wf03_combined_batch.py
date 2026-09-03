@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+from dataclasses import asdict
 from hashlib import sha256
 import json
 from pathlib import Path
@@ -13,11 +14,13 @@ import numpy as np
 import pandas as pd
 
 from market_analogues.adapters import CachedOHLCVSource, source_from_spec
+from market_analogues.causal_prefix import causal_prefix_digest
 from market_analogues.config import load_config
 from market_analogues.dtw_component_search import certified_staged_dtw_component_search
 from market_analogues.dtw_sample_store import load_dtw_sample_generation
 from market_analogues.episodes import build_episode
 from market_analogues.packed_bound_store import load_packed_generation
+from market_analogues.representation import represent, representation_input_digest
 from market_analogues.search import latest_eligible_cutoff
 from market_analogues.types import EpisodeKey, InstrumentKey, SearchQuery, stable_hash
 
@@ -28,7 +31,7 @@ from experiments.m04r import m04r14_t14_10_wf03b_dtw_component_ladder as ladder
 
 OUTPUT_RELATIVE = Path(
     "config/data/analogues/m04r14/"
-    "t14-10-wf03-combined-batch-v4-verification"
+    "t14-10-wf03-combined-batch-v5-verification"
 )
 AUTHORITY_RELATIVE = Path(
     "config/data/analogues/m04r14/t14-10-wf03b-dtw-component-ladder-v1/"
@@ -46,6 +49,33 @@ INVENTORY_DTYPE = np.dtype([
 
 class CombinedBatchVerificationError(RuntimeError):
     pass
+
+
+def _valid_seed_rows(actual: Any, eligible: Any) -> bool:
+    if type(actual) is not int or type(eligible) is not int \
+            or actual < producer.TOP_K or eligible < actual:
+        return False
+    quota = min(producer.SEED_ROWS, eligible)
+    while quota < actual:
+        quota = min(eligible, quota * 2)
+    return quota == actual
+
+
+def _well_formed_resource_observation(value: Any) -> bool:
+    return type(value) is dict and set(value) == {
+        "effective_cpus", "memory_total_kib", "memory_available_kib",
+        "process_rss_kib", "process_peak_rss_kib", "process_swap_kib",
+    } and all(type(item) is int and item >= 0 for item in value.values()) \
+        and value["process_peak_rss_kib"] >= value["process_rss_kib"]
+
+
+def _valid_resource_observation(value: Any) -> bool:
+    return _well_formed_resource_observation(value) \
+        and value["effective_cpus"] >= producer.MINIMUM_EFFECTIVE_CPUS \
+        and value["memory_total_kib"] >= producer.MINIMUM_TOTAL_MEMORY_KIB \
+        and value["memory_available_kib"] \
+            >= producer.MINIMUM_AVAILABLE_MEMORY_KIB \
+        and value["process_swap_kib"] == 0
 
 
 def _seal_valid(value: Mapping[str, Any], field: str) -> bool:
@@ -102,7 +132,7 @@ def select_rerun_sample(rows: Sequence[Mapping[str, Any]]) -> list[str]:
     for fold in sorted(grouped):
         ordered = sorted(grouped[fold], key=lambda row: (
             stable_hash({
-                "purpose": "wf03-combined-independent-rerun-v4",
+                "purpose": "wf03-combined-independent-rerun-v5",
                 "fold": fold, "query_id": row["episode_id"],
             }),
             row["episode_id"],
@@ -145,6 +175,7 @@ def _independent_case(
     preregistration: Mapping[str, Any], records: np.ndarray,
     symbols: tuple[str, ...], id_order: np.ndarray, sorted_ids: np.ndarray,
     source: Any, attempts: Mapping[str, Mapping[str, Any]],
+    packed_manifest: Mapping[str, Any], dtw_manifest: Mapping[str, Any],
 ) -> dict[str, Any]:
     if not _seal_valid(value, "case_digest"):
         raise CombinedBatchVerificationError("combined case seal differs")
@@ -166,7 +197,7 @@ def _independent_case(
         rigid_minimum = certificate["minimum_rigid_pruned"]
         combined_minimum = certificate["minimum_combined_pruned"]
         predicates = (
-            value["schema_version"] == "m04r14-wf03-combined-batch-case-v4",
+            value["schema_version"] == "m04r14-wf03-combined-batch-case-v5",
             value["status"] == "complete",
             value["query_id"] == row["episode_id"],
             value["case_id"] == row["case_id"],
@@ -196,12 +227,16 @@ def _independent_case(
             value["historical_walk_forward_query_outcomes_opened"] is False,
             value["final_period_result_opened"] is False,
             value["process_swap_kib"] == 0,
+            _valid_resource_observation(value["resource_observation"]),
             certificate["schema_version"]
                 == preregistration["contract"]["schema_version"],
             certificate["contract_digest"] == preregistration["contract"]["digest"],
             certificate["packed_generation_id"] == base.GENERATION_ID,
             certificate["dtw_generation_id"] == ladder.DTW_GENERATION_ID,
             certificate["query_episode_id"] == row["episode_id"],
+            _valid_seed_rows(
+                certificate["seed_rows"], certificate["eligible_candidates"],
+            ),
             certificate["eligible_candidates"]
                 == certificate["rigid_bound_evaluated"],
             certificate["rigid_bound_admitted"]
@@ -238,6 +273,26 @@ def _independent_case(
     )
     if episode.key.id != row["episode_id"]:
         raise CombinedBatchVerificationError("combined query reconstruction differs")
+    request = SearchQuery(
+        episode.key, ("nasdaq",), ("A", "B"), producer.TOP_K,
+        False, True, base.MAX_PER_INSTRUMENT, base.MINIMUM_HISTORY_GAP,
+    )
+    expected_input_digest = stable_hash({
+        "query_stock_prefix": asdict(causal_prefix_digest(
+            source.load(episode.key.instrument), episode.key.cutoff,
+        )),
+        "query_representation_digest": representation_input_digest(
+            represent(episode),
+        ),
+        "request": asdict(request),
+        "packed_generation_id": base.GENERATION_ID,
+        "packed_provenance_digest": packed_manifest["provenance_digest"],
+        "dtw_generation_id": ladder.DTW_GENERATION_ID,
+        "dtw_provenance_digest": dtw_manifest["provenance_digest"],
+        "contract_digest": preregistration["contract"]["digest"],
+    })
+    if certificate["input_digest"] != expected_input_digest:
+        raise CombinedBatchVerificationError("combined query input digest differs")
     latest_ns = int(latest_eligible_cutoff(
         episode, base.MINIMUM_HISTORY_GAP
     ).value)
@@ -274,6 +329,8 @@ def _independent_case(
         "neighbor_position_digest": stable_hash([int(value) for value in positions]),
         "same_symbol_neighbors": same_symbol,
         "eligible_candidates": certificate["eligible_candidates"],
+        "seed_rows": certificate["seed_rows"],
+        "input_digest": expected_input_digest,
     }
 
 
@@ -306,7 +363,7 @@ def _attempt_bindings(
         started = base._read(started_path)
         if not _seal_valid(started, "attempt_digest") or not all((
             started.get("schema_version")
-                == "m04r14-wf03-combined-batch-attempt-v4",
+                == "m04r14-wf03-combined-batch-attempt-v5",
             started.get("status") == "running",
             started.get("attempt_id") == path.name,
             started.get("preregistration_digest")
@@ -315,6 +372,15 @@ def _attempt_bindings(
                 == preregistration["inputs"]["packed_content_digest"],
             started.get("dtw_semantic_identity_digest")
                 == preregistration["inputs"]["dtw_semantic_identity_digest"],
+            type(started.get("receipts_reused_at_start")) is int,
+            0 <= started.get("receipts_reused_at_start", -1)
+                <= preregistration["inventory"]["queries"],
+            _valid_resource_observation(
+                started.get("initial_resource_observation")
+            ),
+            _valid_resource_observation(
+                started.get("after_resident_resource_observation")
+            ),
         )):
             raise CombinedBatchVerificationError("combined attempt start differs")
         terminals = [
@@ -325,16 +391,53 @@ def _attempt_bindings(
             raise CombinedBatchVerificationError("combined attempt terminals differ")
         if terminals:
             terminal = base._read(path / terminals[0])
-            if not _seal_valid(terminal, "attempt_digest") \
-                    or terminal.get("attempt_id") != path.name \
-                    or terminal.get("status") != (
-                        "interrupted" if terminals[0] == "INTERRUPTED.json"
-                        else "complete"
-                    ):
+            common_valid = all((
+                _seal_valid(terminal, "attempt_digest"),
+                terminal.get("schema_version")
+                    == "m04r14-wf03-combined-batch-attempt-v5",
+                terminal.get("attempt_id") == path.name,
+                terminal.get("status") == (
+                    "interrupted" if terminals[0] == "INTERRUPTED.json"
+                    else "complete"
+                ),
+                type(terminal.get("created_at")) is str,
+            ))
+            if terminals[0] == "COMPLETE.json":
+                terminal_valid = all((
+                    common_valid,
+                    terminal.get("queries")
+                        == preregistration["inventory"]["queries"],
+                    type(terminal.get("receipts_reused_at_start")) is int,
+                    type(terminal.get("receipts_computed")) is int,
+                    terminal.get("receipts_reused_at_start", -1) >= 0,
+                    terminal.get("receipts_computed", -1) >= 0,
+                    terminal.get("receipts_reused_at_start", 0)
+                        + terminal.get("receipts_computed", 0)
+                        == terminal.get("queries"),
+                    type(terminal.get("result_digest")) is str,
+                ))
+            else:
+                completed = terminal.get("completed_queries")
+                terminal_valid = all((
+                    common_valid,
+                    type(completed) is int and not isinstance(completed, bool),
+                    0 <= completed <= preregistration["inventory"]["queries"],
+                    type(terminal.get("error_type")) is str,
+                    type(terminal.get("error")) is str,
+                    _well_formed_resource_observation(
+                        terminal.get("resource_observation")
+                    ),
+                ))
+            if not terminal_valid:
                 raise CombinedBatchVerificationError(
                     "combined attempt terminal differs"
                 )
-        output[path.name] = started
+            output[path.name] = {
+                **started, "_terminal_name": terminals[0],
+                "_terminal": terminal,
+            }
+        else:
+            output[path.name] = started
     if not output:
         raise CombinedBatchVerificationError("combined attempts are absent")
     return output
@@ -417,7 +520,7 @@ def verify(repository: Path) -> dict[str, Any]:
     result = base._read(root / "RESULT.json")
     if not _seal_valid(result, "result_digest") or not all((
         result.get("schema_version")
-            == "m04r14-t14-10-wf03-combined-batch-result-v4",
+            == "m04r14-t14-10-wf03-combined-batch-result-v5",
         result.get("status") == "complete", result.get("passed") is True,
         result.get("queries") == 3_936,
         result.get("scored_queries") == 3_360,
@@ -437,7 +540,7 @@ def verify(repository: Path) -> dict[str, Any]:
         expected_provenance_digest=base.PROVENANCE_DIGEST,
         verify_content=True, validate_records=True,
     )
-    load_dtw_sample_generation(
+    dtw = load_dtw_sample_generation(
         repository / ladder.DTW_ROOT_RELATIVE, ladder.DTW_GENERATION_ID,
         packed_manifest=packed.manifest, verify_content=True,
         validate_records=True,
@@ -445,9 +548,10 @@ def verify(repository: Path) -> dict[str, Any]:
     records = _inventory(packed.rows, packed.overflow)
     id_order = np.argsort(records["episode_id"], kind="stable")
     sorted_ids = records["episode_id"][id_order]
-    source = source_from_spec(
+    raw_source = source_from_spec(
         load_config(repository / base.CONFIG_RELATIVE).datasets["nasdaq"]
     )
+    source = CachedOHLCVSource(raw_source, max_entries=None)
     cases_root = root / "cases"
     attempts = _attempt_bindings(root, preregistration)
     expected_case_names = {
@@ -457,13 +561,15 @@ def verify(repository: Path) -> dict[str, Any]:
         path for path in cases_root.iterdir()
         if not path.name.startswith(".wf03-")
     ]
+    terminal_attempt = attempts.get(str(result.get("terminal_attempt_id")))
     if {path.name for path in observed_case_paths} != expected_case_names \
             or any(path.is_symlink() or not path.is_file()
                    for path in observed_case_paths) \
-            or result.get("terminal_attempt_id") not in attempts \
-            or result.get("attempts") != len(tuple(
-                (root / "attempts").iterdir()
-            )):
+            or terminal_attempt is None \
+            or terminal_attempt.get("_terminal_name") != "COMPLETE.json" \
+            or terminal_attempt.get("_terminal", {}).get("result_digest") \
+                != result.get("result_digest") \
+            or result.get("attempts") != len(attempts):
         raise CombinedBatchVerificationError("combined terminal layout differs")
     observations = []
     case_manifest = []
@@ -474,6 +580,7 @@ def verify(repository: Path) -> dict[str, Any]:
         observations.append(_independent_case(
             value, row, preregistration, records, packed.symbols,
             id_order, sorted_ids, source, attempts,
+            packed.manifest, dtw.manifest,
         ))
         case_manifest.append({
             "query_id": value["query_id"], "case_digest": value["case_digest"],
@@ -488,6 +595,15 @@ def verify(repository: Path) -> dict[str, Any]:
         ),
         result["maximum_eligible_candidates"] == max(
             row["eligible_candidates"] for row in observations
+        ),
+        result["maximum_seed_rows"] == max(
+            row["seed_rows"] for row in observations
+        ),
+        result["expanded_seed_queries"] == sum(
+            row["seed_rows"] > producer.SEED_ROWS for row in observations
+        ),
+        _valid_resource_observation(
+            result["post_preload_resource_observation"]
         ),
     )):
         raise CombinedBatchVerificationError("combined aggregate differs")
@@ -515,12 +631,13 @@ def verify(repository: Path) -> dict[str, Any]:
         "all_78720_analogue_links_resolve": True,
         "all_analogue_links_causal_and_nonoverlapping": True,
         "all_certificate_result_digests_independently_reconstructed": True,
+        "all_query_input_digests_independently_reconstructed": True,
         "frozen_scalar_authority_exact": True,
         "fold_stratified_reruns_exact": True,
         "outcomes_or_labels_excluded": True,
     }
     state = {
-        "schema_version": "m04r14-t14-10-wf03-combined-batch-verification-v4",
+        "schema_version": "m04r14-t14-10-wf03-combined-batch-verification-v5",
         "status": "complete", "passed": all(gates.values()), "gates": gates,
         "producer_result_digest": result["result_digest"],
         "preregistration_digest": preregistration["preregistration_digest"],

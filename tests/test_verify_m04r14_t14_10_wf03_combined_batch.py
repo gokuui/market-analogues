@@ -84,6 +84,7 @@ def test_attempt_bindings_accept_restart_with_new_physical_lease(
 ) -> None:
     preregistration = {
         "preregistration_digest": "a" * 64,
+        "inventory": {"queries": 2},
         "inputs": {
             "packed_content_digest": "b" * 64,
             "dtw_semantic_identity_digest": "c" * 64,
@@ -96,13 +97,26 @@ def test_attempt_bindings_accept_restart_with_new_physical_lease(
     for number, lease in ((1, "d" * 64), (2, "e" * 64)):
         path = attempts / f"attempt-{number:04d}"
         started = base._sealed({
-            "schema_version": "m04r14-wf03-combined-batch-attempt-v4",
+            "schema_version": "m04r14-wf03-combined-batch-attempt-v5",
             "status": "running", "attempt_id": path.name,
             "preregistration_digest": "a" * 64,
             "packed_content_digest": "b" * 64,
             "dtw_semantic_identity_digest": "c" * 64,
             "resident_attempt_lease_digest": lease,
             "dtw_attempt_identity_digest": str(number) * 64,
+            "receipts_reused_at_start": number - 1,
+            "initial_resource_observation": {
+                "effective_cpus": 8, "memory_total_kib": 64 * 1024 * 1024,
+                "memory_available_kib": 32 * 1024 * 1024,
+                "process_rss_kib": 1, "process_peak_rss_kib": 1,
+                "process_swap_kib": 0,
+            },
+            "after_resident_resource_observation": {
+                "effective_cpus": 8, "memory_total_kib": 64 * 1024 * 1024,
+                "memory_available_kib": 32 * 1024 * 1024,
+                "process_rss_kib": 1, "process_peak_rss_kib": 1,
+                "process_swap_kib": 0,
+            },
         }, "attempt_digest")
         base._atomic(path / "RUN_STARTED.json", started)
     bindings = subject._attempt_bindings(tmp_path, preregistration)
