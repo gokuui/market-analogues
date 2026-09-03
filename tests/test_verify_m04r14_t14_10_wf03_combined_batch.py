@@ -96,7 +96,7 @@ def test_attempt_bindings_accept_restart_with_new_physical_lease(
     for number, lease in ((1, "d" * 64), (2, "e" * 64)):
         path = attempts / f"attempt-{number:04d}"
         started = base._sealed({
-            "schema_version": "m04r14-wf03-combined-batch-attempt-v3",
+            "schema_version": "m04r14-wf03-combined-batch-attempt-v4",
             "status": "running", "attempt_id": path.name,
             "preregistration_digest": "a" * 64,
             "packed_content_digest": "b" * 64,

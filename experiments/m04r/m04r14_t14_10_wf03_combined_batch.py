@@ -36,12 +36,12 @@ from experiments.m04r import m04r14_t14_10_wf03_feasibility as base
 from experiments.m04r import m04r14_t14_10_wf03b_dtw_component_ladder as ladder
 
 
-SCHEMA = "m04r14-t14-10-wf03-combined-batch-preregistration-v3"
+SCHEMA = "m04r14-t14-10-wf03-combined-batch-preregistration-v4"
 OUTPUT_RELATIVE = Path(
-    "config/data/analogues/m04r14/t14-10-wf03-combined-batch-v3"
+    "config/data/analogues/m04r14/t14-10-wf03-combined-batch-v4"
 )
 PREREGISTRATION_RELATIVE = Path(
-    "experiments/m04r/m04r14_t14_10_wf03_combined_batch_v3_preregistered.json"
+    "experiments/m04r/m04r14_t14_10_wf03_combined_batch_v4_preregistered.json"
 )
 PACKED_SOURCE_STORE_RELATIVE = Path(
     "config/data/analogues/poc/m04r/packed-bound-full/store"
@@ -343,14 +343,16 @@ def build_preregistration(repository: Path) -> dict[str, Any]:
             "warmup_queries": sum(not bool(row["scored"]) for row in rows),
             "months": len({row["cutoff"] for row in rows}),
         },
-        "contract": staged_dtw_component_search_contract(),
+        "contract": staged_dtw_component_search_contract(adaptive_seed=True),
         "execution": {
             "query_concurrency": 1,
             "threads_per_query": THREADS,
             "preload_workers": PRELOAD_WORKERS,
             "source_cache_max_entries": None,
             "prepared_symbol_cache": "batch lifetime",
-            "seed_rows": SEED_ROWS,
+            "initial_seed_rows": SEED_ROWS,
+            "seed_policy": "geometric stable-prefix expansion for top-k symbols",
+            "maximum_seed_rows": "eligible candidates",
             "block_rows": BLOCK_ROWS,
             "top_k": TOP_K,
             "tolerance_hex": TOLERANCE.hex(),
@@ -432,13 +434,18 @@ def validate_preregistration(
         value.get("execution", {}).get("query_concurrency") == 1,
         value.get("execution", {}).get("threads_per_query") == THREADS,
         value.get("execution", {}).get("preload_workers") == PRELOAD_WORKERS,
-        value.get("execution", {}).get("seed_rows") == SEED_ROWS,
+        value.get("execution", {}).get("initial_seed_rows") == SEED_ROWS,
+        value.get("execution", {}).get("seed_policy")
+            == "geometric stable-prefix expansion for top-k symbols",
+        value.get("execution", {}).get("maximum_seed_rows")
+            == "eligible candidates",
         value.get("execution", {}).get("block_rows") == BLOCK_ROWS,
         value.get("execution", {}).get("top_k") == TOP_K,
         value.get("execution", {}).get("tolerance_hex") == TOLERANCE.hex(),
         value.get("execution", {}).get("output_root")
             == str((repository / OUTPUT_RELATIVE).resolve()),
-        value.get("contract") == staged_dtw_component_search_contract(),
+        value.get("contract")
+            == staged_dtw_component_search_contract(adaptive_seed=True),
         set(value.get("runtime_files", {})) == set(RUNTIME_FILES),
     )):
         raise CombinedBatchError("combined batch preregistration differs")
@@ -534,7 +541,7 @@ def _validate_case(
         minimum_rigid = certificate["minimum_rigid_pruned"]
         minimum_combined = certificate["minimum_combined_pruned"]
         valid = all((
-            value["schema_version"] == "m04r14-wf03-combined-batch-case-v3",
+            value["schema_version"] == "m04r14-wf03-combined-batch-case-v4",
             value["status"] == "complete",
             value["query_id"] == row["episode_id"],
             value["case_id"] == row["case_id"],
@@ -661,7 +668,7 @@ def _attempt_history(
         base._validate_seal(started, "attempt_digest")
         if not all((
             started.get("schema_version")
-                == "m04r14-wf03-combined-batch-attempt-v3",
+                == "m04r14-wf03-combined-batch-attempt-v4",
             started.get("status") == "running",
             started.get("attempt_id") == path.name,
             started.get("preregistration_digest")
@@ -729,6 +736,7 @@ def _run_case(
         rigid_threads=THREADS, dtw_threads=THREADS, exact_workers=THREADS,
         tolerance=TOLERANCE, verify_content=False,
         prepared_symbol_cache=prepared_symbols,
+        adaptive_seed=True,
     )
     current_lease = resident_file_identity_lease(
         base.RESIDENT_ROOT / "READY.json"
@@ -745,7 +753,7 @@ def _run_case(
     matches = _matches(result)
     certificate = asdict(result.certificate)
     state = {
-        "schema_version": "m04r14-wf03-combined-batch-case-v3",
+        "schema_version": "m04r14-wf03-combined-batch-case-v4",
         "status": "complete",
         "case_id": row["case_id"],
         "query_id": row["episode_id"],
@@ -803,7 +811,7 @@ def _execute_locked(
             base._validate_seal(result)
             if not all((
                 result.get("schema_version")
-                    == "m04r14-t14-10-wf03-combined-batch-result-v3",
+                    == "m04r14-t14-10-wf03-combined-batch-result-v4",
                 result.get("passed") is True,
                 result.get("queries") == 3_936,
                 result.get("preregistration_digest")
@@ -870,7 +878,7 @@ def _execute_locked(
     attempt = _next_attempt(root)
     attempt_id = attempt.name
     base._atomic(attempt / "RUN_STARTED.json", base._sealed({
-        "schema_version": "m04r14-wf03-combined-batch-attempt-v3",
+        "schema_version": "m04r14-wf03-combined-batch-attempt-v4",
         "status": "running", "attempt_id": attempt_id,
         "preregistration_digest": preregistration["preregistration_digest"],
         "packed_content_digest": resident["content_digest"],
@@ -916,7 +924,7 @@ def _execute_locked(
             )
             results.append(value)
             _replace_json(root / "PROGRESS.json", {
-                "schema_version": "m04r14-wf03-combined-batch-progress-v3",
+                "schema_version": "m04r14-wf03-combined-batch-progress-v4",
                 "status": "running" if completed < len(rows) else "publishing",
                 "attempt_id": attempt_id,
                 "completed_queries": completed,
@@ -930,7 +938,7 @@ def _execute_locked(
             })
     except BaseException as exc:
         _replace_json(root / "PROGRESS.json", {
-            "schema_version": "m04r14-wf03-combined-batch-progress-v3",
+            "schema_version": "m04r14-wf03-combined-batch-progress-v4",
             "status": "interrupted", "attempt_id": attempt_id,
             "completed_queries": len(results),
             "total_queries": len(rows),
@@ -940,7 +948,7 @@ def _execute_locked(
             "error_type": type(exc).__name__, "error": str(exc),
         })
         base._atomic(attempt / "INTERRUPTED.json", base._sealed({
-            "schema_version": "m04r14-wf03-combined-batch-attempt-v3",
+            "schema_version": "m04r14-wf03-combined-batch-attempt-v4",
             "status": "interrupted", "attempt_id": attempt_id,
             "completed_queries": len(results),
             "error_type": type(exc).__name__, "error": str(exc),
@@ -957,7 +965,7 @@ def _execute_locked(
         "sha256": base._sha(_case_path(cases_root, value["query_id"])),
     } for value in results]
     state = {
-        "schema_version": "m04r14-t14-10-wf03-combined-batch-result-v3",
+        "schema_version": "m04r14-t14-10-wf03-combined-batch-result-v4",
         "status": "complete",
         "passed": True,
         "queries": len(results),
@@ -994,7 +1002,7 @@ def _execute_locked(
     result = base._sealed(state)
     base._atomic(root / "RESULT.json", result)
     base._atomic(attempt / "COMPLETE.json", base._sealed({
-        "schema_version": "m04r14-wf03-combined-batch-attempt-v3",
+        "schema_version": "m04r14-wf03-combined-batch-attempt-v4",
         "status": "complete", "attempt_id": attempt_id,
         "queries": len(results),
         "receipts_reused_at_start": len(existing_results),
@@ -1003,7 +1011,7 @@ def _execute_locked(
         "created_at": base._now(),
     }, "attempt_digest"))
     _replace_json(root / "PROGRESS.json", {
-        "schema_version": "m04r14-wf03-combined-batch-progress-v3",
+        "schema_version": "m04r14-wf03-combined-batch-progress-v4",
         "status": "complete", "completed_queries": len(results),
         "attempt_id": attempt_id,
         "total_queries": len(results),

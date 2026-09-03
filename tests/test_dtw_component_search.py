@@ -4,10 +4,12 @@ from dataclasses import asdict
 import numpy as np
 import numba
 import pandas as pd
+import pytest
 
 from market_analogues.dtw_component_search import (
     certified_dtw_component_search, certified_staged_dtw_component_search,
     certified_dtw_component_search_contract,
+    _staged_seed_proposals,
     dtw_component_search_contract, staged_dtw_component_search_contract,
     scan_dtw_component_bound_proposals,
 )
@@ -134,6 +136,66 @@ def test_combined_component_report_binds_auxiliary_generation(tmp_path: Path) ->
     assert report.packed_generation_id == packed_generation
     assert report.dtw_generation_id == dtw_generation
     assert report.input_digest
+
+
+def test_adaptive_seed_expands_stable_prefix_until_symbols_are_diverse() -> None:
+    representation = represent(generate_case("rounded_base", 811).episode)
+    symbols = ("AAA", "BBB", "CCC")
+    records = np.concatenate([
+        make_packed_record(
+            f"{index + 1:024x}", index + 1, index // 4, "A",
+            quantize_bound_row(representation),
+        )
+        for index in range(12)
+    ])
+    scores = np.arange(12, dtype=np.float64)
+    fixed, fixed_distinct = _staged_seed_proposals(
+        records, scores, np.empty(0, dtype=OVERFLOW_DTYPE), symbols,
+        initial_seed_rows=4, eligible_main=12, eligible_candidates=12,
+        top_k=3, adaptive_seed=False,
+    )
+    adaptive, adaptive_distinct = _staged_seed_proposals(
+        records, scores, np.empty(0, dtype=OVERFLOW_DTYPE), symbols,
+        initial_seed_rows=4, eligible_main=12, eligible_candidates=12,
+        top_k=3, adaptive_seed=True,
+    )
+    assert len(fixed) == 4
+    assert fixed_distinct == 1
+    assert len(adaptive) == 12
+    assert adaptive_distinct == 3
+    assert [row.episode_id for row in adaptive[:4]] \
+        == [row.episode_id for row in fixed]
+    assert staged_dtw_component_search_contract()["schema_version"] \
+        == "certified-staged-dtw-component-search-v1"
+    assert staged_dtw_component_search_contract()["digest"] \
+        == "989bb4268fa38c7b8c4407c5ae15beb89292caa3029fb72807462f52c0be7224"
+    adaptive_contract = staged_dtw_component_search_contract(adaptive_seed=True)
+    assert adaptive_contract["schema_version"] \
+        == "certified-adaptive-staged-dtw-component-search-v2"
+    assert adaptive_contract["digest"] \
+        == "14957dac821a9a8f4c8d703984acff4dbc1eab622e782f8aa8ca45bfad2463ec"
+    with pytest.raises(ValueError, match="adaptive seed policy must be boolean"):
+        staged_dtw_component_search_contract(adaptive_seed=1)  # type: ignore[arg-type]
+
+
+def test_adaptive_seed_reports_genuinely_insufficient_symbol_universe() -> None:
+    representation = represent(generate_case("rounded_base", 812).episode)
+    records = np.concatenate([
+        make_packed_record(
+            f"{index + 1:024x}", index + 1, 0, "A",
+            quantize_bound_row(representation),
+        )
+        for index in range(8)
+    ])
+    with pytest.raises(
+        ValueError, match="fewer eligible symbols than top-k",
+    ):
+        _staged_seed_proposals(
+            records, np.arange(8, dtype=np.float64),
+            np.empty(0, dtype=OVERFLOW_DTYPE), ("AAA",),
+            initial_seed_rows=2, eligible_main=8, eligible_candidates=8,
+            top_k=2, adaptive_seed=True,
+        )
 
 
 def test_certified_combined_component_matches_exhaustive_oracle(
@@ -263,6 +325,17 @@ def test_certified_combined_component_matches_exhaustive_oracle(
     assert source.load_counts["AAA"] <= 2
     assert source.load_counts["BBB"] <= 1
     assert set(prepared_symbols) == {"AAA", "BBB"}
+    adaptive = certified_staged_dtw_component_search(
+        query, source, request, packed_root, packed_generation,
+        dtw_root, dtw_generation, store_dataset_id="test",
+        seed_rows=20, block_rows=13, rigid_threads=2, dtw_threads=2,
+        exact_workers=2, prepared_symbol_cache=prepared_symbols,
+        adaptive_seed=True,
+    )
+    assert adaptive.matches == staged.matches
+    assert adaptive.certificate.contract_digest == (
+        staged_dtw_component_search_contract(adaptive_seed=True)["digest"]
+    )
     source.load_counts.clear()
     repeated = certified_staged_dtw_component_search(
         query, source, request, packed_root, packed_generation,

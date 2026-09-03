@@ -28,7 +28,7 @@ from experiments.m04r import m04r14_t14_10_wf03b_dtw_component_ladder as ladder
 
 OUTPUT_RELATIVE = Path(
     "config/data/analogues/m04r14/"
-    "t14-10-wf03-combined-batch-v3-verification"
+    "t14-10-wf03-combined-batch-v4-verification"
 )
 AUTHORITY_RELATIVE = Path(
     "config/data/analogues/m04r14/t14-10-wf03b-dtw-component-ladder-v1/"
@@ -102,7 +102,7 @@ def select_rerun_sample(rows: Sequence[Mapping[str, Any]]) -> list[str]:
     for fold in sorted(grouped):
         ordered = sorted(grouped[fold], key=lambda row: (
             stable_hash({
-                "purpose": "wf03-combined-independent-rerun-v3",
+                "purpose": "wf03-combined-independent-rerun-v4",
                 "fold": fold, "query_id": row["episode_id"],
             }),
             row["episode_id"],
@@ -166,7 +166,7 @@ def _independent_case(
         rigid_minimum = certificate["minimum_rigid_pruned"]
         combined_minimum = certificate["minimum_combined_pruned"]
         predicates = (
-            value["schema_version"] == "m04r14-wf03-combined-batch-case-v3",
+            value["schema_version"] == "m04r14-wf03-combined-batch-case-v4",
             value["status"] == "complete",
             value["query_id"] == row["episode_id"],
             value["case_id"] == row["case_id"],
@@ -306,7 +306,7 @@ def _attempt_bindings(
         started = base._read(started_path)
         if not _seal_valid(started, "attempt_digest") or not all((
             started.get("schema_version")
-                == "m04r14-wf03-combined-batch-attempt-v3",
+                == "m04r14-wf03-combined-batch-attempt-v4",
             started.get("status") == "running",
             started.get("attempt_id") == path.name,
             started.get("preregistration_digest")
@@ -378,6 +378,7 @@ def _rerun_sample(
             dtw_threads=producer.THREADS, exact_workers=producer.THREADS,
             tolerance=producer.TOLERANCE, verify_content=False,
             prepared_symbol_cache=prepared,
+            adaptive_seed=True,
         )
         actual = _rerun_matches(result)
         if actual != published["matches"] \
@@ -416,7 +417,7 @@ def verify(repository: Path) -> dict[str, Any]:
     result = base._read(root / "RESULT.json")
     if not _seal_valid(result, "result_digest") or not all((
         result.get("schema_version")
-            == "m04r14-t14-10-wf03-combined-batch-result-v3",
+            == "m04r14-t14-10-wf03-combined-batch-result-v4",
         result.get("status") == "complete", result.get("passed") is True,
         result.get("queries") == 3_936,
         result.get("scored_queries") == 3_360,
@@ -519,7 +520,7 @@ def verify(repository: Path) -> dict[str, Any]:
         "outcomes_or_labels_excluded": True,
     }
     state = {
-        "schema_version": "m04r14-t14-10-wf03-combined-batch-verification-v3",
+        "schema_version": "m04r14-t14-10-wf03-combined-batch-verification-v4",
         "status": "complete", "passed": all(gates.values()), "gates": gates,
         "producer_result_digest": result["result_digest"],
         "preregistration_digest": preregistration["preregistration_digest"],

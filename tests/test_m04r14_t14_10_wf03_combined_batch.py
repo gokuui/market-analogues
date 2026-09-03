@@ -56,7 +56,7 @@ def valid_case() -> dict:
         "minimum_combined_pruned": 1.2,
     }
     value = {
-        "schema_version": "m04r14-wf03-combined-batch-case-v3",
+        "schema_version": "m04r14-wf03-combined-batch-case-v4",
         "status": "complete", "query_id": "a" * 24, "case_id": "case-a",
         "symbol": "AAA", "cutoff": "2020-01-31T00:00:00",
         "fold_id": "development", "fold_role": "development", "scored": True,
@@ -218,7 +218,7 @@ def test_execute_resumes_sealed_cases_under_a_new_attempt_lease(
         **preregistration(),
         "inventory": {"months": 1},
     }
-    output = Path("output-v3")
+    output = Path("output-v4")
     leases = iter(("3" * 64, "5" * 64))
     current_lease = {"value": ""}
     startup_options = []
@@ -326,8 +326,8 @@ def test_execute_resumes_sealed_cases_under_a_new_attempt_lease(
 def test_execute_refuses_a_concurrent_producer_before_validation(
     tmp_path: Path, monkeypatch,
 ) -> None:
-    monkeypatch.setattr(subject, "OUTPUT_RELATIVE", Path("output-v3"))
-    lock = tmp_path / "output-v3.lock"
+    monkeypatch.setattr(subject, "OUTPUT_RELATIVE", Path("output-v4"))
+    lock = tmp_path / "output-v4.lock"
     descriptor = os.open(lock, os.O_RDWR | os.O_CREAT, 0o600)
     try:
         fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)

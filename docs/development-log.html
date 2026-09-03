@@ -1714,6 +1714,13 @@
   <p><b>Attempt-local safety:</b> Packed and DTW physical identities are checked after every newly computed query. Any in-attempt path, device, inode, size, timestamp or mode drift refuses case publication. Semantic case digests deliberately exclude attempt-local physical identities, so the same exact retrieval remains semantically stable across a reboot. Outcome, label and final-period data remain unopened.</p>
   <p class="pass"><b>Correctness and measured performance:</b> An end-to-end synthetic interruption test proves that attempt 2 can use a different resident lease, preserve attempt 1's sealed case byte-for-byte, compute only the missing case and publish the aggregate. Real-data full validation of the 9.2-GB generation passed content, record, lease and DTW identity gates in 204.0 seconds (164.7 resident, 3.2 packed records, 36.2 DTW). The common unchanged-lease restart path completed its generation preflight in 0.097 seconds. All 40 focused tests and all 1,018 repository tests pass; <code>git diff --check</code> is clean. Retrieval math, pruning, top-20 ordering and numeric tolerance are unchanged.</p>
 </section>
+<section class="entry">
+  <h2>L-200 — Distinct-symbol seed concentration diagnosed and closed</h2>
+  <p><b>V3 failure and disposition:</b> The restart-safe producer correctly retained 329 sealed receipts, then stopped on query <code>1223e104…d8708d</code> (APDN at 2013-02-28) because the fixed 2,048-row rigid-bound seed contained only six symbols and could not establish a distinct-symbol top-20 threshold. This was not benchmark drift, data corruption, memory exhaustion or a restart failure: 1,817,049 rows were eligible, but low-priced and zero-volume histories concentrated the lowest rigid bounds in a few symbols. The v3 partial tree remains immutable evidence and is not reused or relabeled.</p>
+  <p><b>V4 correction:</b> An explicitly selected v2 search contract begins with the same stable 2,048-row prefix and doubles that prefix only while it lacks 20 distinct symbols, capped by the complete eligible universe. Prefix membership retains deterministic <code>(bound, episode ID)</code> ordering, overflow rows participate in the same stable bounded merge, and exact completion still admits equality boundaries and prunes only strict greater-than bounds. If the complete eligible universe genuinely has fewer than 20 symbols, the search now terminates with a precise refusal. Legacy callers retain the byte-identical v1 fixed-seed contract digest <code>989bb426…e7224</code>.</p>
+  <p class="pass"><b>Real-data proof:</b> APDN expanded once to 4,096 rows (29 distinct seed symbols), closed with 20 distinct matches, evaluated 5,156 exact candidates and reported zero lower-bound excess. Its ordered episode IDs and hexadecimal distances exactly equal an independent fixed-4,096 differential run. A frozen OHAI authority query required no expansion and reproduced all 20 authority episode IDs, symbols, cutoffs, hexadecimal distances and tiers exactly, also with zero bound excess. The adaptive contract digest is <code>14957dac…3ec</code>.</p>
+  <p class="pass"><b>Verification boundary:</b> Adversarial tests cover a seed dominated by one symbol, geometric stable-prefix expansion, complete-universe symbol exhaustion, legacy contract immutability and exhaustive-oracle parity. Producer and independent verifier tests bind the fresh v4 schemas and adaptive contract. All 26 focused tests and all 1,020 repository tests pass; Python compilation, HTML parsing and <code>git diff --check</code> are clean. The volatile packed mirror was also rebuilt from durable bytes and fully validated in 193.5 seconds. V4 writes to a new output tree, so no v1, v2 or v3 receipt can cross the lineage boundary.</p>
+</section>
 </main>
 
 <section id="reproduce">
@@ -1859,10 +1866,10 @@ git commit -m "Preregister M04R-11 candidate v2"
 # Commit the verifier implementation before its sole-child preregistration.
 .venv/bin/python -m experiments.m04r.verify_m04r14_t14_10_wf03b_dtw_store_full preregister --repository /home/vinay/code/market-analogues
 .venv/bin/python -m experiments.m04r.verify_m04r14_t14_10_wf03b_dtw_store_full run --repository /home/vinay/code/market-analogues</code></pre>
-  <pre><code># T14-10 all-query combined v3: v1/v2 partial trees are retained and never reused.
+  <pre><code># T14-10 all-query combined v4: v1/v2/v3 partial trees are retained and never reused.
 # Commit implementation, tests and this log as clean H0 before preregistration.
 .venv/bin/python -m experiments.m04r.m04r14_t14_10_wf03_combined_batch preregister --repository /home/vinay/code/market-analogues
-# Commit exactly experiments/m04r/m04r14_t14_10_wf03_combined_batch_v3_preregistered.json as sole-child H1.
+# Commit exactly experiments/m04r/m04r14_t14_10_wf03_combined_batch_v4_preregistered.json as sole-child H1.
 .venv/bin/python -m experiments.m04r.m04r14_t14_10_wf03_combined_batch run --repository /home/vinay/code/market-analogues
 # The same run command resumes after a process restart or host reboot; it validates/rebuilds tmpfs automatically.
 .venv/bin/python -m experiments.m04r.verify_m04r14_t14_10_wf03_combined_batch --repository /home/vinay/code/market-analogues</code></pre>

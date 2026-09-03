@@ -187,7 +187,38 @@ def certified_dtw_component_search_contract() -> dict[str, Any]:
     return {**state, "digest": stable_hash(state)}
 
 
-def staged_dtw_component_search_contract() -> dict[str, Any]:
+def staged_dtw_component_search_contract(
+    *, adaptive_seed: bool = False,
+) -> dict[str, Any]:
+    if type(adaptive_seed) is not bool:
+        raise DtwComponentSearchError("adaptive seed policy must be boolean")
+    if adaptive_seed:
+        state = {
+            "schema_version": "certified-adaptive-staged-dtw-component-search-v2",
+            "component": "price",
+            "price_bound_contract_digest": packed_component_search_contract(
+                "price"
+            )["digest"],
+            "combined_bound_contract_digest": dtw_component_search_contract()[
+                "digest"
+            ],
+            "seed": (
+                "begin with the requested stable rigid-price-bound prefix and "
+                "geometrically expand that prefix until it contains distinct "
+                "eligible symbols for top-k; exactly complete the final prefix "
+                "once to establish a finite upper bound"
+            ),
+            "closure": (
+                "retain every eligible rigid bound at or below the seed threshold; "
+                "evaluate its combined DTW bound; exactly complete every combined "
+                "bound at or below that threshold; prune only strict greater-than"
+            ),
+            "selection": (
+                "ascending (exact price distance, episode ID), one row per symbol"
+            ),
+            "outcomes_or_labels_used": False,
+        }
+        return {**state, "digest": stable_hash(state)}
     state = {
         "schema_version": "certified-staged-dtw-component-search-v1",
         "component": "price",
@@ -241,6 +272,42 @@ def _stable_main_positions(
     )
     order = np.lexsort((identifiers["low"], identifiers["high"]))
     return np.concatenate((lower, tied[order[:needed]]))
+
+
+def _staged_seed_proposals(
+    records: np.ndarray, rigid_scores: np.ndarray,
+    eligible_overflow_records: np.ndarray, symbols: tuple[str, ...],
+    *, initial_seed_rows: int, eligible_main: int,
+    eligible_candidates: int, top_k: int, adaptive_seed: bool,
+) -> tuple[tuple[BoundProposal, ...], int]:
+    quota = min(initial_seed_rows, eligible_candidates)
+    while True:
+        seed_positions = _stable_main_positions(
+            records, rigid_scores, min(quota, eligible_main),
+        )
+        seed_heap = _entries_at_positions(
+            records, seed_positions, rigid_scores[seed_positions],
+        )
+        if len(eligible_overflow_records):
+            zeros = np.zeros(len(eligible_overflow_records), dtype=np.float64)
+            seed_heap = _stable_bounded(
+                seed_heap,
+                _entries(
+                    eligible_overflow_records, zeros, zeros, overflow=True,
+                ),
+                quota,
+            )
+        proposals, _counts, _digest = _finalize(
+            {"price": seed_heap}, symbols,
+        )
+        distinct_symbols = len({row.symbol for row in proposals})
+        if not adaptive_seed or distinct_symbols >= top_k:
+            return proposals, distinct_symbols
+        if quota >= eligible_candidates:
+            raise DtwComponentSearchError(
+                "staged search has fewer eligible symbols than top-k"
+            )
+        quota = min(eligible_candidates, quota * 2)
 
 
 def scan_dtw_component_bound_proposals(
@@ -403,20 +470,25 @@ def certified_staged_dtw_component_search(
     tolerance: float = 1e-12,
     verify_content: bool = True,
     prepared_symbol_cache: dict[str, Any] | None = None,
+    adaptive_seed: bool = False,
 ) -> CertifiedStagedDtwComponentResult:
     """Certify exact price neighbours with a retained two-bound cascade.
 
     A finite exact threshold from the cheapest safe-bound prefix lets the
     expensive DTW bound skip every row already excluded by rigid price.  All
     equality boundaries are retained and exact completion uses the same
-    distinct-symbol selector as the scalar certified search.
+    distinct-symbol selector as the scalar certified search.  When explicitly
+    enabled, adaptive seeding geometrically expands that stable prefix until it
+    can form the requested distinct-symbol top-k; the legacy fixed-seed policy
+    remains the default.
     """
     available_threads = int(numba.config.NUMBA_NUM_THREADS)
     if request.max_per_instrument != 1 or request.deduplicate_overlaps is not True:
         raise DtwComponentSearchError("staged search requires one row per symbol")
     if store_dataset_id != query.key.instrument.dataset_id and not request.cross_dataset:
         raise DtwComponentSearchError("cross-dataset staged search is not authorized")
-    if any(type(value) is not int or isinstance(value, bool) or value < 1 for value in (
+    if type(adaptive_seed) is not bool or any(
+        type(value) is not int or isinstance(value, bool) or value < 1 for value in (
         seed_rows, block_rows, rigid_threads, dtw_threads, exact_workers,
     )) or rigid_threads > available_threads or dtw_threads > available_threads \
             or seed_rows < request.top_k or not np.isfinite(tolerance) \
@@ -486,23 +558,11 @@ def certified_staged_dtw_component_search(
     if eligible_candidates < request.top_k:
         raise DtwComponentSearchError("staged search has fewer eligible rows than top-k")
 
-    seed_positions = _stable_main_positions(
-        packed.rows, rigid_scores, min(seed_rows, eligible_main),
-    )
-    seed_heap = _entries_at_positions(
-        packed.rows, seed_positions, rigid_scores[seed_positions],
-    )
-    if eligible_overflow:
-        zeros = np.zeros(eligible_overflow, dtype=np.float64)
-        seed_heap = _stable_bounded(
-            seed_heap,
-            _entries(
-                eligible_overflow_records, zeros, zeros, overflow=True,
-            ),
-            min(seed_rows, eligible_candidates),
-        )
-    seed_proposals, _seed_counts, _seed_digest = _finalize(
-        {"price": seed_heap}, packed.symbols,
+    seed_proposals, _seed_distinct_symbols = _staged_seed_proposals(
+        packed.rows, rigid_scores, eligible_overflow_records, packed.symbols,
+        initial_seed_rows=seed_rows, eligible_main=eligible_main,
+        eligible_candidates=eligible_candidates, top_k=request.top_k,
+        adaptive_seed=adaptive_seed,
     )
     prepared_cache: dict[str, Any] = (
         {} if prepared_symbol_cache is None else prepared_symbol_cache
@@ -595,7 +655,7 @@ def certified_staged_dtw_component_search(
             or np.isfinite(minimum_combined_pruned) \
             and minimum_combined_pruned <= seed_threshold:
         raise DtwComponentSearchError("staged strict-bound closure differs")
-    contract = staged_dtw_component_search_contract()
+    contract = staged_dtw_component_search_contract(adaptive_seed=adaptive_seed)
     input_digest = stable_hash({
         "query_stock_prefix": asdict(causal_prefix_digest(
             source.load(query.key.instrument), query.key.cutoff,
