@@ -1811,6 +1811,11 @@
   <p><b>Execution:</b> Attempt 0001 started at 2026-09-07 10:11:53 UTC with zero reused receipts, 12 effective CPUs, 98,885,896 KiB total memory and 80,022,988 KiB available. Twelve spawned one-thread workers consume a rolling bounded queue. Parent-validated cases, atomic progress and attempt terminals are the durable event trail; a restart validates and reuses completed cases and reschedules only absent IDs.</p>
   <p><b>Post-run verifier:</b> A separate implementation now covers full pack rehash/record validation, all case/attempt/aggregate seals, independently reconstructed query-input and certificate digests, all 78,720 causal links, seven-component weighted totals, complete monotone DTW paths, exact frozen authority parity and two deterministic reruns from each of six folds. Six verifier-specific and all adjacent tests pass. This verifier must be committed before it can publish a receipt.</p>
 </section>
+<section class="entry">
+  <h2>L-216 — One-shot completion listener replaces polling</h2>
+  <p><b>Mechanism:</b> A separate Git-bound listener opens Linux <code>pidfd</code> for the exact producer process and blocks once in the kernel with no timed status loop. On process exit it requires both a sealed complete 3,936-query result and complete progress state. Only then does it launch the committed independent verifier; an incomplete producer creates a failure receipt and never starts verification.</p>
+  <p><b>Auditability:</b> Listener start, failure and success are create-only sealed JSON receipts under the producer root. Verification stdout/stderr tails are retained on failure. Three terminal-state tests plus the six verifier tests pass.</p>
+</section>
 </main>
 
 <section id="reproduce">
@@ -1980,6 +1985,8 @@ git commit -m "Preregister M04R-11 candidate v2"
 # The identical run command validates all existing receipts and resumes only absent queries after a restart.</code></pre>
   <pre><code># Commit the independent full-batch verifier before running it after producer completion.
 .venv/bin/python -m experiments.m04r.verify_m04r14_t14_10_wf03_composite_batch --repository /home/vinay/code/market-analogues</code></pre>
+  <pre><code># One-shot, non-polling completion handoff; replace PID with the live producer PID.
+.venv/bin/python -m experiments.m04r.m04r14_t14_10_wf03_composite_listener --repository /home/vinay/code/market-analogues --producer-pid PID</code></pre>
   <p class="muted">Source datasets are read-only. Generated artifacts live under the configured artifact directory and are intentionally excluded from Git.</p>
 </section>
 </body>
