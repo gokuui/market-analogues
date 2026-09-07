@@ -33,7 +33,7 @@ from experiments.m04r import verify_m04r14_t14_10_wf03_composite_topology_poc as
 
 OUTPUT_RELATIVE = Path(
     "config/data/analogues/m04r14/"
-    "t14-10-wf03-composite-batch-v1-verification"
+    "t14-10-wf03-composite-batch-v2-verification"
 )
 AUTHORITY_RELATIVE = Path(
     "config/data/analogues/m04r14/t14-10-wf03-feasibility-v1/cases/"
@@ -159,7 +159,7 @@ def _attempt_bindings(
             raise CompositeBatchVerificationError("attempt files differ")
         started = base._read(path / "RUN_STARTED.json")
         if not _seal_valid(started, "attempt_digest") or not all((
-            started.get("schema_version") == "m04r14-wf03-composite-batch-attempt-v1",
+            started.get("schema_version") == "m04r14-wf03-composite-batch-attempt-v2",
             started.get("status") == "running",
             started.get("attempt_id") == path.name,
             started.get("preregistration_digest") == preregistration["preregistration_digest"],
@@ -181,7 +181,7 @@ def _attempt_bindings(
             expected_status = "complete" if terminal_name == "COMPLETE.json" else "interrupted"
             if not _seal_valid(terminal, "attempt_digest") or not all((
                 terminal.get("schema_version")
-                    == "m04r14-wf03-composite-batch-attempt-v1",
+                    == "m04r14-wf03-composite-batch-attempt-v2",
                 terminal.get("status") == expected_status,
                 terminal.get("attempt_id") == path.name,
                 type(terminal.get("completed_this_attempt")) is int,
@@ -253,13 +253,13 @@ def _independent_case(
         raise CompositeBatchVerificationError("case seal differs")
     try:
         retrieval = value["retrieval"]
-        certificate = retrieval["certificate"]
+        certificate = kernel.decode_certificate_json_value(retrieval["certificate"])
         matches = retrieval["matches"]
         measurement = value["worker_measurement"]
         certificate_verifier.validate_certificate(retrieval)
         attempt = attempts[value["attempt_id"]]
         predicates = (
-            value["schema_version"] == "m04r14-wf03-composite-batch-case-v1",
+            value["schema_version"] == "m04r14-wf03-composite-batch-case-v2",
             value["status"] == "complete", value["query_id"] == row["episode_id"],
             value["case_id"] == row["case_id"], value["symbol"] == row["symbol"],
             value["cutoff"] == row["cutoff"], value["fold_id"] == row["fold_id"],
@@ -457,7 +457,7 @@ def verify(repository: Path) -> dict[str, Any]:
         semantic_digests.append(value["semantic_digest"])
     if not all((
         result.get("schema_version")
-            == "m04r14-t14-10-wf03-composite-batch-result-v1",
+            == "m04r14-t14-10-wf03-composite-batch-result-v2",
         result.get("status") == "complete", result.get("passed") is True,
         result.get("queries") == producer.EXPECTED_QUERIES,
         result.get("scored_queries") == producer.EXPECTED_SCORED_QUERIES,
@@ -509,7 +509,7 @@ def verify(repository: Path) -> dict[str, Any]:
     if not all(gates.values()):
         raise CompositeBatchVerificationError("composite verification gate failed")
     state = {
-        "schema_version": "m04r14-t14-10-wf03-composite-batch-verification-v1",
+        "schema_version": "m04r14-t14-10-wf03-composite-batch-verification-v2",
         "status": "complete", "passed": True, "gates": gates,
         "producer_result_digest": result["result_digest"],
         "preregistration_digest": preregistration["preregistration_digest"],

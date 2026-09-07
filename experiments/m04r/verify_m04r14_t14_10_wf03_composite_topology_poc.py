@@ -88,7 +88,8 @@ def _metadata_records(values: np.ndarray) -> np.ndarray:
 
 
 def validate_certificate(value: Mapping[str, Any]) -> None:
-    certificate = value.get("certificate", {})
+    stored_certificate = value.get("certificate", {})
+    certificate = producer.decode_certificate_json_value(stored_certificate)
     matches = value.get("matches", [])
     accounting = certificate.get("native_bound_accounting", {})
     try:

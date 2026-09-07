@@ -105,3 +105,38 @@ def test_verifier_normalizes_distinct_main_and_overflow_layouts() -> None:
     ))
     assert normalized.dtype == verifier.METADATA_DTYPE
     assert len(normalized) == 3
+
+
+def test_certificate_json_preserves_valid_incomplete_threshold() -> None:
+    from dataclasses import dataclass
+
+    @dataclass
+    class Certificate:
+        rounds: list
+        threshold_closure_passes: list
+        stop_threshold: float
+
+    original = Certificate(
+        rounds=[{"constrained_threshold": float("inf"),
+                 "selected_rows": 19, "certified": False}],
+        threshold_closure_passes=[], stop_threshold=0.5,
+    )
+    encoded = subject._certificate_json_value(original)
+    assert encoded["rounds"][0]["constrained_threshold"] \
+        == subject.POSITIVE_INFINITY_SENTINEL
+    decoded = subject.decode_certificate_json_value(encoded)
+    assert decoded["rounds"][0]["constrained_threshold"] == float("inf")
+
+
+def test_certificate_json_rejects_nonfinite_final_value() -> None:
+    from dataclasses import dataclass
+    import pytest
+
+    @dataclass
+    class Certificate:
+        rounds: list
+        threshold_closure_passes: list
+        stop_threshold: float
+
+    with pytest.raises(subject.CompositeTopologyError):
+        subject._certificate_json_value(Certificate([], [], float("inf")))

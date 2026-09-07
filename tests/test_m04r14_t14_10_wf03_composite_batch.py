@@ -135,7 +135,7 @@ def test_attempt_history_accepts_unfinished_restart_boundary(tmp_path: Path) -> 
     attempt = root / "attempts" / "attempt-0001"
     attempt.mkdir(parents=True)
     started = subject.base._sealed({
-        "schema_version": "m04r14-wf03-composite-batch-attempt-v1",
+        "schema_version": "m04r14-wf03-composite-batch-attempt-v2",
         "status": "running", "attempt_id": "attempt-0001",
         "preregistration_digest": "b" * 64,
         "resident_content_digest": "c" * 64,

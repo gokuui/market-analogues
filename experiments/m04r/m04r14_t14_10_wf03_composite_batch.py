@@ -24,12 +24,12 @@ from experiments.m04r import m04r14_t14_10_wf03_feasibility as base
 from experiments.m04r import verify_m04r14_t14_10_wf03_composite_topology_poc as kernel_verifier
 
 
-SCHEMA = "m04r14-t14-10-wf03-composite-batch-preregistration-v1"
+SCHEMA = "m04r14-t14-10-wf03-composite-batch-preregistration-v2"
 OUTPUT_RELATIVE = Path(
-    "config/data/analogues/m04r14/t14-10-wf03-composite-batch-v1"
+    "config/data/analogues/m04r14/t14-10-wf03-composite-batch-v2"
 )
 PREREGISTRATION_RELATIVE = Path(
-    "experiments/m04r/m04r14_t14_10_wf03_composite_batch_v1_preregistered.json"
+    "experiments/m04r/m04r14_t14_10_wf03_composite_batch_v2_preregistered.json"
 )
 WIDTH_VERIFICATION_RELATIVE = Path(
     "config/data/analogues/m04r14/"
@@ -220,6 +220,10 @@ def build_preregistration(repository: Path) -> dict[str, Any]:
             "start_method": "spawn",
             "scheduler": "rolling bounded queue, refill after each completed future",
             "worker_batch_queries": 1,
+            "nonfinite_certificate_encoding": (
+                "explicit positive-infinity sentinel only for incomplete "
+                "round thresholds or certified exhaustive closure upper bounds"
+            ),
             "case_publication": "parent-validated create-only sealed JSON",
             "progress_publication": "atomic after every completed query",
             "attempt_publication": "create-only start and terminal receipts",
@@ -283,6 +287,10 @@ def validate_preregistration(
         execution.get("total_numerical_threads") == PROCESS_COUNT,
         execution.get("start_method") == "spawn",
         execution.get("worker_batch_queries") == 1,
+        execution.get("nonfinite_certificate_encoding") == (
+            "explicit positive-infinity sentinel only for incomplete "
+            "round thresholds or certified exhaustive closure upper bounds"
+        ),
         execution.get("output_root") == str((repository / OUTPUT_RELATIVE).resolve()),
         set(value.get("runtime_files", {})) == set(RUNTIME_FILES),
         value.get("claims") == {
@@ -329,7 +337,7 @@ def _validate_case(
         measurement = value["worker_measurement"]
         kernel_verifier.validate_certificate(retrieval)
         valid = all((
-            value["schema_version"] == "m04r14-wf03-composite-batch-case-v1",
+            value["schema_version"] == "m04r14-wf03-composite-batch-case-v2",
             value["status"] == "complete",
             value["query_id"] == row["episode_id"],
             value["case_id"] == row["case_id"],
@@ -417,7 +425,7 @@ def _publish_worker_result(
 ) -> dict[str, Any]:
     retrieval, measurement = _validate_worker_result(worker, row, resident)
     state = {
-        "schema_version": "m04r14-wf03-composite-batch-case-v1",
+        "schema_version": "m04r14-wf03-composite-batch-case-v2",
         "status": "complete", "query_id": row["episode_id"],
         "case_id": row["case_id"], "symbol": row["symbol"],
         "cutoff": row["cutoff"], "fold_id": row["fold_id"],
@@ -474,7 +482,7 @@ def _attempt_history(
         started = base._read(path / "RUN_STARTED.json")
         base._validate_seal(started, "attempt_digest")
         if not all((
-            started.get("schema_version") == "m04r14-wf03-composite-batch-attempt-v1",
+            started.get("schema_version") == "m04r14-wf03-composite-batch-attempt-v2",
             started.get("status") == "running",
             started.get("attempt_id") == path.name,
             started.get("preregistration_digest") == preregistration["preregistration_digest"],
@@ -496,7 +504,7 @@ def _attempt_history(
             base._validate_seal(terminal, "attempt_digest")
             expected_status = "complete" if terminal_name == "COMPLETE.json" else "interrupted"
             if not all((
-                terminal.get("schema_version") == "m04r14-wf03-composite-batch-attempt-v1",
+                terminal.get("schema_version") == "m04r14-wf03-composite-batch-attempt-v2",
                 terminal.get("status") == expected_status,
                 terminal.get("attempt_id") == path.name,
                 type(terminal.get("created_at")) is str,
@@ -560,7 +568,7 @@ def _build_result(
 ) -> dict[str, Any]:
     ordered, manifest = _manifest(rows, results_by_id, cases_root)
     state = {
-        "schema_version": "m04r14-t14-10-wf03-composite-batch-result-v1",
+        "schema_version": "m04r14-t14-10-wf03-composite-batch-result-v2",
         "status": "complete", "passed": True,
         "queries": len(ordered),
         "scored_queries": sum(value["scored"] for value in ordered),
@@ -608,7 +616,7 @@ def _validate_terminal(
         base._validate_seal(value)
         ordered, manifest = _manifest(rows, results_by_id, cases_root)
         valid = all((
-            value["schema_version"] == "m04r14-t14-10-wf03-composite-batch-result-v1",
+            value["schema_version"] == "m04r14-t14-10-wf03-composite-batch-result-v2",
             value["status"] == "complete", value["passed"] is True,
             value["queries"] == EXPECTED_QUERIES,
             value["scored_queries"] == EXPECTED_SCORED_QUERIES,
@@ -651,7 +659,7 @@ def _reconcile_terminal(
         return
     reused = int(attempt["receipts_reused_at_start"])
     base._atomic(root / "attempts" / attempt_id / "COMPLETE.json", base._sealed({
-        "schema_version": "m04r14-wf03-composite-batch-attempt-v1",
+        "schema_version": "m04r14-wf03-composite-batch-attempt-v2",
         "status": "complete", "attempt_id": attempt_id,
         "completed_this_attempt": EXPECTED_QUERIES - reused,
         "completed_total": EXPECTED_QUERIES,
@@ -666,7 +674,7 @@ def _progress(
     error: BaseException | None = None,
 ) -> None:
     state: dict[str, Any] = {
-        "schema_version": "m04r14-wf03-composite-batch-progress-v1",
+        "schema_version": "m04r14-wf03-composite-batch-progress-v2",
         "status": status, "attempt_id": attempt_id,
         "completed_queries": completed, "total_queries": total,
         "remaining_queries": total - completed,
@@ -786,7 +794,7 @@ def _execute_locked(
     attempt = _next_attempt(root)
     attempt_id = attempt.name
     base._atomic(attempt / "RUN_STARTED.json", base._sealed({
-        "schema_version": "m04r14-wf03-composite-batch-attempt-v1",
+        "schema_version": "m04r14-wf03-composite-batch-attempt-v2",
         "status": "running", "attempt_id": attempt_id,
         "preregistration_digest": preregistration["preregistration_digest"],
         "resident_content_digest": resident["content_digest"],
@@ -808,7 +816,7 @@ def _execute_locked(
             started=started, error=exc,
         )
         base._atomic(attempt / "INTERRUPTED.json", base._sealed({
-            "schema_version": "m04r14-wf03-composite-batch-attempt-v1",
+            "schema_version": "m04r14-wf03-composite-batch-attempt-v2",
             "status": "interrupted", "attempt_id": attempt_id,
             "completed_this_attempt": completed_this_attempt,
             "completed_total": len(results_by_id),
@@ -822,7 +830,7 @@ def _execute_locked(
     )
     base._atomic(root / "RESULT.json", result)
     base._atomic(attempt / "COMPLETE.json", base._sealed({
-        "schema_version": "m04r14-wf03-composite-batch-attempt-v1",
+        "schema_version": "m04r14-wf03-composite-batch-attempt-v2",
         "status": "complete", "attempt_id": attempt_id,
         "completed_this_attempt": completed_this_attempt,
         "completed_total": len(results_by_id),

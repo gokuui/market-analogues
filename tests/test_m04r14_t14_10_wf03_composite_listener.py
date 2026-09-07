@@ -22,11 +22,11 @@ def test_terminal_ready_rejects_running_progress(monkeypatch, tmp_path: Path) ->
     root = tmp_path / subject.producer.OUTPUT_RELATIVE
     root.mkdir(parents=True)
     progress = {
-        "schema_version": "m04r14-wf03-composite-batch-progress-v1",
+        "schema_version": "m04r14-wf03-composite-batch-progress-v2",
         "status": "running", "completed_queries": 100, "remaining_queries": 3836,
     }
     result = subject.base._sealed({
-        "schema_version": "m04r14-t14-10-wf03-composite-batch-result-v1",
+        "schema_version": "m04r14-t14-10-wf03-composite-batch-result-v2",
         "status": "complete", "passed": True, "queries": 3936,
         "independent_verification_authorized": True,
     })
@@ -41,11 +41,11 @@ def test_terminal_ready_accepts_sealed_complete_state(tmp_path: Path) -> None:
     root = tmp_path / subject.producer.OUTPUT_RELATIVE
     root.mkdir(parents=True)
     progress = {
-        "schema_version": "m04r14-wf03-composite-batch-progress-v1",
+        "schema_version": "m04r14-wf03-composite-batch-progress-v2",
         "status": "complete", "completed_queries": 3936, "remaining_queries": 0,
     }
     result = subject.base._sealed({
-        "schema_version": "m04r14-t14-10-wf03-composite-batch-result-v1",
+        "schema_version": "m04r14-t14-10-wf03-composite-batch-result-v2",
         "status": "complete", "passed": True, "queries": 3936,
         "independent_verification_authorized": True,
     })

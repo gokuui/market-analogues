@@ -53,12 +53,12 @@ def _terminal_ready(repository: Path) -> tuple[bool, dict[str, Any]]:
         base._validate_seal(result)
         ready = all((
             progress.get("schema_version")
-                == "m04r14-wf03-composite-batch-progress-v1",
+                == "m04r14-wf03-composite-batch-progress-v2",
             progress.get("status") == "complete",
             progress.get("completed_queries") == producer.EXPECTED_QUERIES,
             progress.get("remaining_queries") == 0,
             result.get("schema_version")
-                == "m04r14-t14-10-wf03-composite-batch-result-v1",
+                == "m04r14-t14-10-wf03-composite-batch-result-v2",
             result.get("status") == "complete", result.get("passed") is True,
             result.get("queries") == producer.EXPECTED_QUERIES,
             result.get("independent_verification_authorized") is True,
@@ -77,13 +77,13 @@ def listen(repository: Path, producer_pid: int) -> dict[str, Any]:
     repository = repository.resolve(strict=True)
     if producer._git(repository, "status", "--porcelain"):
         raise CompositeListenerError("listener requires clean commit")
-    root = repository / producer.OUTPUT_RELATIVE / "listener-v1"
+    root = repository / producer.OUTPUT_RELATIVE / "listener-v2"
     if root.exists() or root.is_symlink():
         raise CompositeListenerError("listener output already exists")
     root.mkdir(parents=True)
     preregistration = base._read(repository / producer.PREREGISTRATION_RELATIVE)
     started = base._sealed({
-        "schema_version": "m04r14-wf03-composite-listener-v1",
+        "schema_version": "m04r14-wf03-composite-listener-v2",
         "status": "waiting", "producer_pid": producer_pid,
         "preregistration_digest": preregistration["preregistration_digest"],
         "listener_commit": producer._git(repository, "rev-parse", "HEAD"),
@@ -94,7 +94,7 @@ def listen(repository: Path, producer_pid: int) -> dict[str, Any]:
     ready, terminal = _terminal_ready(repository)
     if not ready:
         failed = base._sealed({
-            "schema_version": "m04r14-wf03-composite-listener-v1",
+            "schema_version": "m04r14-wf03-composite-listener-v2",
             "status": "producer_incomplete", "producer_pid": producer_pid,
             "wait_mode": wait_mode, "terminal_observation": terminal,
             "verifier_launched": False, "created_at": base._now(),
@@ -112,7 +112,7 @@ def listen(repository: Path, producer_pid: int) -> dict[str, Any]:
     verification_path = repository / verifier.OUTPUT_RELATIVE / "VERIFIED.json"
     if completed.returncode or not verification_path.is_file():
         failed = base._sealed({
-            "schema_version": "m04r14-wf03-composite-listener-v1",
+            "schema_version": "m04r14-wf03-composite-listener-v2",
             "status": "verification_failed", "producer_pid": producer_pid,
             "wait_mode": wait_mode, "terminal_observation": terminal,
             "verifier_launched": True, "verifier_returncode": completed.returncode,
@@ -125,7 +125,7 @@ def listen(repository: Path, producer_pid: int) -> dict[str, Any]:
     verification = base._read(verification_path)
     base._validate_seal(verification, "verification_digest")
     state = base._sealed({
-        "schema_version": "m04r14-wf03-composite-listener-v1",
+        "schema_version": "m04r14-wf03-composite-listener-v2",
         "status": "complete", "producer_pid": producer_pid,
         "wait_mode": wait_mode, "terminal_observation": terminal,
         "verifier_launched": True, "verifier_returncode": completed.returncode,

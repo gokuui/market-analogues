@@ -7,6 +7,7 @@ from dataclasses import asdict
 from hashlib import sha256
 import json
 import multiprocessing
+import math
 import os
 from pathlib import Path
 import resource
@@ -78,6 +79,55 @@ RUNTIME_FILES = (
 
 class CompositeTopologyError(RuntimeError):
     pass
+
+
+POSITIVE_INFINITY_SENTINEL = {"__nonfinite_float__": "positive_infinity"}
+
+
+def _certificate_json_value(value: Any) -> dict[str, Any]:
+    """Encode only contract-valid intermediate +inf values as strict JSON."""
+    certificate = asdict(value)
+    for item in certificate.get("rounds", []):
+        threshold = item.get("constrained_threshold")
+        if type(threshold) is float and math.isinf(threshold) and threshold > 0:
+            if item.get("selected_rows", base.TOP_K) >= base.TOP_K \
+                    or item.get("certified") is not False:
+                raise CompositeTopologyError("invalid infinite round threshold")
+            item["constrained_threshold"] = dict(POSITIVE_INFINITY_SENTINEL)
+    for item in certificate.get("threshold_closure_passes", []):
+        upper = item.get("upper_inclusive")
+        if type(upper) is float and math.isinf(upper) and upper > 0:
+            if item.get("certified") is not True \
+                    or item.get("selected_rows", 0) < base.TOP_K:
+                raise CompositeTopologyError("invalid infinite closure threshold")
+            item["upper_inclusive"] = dict(POSITIVE_INFINITY_SENTINEL)
+
+    def reject_nonfinite(item: Any) -> None:
+        if type(item) is float and not math.isfinite(item):
+            raise CompositeTopologyError("unexpected non-finite certificate value")
+        if type(item) is dict:
+            for nested in item.values():
+                reject_nonfinite(nested)
+        elif type(item) in (list, tuple):
+            for nested in item:
+                reject_nonfinite(nested)
+
+    reject_nonfinite(certificate)
+    return certificate
+
+
+def decode_certificate_json_value(value: Mapping[str, Any]) -> dict[str, Any]:
+    """Restore explicit intermediate sentinels for digest reconstruction."""
+    def decode(item: Any) -> Any:
+        if item == POSITIVE_INFINITY_SENTINEL:
+            return float("inf")
+        if type(item) is dict:
+            return {key: decode(nested) for key, nested in item.items()}
+        if type(item) is list:
+            return [decode(nested) for nested in item]
+        return item
+
+    return decode(dict(value))
 
 
 def _git(repository: Path, *args: str) -> str:
@@ -273,7 +323,8 @@ def compare_topologies(
 
 
 def _certificate_closed(value: Mapping[str, Any], matches: Sequence[Any]) -> bool:
-    accounting = value.get("native_bound_accounting", {})
+    decoded = decode_certificate_json_value(value)
+    accounting = decoded.get("native_bound_accounting", {})
     try:
         accounted = (
             accounting["exact_dtw_evaluated"]
@@ -281,13 +332,13 @@ def _certificate_closed(value: Mapping[str, Any], matches: Sequence[Any]) -> boo
             + accounting["packed_bound_pruned"]
         )
         return all((
-            value["schema_version"] == _contract()["schema_version"],
-            value["eligible_candidates"] == accounted,
-            value["exact_evaluated"] == accounting["exact_dtw_evaluated"],
-            value["safely_pruned"]
+            decoded["schema_version"] == _contract()["schema_version"],
+            decoded["eligible_candidates"] == accounted,
+            decoded["exact_evaluated"] == accounting["exact_dtw_evaluated"],
+            decoded["safely_pruned"]
                 == accounting["native_bound_pruned"] + accounting["packed_bound_pruned"],
-            value["maximum_quantized_bound_excess"] <= TOLERANCE,
-            type(value["result_digest"]) is str and len(value["result_digest"]) == 64,
+            decoded["maximum_quantized_bound_excess"] <= TOLERANCE,
+            type(decoded["result_digest"]) is str and len(decoded["result_digest"]) == 64,
             len(matches) == base.TOP_K,
             len({row["symbol"] for row in matches}) == base.TOP_K,
         ))
@@ -352,7 +403,9 @@ def _run_group(
             streaming_threshold_closure=True, branch_aware_packed_bounds=True,
             precomputed_proposal=report,
         )
-        certificate = json.loads(json.dumps(asdict(result.certificate), allow_nan=False))
+        certificate = json.loads(json.dumps(
+            _certificate_json_value(result.certificate), allow_nan=False,
+        ))
         matches = json.loads(json.dumps([_match(item) for item in result.matches], allow_nan=False))
         semantic = {
             "query_id": row["episode_id"],
