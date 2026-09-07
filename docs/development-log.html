@@ -1744,6 +1744,12 @@
   <p><b>Historical reproducibility:</b> The baseline producer continues to reject execution if current runtime bytes differ from its frozen commit. A separate read-only replay utility now validates the frozen producer/verifier Git blobs, creates a temporary clean checkout at the sealed verifier commit, hard-links only the required ignored evidence, reruns the historical independent verifier, and compares every semantic receipt field. Only elapsed time and its enclosing digest may differ. This avoids weakening the production freeze in order to audit old evidence.</p>
   <p class="pass"><b>Checkpoint state:</b> All 31 focused deadline/baseline-harness tests and all 1,031 repository tests pass. Python compilation, HTML parsing and <code>git diff --check</code> also pass. The live historical replay requires a clean committed checkout by design, so it is the immediate post-commit gate before any full-composite benchmark begins.</p>
 </section>
+<section class="entry">
+  <h2>L-204 — Frozen baseline evidence replays at its historical commits</h2>
+  <p class="pass"><b>Replay result:</b> From clean checkpoint <code>f070420</code>, the isolated historical verifier reproduced all 3,936 query receipts, 157,440 neighbor references and 24 stratified exhaustive oracle queries. Every semantic receipt field equals the retained verification. The replay digest is <code>982fdc7f…729a</code>; its verifier digest differs from the retained <code>fd11bf98…c9b6</code> only because measured elapsed time is intentionally live and the verification seal encloses that field.</p>
+  <p><b>Safety:</b> Producer runtime remains frozen at <code>e88d001</code>, verifier runtime remains frozen at <code>dbb0297</code>, outcomes/labels and historical-query/final-period results remained unopened, and the temporary checkout was removed automatically. This closes the historical baseline auditability issue without weakening current-run preregistration checks.</p>
+  <p><b>Next gate:</b> Inspect the existing full-composite implementation and run a matched small sequential/parallel benchmark on the current 12-CPU/94-GiB host. Freeze the all-query composite only after exact-result equality and a measured topology choice.</p>
+</section>
 </main>
 
 <section id="reproduce">
