@@ -1791,7 +1791,13 @@
 <section class="entry">
   <h2>L-212 — Independent width verifier implemented before promotion</h2>
   <p><b>Why:</b> Producer self-checks cannot promote a performance topology. A separate, Git-bound verifier now reconstructs both topology receipts and their aggregate, all 24 certificate digests and all 12 timing-free semantic outputs. It also fully rehashes and record-validates the packed generation, resolves all 240 returned episode IDs, and rechecks symbol, quality, cutoff and causal-overlap constraints.</p>
-  <p><b>Boundary:</b> The verifier reads neither outcomes nor labels. Its create-only receipt must pass from a clean commit before <code>p12×1</code> is frozen into the full 3,936-query producer.</p>
+  <p class="pass"><b>Result:</b> Git-bound verifier <code>c1a1f81</code> passed in 30.67 seconds: 24/24 certificates reconstructed, 12/12 timing-free outputs equal, 240/240 links resolved and causal, all seven component groups present, and zero swap. Verification digest <code>062dbc95…e8c</code>; link-observation digest <code>6dab4a97…596</code>. The verifier opened no outcomes or labels.</p>
+</section>
+<section class="entry">
+  <h2>L-213 — Full true-composite batch implementation boundary</h2>
+  <p><b>Decision:</b> Promote only the independently verified <code>p12×1</code> execution shape: twelve spawned processes, one query and one numerical thread per process. Retrieval semantics remain the frozen seven-group distance-v1 contract; process width changes no ranking rule.</p>
+  <p><b>Required durability:</b> Freeze all 3,936 ordered registry rows and runtime inputs before execution. Publish one create-only sealed case per query, atomically publish progress after every completed future, validate every existing receipt before reuse, retain create-only started/interrupted/completed attempt receipts, hold a non-blocking single-producer lock, and construct the terminal manifest only after every ordered receipt validates. A killed process or host reboot may lose only in-flight cases.</p>
+  <p><b>Required tests before launch:</b> Synthetic worker completion out of order, interruption and resume, corrupt receipt refusal, duplicate/unknown receipt refusal, process-width/resource contract, terminal aggregation and outcome-embargo checks. The independent all-query verifier remains a separate post-run gate.</p>
 </section>
 </main>
 
