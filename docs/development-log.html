@@ -1799,6 +1799,12 @@
   <p><b>Required durability:</b> Freeze all 3,936 ordered registry rows and runtime inputs before execution. Publish one create-only sealed case per query, atomically publish progress after every completed future, validate every existing receipt before reuse, retain create-only started/interrupted/completed attempt receipts, hold a non-blocking single-producer lock, and construct the terminal manifest only after every ordered receipt validates. A killed process or host reboot may lose only in-flight cases.</p>
   <p><b>Required tests before launch:</b> Synthetic worker completion out of order, interruption and resume, corrupt receipt refusal, duplicate/unknown receipt refusal, process-width/resource contract, terminal aggregation and outcome-embargo checks. The independent all-query verifier remains a separate post-run gate.</p>
 </section>
+<section class="entry">
+  <h2>L-214 — Full-batch pre-freeze implementation audit</h2>
+  <p class="pass"><b>Validation:</b> Ten new durability/scheduler tests and all adjacent topology/width tests pass; the complete repository suite passes all 1,049 tests. Python compilation, strict diff checks and HTML parsing also pass. The host exposes 12 effective CPUs, 98,885,896 KiB total memory and over 80 million KiB available during preflight; no artificial low-memory ceiling is applied.</p>
+  <p><b>Inventory correction:</b> Direct reconstruction of sealed WF-03 reports 3,936 queries across 164 months: 3,360 scored and 576 warm-up. The remembered 3,270 denominator is the separate present-snapshot T14-08/T14-09 universe. The first draft's mistaken 3,270/666 constants were caught before commit, preregistration or execution and corrected to fail closed on the actual historical registry.</p>
+  <p><b>Next boundary:</b> Commit the implementation/tests/log as clean H0, generate the preregistration, verify that its commit changes exactly one JSON file, then launch the resumable 12-process search.</p>
+</section>
 </main>
 
 <section id="reproduce">
@@ -1961,6 +1967,11 @@ git commit -m "Preregister M04R-11 candidate v2"
 .venv/bin/python -m experiments.m04r.verify_m04r14_t14_10_wf03_composite_topology_poc --repository /home/vinay/code/market-analogues</code></pre>
   <pre><code># Commit the independent width verifier before publishing its create-only receipt.
 .venv/bin/python -m experiments.m04r.verify_m04r14_t14_10_wf03_composite_width_poc --repository /home/vinay/code/market-analogues</code></pre>
+  <pre><code># Full true-composite batch: commit implementation/tests/log as clean H0 first.
+.venv/bin/python -m experiments.m04r.m04r14_t14_10_wf03_composite_batch preregister --repository /home/vinay/code/market-analogues
+# Commit exactly experiments/m04r/m04r14_t14_10_wf03_composite_batch_v1_preregistered.json as sole-child H1.
+.venv/bin/python -m experiments.m04r.m04r14_t14_10_wf03_composite_batch run --repository /home/vinay/code/market-analogues
+# The identical run command validates all existing receipts and resumes only absent queries after a restart.</code></pre>
   <p class="muted">Source datasets are read-only. Generated artifacts live under the configured artifact directory and are intentionally excluded from Git.</p>
 </section>
 </body>
