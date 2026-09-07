@@ -47,11 +47,10 @@ def _run_hard_limit_seconds() -> float:
     return float(contract.EXECUTION_POLICY["run_hard_limit_seconds"])
 
 
-def _arm_run_deadline() -> tuple[Any, tuple[float, float]]:
+def _arm_run_deadline(seconds: float) -> tuple[Any, tuple[float, float]]:
     """Arm one process wall timer; production execution is main-thread only."""
     if sys.platform != "linux" or threading.current_thread() is not threading.main_thread():
         raise All60Error("hard-deadline execution requires the Linux main thread")
-    seconds = _run_hard_limit_seconds()
     if type(seconds) is not float or not math.isfinite(seconds) or seconds <= 0:
         raise All60Error("run hard deadline differs")
     previous_handler = signal.getsignal(signal.SIGALRM)
@@ -74,9 +73,11 @@ def _restore_run_deadline(previous_handler: Any,
     signal.setitimer(signal.ITIMER_REAL, *previous_timer)
 
 
-def _enter_complete_publication(run_started_monotonic: float) -> set[signal.Signals]:
+def _enter_complete_publication(
+    run_started_monotonic: float, run_hard_limit_seconds: float,
+) -> set[signal.Signals]:
     """Convert the live deadline into one masked terminal commit section."""
-    if perf_counter() - run_started_monotonic > contract.EXECUTION_POLICY["run_hard_limit_seconds"]:
+    if perf_counter() - run_started_monotonic > run_hard_limit_seconds:
         raise _RunHardDeadline("run hard limit exceeded before COMPLETE publication")
     remaining, _interval = signal.getitimer(signal.ITIMER_REAL)
     if remaining <= 0:
@@ -673,7 +674,8 @@ def execute(output_root: Path, preregistration: Mapping[str, Any], backend: Any,
     ledger: str | None = None
     run_started_monotonic = perf_counter()
     semantics: list[dict[str, Any]] = []; measurements: list[dict[str, Any]] = []
-    previous_handler, previous_timer = _arm_run_deadline()
+    run_hard_limit_seconds = _run_hard_limit_seconds()
+    previous_handler, previous_timer = _arm_run_deadline(run_hard_limit_seconds)
     complete_signal_mask: set[signal.Signals] | None = None
     try:
         root.mkdir(parents=True); (root / "events").mkdir(); (root / "cases").mkdir()
@@ -704,7 +706,7 @@ def execute(output_root: Path, preregistration: Mapping[str, Any], backend: Any,
             raise All60Error("resident identity/lease seal differs")
         _atomic(root / "RESIDENT.json", resident); foundation_count = 4
         for ordinal, case in enumerate(backend.cases):
-            remaining = contract.EXECUTION_POLICY["run_hard_limit_seconds"] - (
+            remaining = run_hard_limit_seconds - (
                 perf_counter() - run_started_monotonic)
             if remaining <= 0: raise TimeoutError("run hard limit exceeded")
             if hasattr(backend, "task_timeout"):
@@ -723,7 +725,7 @@ def execute(output_root: Path, preregistration: Mapping[str, Any], backend: Any,
             proposal_path = case_dir / "PROPOSAL.json"
             _atomic(proposal_path, _proposal_leaf(prepared, clock())); stage = "proposal"
             proposal_sha = _sha(proposal_path); backend.bind_proposal(prepared, proposal_path)
-            remaining = contract.EXECUTION_POLICY["run_hard_limit_seconds"] - (
+            remaining = run_hard_limit_seconds - (
                 perf_counter() - run_started_monotonic)
             if remaining <= 0: raise TimeoutError("run hard limit exceeded after proposal")
             if hasattr(backend, "task_timeout"):
@@ -748,7 +750,7 @@ def execute(output_root: Path, preregistration: Mapping[str, Any], backend: Any,
                     completed_event)
             ledger = completed_event["event_digest"]; completed += 1; stage = None
             semantics.append(semantic); measurements.append(measurement)
-        if perf_counter() - run_started_monotonic > contract.EXECUTION_POLICY["run_hard_limit_seconds"]:
+        if perf_counter() - run_started_monotonic > run_hard_limit_seconds:
             raise TimeoutError("run hard limit exceeded before aggregates")
         semantic_payload = _seal({"schema_version": contract.SCHEMAS["semantics"],
             "status": "complete", "ordered_case_semantic_digests": [x["semantic_digest"] for x in semantics],
@@ -800,7 +802,7 @@ def execute(output_root: Path, preregistration: Mapping[str, Any], backend: Any,
                 or final_resident.get("identity_digest") != resident["identity_digest"] \
                 or final_resident.get("lease_digest") != resident["lease"].get("lease_digest"):
             raise All60Error("final source/resident lease drifted")
-        if perf_counter() - run_started_monotonic > contract.EXECUTION_POLICY["run_hard_limit_seconds"]:
+        if perf_counter() - run_started_monotonic > run_hard_limit_seconds:
             raise TimeoutError("run hard limit exceeded before COMPLETE")
         complete = _seal({"schema_version": contract.SCHEMAS["complete"], "status": "complete",
             "preregistration_digest": prereg["preregistration_digest"], "ledger_head_digest": ledger,
@@ -816,7 +818,9 @@ def execute(output_root: Path, preregistration: Mapping[str, Any], backend: Any,
             raise All60Error("backend lacks certified semantic validator")
         _validate_evidence(root, prereg, prospective_complete=complete,
                            certified_validator=backend.validate_certified)
-        complete_signal_mask = _enter_complete_publication(run_started_monotonic)
+        complete_signal_mask = _enter_complete_publication(
+            run_started_monotonic, run_hard_limit_seconds,
+        )
         _atomic(root / "COMPLETE.json", complete)
         # COMPLETE is the final fallible filesystem operation.  Independent
         # validation is deliberately not invoked after terminal publication.

@@ -9,6 +9,7 @@ sys.path.insert(0, str(ROOT))
 from experiments.m04r import m04r14_t14_10_wf03_baseline_batch as subject
 from experiments.m04r import m04r14_t14_10_wf03_feasibility as base
 from experiments.m04r import verify_m04r14_t14_10_wf03_baseline_batch as verifier
+from experiments.m04r import replay_m04r14_t14_10_wf03_baseline_batch as replay
 
 
 def test_case_path_accepts_only_episode_identifiers(tmp_path: Path) -> None:
@@ -48,3 +49,26 @@ def test_valid_case_requires_seal_binding_and_neighbor_counts(tmp_path: Path) ->
     base._atomic(path, value)
     assert subject._valid_case(path, row, "generation") == value
     assert subject._valid_case(path, row, "changed") is None
+
+
+def test_historical_replay_compares_every_nonvolatile_receipt_field() -> None:
+    retained = {
+        "passed": True, "queries_verified": 3936,
+        "elapsed_seconds": 10.0, "verification_digest": "old",
+    }
+    rerun = {
+        "passed": True, "queries_verified": 3936,
+        "elapsed_seconds": 11.0, "verification_digest": "new",
+    }
+    assert replay.semantic_receipt(retained) == replay.semantic_receipt(rerun)
+    rerun["queries_verified"] = 3935
+    assert replay.semantic_receipt(retained) != replay.semantic_receipt(rerun)
+
+
+def test_historical_replay_rejects_symlinked_artifact_tree(tmp_path: Path) -> None:
+    real = tmp_path / "real"
+    real.mkdir()
+    linked = tmp_path / "linked"
+    linked.symlink_to(real, target_is_directory=True)
+    with pytest.raises(replay.HistoricalReplayError, match="artifact root"):
+        replay._require_regular_tree(linked)

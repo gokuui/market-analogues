@@ -429,7 +429,9 @@ def test_linux_hard_deadline_interrupts_final_observer_once_and_restores_signal(
             time.sleep(5)
             return super().final_source_lease()
     root = tmp_path / "hard-deadline"; prereg = _prereg(root); backend = SleepingFinal()
-    monkeypatch.setattr(producer, "_run_hard_limit_seconds", lambda: 1.0)
+    # Leave enough time for the deliberately exhaustive fake 60-case prefix;
+    # the five-second final observer remains the operation under test.
+    monkeypatch.setattr(producer, "_run_hard_limit_seconds", lambda: 3.0)
     original_handler = signal.getsignal(signal.SIGALRM)
     original_timer = signal.getitimer(signal.ITIMER_REAL)
     marker = []
@@ -441,7 +443,7 @@ def test_linux_hard_deadline_interrupts_final_observer_once_and_restores_signal(
         with pytest.raises(producer._RunHardDeadline, match="hard limit"):
             producer.execute(root, prereg, backend, clock=lambda: FIXED_TIME)
         elapsed = time.monotonic() - started
-        assert backend.entered_final is True and elapsed < 2.5
+        assert backend.entered_final is True and elapsed < 4.5
         assert signal.getsignal(signal.SIGALRM) is prior_handler
         restored, interval = signal.getitimer(signal.ITIMER_REAL)
         assert 29.0 <= restored <= 30.0 and interval == 0.0 and marker == []
@@ -458,11 +460,14 @@ def test_complete_atomic_is_masked_terminal_success_after_post_link_delay(
 ):
     if sys.platform != "linux": pytest.skip("Linux ITIMER_REAL contract")
     root = tmp_path / "complete-delay"; prereg = _prereg(root); backend = FakeBackend()
-    monkeypatch.setattr(producer, "_run_hard_limit_seconds", lambda: 1.0)
+    # The prefix itself is intentionally substantial on slower hosts.  The
+    # post-link pause exceeds the deadline and proves terminal publication is
+    # masked without making prefix speed part of the assertion.
+    monkeypatch.setattr(producer, "_run_hard_limit_seconds", lambda: 3.0)
     real_atomic = producer._atomic
     def delayed_after_link(path, value):
         real_atomic(path, value)
-        if path.name == "COMPLETE.json": time.sleep(1.25)
+        if path.name == "COMPLETE.json": time.sleep(3.25)
     monkeypatch.setattr(producer, "_atomic", delayed_after_link)
     result = producer.execute(root, prereg, backend, clock=lambda: FIXED_TIME)
     assert result["status"] == "complete"
