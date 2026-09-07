@@ -2,6 +2,8 @@ from copy import deepcopy
 from pathlib import Path
 import sys
 
+import numpy as np
+
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -82,3 +84,21 @@ def test_independent_certificate_validator_rejects_digest_tamper() -> None:
         pass
     else:
         raise AssertionError("tampered certificate was accepted")
+
+
+def test_verifier_normalizes_distinct_main_and_overflow_layouts() -> None:
+    main = np.zeros(2, dtype=[
+        ("episode_id", "V12"), ("cutoff_ns", "<i8"),
+        ("symbol_id", "<u4"), ("quality_tier", "u1"),
+        ("samples", "f4", (4,)),
+    ])
+    overflow = np.zeros(1, dtype=[
+        ("episode_id", "V12"), ("cutoff_ns", "<i8"),
+        ("symbol_id", "<u4"), ("quality_tier", "u1"),
+        ("padding", "V3"),
+    ])
+    normalized = np.concatenate((
+        verifier._metadata_records(main), verifier._metadata_records(overflow),
+    ))
+    assert normalized.dtype == verifier.METADATA_DTYPE
+    assert len(normalized) == 3

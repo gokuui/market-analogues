@@ -33,6 +33,10 @@ EXPECTED_COMPONENTS = frozenset({
     "coarse", "stage", "price", "candle_volatility",
     "volume_shock", "market_context", "structural",
 })
+METADATA_DTYPE = np.dtype([
+    ("episode_id", "V12"), ("cutoff_ns", "<i8"),
+    ("symbol_id", "<u4"), ("quality_tier", "u1"),
+])
 
 
 class CompositeTopologyVerificationError(RuntimeError):
@@ -64,6 +68,17 @@ def _case_semantics(value: Mapping[str, Any]) -> dict[str, Any]:
         key: item for key, item in value["certificate"].items()
         if key != "elapsed_seconds"
     }
+
+
+def _metadata_records(values: np.ndarray) -> np.ndarray:
+    """Normalize intentionally distinct main/overflow layouts for link audit."""
+    required = set(METADATA_DTYPE.names or ())
+    if not required.issubset(values.dtype.names or ()):
+        raise CompositeTopologyVerificationError("packed metadata fields differ")
+    result = np.empty(len(values), dtype=METADATA_DTYPE)
+    for name in METADATA_DTYPE.names or ():
+        result[name] = values[name]
+    return result
     return {
         "query_id": value["query_id"],
         "proposal_result_digest": value["proposal_result_digest"],
@@ -159,7 +174,9 @@ def verify(repository: Path) -> dict[str, Any]:
         expected_provenance_digest=base.PROVENANCE_DIGEST,
         verify_content=True, validate_records=True,
     )
-    records = np.concatenate((packed.rows, packed.overflow))
+    records = np.concatenate((
+        _metadata_records(packed.rows), _metadata_records(packed.overflow),
+    ))
     order = np.argsort(records["episode_id"], kind="stable")
     sorted_ids = records["episode_id"][order]
     source = source_from_spec(
