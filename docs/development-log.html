@@ -1750,6 +1750,13 @@
   <p><b>Safety:</b> Producer runtime remains frozen at <code>e88d001</code>, verifier runtime remains frozen at <code>dbb0297</code>, outcomes/labels and historical-query/final-period results remained unopened, and the temporary checkout was removed automatically. This closes the historical baseline auditability issue without weakening current-run preregistration checks.</p>
   <p><b>Next gate:</b> Inspect the existing full-composite implementation and run a matched small sequential/parallel benchmark on the current 12-CPU/94-GiB host. Freeze the all-query composite only after exact-result equality and a measured topology choice.</p>
 </section>
+<section class="entry">
+  <h2>L-205 — True-composite topology POC prepared before scale</h2>
+  <p><b>Why:</b> Review confirmed that v5's historical “combined” name means the price component's rigid-plus-DTW completion, not the seven-group professional-chart composite. The true composite authority is already certified on three frozen probes, and an older 24-case process gate showed a 4.06× improvement, but neither result chooses a topology for the current 12-core host and 3,936-query monthly registry.</p>
+  <p><b>POC design:</b> Four scored queries from the same frozen month run twice with equal 12-thread budgets: one fresh process with a single shared four-query packed scan and 12-thread exact completion, then four fresh one-query processes with three threads each. Both use the real seven-group distance weights, branch-aware safe bounds, requested-position vector completion, compact exact state, native-bound deferral and streaming closure. Every match, component, alignment, proposal digest and timing-free certificate must agree; OHAI must also reproduce the earlier frozen multichannel authority.</p>
+  <p><b>Failure/restart behavior:</b> Preregistration binds all package runtime files, inputs, contracts, topology order and resource controls before measurement. Sequential and parallel receipts publish independently and are seal/semantic/certificate validated before reuse, so interruption reruns only the missing topology. Each worker requires an unchanged resident identity and zero process swap. The result selects speed only after all correctness gates pass; no outcome, label or final-period data is opened.</p>
+  <p class="pass"><b>Checkpoint state:</b> The new topology comparison and contract tests pass 2/2; the directly relevant packed-bound/certified-search matrix passes 32/32; all 1,033 repository tests pass. Python compilation, HTML parsing and <code>git diff --check</code> pass. The implementation is ready for its commit, sole-child preregistration and execution.</p>
+</section>
 </main>
 
 <section id="reproduce">
@@ -1904,6 +1911,10 @@ git commit -m "Preregister M04R-11 candidate v2"
 .venv/bin/python -m experiments.m04r.verify_m04r14_t14_10_wf03_combined_batch --repository /home/vinay/code/market-analogues</code></pre>
   <pre><code># Read-only replay of the baseline verifier using its sealed historical Git commit.
 .venv/bin/python -m experiments.m04r.replay_m04r14_t14_10_wf03_baseline_batch --repository /home/vinay/code/market-analogues --output /home/vinay/code/market-analogues/config/data/analogues/m04r14/t14-10-wf03-baseline-batch-v2-historical-replay-v1/REPLAY.json</code></pre>
+  <pre><code># True seven-group composite topology POC: commit implementation first.
+.venv/bin/python -m experiments.m04r.m04r14_t14_10_wf03_composite_topology_poc preregister --repository /home/vinay/code/market-analogues
+# Commit exactly the generated preregistration as the sole child, then run.
+.venv/bin/python -m experiments.m04r.m04r14_t14_10_wf03_composite_topology_poc run --repository /home/vinay/code/market-analogues</code></pre>
   <p class="muted">Source datasets are read-only. Generated artifacts live under the configured artifact directory and are intentionally excluded from Git.</p>
 </section>
 </body>
