@@ -1823,6 +1823,11 @@
   <p class="pass"><b>V2 correction:</b> Contract-valid intermediate positive infinity is now encoded as the explicit strict-JSON object <code>{"__nonfinite_float__":"positive_infinity"}</code>. It is allowed only for an uncertified round with fewer than 20 selected symbols, or a certified exhaustive closure upper bound. NaN, negative infinity, final thresholds, match values and every unexpected path still fail closed. Independent verification decodes the sentinel solely to reconstruct the original certificate digest.</p>
   <p class="pass"><b>Real regression:</b> The exact CRDS worker now completes six rounds, records 17 selected rows and the explicit sentinel in round zero, returns 20 finite matches with zero swap, and passes independent certificate reconstruction at unchanged search-result digest <code>15e97ea0…e9b02</code>. All 1,061 repository tests pass. V1 remains immutable evidence. V2 uses a new output root and preregistration; the 57 V1 receipts are intentionally not relabelled under a different contract, costing approximately one early wave rather than weakening provenance.</p>
 </section>
+<section class="entry">
+  <h2>L-218 — Corrected full batch V2 launched</h2>
+  <p class="pass"><b>Freeze:</b> H0 <code>1f2d8b0</code> contains the explicit-sentinel implementation, producer, verifier, listener and regression tests. Sole-child H1 <code>07caafc</code> contains exactly the V2 preregistration, binding all 3,936 rows and runtime files at digest <code>d34f7f90…31b6</code>. Clean preflight reconstructed the full inventory and resident content before launch.</p>
+  <p><b>Execution:</b> V2 attempt 0001 started at 2026-09-07 18:15:50 UTC as PID 2072523 with 12 effective CPUs and 79,738,816 KiB available memory. Its PID-bound one-shot listener is waiting and will launch the V2 independent verifier only after a sealed complete result.</p>
+</section>
 </main>
 
 <section id="reproduce">
