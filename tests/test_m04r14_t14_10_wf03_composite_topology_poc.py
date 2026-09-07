@@ -75,7 +75,10 @@ def test_independent_certificate_validator_rejects_digest_tamper() -> None:
         "query_id": "a" * 24, "proposal_result_digest": "proposal",
         "certificate": certificate, "matches": matches,
     }
-    case["semantic_digest"] = subject.stable_hash(verifier._case_semantics(case))
+    semantics = verifier._case_semantics(case)
+    assert isinstance(semantics, dict)
+    assert semantics == subject._case_semantics(case)
+    case["semantic_digest"] = subject.stable_hash(semantics)
     verifier.validate_certificate(case)
     case["certificate"]["result_digest"] = "0" * 64
     try:

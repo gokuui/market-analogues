@@ -1768,6 +1768,11 @@
   <p class="fail"><b>Failure:</b> The committed independent verifier fully rehashed and record-validated the packed generation, then raised <code>DTypePromotionError</code> before link validation or receipt publication. It attempted to concatenate feature-bearing main rows with metadata-only overflow rows even though those immutable physical layouts intentionally have different field sets. The producer result and both topology receipts were not changed.</p>
   <p><b>Correction:</b> The verifier now projects both arrays into a new independent metadata-only dtype containing episode ID, cutoff, symbol ID and quality tier before concatenation. A regression test uses deliberately incompatible main/overflow extra fields and requires their three metadata rows to normalize exactly. Certificate, causality and result checks are unchanged. A new verifier commit and clean rerun are required; the failed invocation remains recorded here and cannot be called a pass.</p>
 </section>
+<section class="entry">
+  <h2>L-208 — Second topology-verifier attempt exposed an unreachable return</h2>
+  <p class="fail"><b>Failure:</b> The metadata projection patch was inserted between construction and return of the independent case-semantic payload. The helper therefore returned <code>None</code>, and the verifier refused every otherwise-valid case on semantic-digest mismatch. All eight independent certificate digest, accounting, component and diversity predicates were separately inspected and pass. No receipt was published.</p>
+  <p><b>Test weakness and repair:</b> The first synthetic certificate test derived its expected digest from that same helper, so hashing <code>None</code> allowed the fixture to pass. The helper's return is restored before the metadata function, and the test now explicitly requires a dictionary exactly equal to the separately implemented producer semantics before computing any digest. This turns the precise structural defect into a permanent regression failure.</p>
+</section>
 </main>
 
 <section id="reproduce">

@@ -68,6 +68,12 @@ def _case_semantics(value: Mapping[str, Any]) -> dict[str, Any]:
         key: item for key, item in value["certificate"].items()
         if key != "elapsed_seconds"
     }
+    return {
+        "query_id": value["query_id"],
+        "proposal_result_digest": value["proposal_result_digest"],
+        "certificate": certificate,
+        "matches": value["matches"],
+    }
 
 
 def _metadata_records(values: np.ndarray) -> np.ndarray:
@@ -79,12 +85,6 @@ def _metadata_records(values: np.ndarray) -> np.ndarray:
     for name in METADATA_DTYPE.names or ():
         result[name] = values[name]
     return result
-    return {
-        "query_id": value["query_id"],
-        "proposal_result_digest": value["proposal_result_digest"],
-        "certificate": certificate,
-        "matches": value["matches"],
-    }
 
 
 def validate_certificate(value: Mapping[str, Any]) -> None:
