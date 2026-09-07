@@ -1773,6 +1773,11 @@
   <p class="fail"><b>Failure:</b> The metadata projection patch was inserted between construction and return of the independent case-semantic payload. The helper therefore returned <code>None</code>, and the verifier refused every otherwise-valid case on semantic-digest mismatch. All eight independent certificate digest, accounting, component and diversity predicates were separately inspected and pass. No receipt was published.</p>
   <p><b>Test weakness and repair:</b> The first synthetic certificate test derived its expected digest from that same helper, so hashing <code>None</code> allowed the fixture to pass. The helper's return is restored before the metadata function, and the test now explicitly requires a dictionary exactly equal to the separately implemented producer semantics before computing any digest. This turns the precise structural defect into a permanent regression failure.</p>
 </section>
+<section class="entry">
+  <h2>L-209 — Independent true-composite topology verification passes</h2>
+  <p class="pass"><b>Result:</b> Verifier commit <code>a5cd078</code> passes every frozen gate in 30.61 seconds. It independently reconstructed all eight certificate digests, validated all seals/aggregate bindings, fully rehashed and record-validated the packed generation, resolved all 80 analogue IDs and rechecked symbols, quality, cutoffs, query overlap, distinctness and seven-component presence. Observation digest <code>c38e86ac…1d23</code>; verification digest <code>9ef7ecaf…0584</code>.</p>
+  <p><b>Decision:</b> Select four process groups with three threads each for the all-query true-composite producer. This is a measured host-specific execution choice, not a change to distance, eligibility or ranking. The producer must retain month-level shared scans within each worker group, create-only per-query receipts, strict runtime/source/resident binding, restart validation and an independent full-inventory verifier. Prediction and outcome phases remain unopened.</p>
+</section>
 </main>
 
 <section id="reproduce">
