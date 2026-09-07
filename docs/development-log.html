@@ -1757,6 +1757,12 @@
   <p><b>Failure/restart behavior:</b> Preregistration binds all package runtime files, inputs, contracts, topology order and resource controls before measurement. Sequential and parallel receipts publish independently and are seal/semantic/certificate validated before reuse, so interruption reruns only the missing topology. Each worker requires an unchanged resident identity and zero process swap. The result selects speed only after all correctness gates pass; no outcome, label or final-period data is opened.</p>
   <p class="pass"><b>Checkpoint state:</b> The new topology comparison and contract tests pass 2/2; the directly relevant packed-bound/certified-search matrix passes 32/32; all 1,033 repository tests pass. Python compilation, HTML parsing and <code>git diff --check</code> pass. The implementation is ready for its commit, sole-child preregistration and execution.</p>
 </section>
+<section class="entry">
+  <h2>L-206 — Four-way true-composite topology wins at exact parity</h2>
+  <p class="pass"><b>Measured result:</b> Sole-child preregistration <code>d745beb</code> froze the test before measurement. One process with 12 threads completed four same-month queries in 398.40 seconds; four independent three-thread groups completed in 171.04 seconds, a 2.329× speedup. Parallel worker wall times were 80.79, 112.95, 142.88 and 170.11 seconds. Aggregate worker peak RSS was 2,286.79 MiB (maximum one worker 596.08 MiB), versus 682.37 MiB sequential, with zero swap.</p>
+  <p><b>Correctness:</b> Sequential and parallel outputs have identical proposal digests, seven component distances, alignments, timing-free certificates and ordered matches for all four queries. Each certificate accounts for its complete 1,961,577/1,961,578-row eligible universe with zero lower-bound excess. OHAI reproduces frozen multichannel certificate <code>b4c4e167…2fad</code> and all prior matches exactly. Producer result digest <code>19a98489…ab33</code>.</p>
+  <p><b>Independent gate:</b> A separate verifier is prepared to reconstruct all eight certificate digests, validate every seal and aggregate binding, resolve all 80 links against the fully rehashed packed generation, recheck temporal eligibility/distinct symbols/seven-component presence, and confirm the speed comparison and no-outcome boundary. Its focused test includes certificate-digest tampering. The independent verifier must be committed and pass before <code>p4×3</code> is used by the all-query producer.</p>
+</section>
 </main>
 
 <section id="reproduce">
@@ -1915,6 +1921,8 @@ git commit -m "Preregister M04R-11 candidate v2"
 .venv/bin/python -m experiments.m04r.m04r14_t14_10_wf03_composite_topology_poc preregister --repository /home/vinay/code/market-analogues
 # Commit exactly the generated preregistration as the sole child, then run.
 .venv/bin/python -m experiments.m04r.m04r14_t14_10_wf03_composite_topology_poc run --repository /home/vinay/code/market-analogues</code></pre>
+  <pre><code># Commit the independent topology verifier before publishing its receipt.
+.venv/bin/python -m experiments.m04r.verify_m04r14_t14_10_wf03_composite_topology_poc --repository /home/vinay/code/market-analogues</code></pre>
   <p class="muted">Source datasets are read-only. Generated artifacts live under the configured artifact directory and are intentionally excluded from Git.</p>
 </section>
 </body>

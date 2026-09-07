@@ -7,6 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from experiments.m04r import m04r14_t14_10_wf03_composite_topology_poc as subject
+from experiments.m04r import verify_m04r14_t14_10_wf03_composite_topology_poc as verifier
 
 
 def _case(query_id: str) -> dict:
@@ -41,3 +42,43 @@ def test_true_composite_contract_contains_all_nonprice_channels() -> None:
     assert expected < set(subject.DistanceConfig().weights)
     assert all(subject.DistanceConfig().weights[channel] > 0 for channel in expected)
     assert contract["outcomes_or_labels_used"] is False
+
+
+def test_independent_certificate_validator_rejects_digest_tamper() -> None:
+    certificate = {
+        "schema_version": subject._contract()["schema_version"],
+        "contract_digest": "contract", "generation_id": "generation",
+        "query_episode_id": "a" * 24, "input_digest": "input",
+        "eligible_candidates": 3, "exact_evaluated": 1, "safely_pruned": 2,
+        "stopped_early": True, "stop_threshold": 1.0,
+        "next_lower_bound": 1.1, "maximum_quantized_bound_excess": 0.0,
+        "rounds": [],
+        "native_bound_accounting": {
+            "exact_dtw_evaluated": 1, "native_bound_evaluated": 2,
+            "native_bound_pruned": 1, "packed_bound_pruned": 1,
+        },
+        "minimum_native_pruned_bound": 1.1,
+        "threshold_closure_passes": [], "elapsed_seconds": 2.0,
+    }
+    matches = [{
+        "episode_id": f"{index:024x}", "symbol": f"S{index}",
+        "total_distance": float(index),
+        "component_distances": {key: 0.0 for key in verifier.EXPECTED_COMPONENTS},
+        "alignment": [], "quality_tier": "A",
+    } for index in range(20)]
+    certificate["result_digest"] = verifier._certificate_digest({
+        "certificate": certificate, "matches": matches,
+    })
+    case = {
+        "query_id": "a" * 24, "proposal_result_digest": "proposal",
+        "certificate": certificate, "matches": matches,
+    }
+    case["semantic_digest"] = subject.stable_hash(verifier._case_semantics(case))
+    verifier.validate_certificate(case)
+    case["certificate"]["result_digest"] = "0" * 64
+    try:
+        verifier.validate_certificate(case)
+    except verifier.CompositeTopologyVerificationError:
+        pass
+    else:
+        raise AssertionError("tampered certificate was accepted")
