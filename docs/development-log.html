@@ -1805,6 +1805,12 @@
   <p><b>Inventory correction:</b> Direct reconstruction of sealed WF-03 reports 3,936 queries across 164 months: 3,360 scored and 576 warm-up. The remembered 3,270 denominator is the separate present-snapshot T14-08/T14-09 universe. The first draft's mistaken 3,270/666 constants were caught before commit, preregistration or execution and corrected to fail closed on the actual historical registry.</p>
   <p><b>Next boundary:</b> Commit the implementation/tests/log as clean H0, generate the preregistration, verify that its commit changes exactly one JSON file, then launch the resumable 12-process search.</p>
 </section>
+<section class="entry">
+  <h2>L-215 — Full true-composite batch frozen and launched</h2>
+  <p class="pass"><b>Lifecycle:</b> Clean H0 <code>7e93c33</code> contains the producer, ten durability tests and the reviewed plan. Sole-child H1 <code>00ef87c</code> contains exactly one preregistration JSON, freezing 3,936 ordered queries, 164 months, 3,360 scored/576 warm-up rows, all runtime hashes, packed content <code>27dfa03e…437e</code>, independently verified <code>p12×1</code> topology and preregistration digest <code>7136aeef…045d</code>.</p>
+  <p><b>Execution:</b> Attempt 0001 started at 2026-09-07 10:11:53 UTC with zero reused receipts, 12 effective CPUs, 98,885,896 KiB total memory and 80,022,988 KiB available. Twelve spawned one-thread workers consume a rolling bounded queue. Parent-validated cases, atomic progress and attempt terminals are the durable event trail; a restart validates and reuses completed cases and reschedules only absent IDs.</p>
+  <p><b>Post-run verifier:</b> A separate implementation now covers full pack rehash/record validation, all case/attempt/aggregate seals, independently reconstructed query-input and certificate digests, all 78,720 causal links, seven-component weighted totals, complete monotone DTW paths, exact frozen authority parity and two deterministic reruns from each of six folds. Six verifier-specific and all adjacent tests pass. This verifier must be committed before it can publish a receipt.</p>
+</section>
 </main>
 
 <section id="reproduce">
@@ -1972,6 +1978,8 @@ git commit -m "Preregister M04R-11 candidate v2"
 # Commit exactly experiments/m04r/m04r14_t14_10_wf03_composite_batch_v1_preregistered.json as sole-child H1.
 .venv/bin/python -m experiments.m04r.m04r14_t14_10_wf03_composite_batch run --repository /home/vinay/code/market-analogues
 # The identical run command validates all existing receipts and resumes only absent queries after a restart.</code></pre>
+  <pre><code># Commit the independent full-batch verifier before running it after producer completion.
+.venv/bin/python -m experiments.m04r.verify_m04r14_t14_10_wf03_composite_batch --repository /home/vinay/code/market-analogues</code></pre>
   <p class="muted">Source datasets are read-only. Generated artifacts live under the configured artifact directory and are intentionally excluded from Git.</p>
 </section>
 </body>
