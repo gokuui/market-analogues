@@ -1776,12 +1776,17 @@
 <section class="entry">
   <h2>L-209 — Independent true-composite topology verification passes</h2>
   <p class="pass"><b>Result:</b> Verifier commit <code>a5cd078</code> passes every frozen gate in 30.61 seconds. It independently reconstructed all eight certificate digests, validated all seals/aggregate bindings, fully rehashed and record-validated the packed generation, resolved all 80 analogue IDs and rechecked symbols, quality, cutoffs, query overlap, distinctness and seven-component presence. Observation digest <code>c38e86ac…1d23</code>; verification digest <code>9ef7ecaf…0584</code>.</p>
-  <p><b>Decision:</b> Select four process groups with three threads each for the all-query true-composite producer. This is a measured host-specific execution choice, not a change to distance, eligibility or ranking. The producer must retain month-level shared scans within each worker group, create-only per-query receipts, strict runtime/source/resident binding, restart validation and an independent full-inventory verifier. Prediction and outcome phases remain unopened.</p>
+  <p><b>Interim decision:</b> Four process groups with three threads each beat a single 12-thread group. This is a measured host-specific execution result, not a change to distance, eligibility or ranking. L-210 explicitly tests the still-wider alternative before the all-query topology is frozen.</p>
 </section>
 <section class="entry">
   <h2>L-210 — Wider 12-core topology check required before full freeze</h2>
   <p><b>Review correction:</b> The verified four-query POC proves <code>p4×3</code> beats <code>p1×12</code>, but four queries cannot exercise <code>p12×1</code>. Therefore L-209's p4 selection is provisional rather than the final fastest-host claim. Older eight-process evidence and ample 94-GiB memory make the wider topology credible enough that assuming against it would violate the measured-optimization rule.</p>
   <p><b>Final width POC:</b> Select the first 12 episode IDs in ascending order from the 24 scored March-2014 registry rows—before timing—and compare <code>p4×3</code> with <code>p12×1</code> under equal 12-core budgets. Every timing-free proposal, certificate, component, alignment and match must agree; all 24 certificates must close and swap must remain zero. Topology receipts are independent and resumable. No outcome or label is opened.</p>
+</section>
+<section class="entry">
+  <h2>L-211 — All twelve cores improve true-composite width</h2>
+  <p class="pass"><b>Measured result:</b> Sole-child preregistration <code>b0f6b3e</code> froze 12 deterministic same-month queries before timing. Both topologies produced identical semantic outputs and 24 complete certificates with zero swap. <code>p4×3</code> took 322.08 seconds; <code>p12×1</code> took 249.34 seconds, a further 1.292× speedup. Producer result digest <code>5664dac2…7f2c</code>.</p>
+  <p><b>Next gate:</b> Independently reconstruct all 24 certificate digests and receipt/aggregate bindings before consuming <code>p12×1</code> in the full producer. The measured topology changes execution only; retrieval semantics and the outcome embargo remain unchanged.</p>
 </section>
 </main>
 
