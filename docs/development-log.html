@@ -1788,6 +1788,11 @@
   <p class="pass"><b>Measured result:</b> Sole-child preregistration <code>b0f6b3e</code> froze 12 deterministic same-month queries before timing. Both topologies produced identical semantic outputs and 24 complete certificates with zero swap. <code>p4×3</code> took 322.08 seconds; <code>p12×1</code> took 249.34 seconds, a further 1.292× speedup. Producer result digest <code>5664dac2…7f2c</code>.</p>
   <p><b>Next gate:</b> Independently reconstruct all 24 certificate digests and receipt/aggregate bindings before consuming <code>p12×1</code> in the full producer. The measured topology changes execution only; retrieval semantics and the outcome embargo remain unchanged.</p>
 </section>
+<section class="entry">
+  <h2>L-212 — Independent width verifier implemented before promotion</h2>
+  <p><b>Why:</b> Producer self-checks cannot promote a performance topology. A separate, Git-bound verifier now reconstructs both topology receipts and their aggregate, all 24 certificate digests and all 12 timing-free semantic outputs. It also fully rehashes and record-validates the packed generation, resolves all 240 returned episode IDs, and rechecks symbol, quality, cutoff and causal-overlap constraints.</p>
+  <p><b>Boundary:</b> The verifier reads neither outcomes nor labels. Its create-only receipt must pass from a clean commit before <code>p12×1</code> is frozen into the full 3,936-query producer.</p>
+</section>
 </main>
 
 <section id="reproduce">
@@ -1948,6 +1953,8 @@ git commit -m "Preregister M04R-11 candidate v2"
 .venv/bin/python -m experiments.m04r.m04r14_t14_10_wf03_composite_topology_poc run --repository /home/vinay/code/market-analogues</code></pre>
   <pre><code># Commit the independent topology verifier before publishing its receipt.
 .venv/bin/python -m experiments.m04r.verify_m04r14_t14_10_wf03_composite_topology_poc --repository /home/vinay/code/market-analogues</code></pre>
+  <pre><code># Commit the independent width verifier before publishing its create-only receipt.
+.venv/bin/python -m experiments.m04r.verify_m04r14_t14_10_wf03_composite_width_poc --repository /home/vinay/code/market-analogues</code></pre>
   <p class="muted">Source datasets are read-only. Generated artifacts live under the configured artifact directory and are intentionally excluded from Git.</p>
 </section>
 </body>
