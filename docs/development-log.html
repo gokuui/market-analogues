@@ -1834,6 +1834,13 @@
   <p class="fail"><b>Verifier refusal:</b> The completion listener launched verification and retained its failure instead of publishing a false pass. Investigation showed a verifier-only dimensional assumption: it required DTW paths to end at raw bar 251, while distance-v1 explicitly aligns the 64-point <code>samples_64</code> representation. Published paths correctly run from <code>[0,0]</code> through <code>[63,63]</code>.</p>
   <p><b>Correction:</b> The verifier now derives alignment length from the reconstructed query representation and also reports exact failed predicate names, query ID and match ID on any future binding refusal. Producer evidence and neighbour selection are unchanged. The corrected independent verifier must pass before retrieval is certified.</p>
 </section>
+
+<section>
+  <h2>L-220 — Full true-composite retrieval independently verified</h2>
+  <p class="pass"><b>Result:</b> The corrected independent verifier passed all 3,936 V2 queries in 655.16 seconds. It validated every create-only case seal, input binding and exact-search certificate; resolved all 78,720 top-20 links; and confirmed their temporal causality, seven-component distances and 64-point DTW alignment paths. The frozen authority case matched exactly and twelve fold-stratified queries reproduced exactly under independent rerun.</p>
+  <p><b>Evidence:</b> Producer result digest <code>cdddb428…c2f3c</code>, verification digest <code>a4afeb96…9974</code>, rerun digest <code>c6af9f7b…c357</code> and case-observation digest <code>dada7d75…7ef1</code>. Zero worker swap was observed. Neither outcomes nor labels were used, historical walk-forward query outcomes remain unopened, and the final 2024–August-2025 period remains sealed.</p>
+  <p><b>Disposition:</b> The earlier listener failure remains immutable evidence of a verifier-only dimensional bug; it did not alter producer results. Composite retrieval is now accepted. WF-03D prediction construction is next: reconcile all four verified neighbour inventories, enforce per-query outcome-availability timestamps, and seal predictions before opening any query future.</p>
+</section>
 </main>
 
 <section id="reproduce">
