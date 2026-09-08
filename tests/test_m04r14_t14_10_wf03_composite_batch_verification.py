@@ -17,6 +17,12 @@ def test_alignment_accepts_only_complete_monotone_dtw_path() -> None:
     assert not subject._alignment_valid([[0.0, 0], [1, 1]], 2, 2)
 
 
+def test_chart_lookback_is_not_the_dtw_path_dimension() -> None:
+    path = [[index, index] for index in range(64)]
+    assert subject._alignment_valid(path, 64, 64)
+    assert not subject._alignment_valid(path, 252, 252)
+
+
 def test_lookup_preserves_requested_order() -> None:
     records = np.asarray([
         np.void(bytes.fromhex("02" * 12)),

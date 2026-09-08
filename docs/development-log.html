@@ -1828,6 +1828,12 @@
   <p class="pass"><b>Freeze:</b> H0 <code>1f2d8b0</code> contains the explicit-sentinel implementation, producer, verifier, listener and regression tests. Sole-child H1 <code>07caafc</code> contains exactly the V2 preregistration, binding all 3,936 rows and runtime files at digest <code>d34f7f90…31b6</code>. Clean preflight reconstructed the full inventory and resident content before launch.</p>
   <p><b>Execution:</b> V2 attempt 0001 started at 2026-09-07 18:15:50 UTC as PID 2072523 with 12 effective CPUs and 79,738,816 KiB available memory. Its PID-bound one-shot listener is waiting and will launch the V2 independent verifier only after a sealed complete result.</p>
 </section>
+<section class="entry">
+  <h2>L-219 — V2 retrieval complete; first verifier attempt refuses dimension mismatch</h2>
+  <p class="pass"><b>Producer result:</b> Attempt 0001 completed all 3,936 create-only cases at 2026-09-08 12:50:51 UTC in 66,901.04 seconds. It contains exactly 3,360 scored and 576 warm-up queries across 164 months, with eligible inventories from 657,644 to 3,696,244, maximum worker peak RSS 749.68 MiB and zero worker swap. Result digest <code>cdddb428…c2f3c</code>; no outcome or final-period data was opened.</p>
+  <p class="fail"><b>Verifier refusal:</b> The completion listener launched verification and retained its failure instead of publishing a false pass. Investigation showed a verifier-only dimensional assumption: it required DTW paths to end at raw bar 251, while distance-v1 explicitly aligns the 64-point <code>samples_64</code> representation. Published paths correctly run from <code>[0,0]</code> through <code>[63,63]</code>.</p>
+  <p><b>Correction:</b> The verifier now derives alignment length from the reconstructed query representation and also reports exact failed predicate names, query ID and match ID on any future binding refusal. Producer evidence and neighbour selection are unchanged. The corrected independent verifier must pass before retrieval is certified.</p>
+</section>
 </main>
 
 <section id="reproduce">

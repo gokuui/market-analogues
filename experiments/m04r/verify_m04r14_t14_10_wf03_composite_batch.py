@@ -307,6 +307,10 @@ def _independent_case(
         episode, base.MINIMUM_HISTORY_GAP,
     ).value)
     query_start_ns = int(episode.bars.timestamp.iloc[0].value)
+    represented = represent(episode)
+    alignment_length = len(represented.samples_64["close_path"])
+    if alignment_length <= 0:
+        raise CompositeBatchVerificationError("query DTW representation is empty")
     positions = _lookup_positions(
         sorted_ids, order, [match["episode_id"] for match in matches],
     )
@@ -325,21 +329,36 @@ def _independent_case(
         expected_total = math.fsum(
             weights[name] * components[name] for name in sorted(weights)
         )
-        if not all((
-            symbol == match["symbol"], cutoff.isoformat() == match["cutoff"],
-            quality == QUALITY_CODES.get(match["quality_tier"]),
-            key.id == match["episode_id"], cutoff_ns <= latest_ns,
-            cutoff_ns < int(pd.Timestamp(row["cutoff"]).value),
-            match["episode_id"] != row["episode_id"],
-            set(components) == certificate_verifier.EXPECTED_COMPONENTS,
-            all(type(number) in (int, float) and math.isfinite(number) and number >= 0
-                for number in components.values()),
-            math.isclose(match["total_distance"], expected_total,
-                         rel_tol=1e-12, abs_tol=1e-12),
-            _alignment_valid(match["alignment"], int(row["lookback"]),
-                             int(row["lookback"])),
-        )):
-            raise CompositeBatchVerificationError("analogue binding differs")
+        checks = {
+            "symbol": symbol == match["symbol"],
+            "cutoff": cutoff.isoformat() == match["cutoff"],
+            "quality": quality == QUALITY_CODES.get(match["quality_tier"]),
+            "episode_id": key.id == match["episode_id"],
+            "latest_eligible": cutoff_ns <= latest_ns,
+            "strictly_historical": cutoff_ns < int(pd.Timestamp(row["cutoff"]).value),
+            "not_query_episode": match["episode_id"] != row["episode_id"],
+            "component_names": (
+                set(components) == certificate_verifier.EXPECTED_COMPONENTS
+            ),
+            "component_values": all(
+                type(number) in (int, float) and math.isfinite(number) and number >= 0
+                for number in components.values()
+            ),
+            "weighted_total": math.isclose(
+                match["total_distance"], expected_total,
+                rel_tol=1e-12, abs_tol=1e-12,
+            ),
+            "alignment": _alignment_valid(
+                match["alignment"], alignment_length, alignment_length,
+            ),
+        }
+        failed = [name for name, passed in checks.items() if not passed]
+        if failed:
+            raise CompositeBatchVerificationError(
+                "analogue binding differs: "
+                f"query={row['episode_id']} match={match['episode_id']} "
+                f"checks={','.join(failed)}"
+            )
         if symbol == row["symbol"]:
             same_symbol += 1
             if cutoff_ns >= query_start_ns:
