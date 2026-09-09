@@ -31,7 +31,7 @@
 <p class="pass"><b>Verified real result:</b> All 48 restart partitions sealed. The atomic store contains 274,331 episodes, 1,645,986 six-horizon outcomes, 33,383,810 normalized future-path rows and 1,889,280 link/horizon eligibility rows. The independent reference oracle recomputed all 266,376 new episodes, checked the 7,955 exact verified reuses, reconstructed every eligibility row and closed every aggregate, physical and semantic digest. Store result <code>3e4a02e7…a39e2</code>; verification <code>b494dff2…e49b</code>.</p>
 <p class="warn"><b>Evaluation embargo:</b> Analogue outcomes become available only through completion-time filtering. Historical query evaluation labels and the final 2024–August-2025 evaluation block remain unopened; D3 cannot select a prediction rule or report model skill.</p></section>
 
-<section><h2>D4 — Prediction-before-outcome store</h2>
+<section><h2>D4 — Prediction-before-outcome store <span class="pass">COMPLETE AND INDEPENDENTLY VERIFIED</span></h2>
 <p>Freeze weighted and unweighted analogue probabilities, continuous quantiles, novelty, instability, effective counts and forced/selective lane fields. Process expanding market/regime baselines month by month: seal a month’s predictions first, then—and only then—open that month’s query outcomes to update later baseline state.</p>
 <p><b>Pass:</b> prediction mutation tests, independent formula reconstruction, restart-safe create-only receipts and a manifest proving that no query future affected its own prediction.</p></section>
 
@@ -45,6 +45,7 @@
 </tbody></table>
 <p><b>Performance design:</b> the 33,383,810-row analogue path table is indexed once. Global joins are prepared once, and all 126 pointwise weighted medians are calculated in one vectorized matrix operation per query/lane/measure. A real 24-query month fell from approximately 14 seconds to approximately 3.6 seconds after preparation.</p>
 <p><b>Outcome validation scope:</b> v1 stopped after nine closed months when a query stock had invalid OHLC years after the query’s required future. V2 retains the full-file fingerprint but validates and computes only the causally sufficient prior-20-through-future-126 row extent. A complete 3,456-query scan found zero invalid local windows; v1 artifacts are retained and never reused.</p>
+<p class="pass"><b>Verified real result:</b> All 164 prediction months sealed in 1,032.69 seconds. The independent oracle then reconstructed all 78,720 neighbour rows, 7,872 baseline rows, 472,320 quantile rows and 2,479,680 path rows and independently recomputed 20,736 non-final outcome rows plus 423,466 query-path rows. All eight gates passed at store digest <code>25f92613…ca84</code> and verification digest <code>a5418945…a13a</code>. The 480 final-query predictions remain outcome-unopened.</p>
 <p class="warn"><b>Still no usefulness claim:</b> D4 constructs predictions only. Proper scores, calibration plots, fold comparisons and the final outcome remain unopened until D5.</p></section>
 
 <section><h2>D5 — Non-final evaluation, then single-open final</h2>
