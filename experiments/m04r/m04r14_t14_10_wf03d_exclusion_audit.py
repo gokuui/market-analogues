@@ -100,6 +100,13 @@ def _groups(
         raise ExclusionAuditError("neighbour case layout differs") from exc
 
 
+def _episode_identity_digest(values: Mapping[str, str]) -> str:
+    return stable_hash([
+        {"episode_id": episode_id, "symbol": values[episode_id]}
+        for episode_id in sorted(values)
+    ])
+
+
 def audit(repository: Path) -> dict[str, Any]:
     repository = repository.resolve(strict=True)
     if _git(repository, "status", "--porcelain"):
@@ -218,10 +225,7 @@ def audit(repository: Path) -> dict[str, Any]:
         "methods": methods,
         "total_links": sum(value["links"] for value in methods.values()),
         "unique_episodes": len(all_episodes),
-        "episode_identity_digest": stable_hash(sorted(
-            {"episode_id": key, "symbol": value}
-            for key, value in episode_symbols.items()
-        )),
+        "episode_identity_digest": _episode_identity_digest(episode_symbols),
         "query_impact_digest": stable_hash(query_inventory),
         "t14_09_unique_outcomes": len(old_ids),
         "t14_09_outcome_overlap": len(all_episodes & old_ids),

@@ -33,3 +33,9 @@ def test_groups_rejects_missing_method() -> None:
             {"retrieval": {"matches": []}}, {"matches": []},
             {"random_neighbors": []},
         )
+
+
+def test_episode_identity_digest_is_order_invariant_and_value_sensitive() -> None:
+    first = subject._episode_identity_digest({"b": "B", "a": "A"})
+    assert first == subject._episode_identity_digest({"a": "A", "b": "B"})
+    assert first != subject._episode_identity_digest({"a": "A", "b": "C"})

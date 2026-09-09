@@ -1855,6 +1855,12 @@
   <p><b>Audit harness:</b> A create-only producer binds the frozen walk-forward contract, registry, three producer results and their independent verification receipts. It reconstructs all four method inventories from 3,936 sealed query cases, validates query identity and no-outcome flags, rejects conflicting episode identities and publishes exact affected-query IDs plus T14-09 outcome overlap. Repair selection is outcome-blind.</p>
   <p class="pass"><b>Validation:</b> Ten subset-proof cases, two audit-layout cases and all adjacent baseline/composite/price batch tests pass, 51/51 total. The complete staged repository suite passes all 1,074 tests; the sole first-run failure was the expected tracked-runtime inventory check while the new core module was still untracked, and it passed immediately after staging plus throughout the clean full rerun. Both new modules compile, HTML parsing and <code>git diff --check</code> pass. After this clean checkpoint, publish the audit receipt and independently verify it before freezing the bounded real top-21 repair POC.</p>
 </section>
+
+<section class="entry">
+  <h2>L-223 — First exclusion-audit publication refuses unordered mapping digest</h2>
+  <p class="fail"><b>Failure:</b> The clean-commit audit read and validated the complete case inventory, then stopped before creating its output root because the final episode-identity digest attempted to order dictionary objects directly. Python raises <code>TypeError</code> for that operation. No audit receipt or partial artifact was published, and no outcome value or query future was read.</p>
+  <p><b>Repair:</b> A dedicated digest helper now orders episode IDs first and emits canonical <code>{episode_id, symbol}</code> records. Its regression test requires insertion-order invariance and symbol-value sensitivity. The failed invocation is retained in this log; a new clean commit and single rerun are required.</p>
+</section>
 </main>
 
 <section id="reproduce">
