@@ -1861,6 +1861,12 @@
   <p class="fail"><b>Failure:</b> The clean-commit audit read and validated the complete case inventory, then stopped before creating its output root because the final episode-identity digest attempted to order dictionary objects directly. Python raises <code>TypeError</code> for that operation. No audit receipt or partial artifact was published, and no outcome value or query future was read.</p>
   <p><b>Repair:</b> A dedicated digest helper now orders episode IDs first and emits canonical <code>{episode_id, symbol}</code> records. Its regression test requires insertion-order invariance and symbol-value sensitivity. The failed invocation is retained in this log; a new clean commit and single rerun are required.</p>
 </section>
+
+<section class="entry">
+  <h2>L-224 — Corrected exclusion audit published; independent verifier prepared</h2>
+  <p class="pass"><b>Producer result:</b> Clean commit <code>a6d6202</code> published create-only audit digest <code>51fc8c2f…53f83</code>. It reconstructed 3,936 queries and 314,880 links across four methods, finding 274,343 unique matched episodes. Exact affected sets are 78 composite, 94 price-only, 16 deterministic-random and 24 return/volatility queries. The T14-09 outcome store overlaps 7,954 of these episodes, leaving 266,389 not already represented there.</p>
+  <p><b>Independent gate:</b> A separately implemented verifier now revalidates every source case seal and query binding, reconstructs every link/impact/identity digest, checks all producer and verifier receipt hashes, and reads only the T14-09 <code>episode_id</code> column for overlap accounting. It does not call the producer audit and cannot access outcome values. The verifier must be committed and publish a create-only pass before any affected top-21 repair query runs.</p>
+</section>
 </main>
 
 <section id="reproduce">
