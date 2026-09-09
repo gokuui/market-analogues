@@ -1848,6 +1848,13 @@
   <p><b>Scope reconciliation:</b> The four methods contain 314,880 links over 274,343 unique episodes. The verified T14-09 outcome store covers 56,378 episodes from the separate 3,270-query present snapshot and overlaps the walk-forward union on only 7,954 episodes; as many as 266,389 additional unique episode outcomes may be required before per-link causal availability is applied.</p>
   <p><b>Repair:</b> Preserve all old receipts. An unaffected certified top-20 is already exact over the stricter subset when it contains no query-symbol row. For each affected query, certify top-21 under the original one-per-symbol superset and remove its sole query-symbol row, which yields the exact top-20 under the frozen exclusion rule. Baselines receive the equivalent independent-order reconstruction. A new cross-store manifest and verifier must prove 3,936 × four complete, distinct, non-query-symbol inventories before analogue outcomes are expanded. Historical query outcomes and the final period remain unopened.</p>
 </section>
+
+<section class="entry">
+  <h2>L-222 — Exclusion proof primitive and create-only audit prepared</h2>
+  <p><b>Proof implementation:</b> A reusable subset selector now fails closed unless its input is a symbol-unique certified prefix. An unaffected exact top-20 is retained unchanged; an affected result requires at least 21 rows, removes at most one query-symbol row and emits an explicit <code>exact_top_k_plus_one_drop_single_excluded_symbol</code> proof. It rejects duplicate symbols, malformed rows, invalid <code>k</code> and an affected prefix without the necessary extra row.</p>
+  <p><b>Audit harness:</b> A create-only producer binds the frozen walk-forward contract, registry, three producer results and their independent verification receipts. It reconstructs all four method inventories from 3,936 sealed query cases, validates query identity and no-outcome flags, rejects conflicting episode identities and publishes exact affected-query IDs plus T14-09 outcome overlap. Repair selection is outcome-blind.</p>
+  <p class="pass"><b>Validation:</b> Ten subset-proof cases, two audit-layout cases and all adjacent baseline/composite/price batch tests pass, 51/51 total. The complete staged repository suite passes all 1,074 tests; the sole first-run failure was the expected tracked-runtime inventory check while the new core module was still untracked, and it passed immediately after staging plus throughout the clean full rerun. Both new modules compile, HTML parsing and <code>git diff --check</code> pass. After this clean checkpoint, publish the audit receipt and independently verify it before freezing the bounded real top-21 repair POC.</p>
+</section>
 </main>
 
 <section id="reproduce">
