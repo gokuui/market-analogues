@@ -2085,6 +2085,14 @@
   <p class="pass"><b>Pre-real-data gates:</b> Eight tests pass, including vector/scalar equality, deterministic complete shard assignment, exact offsets/exposures, malformed input refusal, a two-symbol streamed Parquet shard, atomic layout and idempotent second invocation.</p>
   <p><b>Next:</b> Run the complete repository suite, commit H0, generate and commit only the preregistration JSON as H1, then launch all 12 shards. Exposure/control prevalence remains unopened until risk-set verification passes.</p>
 </section>
+<section class="entry">
+  <h2>L-252 — Stockbee risk-set V1 source-quality refusal and V2 repair</h2>
+  <p><b>V1 evidence:</b> H0 <code>313a07a</code>, sole-child H1 <code>85ac636</code> and preregistration <code>4599da9e…5b3a2</code> froze the runner before real access. After 24 seconds, one worker encountered a stricter OHLC invariant violation and the parent failed closed. Only shard 08 had atomically sealed; no aggregate output or exposure/control prevalence exists. V1 remains immutable and its shard will not be reused.</p>
+  <p><b>Complete diagnosis:</b> A parallel read-only audit found 31/12,080 histories with invalid rows. Most are single zero-open/zero-low warrant prints; four older histories contain longer blocks where high/low do not enclose open/close. Rejecting an entire history for one bad row conflicts with the frozen contract's eligible-start wording and would discard valid periods.</p>
+  <p><b>V2 policy:</b> Preserve all source bytes and timestamps. A candidate start is eligible only when every row from its 252-session prior-history boundary through its inclusive 21/63-session future endpoint passes finite, positive, nonnegative-volume and OHLC-envelope checks. Windows intersecting an invalid row are excluded; unaffected windows in the same symbol remain. Per-symbol accounting records invalid source rows and retained risk rows.</p>
+  <p><b>Independent coverage:</b> V2 verification reconstructs the validity mask and retained-window count for every source history, in addition to the cross-shard scalar oracle. Eight focused tests pass, including an invalid row inside/outside required windows. Outcome, exposure and matching definitions are unchanged.</p>
+  <p><b>Next:</b> Commit V2 as a new H0, generate a new sole-child V2 preregistration binding the V1 failure, and rerun in separate cache/output namespaces.</p>
+</section>
 </main>
 
 <section id="reproduce">

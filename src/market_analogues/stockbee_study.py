@@ -42,13 +42,19 @@ def validate_ohlcv(frame: pd.DataFrame) -> pd.DataFrame:
     if result.timestamp.isna().any() or not result.timestamp.is_monotonic_increasing \
             or result.timestamp.duplicated().any():
         raise StockbeeStudyError("timestamps must be unique and strictly increasing")
-    ohlc = result[["open", "high", "low", "close"]].to_numpy(dtype=np.float64)
-    volume = result.volume.to_numpy(dtype=np.float64)
-    if not np.isfinite(ohlc).all() or (ohlc <= 0).any() or not np.isfinite(volume).all() \
-            or (volume < 0).any() or (ohlc[:, 1] < np.maximum.reduce((ohlc[:, 0], ohlc[:, 2], ohlc[:, 3]))).any() \
-            or (ohlc[:, 2] > np.minimum.reduce((ohlc[:, 0], ohlc[:, 1], ohlc[:, 3]))).any():
-        raise StockbeeStudyError("OHLCV values violate finite/positive/range invariants")
     return result.reset_index(drop=True)
+
+
+def valid_ohlcv_rows(frame: pd.DataFrame) -> np.ndarray:
+    bars = validate_ohlcv(frame)
+    ohlc = bars[["open", "high", "low", "close"]].to_numpy(dtype=np.float64)
+    volume = bars.volume.to_numpy(dtype=np.float64)
+    return (
+        np.isfinite(ohlc).all(axis=1) & (ohlc > 0).all(axis=1)
+        & np.isfinite(volume) & (volume >= 0)
+        & (ohlc[:, 1] >= np.maximum.reduce((ohlc[:, 0], ohlc[:, 2], ohlc[:, 3])))
+        & (ohlc[:, 2] <= np.minimum.reduce((ohlc[:, 0], ohlc[:, 1], ohlc[:, 3])))
+    )
 
 
 def symbol_risk_rows(
@@ -63,16 +69,21 @@ def symbol_risk_rows(
     open_ = bars.open.to_numpy(dtype=np.float64); high = bars.high.to_numpy(dtype=np.float64)
     low = bars.low.to_numpy(dtype=np.float64); close = bars.close.to_numpy(dtype=np.float64)
     volume = bars.volume.to_numpy(dtype=np.float64); timestamps = bars.timestamp.to_numpy()
+    valid_rows = valid_ohlcv_rows(bars)
     previous = np.roll(close, 1); previous[0] = np.nan
-    close_return = close / previous - 1
-    true_range_fraction = np.maximum.reduce((high - low, np.abs(high - previous), np.abs(low - previous))) / previous
+    with np.errstate(divide="ignore", invalid="ignore"):
+        close_return = close / previous - 1
+        true_range_fraction = np.maximum.reduce((high - low, np.abs(high - previous), np.abs(low - previous))) / previous
+    close_return[~valid_rows] = np.nan; true_range_fraction[~valid_rows] = np.nan
     prior_range_median = _prior_rolling(true_range_fraction, 20, "median")
     up_move = close_return >= spec.move_threshold
     range_day = true_range_fraction >= spec.move_threshold
     bullish_expansion = range_day & (close > open_) & (true_range_fraction >= spec.range_multiple * prior_range_median)
-    dollar_volume = close * volume
+    dollar_volume = close * volume; dollar_volume[~valid_rows] = np.nan
     prior_median_dollar_volume = _prior_rolling(dollar_volume, 20, "median")
-    log_returns = np.log(close / previous)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        log_returns = np.log(close / previous)
+    log_returns[~valid_rows] = np.nan
     prior_volatility = _prior_rolling(log_returns, 20, "std")
     indices = np.arange(n)
     prior_return_63 = np.full(n, np.nan)
@@ -81,6 +92,13 @@ def symbol_risk_rows(
     rows: list[pd.DataFrame] = []
     for horizon in sorted(spec.horizons):
         starts = np.arange(spec.prior_sessions, n - horizon + 1)
+        if not len(starts): continue
+        invalid_cumulative = np.concatenate(([0], np.cumsum((~valid_rows).astype(np.int64))))
+        complete = (
+            invalid_cumulative[starts + horizon]
+            - invalid_cumulative[starts - spec.prior_sessions]
+        ) == 0
+        starts = starts[complete]
         if not len(starts): continue
         endpoint = starts + horizon - 1
         outcome = close[endpoint] / close[starts - 1] - 1

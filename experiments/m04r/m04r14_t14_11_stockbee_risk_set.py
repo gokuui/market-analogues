@@ -18,20 +18,21 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from market_analogues.stockbee_study import StockbeeKernelSpec, symbol_risk_rows
+from market_analogues.stockbee_study import symbol_risk_rows, valid_ohlcv_rows
 from market_analogues.types import stable_hash
 
 from experiments.m04r import m04r14_t14_09_outcome_smoke as smoke
 from experiments.m04r import m04r14_t14_10_wf03_feasibility as base
 
 
-SCHEMA = "m04r14-t14-11-stockbee-risk-set-v1"
-PREREGISTRATION_RELATIVE = Path("experiments/m04r/m04r14_t14_11_stockbee_risk_set_v1_preregistered.json")
+SCHEMA = "m04r14-t14-11-stockbee-risk-set-v2"
+PREREGISTRATION_RELATIVE = Path("experiments/m04r/m04r14_t14_11_stockbee_risk_set_v2_preregistered.json")
+V1_PREREGISTRATION_RELATIVE = Path("experiments/m04r/m04r14_t14_11_stockbee_risk_set_v1_preregistered.json")
 CONTRACT_RELATIVE = Path("config/m04r14-t14-11-stockbee-contract.json")
 ACCOUNTING_RELATIVE = Path("config/data/analogues/m04r14/t14-10-walk-forward-query-registry-v1/source-accounting.parquet")
-CACHE_RELATIVE = Path("config/data/analogues/m04r14/t14-11-stockbee-risk-set-v1-cache")
-OUTPUT_RELATIVE = Path("config/data/analogues/m04r14/t14-11-stockbee-risk-set-v1")
-VERIFICATION_RELATIVE = Path("config/data/analogues/m04r14/t14-11-stockbee-risk-set-v1-verification")
+CACHE_RELATIVE = Path("config/data/analogues/m04r14/t14-11-stockbee-risk-set-v2-cache")
+OUTPUT_RELATIVE = Path("config/data/analogues/m04r14/t14-11-stockbee-risk-set-v2")
+VERIFICATION_RELATIVE = Path("config/data/analogues/m04r14/t14-11-stockbee-risk-set-v2-verification")
 SHARDS = 12
 RUNTIME_FILES = (
     "experiments/m04r/m04r14_t14_11_stockbee_risk_set.py",
@@ -102,6 +103,23 @@ def _shard(symbol: str) -> int:
     return int.from_bytes(sha256(str(symbol).encode()).digest()[:8], "big") % SHARDS
 
 
+def _v1_failure(repository: Path) -> dict[str, Any]:
+    prereg = base._read(repository / V1_PREREGISTRATION_RELATIVE)
+    root = repository / "config/data/analogues/m04r14/t14-11-stockbee-risk-set-v1-cache"
+    sealed = sorted(root.glob("shard-*/SHARD_SEALED.json"))
+    if prereg.get("preregistration_digest") != "4599da9e03eda120c156c260fd04c84caee80fd496a19dc2faefa0984fd5b3a2" \
+            or [path.parent.name for path in sealed] != ["shard-08"]:
+        raise RiskSetError("V1 failure evidence differs")
+    return {
+        "preregistration_digest": prereg["preregistration_digest"],
+        "preregistration_sha256": _sha(repository / V1_PREREGISTRATION_RELATIVE),
+        "sealed_shards": ["shard-08"], "sealed_shard_result_digest": base._read(sealed[0])["result_digest"],
+        "failure": "whole_symbol_OHLCV_rejection_encountered_31_histories_with_invalid_rows",
+        "repair": "exclude_only_start_windows_whose_252_prior_through_future_endpoint_intersects_invalid_row",
+        "real_universe_outcomes_accessed": True, "v1_receipts_reused": False,
+    }
+
+
 def build_preregistration(repository: Path) -> dict[str, Any]:
     repository = repository.resolve(strict=True)
     if _git(repository, "status", "--porcelain", "--untracked-files=all"): raise RiskSetError("clean worktree required")
@@ -114,6 +132,7 @@ def build_preregistration(repository: Path) -> dict[str, Any]:
     state = {
         "schema_version": SCHEMA, "status": "frozen_before_real_universe_risk_scan",
         "implementation_h0": h0, "runtime_files": _runtime_manifest(repository, h0),
+        "superseded_v1": _v1_failure(repository),
         "contract_digest": contract["contract_digest"], "source_accounting_sha256": _sha(repository / ACCOUNTING_RELATIVE),
         "symbol_count": len(accounting), "shards": SHARDS,
         "shard_symbol_counts": {str(i): sum(v == i for v in assignments.values()) for i in range(SHARDS)},
@@ -153,6 +172,7 @@ def validate_preregistration(repository: Path) -> tuple[dict[str, Any], pd.DataF
         "contract_digest": _contract(repository)["contract_digest"],
         "source_accounting_sha256": _sha(repository / ACCOUNTING_RELATIVE), "symbol_count": len(accounting),
         "assignment_digest": stable_hash({str(r.symbol): _shard(str(r.symbol)) for r in accounting.itertuples(index=False)}),
+        "superseded_v1": _v1_failure(repository),
     }
     if any(prereg.get(k) != v for k, v in observed.items()): raise RiskSetError("preregistered inputs drifted")
     return prereg, accounting, h1
@@ -175,6 +195,7 @@ def _write_shard(shard: int, records: list[dict[str, Any]], cache_text: str, con
             )
             frame = frame.loc[pd.to_datetime(frame.date) <= pd.Timestamp(record["coverage_last_timestamp"])].rename(columns={"date": "timestamp"})
             if len(frame) != int(record["rows_through_lock"]): raise RiskSetError(f"locked row count differs: {record['symbol']}")
+            invalid_rows = int((~valid_ohlcv_rows(frame)).sum())
             risk = symbol_risk_rows(frame, str(record["symbol"]))
             if not risk.empty:
                 table = pa.Table.from_pandas(risk, preserve_index=False)
@@ -183,6 +204,7 @@ def _write_shard(shard: int, records: list[dict[str, Any]], cache_text: str, con
             accounting_rows.append({
                 "symbol": str(record["symbol"]), "source_rows": len(frame), "risk_rows": len(risk),
                 "winner_rows": int(risk.winner_25pct.sum()) if len(risk) else 0,
+                "invalid_source_rows": invalid_rows,
                 "source_sha256": str(record["source_hash_at_lock"]),
             })
         if writer is None:

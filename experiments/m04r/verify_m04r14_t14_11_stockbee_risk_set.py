@@ -23,7 +23,7 @@ from experiments.m04r import m04r14_t14_10_wf03_feasibility as base
 from experiments.m04r import m04r14_t14_11_stockbee_risk_set as target
 
 
-SCHEMA = "m04r14-t14-11-stockbee-risk-set-verification-v1"
+SCHEMA = "m04r14-t14-11-stockbee-risk-set-verification-v2"
 SAMPLE_PER_SHARD = 5
 TOLERANCE = 5e-13
 
@@ -56,6 +56,23 @@ def _close(left: Any, right: Any) -> bool:
 def _true_range(open_: np.ndarray, high: np.ndarray, low: np.ndarray, close: np.ndarray, index: int) -> float:
     previous = close[index - 1]
     return max(high[index] - low[index], abs(high[index] - previous), abs(low[index] - previous)) / previous
+
+
+def _valid_mask(frame: pd.DataFrame) -> np.ndarray:
+    ohlc = frame[["open", "high", "low", "close"]].to_numpy(float); volume = frame.volume.to_numpy(float)
+    return (
+        np.isfinite(ohlc).all(axis=1) & (ohlc > 0).all(axis=1) & np.isfinite(volume) & (volume >= 0)
+        & (ohlc[:, 1] >= np.maximum.reduce((ohlc[:, 0], ohlc[:, 2], ohlc[:, 3])))
+        & (ohlc[:, 2] <= np.minimum.reduce((ohlc[:, 0], ohlc[:, 1], ohlc[:, 3])))
+    )
+
+
+def _expected_count(valid: np.ndarray) -> int:
+    cumulative = np.concatenate(([0], np.cumsum((~valid).astype(np.int64)))); total = 0; n = len(valid)
+    for horizon in (21, 63):
+        starts = np.arange(252, n - horizon + 1)
+        if len(starts): total += int(((cumulative[starts + horizon] - cumulative[starts - 252]) == 0).sum())
+    return total
 
 
 def _exposure(open_: np.ndarray, high: np.ndarray, low: np.ndarray, close: np.ndarray, index: int, name: str) -> bool:
@@ -123,8 +140,13 @@ def execute(repository: Path) -> dict[str, Any]:
     accounting = pd.concat(accountings, ignore_index=True).sort_values("symbol", kind="stable").reset_index(drop=True)
     if accounting.symbol.astype(str).tolist() != expected.symbol.astype(str).tolist():
         raise RiskSetVerificationError("symbol accounting inventory differs")
-    expected_counts = [sum(max(0, int(rows) - 252 - horizon + 1) for horizon in (21, 63)) for rows in expected.rows_through_lock]
+    expected_counts = []; invalid_counts = []
+    for row in expected.itertuples(index=False):
+        frame = pd.read_parquet(row.source_path, columns=["date", "open", "high", "low", "close", "volume"])
+        frame = frame.loc[pd.to_datetime(frame.date) <= pd.Timestamp(row.coverage_last_timestamp)]
+        valid = _valid_mask(frame); invalid_counts.append(int((~valid).sum())); expected_counts.append(_expected_count(valid))
     if accounting.risk_rows.astype(int).tolist() != expected_counts \
+            or accounting.invalid_source_rows.astype(int).tolist() != invalid_counts \
             or accounting.risk_rows.sum() != seal.get("risk_rows") \
             or accounting.winner_rows.sum() != seal.get("winner_rows"):
         raise RiskSetVerificationError("complete universe row accounting differs")

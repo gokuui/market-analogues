@@ -75,13 +75,16 @@ def test_event_clustering_keeps_earliest_and_peak() -> None:
     assert len(result.loc[result.symbol == "B"]) == 1
 
 
-def test_invalid_order_and_ohlc_are_rejected() -> None:
+def test_invalid_order_is_rejected_and_invalid_ohlc_window_is_excluded() -> None:
     bars = _bars(); bars.loc[2, "timestamp"] = bars.loc[1, "timestamp"]
     with pytest.raises(StockbeeStudyError, match="timestamps"):
         symbol_risk_rows(bars, "BAD")
     bars = _bars(); bars.loc[2, "high"] = 50
-    with pytest.raises(StockbeeStudyError, match="OHLCV"):
-        symbol_risk_rows(bars, "BAD")
+    assert not symbol_risk_rows(bars, "BAD").empty
+    bars = _bars(600); bars.loc[260, "high"] = 50
+    result = symbol_risk_rows(bars, "BAD")
+    assert 252 not in set(result.start_position)
+    assert 261 not in set(result.start_position)
 
 
 def test_stockbee_contract_self_seal_and_offset_words_agree() -> None:
