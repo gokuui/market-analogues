@@ -131,3 +131,18 @@ def test_vectorized_path_summary_matches_scalar_formula_to_float_roundoff() -> N
 
 def test_listener_handles_already_exited_pid_without_polling() -> None:
     assert listener._wait_once(2_147_483_647) == "already_exited"
+
+
+def test_query_local_stock_excludes_remote_bad_bars_without_changing_window() -> None:
+    timestamps = pd.date_range("2020-01-01", periods=200, freq="D")
+    frame = pd.DataFrame({
+        "timestamp": timestamps,
+        "open": np.ones(200), "high": np.ones(200) * 1.1,
+        "low": np.ones(200) * .9, "close": np.ones(200),
+    })
+    frame.loc[199, "open"] = 0.0
+    local = store._query_local_stock(frame, timestamps[50])
+    assert local.timestamp.iloc[0] == timestamps[30]
+    assert local.timestamp.iloc[-1] == timestamps[176]
+    assert len(local) == 147
+    assert (local[["open", "high", "low", "close"]] > 0).all().all()

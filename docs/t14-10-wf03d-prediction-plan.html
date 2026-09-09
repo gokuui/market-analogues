@@ -44,6 +44,7 @@
 <tr><td>D4-E independent oracle</td><td>Reconstruct every probability, baseline, quantile and path point, all monthly/aggregate digests, and independently recompute all 3,456 non-final query futures.</td><td>All 164 prediction-before-outcome timestamps, namespace rules, source fingerprints and physical seals must close before evaluation is authorized.</td></tr>
 </tbody></table>
 <p><b>Performance design:</b> the 33,383,810-row analogue path table is indexed once. Global joins are prepared once, and all 126 pointwise weighted medians are calculated in one vectorized matrix operation per query/lane/measure. A real 24-query month fell from approximately 14 seconds to approximately 3.6 seconds after preparation.</p>
+<p><b>Outcome validation scope:</b> v1 stopped after nine closed months when a query stock had invalid OHLC years after the query’s required future. V2 retains the full-file fingerprint but validates and computes only the causally sufficient prior-20-through-future-126 row extent. A complete 3,456-query scan found zero invalid local windows; v1 artifacts are retained and never reused.</p>
 <p class="warn"><b>Still no usefulness claim:</b> D4 constructs predictions only. Proper scores, calibration plots, fold comparisons and the final outcome remain unopened until D5.</p></section>
 
 <section><h2>D5 — Non-final evaluation, then single-open final</h2>

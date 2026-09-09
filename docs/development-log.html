@@ -1982,6 +1982,14 @@
   <p><b>Complete-suite diagnostics:</b> The first full run reached one expected index-sensitive failure because the new package module was not yet staged and therefore was absent from <code>git ls-files</code>; that gate passed immediately after staging the exact D4 set. The next run encountered an unrelated readiness-file identity race in an existing serial-runtime adversarial test; the exact case passed five consecutive isolated reruns. A third full run over the identical staged code completed at 100% with exit code zero. Neither diagnostic changed D4 calculations or opened query outcomes.</p>
   <p><b>Next:</b> Run the complete repository suite, freeze implementation H0, run the clean-commit synthetic verifier, preregister its exact receipt as sole-child H1, then execute/resume the 164-month producer and the independent all-row verifier. Evaluation metrics and final outcomes remain unopened.</p>
 </section>
+
+<section class="entry">
+  <h2>L-239 — D4 v1 query-outcome scope refusal and v2 repair</h2>
+  <p><b>Retained refusal:</b> V1 H0 <code>53ec33c</code> and sole-child H1 <code>9fac9d3</code> froze preregistration <code>e92209f1…02a0</code>. It sealed and closed January–September 2012 and sealed October predictions, then stopped before October query outcomes because the full source frame for registry stock <code>MHR</code> contains non-positive OHLC bars in March–May 2016. No producer seal exists; the pidfd listener correctly refused to launch verification. The ten prediction receipts and nine closed-month receipts remain immutable failed-prefix evidence and will not be reused.</p>
+  <p><b>Diagnosis:</b> The <code>MHR</code> query cutoff is 31 October 2012; its frozen calculation requires the prior 20 ATR bars and at most 126 subsequent stock bars, ending 3 May 2013. The invalid 2016 rows cannot affect any value for that query. Rejecting the entire lifetime source was therefore an overly broad operational validation scope, not a bad query or permission to impute data.</p>
+  <p><b>V2 rule:</b> Preserve the full-file fingerprint for identity, but pass exactly <code>[cutoff−20 stored rows, cutoff+126 stored rows]</code> to the unchanged outcome calculator. No bar inside that window is removed or repaired; any non-positive, non-finite, inconsistent or duplicate local observation still fails closed. The independent oracle applies the same causal extent through separately implemented slicing.</p>
+  <p class="pass"><b>Complete-universe preflight:</b> All 3,456 non-final registry-query windows pass strict local OHLC validation with zero errors. V2 uses new cache, output, verification, synthetic and preregistration identities, and cryptographically binds the exact failed v1 receipt prefix while setting <code>receipts_reused=false</code>.</p>
+</section>
 </main>
 
 <section id="reproduce">
@@ -2169,7 +2177,7 @@ git commit -m "Preregister M04R-11 candidate v2"
   <pre><code># D4 prediction-before-outcome store: commit implementation/tests/log as clean H0 first.
 .venv/bin/python -m experiments.m04r.m04r14_t14_10_wf03d_prediction_synthetic_gate --repository /home/vinay/code/market-analogues
 .venv/bin/python -m experiments.m04r.m04r14_t14_10_wf03d_prediction_store preregister --repository /home/vinay/code/market-analogues
-# Commit exactly experiments/m04r/m04r14_t14_10_wf03d_prediction_store_v1_preregistered.json as sole-child H1, then run/resume.
+# V1 is retained as a ten-month partial refusal. Commit exactly the generated v2 preregistration as sole-child H1, then run/resume.
 .venv/bin/python -m experiments.m04r.m04r14_t14_10_wf03d_prediction_store run --repository /home/vinay/code/market-analogues
 # Optional one-shot handoff derives the canonical output path from producer code rather than duplicating it.
 .venv/bin/python -m experiments.m04r.m04r14_t14_10_wf03d_prediction_listener --repository /home/vinay/code/market-analogues --producer-pid PID

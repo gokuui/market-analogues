@@ -46,23 +46,29 @@ from experiments.m04r import m04r14_t14_10_wf03d_cross_store_manifest as cross_s
 from experiments.m04r import m04r14_t14_10_wf03d_outcome_store as outcome_store
 
 
-SCHEMA = "m04r14-t14-10-wf03d-prediction-store-preregistration-v1"
-MONTH_SCHEMA = "m04r14-t14-10-wf03d-prediction-month-v1"
-STORE_SCHEMA = "m04r14-t14-10-wf03d-prediction-store-v1"
+SCHEMA = "m04r14-t14-10-wf03d-prediction-store-preregistration-v2"
+MONTH_SCHEMA = "m04r14-t14-10-wf03d-prediction-month-v2"
+STORE_SCHEMA = "m04r14-t14-10-wf03d-prediction-store-v2"
 PREREGISTRATION_RELATIVE = Path(
-    "experiments/m04r/m04r14_t14_10_wf03d_prediction_store_v1_preregistered.json"
+    "experiments/m04r/m04r14_t14_10_wf03d_prediction_store_v2_preregistered.json"
 )
 CACHE_RELATIVE = Path(
-    "config/data/analogues/m04r14/t14-10-wf03d-prediction-months-v1"
+    "config/data/analogues/m04r14/t14-10-wf03d-prediction-months-v2"
 )
 OUTPUT_RELATIVE = Path(
-    "config/data/analogues/m04r14/t14-10-wf03d-prediction-store-v1"
+    "config/data/analogues/m04r14/t14-10-wf03d-prediction-store-v2"
 )
 VERIFICATION_RELATIVE = Path(
-    "config/data/analogues/m04r14/t14-10-wf03d-prediction-store-v1-verification"
+    "config/data/analogues/m04r14/t14-10-wf03d-prediction-store-v2-verification"
 )
 SYNTHETIC_RELATIVE = Path(
-    "config/data/analogues/m04r14/t14-10-wf03d-prediction-synthetic-v1/VERIFIED.json"
+    "config/data/analogues/m04r14/t14-10-wf03d-prediction-synthetic-v2/VERIFIED.json"
+)
+V1_PREREGISTRATION = Path(
+    "experiments/m04r/m04r14_t14_10_wf03d_prediction_store_v1_preregistered.json"
+)
+V1_CACHE = Path(
+    "config/data/analogues/m04r14/t14-10-wf03d-prediction-months-v1"
 )
 WALK_FORWARD_CONTRACT = Path("config/m04r14-t14-10-walk-forward-contract.json")
 REGISTRY_RELATIVE = Path(
@@ -299,6 +305,26 @@ def _query_overlap(repository: Path, registry: pd.DataFrame) -> list[str]:
     return sorted(set(registry.query_id).intersection(ids))
 
 
+def _v1_failure_evidence(repository: Path) -> dict[str, Any]:
+    prereg=base._read(repository/V1_PREREGISTRATION)
+    root=repository/V1_CACHE
+    closed=sorted(root.glob("month-*/MONTH_CLOSED.json"))
+    predictions=sorted(root.glob("month-*/PREDICTIONS_SEALED.json"))
+    if prereg.get("preregistration_digest")!="e92209f1ea54ef98d56bf25e1567b10b5a2057e5608b48151ae571599b4302a0" \
+            or len(closed)!=9 or len(predictions)!=10:
+        raise WalkForwardPredictionError("failed v1 evidence prefix differs")
+    return {
+        "preregistration_digest":prereg["preregistration_digest"],
+        "preregistration_sha256":_sha(repository/V1_PREREGISTRATION),
+        "closed_months":[path.parent.name.removeprefix("month-") for path in closed],
+        "closed_result_digests":[base._read(path)["result_digest"] for path in closed],
+        "prediction_months":[path.parent.name.removeprefix("month-") for path in predictions],
+        "prediction_result_digests":[base._read(path)["result_digest"] for path in predictions],
+        "terminal_failure":"remote_nonpositive_ohlc_rejected_before_query_local_windowing",
+        "receipts_reused":False,
+    }
+
+
 def build_preregistration(repository: Path) -> dict[str, Any]:
     repository = repository.resolve(strict=True)
     if _git(repository, "status", "--porcelain", "--untracked-files=all"):
@@ -323,6 +349,7 @@ def build_preregistration(repository: Path) -> dict[str, Any]:
         "implementation_h0": h0,
         "runtime_files": _runtime_manifest(repository, h0),
         "verified_inputs": verified_inputs,
+        "superseded_v1": _v1_failure_evidence(repository),
         "query_count": len(registry), "month_count": len(months),
         "nonfinal_query_count": int((pd.to_datetime(registry.cutoff) < FINAL_START).sum()),
         "final_query_count": int((pd.to_datetime(registry.cutoff) >= FINAL_START).sum()),
@@ -390,6 +417,7 @@ def validate_preregistration(repository: Path) -> tuple[dict[str, Any], pd.DataF
     final_ids = set(registry.loc[pd.to_datetime(registry.cutoff) >= FINAL_START, "query_id"])
     observed = {
         "verified_inputs": _verified_inputs(repository),
+        "superseded_v1": _v1_failure_evidence(repository),
         "registry_digest": _frame_digest(registry, ("cutoff", "query_id")),
         "regime_digest": _frame_digest(regimes, ("month",)),
         "registry_episode_overlap_count": len(overlap),
@@ -813,6 +841,17 @@ def _source_fingerprints(repository: Path) -> dict[str, str]:
     }
 
 
+def _query_local_stock(stock: pd.DataFrame, cutoff: pd.Timestamp | str) -> pd.DataFrame:
+    ordered=stock.sort_values("timestamp",kind="stable").reset_index(drop=True)
+    positions={stamp:index for index,stamp in enumerate(pd.to_datetime(ordered.timestamp))}
+    position=positions.get(pd.Timestamp(cutoff))
+    if position is None:
+        raise WalkForwardPredictionError("query cutoff is absent from stock source")
+    return ordered.iloc[
+        max(0,position-20):min(len(ordered),position+127)
+    ].reset_index(drop=True)
+
+
 def _compute_query_outcomes(
     repository: Path, month_registry: pd.DataFrame, regime: str,
     fingerprints: Mapping[str, str],
@@ -832,12 +871,10 @@ def _compute_query_outcomes(
         fingerprint = source.fingerprint(key)
         if fingerprints.get(str(symbol)) != fingerprint:
             raise WalkForwardPredictionError(f"query source fingerprint differs: {symbol}")
-        prepared_stock = prepare_outcome_sessions(stock, f"stock:{symbol}")
-        timestamps = set(pd.to_datetime(stock.timestamp))
         for query in query_rows.itertuples(index=False):
             cutoff = pd.Timestamp(query.cutoff)
-            if cutoff not in timestamps:
-                raise WalkForwardPredictionError(f"query cutoff absent: {query.case_id}")
+            local=_query_local_stock(stock,cutoff)
+            prepared_stock=prepare_outcome_sessions(local,f"stock:{symbol}:{query.query_id}")
             bundle = compute_prepared_episode_outcomes(
                 prepared_stock, prepared_benchmark, episode_id=query.query_id,
                 cutoff=cutoff, source_fingerprint=fingerprint,

@@ -24,8 +24,8 @@ from market_analogues.walk_forward_predictions import (
 from experiments.m04r import m04r14_t14_10_wf03d_prediction_store as producer
 
 
-SCHEMA="m04r14-t14-10-wf03d-prediction-synthetic-verification-v1"
-OUTPUT=Path("config/data/analogues/m04r14/t14-10-wf03d-prediction-synthetic-v1")
+SCHEMA="m04r14-t14-10-wf03d-prediction-synthetic-verification-v2"
+OUTPUT=Path("config/data/analogues/m04r14/t14-10-wf03d-prediction-synthetic-v2")
 
 
 class SyntheticPredictionError(RuntimeError): pass

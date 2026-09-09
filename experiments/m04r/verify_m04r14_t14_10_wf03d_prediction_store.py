@@ -27,7 +27,7 @@ from experiments.m04r.m04r14_t14_09_outcome_oracle import (
 )
 
 
-SCHEMA = "m04r14-t14-10-wf03d-prediction-verification-v1"
+SCHEMA = "m04r14-t14-10-wf03d-prediction-verification-v2"
 
 
 class WalkForwardPredictionVerificationError(RuntimeError):
@@ -312,8 +312,16 @@ def _verify_nonfinal_query_outcomes(
         key=InstrumentKey("nasdaq",str(symbol)); stock=source.load(key); fingerprint=source.fingerprint(key)
         if fingerprints.get(str(symbol))!=fingerprint:
             raise WalkForwardPredictionVerificationError(f"oracle source differs: {symbol}")
-        reference_stock=prepare_reference_series(stock)
+        ordered_stock=stock.sort_values("timestamp",kind="stable").reset_index(drop=True)
+        positions={stamp:index for index,stamp in enumerate(pd.to_datetime(ordered_stock.timestamp))}
         for query in queries.itertuples(index=False):
+            position=positions.get(pd.Timestamp(query.cutoff))
+            if position is None:
+                raise WalkForwardPredictionVerificationError(f"oracle cutoff absent: {query.case_id}")
+            local=ordered_stock.iloc[
+                max(0,position-20):min(len(ordered_stock),position+127)
+            ].reset_index(drop=True)
+            reference_stock=prepare_reference_series(local)
             outcomes,paths=reference_prepared_episode(
                 reference_stock,reference_benchmark,episode_id=str(query.query_id),
                 cutoff=pd.Timestamp(query.cutoff),source_fingerprint=fingerprint,
