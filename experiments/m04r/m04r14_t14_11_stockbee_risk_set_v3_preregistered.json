@@ -1,0 +1,60 @@
+{
+  "assignment_digest": "f126aee521a092b3909cf3b8c62003ae4ab197f1113be7a54df024a63d13bf4b",
+  "contract_digest": "8cc7c8f21c42c8d96c87dfb65bb8dc0d7a2da540135b58ee37b44293aeb18379",
+  "created_at": "2026-09-09T17:25:06.330997+00:00",
+  "expected_horizons": [
+    21,
+    63
+  ],
+  "implementation_h0": "bb22e06e4a16e2431497c499c229071b50126d7e",
+  "preregistration_digest": "1fcec47a0b24b408c90e337ce6580699fd2720ad296141477897fc7ecc182862",
+  "production_promotion_authorized": false,
+  "real_universe_outcomes_accessed": false,
+  "runtime_files": {
+    "config/m04r14-t14-11-stockbee-contract.json": "8aebc7d6f5ab35d5a842b320ca5ab4b9a86edfd16868162fa294cb4333ec1af1",
+    "experiments/m04r/m04r14_t14_11_stockbee_risk_set.py": "f89aed446a4774fc77bba525c3a57e9dac2a853fd545a7a69eba75b457ba4936",
+    "experiments/m04r/verify_m04r14_t14_11_stockbee_risk_set.py": "c3306dc2e2b430cadf38f88d00f7fa1d3b80facfd989e81038fb828097e6fbff",
+    "pyproject.toml": "9eeb5497e7c3cb4615345e9104cac78d93d45579f2ac71a1540f316c181858c1",
+    "src/market_analogues/stockbee_study.py": "e6cddedd2a4b7c5e0613c8912eb1ee5cc896417f5f3435d8e85531edf8b22541"
+  },
+  "schema_version": "m04r14-t14-11-stockbee-risk-set-v3",
+  "shard_symbol_counts": {
+    "0": 966,
+    "1": 1007,
+    "10": 1019,
+    "11": 1006,
+    "2": 994,
+    "3": 988,
+    "4": 1019,
+    "5": 975,
+    "6": 1013,
+    "7": 1029,
+    "8": 1031,
+    "9": 1033
+  },
+  "shards": 12,
+  "source_accounting_sha256": "377bd82f680278f0b4162769bce4cc16fb1906f9da4cfb11bd57465ff48b025a",
+  "status": "frozen_before_real_universe_risk_scan",
+  "superseded_v1": {
+    "failure": "whole_symbol_OHLCV_rejection_encountered_31_histories_with_invalid_rows",
+    "preregistration_digest": "4599da9e03eda120c156c260fd04c84caee80fd496a19dc2faefa0984fd5b3a2",
+    "preregistration_sha256": "4932d30bd041161b8dfaca6f7b1a2af1e9f28487b752f12c257c0fc76aa8718e",
+    "real_universe_outcomes_accessed": true,
+    "repair": "exclude_only_start_windows_whose_252_prior_through_future_endpoint_intersects_invalid_row",
+    "sealed_shard_result_digest": "ba719730e00c5668c420e61f2ac76e43ad6556390b1b1dc616477a98234181bb",
+    "sealed_shards": [
+      "shard-08"
+    ],
+    "v1_receipts_reused": false
+  },
+  "superseded_v2": {
+    "failed_verification": "eight_exact_273_row_histories_missing_one_valid_21_session_start_each",
+    "preregistration_digest": "96f44539ba6bcadb32d7e9975332077887b76879fadf6ded73b2c679678b73b1",
+    "preregistration_sha256": "77bd181a8e8d5653aa3624bb7a379c8e9eeb65a79cdf4625b874c2eb68438913",
+    "repair": "minimum_length_guard_changes_from_lte_to_lt_only",
+    "store_result_digest": "a22337d6184b08672f3d49ed8dd8c8199ecb5620d3e2d8a39f2f60b8525608fe",
+    "store_sha256": "00a6195c840d4add2acd266b22219ea973631df0143d5adbf39e8c420f31719a",
+    "v2_receipts_reused": false
+  },
+  "symbol_count": 12080
+}
