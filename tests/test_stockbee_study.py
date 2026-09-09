@@ -6,6 +6,10 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
+import sys
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
 
 from market_analogues.stockbee_study import (
     StockbeeStudyError,
@@ -13,9 +17,8 @@ from market_analogues.stockbee_study import (
     symbol_risk_rows,
 )
 from market_analogues.types import stable_hash
-
-
-ROOT = Path(__file__).resolve().parents[1]
+from experiments.m04r import m04r14_t14_11_stockbee_risk_set as risk_set
+from experiments.m04r import verify_m04r14_t14_11_stockbee_risk_set as risk_verifier
 
 
 def _bars(rows: int = 340) -> pd.DataFrame:
@@ -87,3 +90,26 @@ def test_stockbee_contract_self_seal_and_offset_words_agree() -> None:
     assert digest == stable_hash(contract)
     assert contract["outcomes"]["return_formula"] == "close_at_t_plus_horizon_minus_1_divided_by_close_at_t_minus_1_minus_1"
     assert contract["exposures"]["windows_relative_to_start"]["full_move"] == [0, "horizon_minus_1"]
+
+
+def test_independent_scalar_oracle_matches_vector_kernel() -> None:
+    bars = _bars(); vector = symbol_risk_rows(bars, "SYN")
+    for horizon in (21, 63):
+        for position in (252, 270):
+            observed = vector.loc[
+                (vector.horizon_sessions == horizon) & (vector.start_position == position)
+            ].iloc[0]
+            expected = risk_verifier._scalar_row(bars, "SYN", position, horizon)
+            for name, value in expected.items():
+                if isinstance(value, float):
+                    assert observed[name] == pytest.approx(value, abs=5e-13)
+                else:
+                    assert observed[name] == value
+
+
+def test_symbol_sharding_is_deterministic_and_complete() -> None:
+    symbols = [f"S{i}" for i in range(1000)]
+    first = [risk_set._shard(symbol) for symbol in symbols]
+    second = [risk_set._shard(symbol) for symbol in reversed(symbols)][::-1]
+    assert first == second
+    assert set(first) == set(range(risk_set.SHARDS))

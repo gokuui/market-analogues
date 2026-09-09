@@ -2078,6 +2078,13 @@
   <p class="pass"><b>Synthetic tests:</b> Five focused tests pass exact 21/63 offsets, +4% and range calculations, first-five/pre-start counts, history/future boundaries, investability, clustering, self-seal and malformed OHLCV rejection.</p>
   <p><b>Next:</b> Commit the frozen contract/kernel, build the create-only 12-shard risk-set runner and an independent synthetic/reference oracle, then preregister the runner bytes before any real universe prevalence is calculated.</p>
 </section>
+<section class="entry">
+  <h2>L-251 — Stockbee full-universe risk-set runner ready</h2>
+  <p><b>Implementation:</b> Twelve deterministic SHA-256 symbol shards each verify source bytes against the locked accounting row, truncate to the frozen coverage timestamp, stream per-symbol risk rows into Zstandard Parquet, write per-symbol counts and publish only through an atomic sealed-directory rename. Existing sealed shards validate and return immediately after a restart; incomplete temporary directories are never accepted.</p>
+  <p><b>Independent verifier:</b> All 12 shard manifests and bytes must seal; all 12,080 symbols must appear exactly once; every symbol's expected row count is reconstructed from locked source length and 21/63-session boundaries. Five deterministic symbols per shard receive independent scalar start/middle/end reconstruction at both horizons.</p>
+  <p class="pass"><b>Pre-real-data gates:</b> Eight tests pass, including vector/scalar equality, deterministic complete shard assignment, exact offsets/exposures, malformed input refusal, a two-symbol streamed Parquet shard, atomic layout and idempotent second invocation.</p>
+  <p><b>Next:</b> Run the complete repository suite, commit H0, generate and commit only the preregistration JSON as H1, then launch all 12 shards. Exposure/control prevalence remains unopened until risk-set verification passes.</p>
+</section>
 </main>
 
 <section id="reproduce">
