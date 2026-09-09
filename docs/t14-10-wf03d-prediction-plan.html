@@ -17,9 +17,18 @@
 <section><h2>D2 — Cross-store manifest <span class="pass">COMPLETE AND INDEPENDENTLY VERIFIED</span></h2>
 <p>Publish one immutable raw-link table with 314,880 rows, one source receipt binding per row and a deduplicated episode-request table. Verify exact query coverage, method/rank uniqueness, source identities, timestamps, causal gap, symbol exclusion and file-manifest closure.</p></section>
 
-<section><h2>D3 — Walk-forward analogue outcome store <span class="open">NEXT</span></h2>
+<section><h2>D3 — Walk-forward analogue outcome store <span class="open">IMPLEMENTED; H0 VALIDATION IN PROGRESS</span></h2>
 <p>Reuse exact rows from T14-09 only when episode identity, source fingerprint and outcome contract match. Compute missing episode outcomes with the already verified T14-09 formulas. Every measure carries its completion timestamp; a link contributes to a query only when that timestamp is no later than the query cutoff. Ambiguous, censored and truncated states remain explicit.</p>
 <p><b>Pass:</b> producer and independent oracle agree on identities, paths, outcomes, completion timestamps, reuse and causal eligibility; future mutation cannot change any earlier eligible row.</p></section>
+
+<section><h2>D3 execution detail</h2>
+<table><thead><tr><th>Stage</th><th>Frozen work</th><th>Synthetic/independent gate</th></tr></thead><tbody>
+<tr><td>D3-A reuse split</td><td>274,331 requests: reuse exactly 7,955 prior verified episodes; compute 266,376.</td><td>Episode ID, cutoff, source fingerprint, contract digest and source-content digest must all match. Mutation of any field forces recomputation.</td></tr>
+<tr><td>D3-B computation</td><td>48 symbol-stable restart checkpoints executed by 12 workers. Each symbol belongs to one partition.</td><td>Production calculator remains bound to the verified six-horizon contract and source/benchmark fingerprints.</td></tr>
+<tr><td>D3-C causal join</td><td>Publish outcomes, normalized future paths and 314,880 × six horizon-eligibility rows.</td><td>Incomplete outcomes abstain; complete outcomes are eligible only when completion timestamp ≤ query cutoff.</td></tr>
+<tr><td>D3-D verification</td><td>Independently recompute all 266,376 new episodes and reuse prior rows by verified identity.</td><td>Slow oracle must match every outcome/path value; aggregate, coverage, file and eligibility digests must close exactly.</td></tr>
+</tbody></table>
+<p class="warn"><b>Evaluation embargo:</b> Analogue outcomes become available only through completion-time filtering. Historical query evaluation labels and the final 2024–August-2025 evaluation block remain unopened; D3 cannot select a prediction rule or report model skill.</p></section>
 
 <section><h2>D4 — Prediction-before-outcome store</h2>
 <p>Freeze weighted and unweighted analogue probabilities, continuous quantiles, novelty, instability, effective counts and forced/selective lane fields. Process expanding market/regime baselines month by month: seal a month’s predictions first, then—and only then—open that month’s query outcomes to update later baseline state.</p>

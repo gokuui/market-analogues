@@ -1952,6 +1952,16 @@
   <p><b>Decision and boundary:</b> D2 is complete and authorizes D3 walk-forward analogue outcome-store construction. No outcome, historical query future or final-period result was opened by D2; predictive usefulness and production promotion remain unclaimed.</p>
   <p><b>Next:</b> Freeze D3 reuse and completion-time semantics before reading missing analogue futures. Reuse T14-09 outcomes only on exact episode/source/contract identity, compute all remaining requests with the verified production formula, and independently reproduce identities, paths, outcomes, censor states and causal availability.</p>
 </section>
+
+<section class="entry">
+  <h2>L-236 — D3 causal outcome-store implementation and bounded real proof</h2>
+  <p><b>Frozen work shape:</b> D2 contributes 274,331 unique episode requests. Exact ID/cutoff/source-fingerprint/contract/source-content reconciliation permits reuse of 7,955 episodes from the independently verified T14-09 store; the other 266,376 require new computation. The missing inventory digest is <code>b5b89e6a…eb00</code>.</p>
+  <p><b>Memory/performance design:</b> Concurrency and restart granularity are separated. Forty-eight deterministic symbol partitions contain 4,700–7,116 episodes each and run through 12 processes, retaining full CPU use while reducing the simultaneous in-memory future-path working set by approximately fourfold versus twelve oversized partitions. A symbol is loaded in only one partition and each completed partition is atomically sealed for restart.</p>
+  <p><b>Outputs:</b> The final atomic store contains six-horizon outcome rows, all observed normalized future-path rows, explicit censor/ambiguity status and a 1,889,280-row query/method/rank/horizon eligibility table. Eligibility is true only for complete outcomes whose completion timestamp is no later than the query cutoff; incomplete and not-yet-observable reasons remain distinct.</p>
+  <p><b>Verification:</b> The independent verifier uses the separately implemented T14-09 reference oracle to recompute every new episode and compare every outcome and path row. Reused rows must equal the prior independently verified store. It separately reconstructs causal eligibility, coverage, partition aggregation and physical/semantic file closure. Both producer and verifier resume from immutable per-partition receipts.</p>
+  <p class="pass"><b>Pre-freeze evidence:</b> All 45 focused causal/outcome/D3 tests pass. Synthetic gates cover equality-at-cutoff, future embargo, incomplete horizons, deterministic symbol co-location, receipt timing exclusion and mutation of each reuse-identity field. A real two-episode production POC produced 12 outcome rows and 52 path rows, both exactly equal to the independent oracle. Contract, synthetic, D2 and prior-store verification bindings all revalidate.</p>
+  <p><b>Boundary and next:</b> No new real analogue outcome has been opened and no historical query evaluation or final-period result has been opened. Pass the complete suite, commit H0, generate sole-file H1, then run and independently verify all 48 checkpoints before D4 predictions may begin.</p>
+</section>
 </main>
 
 <section id="reproduce">
@@ -2130,6 +2140,12 @@ git commit -m "Preregister M04R-11 candidate v2"
 # Commit exactly the generated preregistration JSON as the sole H1 file, then publish and verify.
 .venv/bin/python -m experiments.m04r.m04r14_t14_10_wf03d_cross_store_manifest run --repository /home/vinay/code/market-analogues
 .venv/bin/python -m experiments.m04r.verify_m04r14_t14_10_wf03d_cross_store_manifest --repository /home/vinay/code/market-analogues</code></pre>
+  <pre><code># D3 causal analogue outcomes: commit implementation/tests/log as clean H0 first.
+.venv/bin/python -m experiments.m04r.m04r14_t14_10_wf03d_outcome_store preregister --repository /home/vinay/code/market-analogues
+# Commit exactly the generated preregistration JSON as sole-child H1, then run/resume.
+.venv/bin/python -m experiments.m04r.m04r14_t14_10_wf03d_outcome_store run --repository /home/vinay/code/market-analogues
+# The independent numeric oracle is also restart-safe at partition granularity.
+.venv/bin/python -m experiments.m04r.verify_m04r14_t14_10_wf03d_outcome_store --repository /home/vinay/code/market-analogues</code></pre>
   <pre><code># One-shot, non-polling completion handoff; replace PID with the live producer PID.
 .venv/bin/python -m experiments.m04r.m04r14_t14_10_wf03_composite_listener --repository /home/vinay/code/market-analogues --producer-pid PID</code></pre>
   <p class="muted">Source datasets are read-only. Generated artifacts live under the configured artifact directory and are intentionally excluded from Git.</p>
