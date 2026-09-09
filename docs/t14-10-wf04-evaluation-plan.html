@@ -10,7 +10,7 @@
 <p>Bind the verified D4 seal, D4 verification, original walk-forward contract, synthetic scoring oracle, query registry and benchmark-calendar fingerprint. Derive each non-final fold’s allowed last query cutoff by removing the final 126 benchmark sessions before the next fold begins. The final block has no tail purge because its endpoint was already chosen to leave 126 sessions in the locked archive.</p>
 <p><b>Pass:</b> synthetic fixtures prove route exclusions, joins, purge boundaries, probability/continuous/path scores, month dependence units, calibration, stability slices, inference, digest closure and rejection of any final outcome file.</p></section>
 
-<section><h2>E1 — Non-final evaluation</h2>
+<section><h2>E1 — Non-final evaluation <span class="pass">COMPLETE AND INDEPENDENTLY VERIFIED</span></h2>
 <table><thead><tr><th>Surface</th><th>Frozen calculation</th><th>Output</th></tr></thead><tbody>
 <tr><td>Primary route</td><td>Twenty-session favorable/adverse/no-touch multiclass Brier and log loss at prefix 20; ambiguous and censored rows excluded but counted.</td><td>Per-query scores, fold/year/regime/cell summaries, monthly paired losses.</td></tr>
 <tr><td>Directional</td><td>Favorable versus adverse only, with no-touch/ambiguous/censored excluded.</td><td>Binary Brier and log loss.</td></tr>
@@ -20,6 +20,7 @@
 <tr><td>Calibration/selectivity</td><td>Equal-count one-vs-rest reliability, ECE and risk-coverage ordered by frozen nearest-composite distance.</td><td>Forced and selective diagnostics with explicit reason counts.</td></tr>
 </tbody></table>
 <p><b>Pass:</b> a separately structured verifier reconstructs every per-query score and aggregate from the immutable D4 files. Non-final results may be reported but cannot tune the final test.</p></section>
+<p class="warn"><b>Observed non-final result:</b> Composite Brier skill is −3.22% versus unconditional and −1.20% versus price-only on pooled validation, loses to unconditional in validation 1 and 3, and has no significant Holm-adjusted paired advantage. Preserve this failure; do not tune the final block.</p>
 
 <section><h2>E2 — Contract contradiction retained visibly</h2>
 <p>The V1 contract says <code>poor_data_quality</code> and <code>failed_calibration</code> are always present until missing point-in-time membership/delisting/sector/event-cluster data and this calibration gate are resolved. It also requires at least 50% final non-abstained coverage. D4 therefore correctly records <code>selective_lane=false</code> for every query, making that literal acceptance gate impossible.</p>

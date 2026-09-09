@@ -2028,6 +2028,14 @@
   <p class="pass"><b>Repair verification:</b> The report regression and focused evaluation suite pass 29/29. The complete staged repository suite also passes at 100% with exit code zero.</p>
   <p><b>Next:</b> Commit the new H0, publish the V3 synthetic receipt, freeze sole-child V2 preregistration and rerun the unchanged numeric calculation into the new atomic namespace.</p>
 </section>
+<section class="entry">
+  <h2>L-245 — WF-04 non-final evaluation independently verified</h2>
+  <p><b>Frozen V2:</b> Report-repair H0 <code>7cc0b8f</code>, V3 synthetic digest <code>4134306e…43a9</code> and sole-child H1 <code>598eb35</code> bind the exact V1 formulas, 2,304-query purged population, failed V1 evidence and all D4 inputs. V2 published atomically in 41.72 seconds at result digest <code>410936a9…8b12</code>.</p>
+  <p class="pass"><b>Independent reconstruction:</b> The verifier rebuilt all 24,192 query-score rows, 414,720 continuous-score rows, calibration, stability, risk, dependence-aware inference, interval coverage and path aggregates. All nine gates passed in 28.64 seconds; maximum numeric delta was <code>2.22e-16</code> against a <code>5e-13</code> ceiling. Verification digest is <code>dd1ce150…ea95</code>. The final 480 outcomes remain unopened.</p>
+  <p class="fail"><b>Non-final scientific result:</b> On 1,223 evaluable pooled-validation queries, composite mean Brier is <code>0.571127</code> versus <code>0.553311</code> unconditional, <code>0.552512</code> regime-only, <code>0.564373</code> price-only, <code>0.565300</code> return/volatility and <code>0.572414</code> deterministic-random. Composite skill is −3.22% versus unconditional, −3.37% versus regime-only, −1.20% versus price-only, −1.03% versus return/volatility and +0.22% versus random. It loses to unconditional in validation 1 and 3, so the frozen pooled/no-negative-fold acceptance conditions already fail. No Holm-adjusted paired comparison is significant.</p>
+  <p><b>Coverage:</b> 2,140/2,304 purged queries are multiclass evaluable and 1,983 directional. The dynamic-selectivity diagnostic retains 1,979; literal selectivity is zero under the retained V1 contradiction. This is a technically valid failed calibration result, not evidence that retrieval or storage is incorrect.</p>
+  <p><b>Next:</b> Preserve the non-final failure without tuning. Implement a separate final-open generation that first binds the verified non-final store and every final prediction byte, computes the 480 final outcomes exactly once, and independently reconstructs both outcomes and frozen acceptance metrics.</p>
+</section>
 </main>
 
 <section id="reproduce">
