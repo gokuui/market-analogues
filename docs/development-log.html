@@ -1925,6 +1925,15 @@
   <p><b>V2 reuse rule:</b> A new create-only V2 contract will bind the V1 contract, exact interrupted progress, and an ordered digest of all 135 sealed receipts. V2 may copy each only after full seal, query, source-file, old-prefix and subset-proof validation; imported receipts are resealed under V2 with their V1 digest and SHA-256. Only the remaining 77 composite receipts will be recomputed.</p>
   <p class="pass"><b>Pre-freeze validation:</b> The legacy-evidence audit reconstructs the exact 1/94/16/24 receipt split and digest <code>9d88e760…b6d2</code>. A temporary create-only migration validated, imported and resealed all 135 receipts. The focused repair/migration suite passes 27/27; Python compilation, strict diff checks and all 1,092 repository tests pass. The V2 implementation is ready for its clean H0 and sole-child preregistration.</p>
 </section>
+
+<section class="entry">
+  <h2>L-233 — Full D1 query-symbol exclusion repair independently verified</h2>
+  <p><b>Producer result:</b> V2 cryptographically validated and resealed all 135 complete V1 receipts, then computed only the 77 missing composite receipts. It completed all 212 repairs in 1,134.06 seconds: 78 composite, 94 price-only, 16 deterministic-random and 24 recent-return/volatility. The terminal manifest resolves 3,936 queries × four methods × 20 neighbours = 314,880 effective links. Producer result digest is <code>a5dd3f01…854a</code>; manifest digest is <code>33dccb51…770d</code>.</p>
+  <p><b>Independent result:</b> Clean-commit verifier <code>0b9a218</code> checked all 15,744 method lanes, every effective link's packed identity, causal eligibility and query-symbol exclusion, all 212 receipt seals and subset proofs, all 172 composite/price certificates and exact reruns of all 40 baseline repairs. It passed every gate in 100.84 seconds at verification digest <code>5dca3f52…2eca</code> and effective-inventory digest <code>94a33dfe…9f31</code>.</p>
+  <p><b>Verifier incident:</b> The automatic handoff correctly produced no receipt because its first verifier run mapped manifest <code>query_id</code> to a nonexistent inventory field of the same name; inventory calls that identity <code>episode_id</code>. The producer and manifest were unaffected. The verifier mapping was isolated behind a regression-tested helper, the complete repository suite passed, and verification was rerun only from the clean committed fix.</p>
+  <p class="pass"><b>Decision and boundary:</b> D1 is complete. All 314,880 links now conform to the frozen walk-forward rule that excludes the query symbol, and no outcome, historical query future or final-period result was opened. This authorizes D2 cross-store manifest construction only; it does not establish predictive value or authorize production.</p>
+  <p><b>Next:</b> Preregister and build D2's immutable 314,880-row raw-link table and deduplicated episode-request inventory, binding every row to its effective source receipt. Independently verify exact coverage, method/rank uniqueness, identities, causal gap, symbol exclusion and file-manifest closure before D3 may open analogue outcomes.</p>
+</section>
 </main>
 
 <section id="reproduce">
@@ -2094,6 +2103,10 @@ git commit -m "Preregister M04R-11 candidate v2"
 # The identical run command validates all existing receipts and resumes only absent queries after a restart.</code></pre>
   <pre><code># Commit the independent full-batch verifier before running it after producer completion.
 .venv/bin/python -m experiments.m04r.verify_m04r14_t14_10_wf03_composite_batch --repository /home/vinay/code/market-analogues</code></pre>
+  <pre><code># D1 exact query-symbol exclusion repair. V1 remains immutable interrupted evidence.
+.venv/bin/python -m experiments.m04r.m04r14_t14_10_wf03d_exclusion_repair_full run --repository /home/vinay/code/market-analogues
+# Run only after the V2 producer result exists and the verifier implementation is committed cleanly.
+.venv/bin/python -m experiments.m04r.verify_m04r14_t14_10_wf03d_exclusion_repair_full --repository /home/vinay/code/market-analogues</code></pre>
   <pre><code># One-shot, non-polling completion handoff; replace PID with the live producer PID.
 .venv/bin/python -m experiments.m04r.m04r14_t14_10_wf03_composite_listener --repository /home/vinay/code/market-analogues --producer-pid PID</code></pre>
   <p class="muted">Source datasets are read-only. Generated artifacts live under the configured artifact directory and are intentionally excluded from Git.</p>
