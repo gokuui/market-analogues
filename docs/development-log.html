@@ -1934,6 +1934,15 @@
   <p class="pass"><b>Decision and boundary:</b> D1 is complete. All 314,880 links now conform to the frozen walk-forward rule that excludes the query symbol, and no outcome, historical query future or final-period result was opened. This authorizes D2 cross-store manifest construction only; it does not establish predictive value or authorize production.</p>
   <p><b>Next:</b> Preregister and build D2's immutable 314,880-row raw-link table and deduplicated episode-request inventory, binding every row to its effective source receipt. Independently verify exact coverage, method/rank uniqueness, identities, causal gap, symbol exclusion and file-manifest closure before D3 may open analogue outcomes.</p>
 </section>
+
+<section class="entry">
+  <h2>L-234 — D2 cross-store manifest implementation and real preflight</h2>
+  <p><b>Representation:</b> D2 writes one compact Parquet row per query/method/rank position. Each row retains query and fold identity, canonical packed episode identity, exact hexadecimal distance, effective-list and match digests, resolution kind, latest eligible cutoff and the path, SHA-256 and seal digest of its source case or repair receipt. Large composite alignments are not duplicated; their sealed source artifact remains losslessly addressable through that binding.</p>
+  <p><b>Episode requests:</b> A second table deduplicates the effective link union by episode ID and retains dataset, symbol, cutoff and quality tier. Packed main and overflow rows are searched together; symbol, cutoff and tier must agree with each source match, and every matched cutoff must be no later than the query's sealed latest-eligible timestamp.</p>
+  <p><b>Lifecycle:</b> A clean-H0/sole-child-H1 preregistration freezes the D1 result, manifest and verification bytes/digests, registry, resident packed generation, exact logical table digests and counts. Publication uses a temporary sibling directory followed by one atomic rename, so interruption cannot expose a partial official store. The independent verifier reconstructs every row from D1 sources and the packed inventory and checks exact directory/file closure.</p>
+  <p class="pass"><b>Evidence so far:</b> The real outcome-blind preflight reconstructed all 314,880 links and found 274,331 unique episode requests in 27.89 seconds. Link digest was <code>6ea31e6e…16c9</code> before the final registry-order correction; the frozen digest will be regenerated from the corrected authoritative order. Seventeen focused D1/D2 tests pass, including synthetic refusals for duplicate ranks, query-symbol leakage, future leakage, missing/conflicting requests, ordering mutation and null mutation.</p>
+  <p><b>Boundary and next:</b> No outcome was opened. Finish the complete repository suite, commit H0, generate and commit only the preregistration as H1, publish D2, then run its independent verifier from a clean commit. D3 remains unauthorized until that receipt passes.</p>
+</section>
 </main>
 
 <section id="reproduce">
@@ -2107,6 +2116,11 @@ git commit -m "Preregister M04R-11 candidate v2"
 .venv/bin/python -m experiments.m04r.m04r14_t14_10_wf03d_exclusion_repair_full run --repository /home/vinay/code/market-analogues
 # Run only after the V2 producer result exists and the verifier implementation is committed cleanly.
 .venv/bin/python -m experiments.m04r.verify_m04r14_t14_10_wf03d_exclusion_repair_full --repository /home/vinay/code/market-analogues</code></pre>
+  <pre><code># D2 cross-store manifest: commit implementation/tests/log as clean H0 first.
+.venv/bin/python -m experiments.m04r.m04r14_t14_10_wf03d_cross_store_manifest preregister --repository /home/vinay/code/market-analogues
+# Commit exactly the generated preregistration JSON as the sole H1 file, then publish and verify.
+.venv/bin/python -m experiments.m04r.m04r14_t14_10_wf03d_cross_store_manifest run --repository /home/vinay/code/market-analogues
+.venv/bin/python -m experiments.m04r.verify_m04r14_t14_10_wf03d_cross_store_manifest --repository /home/vinay/code/market-analogues</code></pre>
   <pre><code># One-shot, non-polling completion handoff; replace PID with the live producer PID.
 .venv/bin/python -m experiments.m04r.m04r14_t14_10_wf03_composite_listener --repository /home/vinay/code/market-analogues --producer-pid PID</code></pre>
   <p class="muted">Source datasets are read-only. Generated artifacts live under the configured artifact directory and are intentionally excluded from Git.</p>

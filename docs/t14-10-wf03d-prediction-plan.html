@@ -14,7 +14,7 @@
 <p>For an affected query, retrieve the certified top-21 under the original one-result-per-symbol rule and remove the query-symbol row. Because at most one result can come from that symbol, the remaining first 20 are exactly the top-20 over the required subset. Composite and price repairs retain full search certificates; deterministic-random and return/volatility repairs are independently reconstructed from their exact orderings.</p>
 <p><b>Pass:</b> 3,936 queries × four methods, exactly 20 distinct non-query symbols per method, unchanged ranks for every unaffected query, exact top-21/drop proof for every affected query, and zero outcome or label access.</p></section>
 
-<section><h2>D2 — Cross-store manifest <span class="open">NEXT</span></h2>
+<section><h2>D2 — Cross-store manifest <span class="open">IMPLEMENTED; H0 VALIDATION IN PROGRESS</span></h2>
 <p>Publish one immutable raw-link table with 314,880 rows, one source receipt binding per row and a deduplicated episode-request table. Verify exact query coverage, method/rank uniqueness, source identities, timestamps, causal gap, symbol exclusion and file-manifest closure.</p></section>
 
 <section><h2>D3 — Walk-forward analogue outcome store</h2>
