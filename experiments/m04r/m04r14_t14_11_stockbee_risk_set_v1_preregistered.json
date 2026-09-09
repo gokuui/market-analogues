@@ -1,0 +1,39 @@
+{
+  "assignment_digest": "f126aee521a092b3909cf3b8c62003ae4ab197f1113be7a54df024a63d13bf4b",
+  "contract_digest": "8cc7c8f21c42c8d96c87dfb65bb8dc0d7a2da540135b58ee37b44293aeb18379",
+  "created_at": "2026-09-09T17:03:49.066612+00:00",
+  "expected_horizons": [
+    21,
+    63
+  ],
+  "implementation_h0": "313a07a1ebbd5d88a7f94a796cb1298541574bf6",
+  "preregistration_digest": "4599da9e03eda120c156c260fd04c84caee80fd496a19dc2faefa0984fd5b3a2",
+  "production_promotion_authorized": false,
+  "real_universe_outcomes_accessed": false,
+  "runtime_files": {
+    "config/m04r14-t14-11-stockbee-contract.json": "8aebc7d6f5ab35d5a842b320ca5ab4b9a86edfd16868162fa294cb4333ec1af1",
+    "experiments/m04r/m04r14_t14_11_stockbee_risk_set.py": "2c599a0ba38752a1c276a78ee3948c6308ebf885eeee0e9b373c531abb39d691",
+    "experiments/m04r/verify_m04r14_t14_11_stockbee_risk_set.py": "27a8bb25a51a95986b872f2926d5e2c71734ab033eab80cf4863a578f5518f95",
+    "pyproject.toml": "9eeb5497e7c3cb4615345e9104cac78d93d45579f2ac71a1540f316c181858c1",
+    "src/market_analogues/stockbee_study.py": "c017460b726da2e42096f8113324673ae4a7f753b09e6d9327e2342c128b5996"
+  },
+  "schema_version": "m04r14-t14-11-stockbee-risk-set-v1",
+  "shard_symbol_counts": {
+    "0": 966,
+    "1": 1007,
+    "10": 1019,
+    "11": 1006,
+    "2": 994,
+    "3": 988,
+    "4": 1019,
+    "5": 975,
+    "6": 1013,
+    "7": 1029,
+    "8": 1031,
+    "9": 1033
+  },
+  "shards": 12,
+  "source_accounting_sha256": "377bd82f680278f0b4162769bce4cc16fb1906f9da4cfb11bd57465ff48b025a",
+  "status": "frozen_before_real_universe_risk_scan",
+  "symbol_count": 12080
+}
