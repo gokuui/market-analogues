@@ -17,7 +17,7 @@
 <section><h2>D2 — Cross-store manifest <span class="pass">COMPLETE AND INDEPENDENTLY VERIFIED</span></h2>
 <p>Publish one immutable raw-link table with 314,880 rows, one source receipt binding per row and a deduplicated episode-request table. Verify exact query coverage, method/rank uniqueness, source identities, timestamps, causal gap, symbol exclusion and file-manifest closure.</p></section>
 
-<section><h2>D3 — Walk-forward analogue outcome store <span class="open">IMPLEMENTED; H0 VALIDATION IN PROGRESS</span></h2>
+<section><h2>D3 — Walk-forward analogue outcome store <span class="pass">COMPLETE AND INDEPENDENTLY VERIFIED</span></h2>
 <p>Reuse exact rows from T14-09 only when episode identity, source fingerprint and outcome contract match. Compute missing episode outcomes with the already verified T14-09 formulas. Every measure carries its completion timestamp; a link contributes to a query only when that timestamp is no later than the query cutoff. Ambiguous, censored and truncated states remain explicit.</p>
 <p><b>Pass:</b> producer and independent oracle agree on identities, paths, outcomes, completion timestamps, reuse and causal eligibility; future mutation cannot change any earlier eligible row.</p></section>
 
@@ -28,6 +28,7 @@
 <tr><td>D3-C causal join</td><td>Publish outcomes, normalized future paths and 314,880 × six horizon-eligibility rows.</td><td>Incomplete outcomes abstain; complete outcomes are eligible only when completion timestamp ≤ query cutoff.</td></tr>
 <tr><td>D3-D verification</td><td>Independently recompute all 266,376 new episodes and reuse prior rows by verified identity.</td><td>Slow oracle must match every outcome/path value; aggregate, coverage, file and eligibility digests must close exactly.</td></tr>
 </tbody></table>
+<p class="pass"><b>Verified real result:</b> All 48 restart partitions sealed. The atomic store contains 274,331 episodes, 1,645,986 six-horizon outcomes, 33,383,810 normalized future-path rows and 1,889,280 link/horizon eligibility rows. The independent reference oracle recomputed all 266,376 new episodes, checked the 7,955 exact verified reuses, reconstructed every eligibility row and closed every aggregate, physical and semantic digest. Store result <code>3e4a02e7…a39e2</code>; verification <code>b494dff2…e49b</code>.</p>
 <p class="warn"><b>Evaluation embargo:</b> Analogue outcomes become available only through completion-time filtering. Historical query evaluation labels and the final 2024–August-2025 evaluation block remain unopened; D3 cannot select a prediction rule or report model skill.</p></section>
 
 <section><h2>D4 — Prediction-before-outcome store</h2>
