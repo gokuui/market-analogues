@@ -64,7 +64,7 @@ def symbol_risk_rows(
     n = len(bars)
     if len(set(spec.horizons)) != len(spec.horizons) or any(h < 5 for h in spec.horizons):
         raise StockbeeStudyError("horizons must be unique and at least five sessions")
-    if n <= spec.prior_sessions + min(spec.horizons):
+    if n < spec.prior_sessions + min(spec.horizons):
         return pd.DataFrame()
     open_ = bars.open.to_numpy(dtype=np.float64); high = bars.high.to_numpy(dtype=np.float64)
     low = bars.low.to_numpy(dtype=np.float64); close = bars.close.to_numpy(dtype=np.float64)

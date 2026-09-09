@@ -23,7 +23,7 @@ from experiments.m04r import m04r14_t14_10_wf03_feasibility as base
 from experiments.m04r import m04r14_t14_11_stockbee_risk_set as target
 
 
-SCHEMA = "m04r14-t14-11-stockbee-risk-set-verification-v2"
+SCHEMA = "m04r14-t14-11-stockbee-risk-set-verification-v3"
 SAMPLE_PER_SHARD = 5
 TOLERANCE = 5e-13
 

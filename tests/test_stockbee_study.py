@@ -27,7 +27,8 @@ def _bars(rows: int = 340) -> pd.DataFrame:
     start = 252
     open_[start] = 100.; high[start] = 105.; low[start] = 99.; close[start] = 104.
     close[start + 20] = 125.; open_[start + 20] = 124.; high[start + 20] = 126.; low[start + 20] = 123.
-    close[start + 62] = 130.; open_[start + 62] = 129.; high[start + 62] = 131.; low[start + 62] = 128.
+    if rows > start + 62:
+        close[start + 62] = 130.; open_[start + 62] = 129.; high[start + 62] = 131.; low[start + 62] = 128.
     return pd.DataFrame({
         "timestamp": pd.bdate_range("2020-01-01", periods=rows),
         "open": open_, "high": np.maximum(high, close), "low": np.minimum(low, close),
@@ -57,6 +58,13 @@ def test_symbol_kernel_has_exact_history_and_future_boundaries() -> None:
         assert len(group) == len(bars) - horizon - 252 + 1
     assert result.prior_return_63.notna().all()
     assert result.prior_volatility_20.notna().all()
+
+
+def test_exact_minimum_length_retains_one_21_session_start() -> None:
+    result = symbol_risk_rows(_bars(273), "MIN")
+    assert len(result) == 1
+    assert result.iloc[0].horizon_sessions == 21
+    assert result.iloc[0].start_position == 252
 
 
 def test_event_clustering_keeps_earliest_and_peak() -> None:

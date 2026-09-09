@@ -25,14 +25,15 @@ from experiments.m04r import m04r14_t14_09_outcome_smoke as smoke
 from experiments.m04r import m04r14_t14_10_wf03_feasibility as base
 
 
-SCHEMA = "m04r14-t14-11-stockbee-risk-set-v2"
-PREREGISTRATION_RELATIVE = Path("experiments/m04r/m04r14_t14_11_stockbee_risk_set_v2_preregistered.json")
+SCHEMA = "m04r14-t14-11-stockbee-risk-set-v3"
+PREREGISTRATION_RELATIVE = Path("experiments/m04r/m04r14_t14_11_stockbee_risk_set_v3_preregistered.json")
 V1_PREREGISTRATION_RELATIVE = Path("experiments/m04r/m04r14_t14_11_stockbee_risk_set_v1_preregistered.json")
+V2_PREREGISTRATION_RELATIVE = Path("experiments/m04r/m04r14_t14_11_stockbee_risk_set_v2_preregistered.json")
 CONTRACT_RELATIVE = Path("config/m04r14-t14-11-stockbee-contract.json")
 ACCOUNTING_RELATIVE = Path("config/data/analogues/m04r14/t14-10-walk-forward-query-registry-v1/source-accounting.parquet")
-CACHE_RELATIVE = Path("config/data/analogues/m04r14/t14-11-stockbee-risk-set-v2-cache")
-OUTPUT_RELATIVE = Path("config/data/analogues/m04r14/t14-11-stockbee-risk-set-v2")
-VERIFICATION_RELATIVE = Path("config/data/analogues/m04r14/t14-11-stockbee-risk-set-v2-verification")
+CACHE_RELATIVE = Path("config/data/analogues/m04r14/t14-11-stockbee-risk-set-v3-cache")
+OUTPUT_RELATIVE = Path("config/data/analogues/m04r14/t14-11-stockbee-risk-set-v3")
+VERIFICATION_RELATIVE = Path("config/data/analogues/m04r14/t14-11-stockbee-risk-set-v3-verification")
 SHARDS = 12
 RUNTIME_FILES = (
     "experiments/m04r/m04r14_t14_11_stockbee_risk_set.py",
@@ -120,6 +121,24 @@ def _v1_failure(repository: Path) -> dict[str, Any]:
     }
 
 
+def _v2_failure(repository: Path) -> dict[str, Any]:
+    prereg = base._read(repository / V2_PREREGISTRATION_RELATIVE)
+    output = repository / "config/data/analogues/m04r14/t14-11-stockbee-risk-set-v2/SEALED.json"
+    seal = base._read(output)
+    if prereg.get("preregistration_digest") != "96f44539ba6bcadb32d7e9975332077887b76879fadf6ded73b2c679678b73b1" \
+            or seal.get("result_digest") != "a22337d6184b08672f3d49ed8dd8c8199ecb5620d3e2d8a39f2f60b8525608fe" \
+            or (repository / "config/data/analogues/m04r14/t14-11-stockbee-risk-set-v2-verification").exists():
+        raise RiskSetError("V2 failure evidence differs")
+    return {
+        "preregistration_digest": prereg["preregistration_digest"],
+        "preregistration_sha256": _sha(repository / V2_PREREGISTRATION_RELATIVE),
+        "store_result_digest": seal["result_digest"], "store_sha256": _sha(output),
+        "failed_verification": "eight_exact_273_row_histories_missing_one_valid_21_session_start_each",
+        "repair": "minimum_length_guard_changes_from_lte_to_lt_only",
+        "v2_receipts_reused": False,
+    }
+
+
 def build_preregistration(repository: Path) -> dict[str, Any]:
     repository = repository.resolve(strict=True)
     if _git(repository, "status", "--porcelain", "--untracked-files=all"): raise RiskSetError("clean worktree required")
@@ -133,6 +152,7 @@ def build_preregistration(repository: Path) -> dict[str, Any]:
         "schema_version": SCHEMA, "status": "frozen_before_real_universe_risk_scan",
         "implementation_h0": h0, "runtime_files": _runtime_manifest(repository, h0),
         "superseded_v1": _v1_failure(repository),
+        "superseded_v2": _v2_failure(repository),
         "contract_digest": contract["contract_digest"], "source_accounting_sha256": _sha(repository / ACCOUNTING_RELATIVE),
         "symbol_count": len(accounting), "shards": SHARDS,
         "shard_symbol_counts": {str(i): sum(v == i for v in assignments.values()) for i in range(SHARDS)},
@@ -173,6 +193,7 @@ def validate_preregistration(repository: Path) -> tuple[dict[str, Any], pd.DataF
         "source_accounting_sha256": _sha(repository / ACCOUNTING_RELATIVE), "symbol_count": len(accounting),
         "assignment_digest": stable_hash({str(r.symbol): _shard(str(r.symbol)) for r in accounting.itertuples(index=False)}),
         "superseded_v1": _v1_failure(repository),
+        "superseded_v2": _v2_failure(repository),
     }
     if any(prereg.get(k) != v for k, v in observed.items()): raise RiskSetError("preregistered inputs drifted")
     return prereg, accounting, h1

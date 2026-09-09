@@ -2093,6 +2093,13 @@
   <p><b>Independent coverage:</b> V2 verification reconstructs the validity mask and retained-window count for every source history, in addition to the cross-shard scalar oracle. Eight focused tests pass, including an invalid row inside/outside required windows. Outcome, exposure and matching definitions are unchanged.</p>
   <p><b>Next:</b> Commit V2 as a new H0, generate a new sole-child V2 preregistration binding the V1 failure, and rerun in separate cache/output namespaces.</p>
 </section>
+<section class="entry">
+  <h2>L-253 — Stockbee V2 complete scan rejected by independent boundary count</h2>
+  <p><b>Execution:</b> V2 H0 <code>2a05aca</code> and sole-child H1 <code>eb6472c</code> completed all 12 fresh shards in 45.26 seconds, sealing 12,080 symbols and 37,358,628 risk rows at store digest <code>a22337d6…08fe</code>. Exposure/control prevalence remained unopened.</p>
+  <p class="fail"><b>Verifier refusal:</b> The independent all-symbol count expected one 21-session row for each of eight histories with exactly 273 rows; V2 produced zero. Invalid-row counts, total stored-row reconciliation and sampled scalar values otherwise agreed. The kernel's early-return condition used <code>n &lt;= 252 + 21</code> although exactly 273 rows support start 252 through endpoint 272.</p>
+  <p><b>V3 repair:</b> Change only the guard from <code>&lt;=</code> to <code>&lt;</code>, add an exact-minimum-length regression, retain both failed V1 and sealed-but-unverified V2 identities, and write a third fresh namespace. Expected V3 row count is V2 plus exactly eight.</p>
+  <p><b>Next:</b> Pass focused and complete regression suites, freeze V3 H0/H1, rerun all shards and require the same independent verifier to pass before any prevalence step.</p>
+</section>
 </main>
 
 <section id="reproduce">
