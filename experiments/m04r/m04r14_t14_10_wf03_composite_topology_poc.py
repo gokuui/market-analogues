@@ -84,13 +84,18 @@ class CompositeTopologyError(RuntimeError):
 POSITIVE_INFINITY_SENTINEL = {"__nonfinite_float__": "positive_infinity"}
 
 
-def _certificate_json_value(value: Any) -> dict[str, Any]:
+def _certificate_json_value(
+    value: Any, *, required_top_k: int = base.TOP_K,
+) -> dict[str, Any]:
     """Encode only contract-valid intermediate +inf values as strict JSON."""
+    if type(required_top_k) is not int or isinstance(required_top_k, bool) \
+            or required_top_k < 1:
+        raise CompositeTopologyError("certificate top-k must be positive")
     certificate = asdict(value)
     for item in certificate.get("rounds", []):
         threshold = item.get("constrained_threshold")
         if type(threshold) is float and math.isinf(threshold) and threshold > 0:
-            if item.get("selected_rows", base.TOP_K) >= base.TOP_K \
+            if item.get("selected_rows", required_top_k) >= required_top_k \
                     or item.get("certified") is not False:
                 raise CompositeTopologyError("invalid infinite round threshold")
             item["constrained_threshold"] = dict(POSITIVE_INFINITY_SENTINEL)
@@ -98,7 +103,7 @@ def _certificate_json_value(value: Any) -> dict[str, Any]:
         upper = item.get("upper_inclusive")
         if type(upper) is float and math.isinf(upper) and upper > 0:
             if item.get("certified") is not True \
-                    or item.get("selected_rows", 0) < base.TOP_K:
+                    or item.get("selected_rows", 0) < required_top_k:
                 raise CompositeTopologyError("invalid infinite closure threshold")
             item["upper_inclusive"] = dict(POSITIVE_INFINITY_SENTINEL)
 

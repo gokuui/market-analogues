@@ -378,7 +378,9 @@ def _composite(
     return {
         "method": "composite", "superset_matches": matches,
         "corrected_matches": selected, "subset_proof": proof,
-        "certificate": composite_kernel._certificate_json_value(result.certificate),
+        "certificate": composite_kernel._certificate_json_value(
+            result.certificate, required_top_k=SUPERSET_K,
+        ),
         "elapsed_seconds": perf_counter() - started,
     }
 

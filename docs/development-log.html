@@ -1916,6 +1916,15 @@
   <p><b>Independence:</b> The verifier has its own Git binding, subset implementation, certificate checks, effective-inventory reconstruction and packed-identity lookup. It does not call the producer’s execution, repair-selection or manifest-construction functions. The already verified real POC supplies independent exact reruns for every search family; full verification checks every production certificate rather than duplicating all 172 expensive searches.</p>
   <p class="pass"><b>Pre-publication validation:</b> This verifier was added without changing any of the 100 runtime files frozen by the active full-repair contract. Its independent subset tests and adjacent repair tests pass 11/11; both certificate formulas accept the earlier independently verified real PCO composite/price artifact; Python compilation, strict diff checks and all 1,091 repository tests pass. The verifier is ready for a clean commit but cannot execute or publish until the producer completes.</p>
 </section>
+
+<section class="entry">
+  <h2>L-232 — Full repair v1 stopped safely; top-21 serializer defect diagnosed</h2>
+  <p><b>Observed:</b> V1 completed and sealed all 40 baseline repairs, all 94 price-only repairs and one composite repair (135/212). A subsequent composite search completed correctly but publication stopped with <code>CompositeTopologyError: invalid infinite round threshold</code>. No partial or invalid receipt was written; the terminal result and manifest do not exist.</p>
+  <p><b>Root cause:</b> The inherited strict-JSON certificate encoder treated 20 selected rows as a complete top-k because its validation boundary was hard-coded to the historical top-20 search. For the new top-21 contract, an intermediate round with 20 distinct rows correctly retains a positive-infinity constrained threshold. Retrieval, pruning, distance calculation and selection were not implicated.</p>
+  <p><b>Repair:</b> The encoder now accepts an explicit positive <code>required_top_k</code>; historical callers retain the top-20 default, while both exclusion-repair producers pass 21. A boundary test proves that selected=20/+∞ is accepted for top-21 and still rejected for top-20. V1 remains immutable failure evidence.</p>
+  <p><b>V2 reuse rule:</b> A new create-only V2 contract will bind the V1 contract, exact interrupted progress, and an ordered digest of all 135 sealed receipts. V2 may copy each only after full seal, query, source-file, old-prefix and subset-proof validation; imported receipts are resealed under V2 with their V1 digest and SHA-256. Only the remaining 77 composite receipts will be recomputed.</p>
+  <p class="pass"><b>Pre-freeze validation:</b> The legacy-evidence audit reconstructs the exact 1/94/16/24 receipt split and digest <code>9d88e760…b6d2</code>. A temporary create-only migration validated, imported and resealed all 135 receipts. The focused repair/migration suite passes 27/27; Python compilation, strict diff checks and all 1,092 repository tests pass. The V2 implementation is ready for its clean H0 and sole-child preregistration.</p>
+</section>
 </main>
 
 <section id="reproduce">

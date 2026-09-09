@@ -44,14 +44,23 @@ from experiments.m04r import m04r14_t14_10_wf03d_exclusion_repair_poc as poc
 from experiments.m04r import verify_m04r14_t14_10_wf03d_exclusion_repair_poc as poc_verifier
 
 
-SCHEMA = "m04r14-t14-10-wf03d-exclusion-repair-full-preregistration-v1"
+SCHEMA = "m04r14-t14-10-wf03d-exclusion-repair-full-preregistration-v2"
 OUTPUT_RELATIVE = Path(
-    "config/data/analogues/m04r14/t14-10-wf03d-exclusion-repair-full-v1"
+    "config/data/analogues/m04r14/t14-10-wf03d-exclusion-repair-full-v2"
 )
 PREREGISTRATION_RELATIVE = Path(
     "experiments/m04r/"
+    "m04r14_t14_10_wf03d_exclusion_repair_full_v2_preregistered.json"
+)
+LEGACY_V1_OUTPUT_RELATIVE = Path(
+    "config/data/analogues/m04r14/t14-10-wf03d-exclusion-repair-full-v1"
+)
+LEGACY_V1_PREREGISTRATION_RELATIVE = Path(
+    "experiments/m04r/"
     "m04r14_t14_10_wf03d_exclusion_repair_full_v1_preregistered.json"
 )
+RECEIPT_SCHEMA = "m04r14-t14-10-wf03d-exclusion-repair-receipt-v2"
+LEGACY_RECEIPT_SCHEMA = "m04r14-t14-10-wf03d-exclusion-repair-receipt-v1"
 AUDIT_VERIFICATION = poc.AUDIT_VERIFICATION
 POC_VERIFICATION = poc_verifier.OUTPUT_RELATIVE / "VERIFIED.json"
 TOP_K = 20
@@ -186,6 +195,85 @@ def _affected(audit_value: Mapping[str, Any]) -> dict[str, list[str]]:
     return result
 
 
+def _legacy_v1_evidence(
+    repository: Path, rows_by_id: Mapping[str, Mapping[str, Any]],
+    affected: Mapping[str, Sequence[str]],
+) -> dict[str, Any]:
+    root = repository / LEGACY_V1_OUTPUT_RELATIVE
+    contract_path = root / "CONTRACT.json"
+    if not root.is_dir() or not contract_path.is_file() \
+            or (root / "RESULT.json").exists() \
+            or {path.name for path in root.iterdir()} \
+                != {"CONTRACT.json", "PROGRESS.json", "repairs"}:
+        raise ExclusionRepairFullError("legacy v1 partial evidence differs")
+    contract = base._read(contract_path)
+    base._validate_seal(contract, "preregistration_digest")
+    tracked = base._read(repository / LEGACY_V1_PREREGISTRATION_RELATIVE)
+    if contract != tracked:
+        raise ExclusionRepairFullError("legacy v1 contract differs")
+    affected_sets = {method: set(values) for method, values in affected.items()}
+    repairs_root = root / "repairs"
+    if not repairs_root.is_dir() \
+            or {path.name for path in repairs_root.iterdir()} != set(METHODS):
+        raise ExclusionRepairFullError("legacy v1 repairs layout differs")
+    entries = []
+    counts = {method: 0 for method in METHODS}
+    for method in METHODS:
+        method_root = root / "repairs" / method
+        if not method_root.is_dir() or any(
+            path.is_symlink() or not path.is_file() or path.suffix != ".json"
+            for path in method_root.iterdir()
+        ):
+            raise ExclusionRepairFullError("legacy v1 method root differs")
+        for path in sorted(method_root.glob("*.json")):
+            query_id = path.stem
+            if query_id not in rows_by_id or query_id not in affected_sets[method]:
+                raise ExclusionRepairFullError("legacy v1 receipt inventory differs")
+            value = _valid_receipt(
+                repository, path, rows_by_id[query_id], method, contract,
+                expected_schema=LEGACY_RECEIPT_SCHEMA,
+            )
+            if value is None:
+                raise ExclusionRepairFullError("legacy v1 receipt disappeared")
+            entries.append({
+                "path": str(path.relative_to(root)), "query_id": query_id,
+                "method": method, "sha256": _sha(path),
+                "receipt_digest": value["receipt_digest"],
+            })
+            counts[method] += 1
+    expected_counts = {
+        "composite": 1, "price_only": 94,
+        "deterministic_random": 16, "recent_return_volatility": 24,
+    }
+    if counts != expected_counts or len(entries) != 135:
+        raise ExclusionRepairFullError("legacy v1 completion boundary differs")
+    progress_path = root / "PROGRESS.json"
+    progress = base._read(progress_path)
+    if not all((
+        progress.get("status") == "interrupted",
+        progress.get("phase") == "composite",
+        progress.get("completed_method_repairs") == 135,
+        progress.get("total_method_repairs") == 212,
+        progress.get("error_type") == "CompositeTopologyError",
+        progress.get("error") == "invalid infinite round threshold",
+    )):
+        raise ExclusionRepairFullError("legacy v1 interruption evidence differs")
+    return {
+        "root": str(root.resolve()),
+        "contract_preregistration_digest": contract["preregistration_digest"],
+        "contract_sha256": _sha(contract_path),
+        "receipt_count": len(entries), "method_counts": counts,
+        "receipt_manifest_digest": stable_hash(entries),
+        "progress_sha256": _sha(progress_path),
+        "interruption": {
+            key: progress[key] for key in (
+                "status", "phase", "completed_method_repairs",
+                "total_method_repairs", "error_type", "error",
+            )
+        },
+    }
+
+
 def build_preregistration(repository: Path) -> dict[str, Any]:
     repository = repository.resolve(strict=True)
     if _git(repository, "status", "--porcelain"):
@@ -209,6 +297,8 @@ def build_preregistration(repository: Path) -> dict[str, Any]:
             or poc_verified.get("full_exclusion_repair_authorized") is not True:
         raise ExclusionRepairFullError("verified repair authority differs")
     affected = _affected(audit_value)
+    rows_by_id = {row["episode_id"]: row for row in rows}
+    legacy_v1 = _legacy_v1_evidence(repository, rows_by_id, affected)
     resident = base._resident()
     feature_result = base._read(repository / poc.FEATURE_RESULT)
     base._validate_seal(feature_result)
@@ -238,6 +328,7 @@ def build_preregistration(repository: Path) -> dict[str, Any]:
             "feature_result_digest": feature_result["result_digest"],
         },
         "affected_query_ids": affected,
+        "legacy_v1_import": legacy_v1,
         "execution": {
             "top_k": TOP_K, "certified_superset_k": SUPERSET_K,
             "composite_processes": COMPOSITE_PROCESSES,
@@ -335,6 +426,11 @@ def validate_preregistration(
     affected = _affected(audit_value)
     if value.get("affected_query_ids") != affected:
         raise ExclusionRepairFullError("full repair affected inventory differs")
+    legacy_v1 = _legacy_v1_evidence(
+        repository, {row["episode_id"]: row for row in rows}, affected,
+    )
+    if value.get("legacy_v1_import") != legacy_v1:
+        raise ExclusionRepairFullError("full repair legacy import evidence differs")
     if value["inputs"].get("affected_query_input_manifest_digest") \
             != _query_input_manifest(repository, rows, affected):
         raise ExclusionRepairFullError("full repair query input prefixes differ")
@@ -414,7 +510,7 @@ def _repair_state(
     if matches[:TOP_K] != _source_prefix(repository, row, method):
         raise ExclusionRepairFullError("full repair top-21 prefix differs")
     state = {
-        "schema_version": "m04r14-t14-10-wf03d-exclusion-repair-receipt-v1",
+        "schema_version": RECEIPT_SCHEMA,
         "status": "complete", "query_id": row["episode_id"],
         "case_id": row["case_id"], "symbol": row["symbol"],
         "cutoff": row["cutoff"], "method": method,
@@ -426,6 +522,7 @@ def _repair_state(
         },
         "superset_matches": matches, "corrected_matches": selected,
         "subset_proof": proof, "certificate": dict(certificate) if certificate else None,
+        "receipt_provenance": {"kind": "computed_v2"},
         "elapsed_seconds": elapsed,
         "outcomes_or_labels_used": False,
         "historical_walk_forward_query_outcomes_opened": False,
@@ -460,7 +557,9 @@ def _composite_worker(
     )
     return _repair_state(
         row, "composite", [composite_kernel._match(value) for value in result.matches],
-        composite_kernel._certificate_json_value(result.certificate),
+        composite_kernel._certificate_json_value(
+            result.certificate, required_top_k=SUPERSET_K,
+        ),
         perf_counter() - started,
     )
 
@@ -507,16 +606,30 @@ def _receipt_path(root: Path, method: str, query_id: str) -> Path:
 
 def _valid_receipt(
     repository: Path, path: Path, row: Mapping[str, Any], method: str,
-    preregistration: Mapping[str, Any],
+    preregistration: Mapping[str, Any], *, expected_schema: str = RECEIPT_SCHEMA,
 ) -> dict[str, Any] | None:
     if not path.exists():
         return None
     value = base._read(path)
     base._validate_seal(value, "receipt_digest")
     selected, proof = _selected(value["superset_matches"], str(row["symbol"]))
+    provenance = value.get("receipt_provenance")
+    provenance_valid = expected_schema == LEGACY_RECEIPT_SCHEMA \
+        and provenance is None
+    if expected_schema == RECEIPT_SCHEMA and type(provenance) is dict:
+        provenance_valid = (
+            provenance.get("kind") == "computed_v2"
+            and set(provenance) == {"kind"}
+        ) or (
+            provenance.get("kind") == "validated_v1_import"
+            and set(provenance) == {
+                "kind", "legacy_contract_preregistration_digest",
+                "legacy_receipt_digest", "legacy_receipt_sha256",
+            }
+            and all(type(provenance[key]) is str for key in provenance)
+        )
     if not all((
-        value.get("schema_version")
-            == "m04r14-t14-10-wf03d-exclusion-repair-receipt-v1",
+        value.get("schema_version") == expected_schema,
         value.get("status") == "complete",
         value.get("query_id") == row["episode_id"],
         value.get("case_id") == row["case_id"],
@@ -536,9 +649,63 @@ def _valid_receipt(
         value.get("production_promotion_authorized") is False,
         (value.get("certificate") is None)
             == (method in {"deterministic_random", "recent_return_volatility"}),
+        provenance_valid,
     )):
         raise ExclusionRepairFullError("existing full repair receipt differs")
     return value
+
+
+def _import_legacy_v1(
+    repository: Path, root: Path,
+    rows_by_id: Mapping[str, dict[str, Any]],
+    affected: Mapping[str, list[str]], preregistration: Mapping[str, Any],
+) -> int:
+    legacy_root = repository / LEGACY_V1_OUTPUT_RELATIVE
+    legacy_contract = base._read(legacy_root / "CONTRACT.json")
+    imported = 0
+    for method in METHODS:
+        for source_path in sorted((legacy_root / "repairs" / method).glob("*.json")):
+            query_id = source_path.stem
+            source = _valid_receipt(
+                repository, source_path, rows_by_id[query_id], method,
+                legacy_contract, expected_schema=LEGACY_RECEIPT_SCHEMA,
+            )
+            if source is None:
+                raise ExclusionRepairFullError("legacy v1 receipt disappeared")
+            target = _receipt_path(root, method, query_id)
+            existing = _valid_receipt(
+                repository, target, rows_by_id[query_id], method,
+                preregistration,
+            )
+            if existing is not None:
+                provenance = existing.get("receipt_provenance", {})
+                if provenance.get("kind") != "validated_v1_import" \
+                        or provenance.get("legacy_receipt_digest") \
+                            != source["receipt_digest"]:
+                    raise ExclusionRepairFullError("legacy import provenance differs")
+                imported += 1
+                continue
+            state = {
+                key: value for key, value in source.items()
+                if key != "receipt_digest"
+            }
+            state.update({
+                "schema_version": RECEIPT_SCHEMA,
+                "preregistration_digest": preregistration["preregistration_digest"],
+                "receipt_provenance": {
+                    "kind": "validated_v1_import",
+                    "legacy_contract_preregistration_digest": legacy_contract[
+                        "preregistration_digest"
+                    ],
+                    "legacy_receipt_digest": source["receipt_digest"],
+                    "legacy_receipt_sha256": _sha(source_path),
+                },
+            })
+            _publish_receipt(root, base._sealed(state, "receipt_digest"))
+            imported += 1
+    if imported != preregistration["legacy_v1_import"]["receipt_count"]:
+        raise ExclusionRepairFullError("legacy v1 imported receipt count differs")
+    return imported
 
 
 def _publish_receipt(root: Path, value: Mapping[str, Any]) -> None:
@@ -778,7 +945,7 @@ def _manifest(
             "symbol": row["symbol"], "cutoff": row["cutoff"], "methods": methods,
         })
     state = {
-        "schema_version": "m04r14-t14-10-wf03d-exclusion-repair-manifest-v1",
+        "schema_version": "m04r14-t14-10-wf03d-exclusion-repair-manifest-v2",
         "status": "complete", "query_count": len(entries),
         "method_links": len(entries) * len(METHODS),
         "effective_neighbour_links": len(entries) * len(METHODS) * TOP_K,
@@ -815,6 +982,9 @@ def execute(repository: Path, preregistration: Mapping[str, Any]) -> dict[str, A
         (root / "repairs" / method).mkdir(parents=True, exist_ok=True)
     rows_by_id = {row["episode_id"]: row for row in rows}
     total = sum(len(values) for values in affected.values())
+    _import_legacy_v1(
+        repository, root, rows_by_id, affected, preregistration,
+    )
     if terminal_result is not None:
         manifest_path = root / "MANIFEST.json"
         manifest = base._read(manifest_path)
@@ -824,7 +994,7 @@ def execute(repository: Path, preregistration: Mapping[str, Any]) -> dict[str, A
         )
         if manifest != reconstructed or not all((
             terminal_result.get("schema_version")
-                == "m04r14-t14-10-wf03d-exclusion-repair-full-result-v1",
+                == "m04r14-t14-10-wf03d-exclusion-repair-full-result-v2",
             terminal_result.get("status") == "complete",
             terminal_result.get("passed") is True,
             terminal_result.get("preregistration_digest")
@@ -835,6 +1005,8 @@ def execute(repository: Path, preregistration: Mapping[str, Any]) -> dict[str, A
             terminal_result.get("affected_method_repairs") == total,
             terminal_result.get("affected_query_union") == EXPECTED_AFFECTED_UNION,
             terminal_result.get("repair_receipts") == total,
+            terminal_result.get("legacy_v1_receipts_imported")
+                == preregistration["legacy_v1_import"]["receipt_count"],
             terminal_result.get("outcomes_or_labels_used") is False,
             terminal_result.get("historical_walk_forward_query_outcomes_opened") is False,
             terminal_result.get("final_period_result_opened") is False,
@@ -869,7 +1041,7 @@ def execute(repository: Path, preregistration: Mapping[str, Any]) -> dict[str, A
     else:
         base._atomic(manifest_path, manifest)
     state = {
-        "schema_version": "m04r14-t14-10-wf03d-exclusion-repair-full-result-v1",
+        "schema_version": "m04r14-t14-10-wf03d-exclusion-repair-full-result-v2",
         "status": "complete", "passed": True,
         "preregistration_digest": preregistration["preregistration_digest"],
         "manifest_digest": manifest["manifest_digest"],
@@ -879,6 +1051,12 @@ def execute(repository: Path, preregistration: Mapping[str, Any]) -> dict[str, A
         "affected_query_union": manifest["affected_query_union"],
         "affected_method_repairs": total,
         "repair_receipts": total,
+        "legacy_v1_receipts_imported": preregistration[
+            "legacy_v1_import"
+        ]["receipt_count"],
+        "fresh_v2_receipts_computed": total - preregistration[
+            "legacy_v1_import"
+        ]["receipt_count"],
         "all_effective_matches_exclude_query_symbol": True,
         "all_unaffected_top20_reused_unchanged": True,
         "all_affected_top21_prefixes_exact": True,

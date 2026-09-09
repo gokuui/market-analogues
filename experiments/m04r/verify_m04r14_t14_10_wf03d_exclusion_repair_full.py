@@ -47,10 +47,10 @@ from experiments.m04r import m04r14_t14_10_wf03d_exclusion_repair_full as produc
 from experiments.m04r import verify_m04r14_t14_10_wf03_combined_batch as price_verifier
 
 
-SCHEMA = "m04r14-t14-10-wf03d-exclusion-repair-full-verification-v1"
+SCHEMA = "m04r14-t14-10-wf03d-exclusion-repair-full-verification-v2"
 OUTPUT_RELATIVE = Path(
     "config/data/analogues/m04r14/"
-    "t14-10-wf03d-exclusion-repair-full-v1-verification"
+    "t14-10-wf03d-exclusion-repair-full-v2-verification"
 )
 INVENTORY_DTYPE = np.dtype([
     ("episode_id", "V12"), ("cutoff_ns", "<i8"),
@@ -335,7 +335,7 @@ def verify(repository: Path) -> dict[str, Any]:
     base._validate_seal(manifest, "manifest_digest")
     if not all((
         result.get("schema_version")
-            == "m04r14-t14-10-wf03d-exclusion-repair-full-result-v1",
+            == "m04r14-t14-10-wf03d-exclusion-repair-full-result-v2",
         result.get("passed") is True, result.get("status") == "complete",
         result.get("preregistration_digest")
             == preregistration["preregistration_digest"],
@@ -344,12 +344,17 @@ def verify(repository: Path) -> dict[str, Any]:
         result.get("query_count") == producer.EXPECTED_QUERIES,
         result.get("affected_query_union") == producer.EXPECTED_AFFECTED_UNION,
         result.get("affected_method_repairs") == sum(map(len, affected.values())),
+        result.get("legacy_v1_receipts_imported")
+            == preregistration["legacy_v1_import"]["receipt_count"],
+        result.get("fresh_v2_receipts_computed")
+            == sum(map(len, affected.values()))
+                - preregistration["legacy_v1_import"]["receipt_count"],
         result.get("outcomes_or_labels_used") is False,
         result.get("historical_walk_forward_query_outcomes_opened") is False,
         result.get("final_period_result_opened") is False,
         result.get("production_promotion_authorized") is False,
         manifest.get("schema_version")
-            == "m04r14-t14-10-wf03d-exclusion-repair-manifest-v1",
+            == "m04r14-t14-10-wf03d-exclusion-repair-manifest-v2",
         manifest.get("status") == "complete",
         manifest.get("preregistration_digest")
             == preregistration["preregistration_digest"],
@@ -393,6 +398,8 @@ def verify(repository: Path) -> dict[str, Any]:
     effective_states = []
     composite_certificates = 0
     price_certificates = 0
+    imported_receipts = 0
+    computed_receipts = 0
 
     for row, entry in zip(rows, manifest["queries"], strict=True):
         query_id = row["episode_id"]
@@ -437,8 +444,7 @@ def verify(repository: Path) -> dict[str, Any]:
                     receipt.get("superset_matches"), row["symbol"],
                 )
                 if not all((
-                    receipt.get("schema_version")
-                        == "m04r14-t14-10-wf03d-exclusion-repair-receipt-v1",
+                    receipt.get("schema_version") == producer.RECEIPT_SCHEMA,
                     receipt.get("status") == "complete",
                     receipt.get("receipt_digest")
                         == method_entry.get("repair_receipt_digest"),
@@ -461,6 +467,30 @@ def verify(repository: Path) -> dict[str, Any]:
                     receipt.get("production_promotion_authorized") is False,
                 )):
                     raise ExclusionRepairFullVerificationError("repair receipt differs")
+                legacy_path = repository / producer.LEGACY_V1_OUTPUT_RELATIVE \
+                    / "repairs" / method / f"{query_id}.json"
+                provenance = receipt.get("receipt_provenance", {})
+                if legacy_path.exists():
+                    legacy_receipt = base._read(legacy_path)
+                    base._validate_seal(legacy_receipt, "receipt_digest")
+                    if provenance != {
+                        "kind": "validated_v1_import",
+                        "legacy_contract_preregistration_digest": preregistration[
+                            "legacy_v1_import"
+                        ]["contract_preregistration_digest"],
+                        "legacy_receipt_digest": legacy_receipt["receipt_digest"],
+                        "legacy_receipt_sha256": _sha(legacy_path),
+                    }:
+                        raise ExclusionRepairFullVerificationError(
+                            "legacy receipt import differs"
+                        )
+                    imported_receipts += 1
+                elif provenance != {"kind": "computed_v2"}:
+                    raise ExclusionRepairFullVerificationError(
+                        "fresh v2 receipt provenance differs"
+                    )
+                else:
+                    computed_receipts += 1
                 matches = selected
                 if method == "composite":
                     _validate_composite_certificate(
@@ -580,7 +610,9 @@ def verify(repository: Path) -> dict[str, Any]:
             or price_certificates != producer.EXPECTED_AFFECTED["price_only"] \
             or len(repaired_baselines) \
                 != producer.EXPECTED_AFFECTED["deterministic_random"] \
-                    + producer.EXPECTED_AFFECTED["recent_return_volatility"]:
+                    + producer.EXPECTED_AFFECTED["recent_return_volatility"] \
+            or imported_receipts != preregistration["legacy_v1_import"]["receipt_count"] \
+            or computed_receipts != sum(map(len, affected.values())) - imported_receipts:
         raise ExclusionRepairFullVerificationError("verified inventory totals differ")
     state = {
         "schema_version": SCHEMA,
@@ -599,12 +631,15 @@ def verify(repository: Path) -> dict[str, Any]:
         "composite_certificates": composite_certificates,
         "price_certificates": price_certificates,
         "baseline_exact_reruns": len(repaired_baselines),
+        "legacy_v1_receipts_imported": imported_receipts,
+        "fresh_v2_receipts_computed": computed_receipts,
         "elapsed_seconds": perf_counter() - started,
         "gates": {
             "all_source_cases_and_identities_valid": True,
             "all_15744_method_lanes_resolved": True,
             "all_314880_effective_links_eligible": True,
             "all_212_repair_receipts_valid": True,
+            "all_135_legacy_receipts_cryptographically_imported": True,
             "all_172_search_certificates_reconstructed": True,
             "all_40_baseline_repairs_exactly_rerun": True,
             "all_query_symbols_excluded": True,
