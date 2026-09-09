@@ -1971,6 +1971,17 @@
   <p><b>Operational incident:</b> The one-shot shell listener watched the noncanonical shorthand <code>t14-10-wf03d-outcomes-v1</code> while the committed producer correctly published to <code>t14-10-wf03d-outcome-store-v1</code>. This caused a missed automatic handoff only: no data failed, no partition was rerun and no artifact was changed. The verifier was started directly in a persistent execution session and completed normally. Future handoffs must derive the output path from the producer constant rather than duplicate it.</p>
   <p><b>Next:</b> Implement D4 without opening historical query futures: freeze the prediction formulas and all abstention/novelty fields, synthesize causal month-by-month fixtures, obtain an independent formula oracle, then commit H0 and a sole-child preregistration before producing any real prediction.</p>
 </section>
+
+<section class="entry">
+  <h2>L-238 — D4 prediction-before-outcome implementation and real path preflight</h2>
+  <p><b>Access-control finding:</b> Thirty-five of the 3,936 registry episode IDs also occur in D3 because those historical states are legitimate causally completed analogues for later queries. None belongs to the 480-query final block. D4 therefore treats analogue evidence and query-label state as separate namespaces: expanding unconditional/regime baselines may consume only prior query outcomes published behind a month receipt after that month’s predictions sealed.</p>
+  <p><b>Prediction surface:</b> Each query receives composite rank-weighted and unweighted diagnostics plus price-only, deterministic-random and return/volatility evidence at prefixes 5/10/15/20. Outputs include half-smoothed three-class barrier-route and directional probabilities, exclusion counts, effective sample size, novelty, neighborhood instability, forced/selective lanes, five weighted quantiles for four measures at six horizons and 126-step pointwise path medians for five path measures. Unconditional and causal benchmark-regime frequencies use the same smoothing/censor rules.</p>
+  <p><b>Temporal lifecycle:</b> Each of 164 month directories first atomically publishes four prediction files and <code>PREDICTIONS_SEALED.json</code>. Only then may a non-final month compute and publish query outcomes and <code>MONTH_CLOSED.json</code>. January 2024 through August 2025 permit prediction files only. Partial non-final outcome publication resumes only when recomputed bytes match; unexpected files, changed inputs or final-period outcomes fail closed.</p>
+  <p><b>Performance/correctness POC:</b> The real D3 path table has 33,383,810 rows across 274,153 episode IDs; 178 episodes correctly have no observable path row. The first implementation incorrectly assumed every episode had a path and was repaired before freeze. A one-time path index now builds in approximately 7.5 seconds. Preparing global joins once and vectorizing all 126 weighted medians reduced a real 24-query month from approximately 14 seconds to approximately 3.6 seconds after preparation while matching the scalar formula to floating-point accumulation roundoff.</p>
+  <p class="pass"><b>Synthetic boundary:</b> Focused prediction/scoring tests currently pass 38/38. They cover original-rank weights, half smoothing, directional/no-touch exclusion, ambiguous/censored/unobservable accounting, completion equality, future mutation invariance, missing paths, scalar/vector agreement, kernel-level process-exit listening and rejection of final-period outcome files. The standalone synthetic verifier must pass from clean H0 before D4 preregistration.</p>
+  <p><b>Complete-suite diagnostics:</b> The first full run reached one expected index-sensitive failure because the new package module was not yet staged and therefore was absent from <code>git ls-files</code>; that gate passed immediately after staging the exact D4 set. The next run encountered an unrelated readiness-file identity race in an existing serial-runtime adversarial test; the exact case passed five consecutive isolated reruns. A third full run over the identical staged code completed at 100% with exit code zero. Neither diagnostic changed D4 calculations or opened query outcomes.</p>
+  <p><b>Next:</b> Run the complete repository suite, freeze implementation H0, run the clean-commit synthetic verifier, preregister its exact receipt as sole-child H1, then execute/resume the 164-month producer and the independent all-row verifier. Evaluation metrics and final outcomes remain unopened.</p>
+</section>
 </main>
 
 <section id="reproduce">
@@ -2155,6 +2166,14 @@ git commit -m "Preregister M04R-11 candidate v2"
 .venv/bin/python -m experiments.m04r.m04r14_t14_10_wf03d_outcome_store run --repository /home/vinay/code/market-analogues
 # The independent numeric oracle is also restart-safe at partition granularity.
 .venv/bin/python -m experiments.m04r.verify_m04r14_t14_10_wf03d_outcome_store --repository /home/vinay/code/market-analogues</code></pre>
+  <pre><code># D4 prediction-before-outcome store: commit implementation/tests/log as clean H0 first.
+.venv/bin/python -m experiments.m04r.m04r14_t14_10_wf03d_prediction_synthetic_gate --repository /home/vinay/code/market-analogues
+.venv/bin/python -m experiments.m04r.m04r14_t14_10_wf03d_prediction_store preregister --repository /home/vinay/code/market-analogues
+# Commit exactly experiments/m04r/m04r14_t14_10_wf03d_prediction_store_v1_preregistered.json as sole-child H1, then run/resume.
+.venv/bin/python -m experiments.m04r.m04r14_t14_10_wf03d_prediction_store run --repository /home/vinay/code/market-analogues
+# Optional one-shot handoff derives the canonical output path from producer code rather than duplicating it.
+.venv/bin/python -m experiments.m04r.m04r14_t14_10_wf03d_prediction_listener --repository /home/vinay/code/market-analogues --producer-pid PID
+.venv/bin/python -m experiments.m04r.verify_m04r14_t14_10_wf03d_prediction_store --repository /home/vinay/code/market-analogues</code></pre>
   <pre><code># One-shot, non-polling completion handoff; replace PID with the live producer PID.
 .venv/bin/python -m experiments.m04r.m04r14_t14_10_wf03_composite_listener --repository /home/vinay/code/market-analogues --producer-pid PID</code></pre>
   <p class="muted">Source datasets are read-only. Generated artifacts live under the configured artifact directory and are intentionally excluded from Git.</p>
