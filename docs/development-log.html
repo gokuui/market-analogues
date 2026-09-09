@@ -1943,6 +1943,15 @@
   <p class="pass"><b>Evidence so far:</b> The real outcome-blind preflight reconstructed all 314,880 links and found 274,331 unique episode requests in 27.89 seconds. Link digest was <code>6ea31e6e…16c9</code> before the final registry-order correction; the frozen digest will be regenerated from the corrected authoritative order. Seventeen focused D1/D2 tests pass, including synthetic refusals for duplicate ranks, query-symbol leakage, future leakage, missing/conflicting requests, ordering mutation and null mutation.</p>
   <p><b>Boundary and next:</b> No outcome was opened. Finish the complete repository suite, commit H0, generate and commit only the preregistration as H1, publish D2, then run its independent verifier from a clean commit. D3 remains unauthorized until that receipt passes.</p>
 </section>
+
+<section class="entry">
+  <h2>L-235 — D2 cross-store manifest published and independently verified</h2>
+  <p><b>Frozen contract:</b> H0 <code>8555712</code> passed the complete repository suite; sole-file H1 <code>ffdab33</code> froze 3,936 queries, 15,744 method lanes, 314,880 links and 274,331 unique episode requests at preregistration digest <code>544acfe3…02db</code>. The authoritative registry-order link digest is <code>a0e83127…b6d3</code>; episode-request digest is <code>8c098c24…5d11</code>.</p>
+  <p><b>Publication:</b> Atomic construction completed in 43.49 seconds. The raw-link table is 19,511,711 bytes and the deduplicated request table is 4,378,974 bytes. Result digest is <code>3b2bef73…fe81</code> and manifest digest is <code>633dc166…be1d</code>.</p>
+  <p class="pass"><b>Independent verification:</b> In 34.81 seconds the verifier reconstructed every query/method/rank row from 11,848 sealed source artifacts, resolved every matched identity against the complete packed main/overflow inventory, verified all physical and semantic table digests, causal gaps, query-symbol exclusions, exact request deduplication and closed directory layout. All nine gates passed at verification digest <code>1e2c5c1f…abbe</code>.</p>
+  <p><b>Decision and boundary:</b> D2 is complete and authorizes D3 walk-forward analogue outcome-store construction. No outcome, historical query future or final-period result was opened by D2; predictive usefulness and production promotion remain unclaimed.</p>
+  <p><b>Next:</b> Freeze D3 reuse and completion-time semantics before reading missing analogue futures. Reuse T14-09 outcomes only on exact episode/source/contract identity, compute all remaining requests with the verified production formula, and independently reproduce identities, paths, outcomes, censor states and causal availability.</p>
+</section>
 </main>
 
 <section id="reproduce">
