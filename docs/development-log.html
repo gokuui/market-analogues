@@ -2100,6 +2100,14 @@
   <p><b>V3 repair:</b> Change only the guard from <code>&lt;=</code> to <code>&lt;</code>, add an exact-minimum-length regression, retain both failed V1 and sealed-but-unverified V2 identities, and write a third fresh namespace. Expected V3 row count is V2 plus exactly eight.</p>
   <p><b>Next:</b> Pass focused and complete regression suites, freeze V3 H0/H1, rerun all shards and require the same independent verifier to pass before any prevalence step.</p>
 </section>
+<section class="entry">
+  <h2>L-254 — Stockbee V3 full risk set independently verified</h2>
+  <p><b>Frozen V3:</b> H0 <code>bb22e06</code>, sole-child H1 <code>e4cf706</code> and preregistration digest <code>1fcec47a…2862</code> bind the one-character minimum-length repair plus immutable V1/V2 failure evidence. The complete repository suite passed before the new real scan.</p>
+  <p class="pass"><b>Producer:</b> All 12 fresh shards completed in 43.59 seconds with 12,080/12,080 locked histories and exactly 37,358,636 eligible symbol-horizon starts—the V2 count plus the expected eight boundary rows. Store digest is <code>47f44e00…f6b99</code>. No exposure/control prevalence was calculated.</p>
+  <p class="pass"><b>Independent verification:</b> All shard bytes and seals pass; every locked symbol occurs once; every retained-window count is reconstructed independently from source length plus its validity mask. A 60-symbol cross-shard sample yielded 283 exact scalar start/middle/end rows across available horizons. All five gates passed in 54.78 seconds at verification digest <code>598d2777…f7ecd</code>.</p>
+  <p><b>Observed but not yet interpreted:</b> The verified risk store contains 4,034,853 unclustered 25%-winner rows. This is a rolling-window numerator, not an event prevalence or proof of the Stockbee statement; clustering, exposure prevalence, controls and dependence-aware inference remain required.</p>
+  <p><b>Next:</b> Build and preregister the clustered-event, full-risk-set prevalence and deterministic matched-control stage against this exact verified store.</p>
+</section>
 </main>
 
 <section id="reproduce">
