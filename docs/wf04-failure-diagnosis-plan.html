@@ -1,0 +1,11 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>WF-04 failure diagnosis plan</title>
+<style>body{font-family:system-ui;max-width:1100px;margin:2rem auto;line-height:1.5}section{border-top:1px solid #ddd;padding-top:1rem}.warn{background:#fff4dc;padding:.8rem;border-left:5px solid #b9770e}.pass{color:#176b32}</style></head><body>
+<h1>WF-04 post-hoc failure diagnosis</h1>
+<p class="warn"><b>Interpretation boundary:</b> V1 has failed and its final holdout is consumed. This diagnosis may explain failure and generate hypotheses, but no segment, threshold or alternative may be presented as validated or used to rescue V1.</p>
+<section><h2>D0 — Bind verified evidence</h2><p>Require the verified non-final and final stores, exact file hashes, immutable seals and the failed acceptance decision. Refuse unverified or partially published inputs.</p></section>
+<section><h2>D1 — Reconstruct paired query losses</h2><p>For each evaluable query, pair composite Brier and log loss with every frozen baseline. Preserve fold, month, true route, regime, quality, liquidity, distance, effective sample, instability and dynamic-selectivity metadata.</p></section>
+<section><h2>D2 — Decompose without selecting</h2><p>Report loss differences by fold, class, year, regime, quality/liquidity and predeclared quintiles of distance, effective sample and instability. Report every cell meeting the minimum count; do not highlight only favorable cells.</p></section>
+<section><h2>D3 — Measure probability behavior</h2><p>For every lane and class, compare mean probability with empirical frequency, classwise Brier contribution, sharpness and one-v-rest rank AUC. Distinguish base-rate calibration from conditional discrimination.</p></section>
+<section><h2>D4 — Explain and verify</h2><p>Quantify how often analogue adjustments improve individual-query loss, which true classes contribute excess loss, and whether effects persist across time. Independently reconstruct artifacts and publish an HTML report. Findings authorize hypotheses only.</p></section>
+<section><h2>After diagnosis</h2><p>Preregister the Stockbee 25% monthly/quarterly advance and 4% range-expansion controlled study. Any future analogue V2 must freeze changes before a genuinely new, unconsumed future holdout.</p></section>
+</body></html>

@@ -2053,6 +2053,13 @@
   <p><b>Decision:</b> <code>research_calibration_pass=false</code>, <code>product_calibration_pass=false</code>, and production promotion remains forbidden. This is a successfully completed falsification, not an implementation failure. V1 final data is now consumed and cannot be used to validate a redesigned V2; any redesign needs a genuinely new future holdout.</p>
   <p><b>Next:</b> Diagnose failure by lane, class, regime, era, quality/liquidity and neighbour composition without presenting the diagnosis as new validation. In parallel with design work, execute the separately preregistered Stockbee 25% advance / 4% range-expansion controlled study. Freeze any V2 changes before collecting a new future holdout.</p>
 </section>
+<section class="entry">
+  <h2>L-248 — Post-hoc failure-diagnosis harness ready</h2>
+  <p><b>Boundary:</b> The diagnosis consumes only the already-open, independently verified WF-04 scores. It cannot change V1, select a winning subgroup, validate a new model or authorize production. Every predeclared cell with at least 30 evaluable queries is reported.</p>
+  <p><b>Coverage:</b> The harness pairs composite against all five frozen baselines per query and decomposes Brier/log loss across fold, actual route, year, benchmark regime, quality, liquidity, quality/liquidity cell, dynamic selectivity and within-fold quintiles of distance, effective sample and neighbourhood instability. It separately reports class calibration bias, probability sharpness, one-v-rest rank AUC and calendar-month stability.</p>
+  <p class="pass"><b>Pre-run verification:</b> Thirteen focused tests pass. An in-memory dry run over all 2,784 purged/final queries creates 13,920 paired comparisons, 1,145 complete segment rows, 126 probability-behaviour rows and 580 month/baseline rows; quintile assignments are identical across baselines for each query. The independent verifier audits every pairing and recomputes every published aggregate.</p>
+  <p><b>Next:</b> Commit the harness and plan, publish the atomic diagnostic, run its independent verifier, then record the findings before freezing the Stockbee study contract.</p>
+</section>
 </main>
 
 <section id="reproduce">
