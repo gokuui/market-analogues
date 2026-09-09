@@ -1901,6 +1901,14 @@
   <p><b>Decision:</b> The bounded evidence authorizes full D1 repair. Only the 173-query union of affected cases requires work: 78 composite searches, 94 price-only searches, 16 deterministic-random reconstructions and 24 return/volatility reconstructions; 32 queries overlap composite and price. The other 3,763 queries will retain their exact sealed top-20 by reference and receive an unchanged-over-subset proof.</p>
   <p><b>Boundary:</b> Full repair has not yet run and D1 is not complete. No outcome, historical query future or final-period result was opened. The next artifact must be preregistered, restart-safe, per-method resumable and independently verified before D2 manifest construction.</p>
 </section>
+
+<section class="entry">
+  <h2>L-230 — Full D1 repair implementation prepared</h2>
+  <p><b>Execution topology:</b> The full producer computes only 212 affected method receipts across the 173-query union. Composite uses the previously qualified 12-process × one-thread topology; price-only uses three persistent processes × four threads so all 12 cores are available while per-process OHLCV and prepared-symbol caches survive between tasks. The 40 baseline repairs are exact in-process reconstructions.</p>
+  <p><b>Restart model:</b> Each affected query/method result is sealed and published create-only immediately. On restart, all existing receipts are seal-, query-, source-prefix- and subset-proof-validated before reuse. The final manifest resolves all 15,744 query/method lanes: 212 via repair receipts and 15,532 via unchanged-over-subset upstream references, yielding 314,880 effective neighbour links.</p>
+  <p><b>Integrity:</b> Preregistration binds the independently verified POC, exclusion audit, all 11,808 upstream case-file identities as one ordered manifest digest, causal stock/benchmark prefixes for all 173 affected queries, the registry, packed/DTW/feature generations and every runtime source. No outcome path is imported or read.</p>
+  <p class="pass"><b>Pre-freeze checks:</b> The real PCO query passed the new persistent-price worker in 13.55 seconds and the one-thread composite worker in 54.54 seconds, each reproducing the old top-20 and one-row exclusion without publishing artifacts. Manifest construction measured 0.58 seconds for upstream files and 7.72 seconds for all affected causal inputs. The focused producer/proof suite passes 20/20 and the complete 1,087-test repository suite passes. A subsequent explicit 173-query-union invariant passes its focused 3/3 gate; Python compilation and strict diff checks remain clean.</p>
+</section>
 </main>
 
 <section id="reproduce">
