@@ -2108,6 +2108,14 @@
   <p><b>Observed but not yet interpreted:</b> The verified risk store contains 4,034,853 unclustered 25%-winner rows. This is a rolling-window numerator, not an event prevalence or proof of the Stockbee statement; clustering, exposure prevalence, controls and dependence-aware inference remain required.</p>
   <p><b>Next:</b> Build and preregister the clustered-event, full-risk-set prevalence and deterministic matched-control stage against this exact verified store.</p>
 </section>
+<section class="entry">
+  <h2>L-255 — Stockbee event clustering and prevalence stage ready</h2>
+  <p><b>Scope split:</b> This stage clusters overlapping winner starts and reports complete broad/investable exposure prevalence for unclustered risk rows and clustered winners. It deliberately does not construct matched controls or make the final claim decision; those remain a separately verified next boundary.</p>
+  <p><b>Producer:</b> Each verified V3 shard is aggregated without dropping any exposure definition or window. Winner runs are clustered independently within symbol/horizon; event IDs bind contract, symbol, horizon and representative start. The output contains raw clustered events, prevalence denominators/numerators, coverage and an HTML report.</p>
+  <p><b>Verifier:</b> A separate clustering implementation reconstructs every event boundary and event row from all 37,358,636 risk rows, independently accumulates full-risk and clustered prevalence, and requires exact frame/coverage equality.</p>
+  <p class="pass"><b>Synthetic gates:</b> Eleven focused tests pass, including independent cluster equivalence and exact broad/investable prevalence counts.</p>
+  <p><b>Next:</b> Run the complete suite, freeze H0/H1, publish and verify this prevalence stage, then open the first interpretable Stockbee prevalence results.</p>
+</section>
 </main>
 
 <section id="reproduce">
