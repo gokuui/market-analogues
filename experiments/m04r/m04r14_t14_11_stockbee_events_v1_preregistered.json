@@ -1,0 +1,48 @@
+{
+  "clustered_winner_prevalence_reported_separately": true,
+  "contract_digest": "8cc7c8f21c42c8d96c87dfb65bb8dc0d7a2da540135b58ee37b44293aeb18379",
+  "created_at": "2026-09-09T17:40:03.555162+00:00",
+  "event_cluster_rule": {
+    "representative": "earliest_start_position_in_run",
+    "retain_run_length_and_peak_forward_return": true,
+    "rule": "maximal_consecutive_run_of_qualifying_start_positions_per_symbol_and_horizon",
+    "unclustered_population_statistics_also_reported": true
+  },
+  "exposures": [
+    "up_close_4pct",
+    "true_range_4pct",
+    "bullish_range_expansion_4pct"
+  ],
+  "full_risk_set_prevalence_uses_unclustered_starts": true,
+  "implementation_h0": "d4b90d473293c4c8595c17c6b02bdc2d54560628",
+  "matched_controls_constructed": false,
+  "populations": [
+    "broad",
+    "investable"
+  ],
+  "preregistration_digest": "8164bafa91a53d05d64761bf9a9d1c19363069fcc18ac07416eb41a67d47d2de",
+  "production_promotion_authorized": false,
+  "real_exposure_prevalence_accessed": false,
+  "runtime_files": {
+    "config/m04r14-t14-11-stockbee-contract.json": "8aebc7d6f5ab35d5a842b320ca5ab4b9a86edfd16868162fa294cb4333ec1af1",
+    "experiments/m04r/m04r14_t14_11_stockbee_events.py": "9881994f30846b90abd3402d3b1709664bca9a60c38db410df6ec67620a2f5fc",
+    "experiments/m04r/m04r14_t14_11_stockbee_risk_set.py": "f89aed446a4774fc77bba525c3a57e9dac2a853fd545a7a69eba75b457ba4936",
+    "experiments/m04r/verify_m04r14_t14_11_stockbee_events.py": "02b07c6491dd14897e282cac19f841141fbbb3a68c6e212d3c0b497210bfdc95",
+    "pyproject.toml": "9eeb5497e7c3cb4615345e9104cac78d93d45579f2ac71a1540f316c181858c1",
+    "src/market_analogues/stockbee_study.py": "e6cddedd2a4b7c5e0613c8912eb1ee5cc896417f5f3435d8e85531edf8b22541"
+  },
+  "schema_version": "m04r14-t14-11-stockbee-events-v1",
+  "status": "frozen_before_event_clustering_and_exposure_prevalence",
+  "verified_inputs": {
+    "risk_set_result_digest": "47f44e00fed9685e589498a3c11add3b231de1929cf1c9b25fe2e209b06f6b99",
+    "risk_set_sha256": "03595e7707ec449fe4907987e3977a5bbd1afe9a3a16f9cb14343d9e35b61dfd",
+    "risk_set_verification_digest": "598d27774e44be2372dfe8a71b59385df0b07531135bfc03bc0562910a6f7ecd",
+    "risk_set_verification_sha256": "138881366ffd14181bc05993cc18b90da181f8dfa721505ac9b7bba18c9edfdd"
+  },
+  "windows": [
+    "start_day",
+    "first_5_sessions",
+    "full_move",
+    "pre_start_20_sessions"
+  ]
+}
