@@ -1867,6 +1867,12 @@
   <p class="pass"><b>Producer result:</b> Clean commit <code>a6d6202</code> published create-only audit digest <code>51fc8c2f…53f83</code>. It reconstructed 3,936 queries and 314,880 links across four methods, finding 274,343 unique matched episodes. Exact affected sets are 78 composite, 94 price-only, 16 deterministic-random and 24 return/volatility queries. The T14-09 outcome store overlaps 7,954 of these episodes, leaving 266,389 not already represented there.</p>
   <p><b>Independent gate:</b> A separately implemented verifier now revalidates every source case seal and query binding, reconstructs every link/impact/identity digest, checks all producer and verifier receipt hashes, and reads only the T14-09 <code>episode_id</code> column for overlap accounting. It does not call the producer audit and cannot access outcome values. The verifier must be committed and publish a create-only pass before any affected top-21 repair query runs.</p>
 </section>
+
+<section class="entry">
+  <h2>L-225 — Walk-forward exclusion mismatch independently verified</h2>
+  <p class="pass"><b>Result:</b> Git-bound verifier <code>f88af93</code> independently reconstructed all 3,936 query bindings and 314,880 source links, the four method-specific impact sets, the 274,343-episode identity union and the identity-only T14-09 overlap. All six gates pass at verification digest <code>06b954fd…fed0</code>; affected-query counts remain 78 composite, 94 price-only, 16 deterministic-random and 24 return/volatility.</p>
+  <p><b>Boundary:</b> Repair selection used no outcome or label value. Historical walk-forward query outcomes and the final period remain unopened. This verification authorizes only a preregistered bounded real top-21/drop-one repair POC; it does not authorize prediction construction yet.</p>
+</section>
 </main>
 
 <section id="reproduce">
