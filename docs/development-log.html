@@ -1997,6 +1997,14 @@
   <p class="pass"><b>Independent verification:</b> In 1,077.71 seconds the separate verifier validated every physical seal and prediction-before-outcome timestamp, reconstructed all neighbour formulas, baselines, continuous quantiles and pointwise paths, and independently recomputed every non-final query outcome and path. All eight gates passed for 3,936 queries at verification digest <code>a5418945…a13a</code>. Evaluation is authorized; production promotion remains false.</p>
   <p><b>Next:</b> Implement WF-04/D5 as a new fail-closed evaluation generation. First score only development and validation 1–3 using the already frozen proper-score, dependence and purge contract. Independently verify those artifacts before the 480-query final block is opened exactly once. No threshold, representation, neighbor selection or prediction may change in response to non-final results.</p>
 </section>
+<section class="entry">
+  <h2>L-241 — WF-04 non-final evaluation frozen before score calculation</h2>
+  <p><b>Population and purge:</b> The benchmark calendar fixes the last admissible query cutoffs at 30 June 2017, 2 July 2019, 2 July 2021 and 30 June 2023. Because registry queries occur at month end, this retains 1,008 development queries and 432 in each of validation 1–3: 2,304 total. The final block is not tail-purged because its August 2025 endpoint was already selected to leave 126 benchmark sessions in the locked archive; all 480 final outcomes remain absent.</p>
+  <p><b>Evaluation surface:</b> The producer publishes per-query multiclass/directional Brier and log scores; five-quantile continuous scores at six horizons; path median error; fold, year, regime and quality/liquidity stability; one-vs-rest equal-count calibration/ECE; nearest-composite-distance risk coverage; calendar-month paired block-bootstrap and Newey–West/DM comparisons with Holm correction; and marginal, independence and dynamic interval-coverage tests. The independent verifier reconstructs every row and aggregate from D4 inputs.</p>
+  <p class="fail"><b>Pre-result contract contradiction:</b> V1 declares <code>poor_data_quality</code> and <code>failed_calibration</code> always present, while requiring at least 50% final non-abstained coverage. Literal D4 selectivity is consequently zero by construction and that overall gate cannot pass. V1 remains unchanged. A separately named dynamic-selectivity diagnostic removes only those two permanent product blockers, but it cannot promote the V1 decision; forced-lane scores remain the primary scientific test.</p>
+  <p class="pass"><b>Pre-outcome checks:</b> Focused evaluation/scoring tests pass 28/28, including an end-to-end synthetic aggregate surface with input-order invariance. The final complete repository suite, with the producer, independent verifier and standalone synthetic gate staged, passed at 100% with exit code zero. No real score aggregate or final outcome has been opened.</p>
+  <p><b>Next:</b> Commit H0, execute the create-only WF-04 synthetic gate, generate and commit the sole-child non-final preregistration, then run the producer and independent verifier. Only a verified non-final store may authorize the final single-open generation.</p>
+</section>
 </main>
 
 <section id="reproduce">
@@ -2189,6 +2197,12 @@ git commit -m "Preregister M04R-11 candidate v2"
 # Optional one-shot handoff derives the canonical output path from producer code rather than duplicating it.
 .venv/bin/python -m experiments.m04r.m04r14_t14_10_wf03d_prediction_listener --repository /home/vinay/code/market-analogues --producer-pid PID
 .venv/bin/python -m experiments.m04r.verify_m04r14_t14_10_wf03d_prediction_store --repository /home/vinay/code/market-analogues</code></pre>
+  <pre><code># WF-04 non-final evaluation: commit implementation/tests/log as clean H0 first.
+.venv/bin/python -m experiments.m04r.m04r14_t14_10_wf04_synthetic_gate --repository /home/vinay/code/market-analogues
+.venv/bin/python -m experiments.m04r.m04r14_t14_10_wf04_nonfinal_evaluation preregister --repository /home/vinay/code/market-analogues
+# Commit exactly the generated preregistration JSON as the sole-child H1, then calculate non-final scores once.
+.venv/bin/python -m experiments.m04r.m04r14_t14_10_wf04_nonfinal_evaluation run --repository /home/vinay/code/market-analogues
+.venv/bin/python -m experiments.m04r.verify_m04r14_t14_10_wf04_nonfinal_evaluation --repository /home/vinay/code/market-analogues</code></pre>
   <pre><code># One-shot, non-polling completion handoff; replace PID with the live producer PID.
 .venv/bin/python -m experiments.m04r.m04r14_t14_10_wf03_composite_listener --repository /home/vinay/code/market-analogues --producer-pid PID</code></pre>
   <p class="muted">Source datasets are read-only. Generated artifacts live under the configured artifact directory and are intentionally excluded from Git.</p>
