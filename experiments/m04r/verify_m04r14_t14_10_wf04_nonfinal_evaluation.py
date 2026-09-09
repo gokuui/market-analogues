@@ -250,7 +250,9 @@ def _assert_frame(name: str, expected: pd.DataFrame, observed: pd.DataFrame) -> 
 
 
 def _simple_aggregates(scores: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
-    usable = scores.loc[scores.purged_evaluation_included]
+    usable = scores.loc[scores.purged_evaluation_included].sort_values(
+        ["query_id", "lane"], kind="stable",
+    )
     folds: list[dict[str, Any]] = []
     scopes = [(fold, usable.loc[usable.fold_id == fold]) for fold in target.SCORED_NONFINAL_FOLDS]
     scopes.append(("validation_pooled", usable.loc[usable.fold_id.isin(target.VALIDATION_FOLDS)]))
@@ -291,7 +293,9 @@ def _simple_aggregates(scores: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame
 
 
 def _calibration_oracle(scores: pd.DataFrame) -> pd.DataFrame:
-    usable = scores.loc[scores.purged_evaluation_included & scores.multiclass_evaluable]
+    usable = scores.loc[
+        scores.purged_evaluation_included & scores.multiclass_evaluable
+    ].sort_values(["query_id", "lane"], kind="stable")
     rows: list[dict[str, Any]] = []
     scopes = [(fold, usable.loc[usable.fold_id == fold]) for fold in target.SCORED_NONFINAL_FOLDS]
     scopes.append(("validation_pooled", usable.loc[usable.fold_id.isin(target.VALIDATION_FOLDS)]))
@@ -318,7 +322,9 @@ def _calibration_oracle(scores: pd.DataFrame) -> pd.DataFrame:
 
 
 def _risk_oracle(scores: pd.DataFrame) -> pd.DataFrame:
-    data = scores.loc[scores.purged_evaluation_included & scores.multiclass_evaluable & (scores.lane == "composite")]
+    data = scores.loc[
+        scores.purged_evaluation_included & scores.multiclass_evaluable & (scores.lane == "composite")
+    ].sort_values("query_id", kind="stable")
     rows = []
     scopes = [(fold, data.loc[data.fold_id == fold]) for fold in target.SCORED_NONFINAL_FOLDS]
     scopes.append(("validation_pooled", data.loc[data.fold_id.isin(target.VALIDATION_FOLDS)]))
@@ -368,7 +374,9 @@ def _holm(values: Mapping[str, float]) -> dict[str, tuple[float, bool]]:
 
 
 def _inference_oracle(scores: pd.DataFrame) -> pd.DataFrame:
-    usable = scores.loc[scores.purged_evaluation_included & scores.multiclass_evaluable]
+    usable = scores.loc[
+        scores.purged_evaluation_included & scores.multiclass_evaluable
+    ].sort_values(["query_id", "lane"], kind="stable")
     rows = []
     scopes = [(fold, usable.loc[usable.fold_id == fold]) for fold in target.SCORED_NONFINAL_FOLDS]
     scopes.append(("validation_pooled", usable.loc[usable.fold_id.isin(target.VALIDATION_FOLDS)]))

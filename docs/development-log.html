@@ -2005,6 +2005,14 @@
   <p class="pass"><b>Pre-outcome checks:</b> Focused evaluation/scoring tests pass 28/28, including an end-to-end synthetic aggregate surface with input-order invariance. The final complete repository suite, with the producer, independent verifier and standalone synthetic gate staged, passed at 100% with exit code zero. No real score aggregate or final outcome has been opened.</p>
   <p><b>Next:</b> Commit H0, execute the create-only WF-04 synthetic gate, generate and commit the sole-child non-final preregistration, then run the producer and independent verifier. Only a verified non-final store may authorize the final single-open generation.</p>
 </section>
+<section class="entry">
+  <h2>L-242 — Synthetic input-order refusal and deterministic aggregation repair</h2>
+  <p><b>Retained refusal:</b> The first post-H0 synthetic execution reached the final input-order transformation and refused before publishing a receipt. Reversing rows changed a synthetic mean from <code>0.012499999999999999</code> to <code>0.012499999999999997</code>; no real query score, aggregate or final outcome was opened.</p>
+  <p><b>Cause and repair:</b> Pandas reductions preserve physical row order, so equivalent inputs can accumulate floating-point additions differently. The producer now canonically sorts by query ID and lane before fold/stability/calibration aggregations, by query ID before risk ties, and by query ID before paired monthly inference. The independent oracle applies the same externally specified canonical order through separate code.</p>
+  <p class="pass"><b>Focused result:</b> All 28 evaluation/scoring tests pass after repair, including exact forward/reverse equality of the complete synthetic inference surface. The repair changes aggregation order only; it does not change predictions, labels, folds, thresholds or acceptance rules.</p>
+  <p class="pass"><b>Complete-suite result:</b> The repaired staged tree passed the full repository suite at 100% with exit code zero. No preregistration exists, so no frozen real evaluation generation is superseded.</p>
+  <p><b>Next:</b> Commit the repaired H0 and rerun the create-only synthetic gate.</p>
+</section>
 </main>
 
 <section id="reproduce">

@@ -487,7 +487,9 @@ def _continuous_scores(
 
 
 def _fold_metrics(scores: pd.DataFrame) -> pd.DataFrame:
-    usable = scores.loc[scores.purged_evaluation_included].copy()
+    usable = scores.loc[scores.purged_evaluation_included].sort_values(
+        ["query_id", "lane"], kind="stable",
+    ).copy()
     rows: list[dict[str, Any]] = []
     scopes = [(fold, usable.loc[usable.fold_id == fold]) for fold in SCORED_NONFINAL_FOLDS]
     scopes.append(("validation_pooled", usable.loc[usable.fold_id.isin(VALIDATION_FOLDS)]))
@@ -510,7 +512,9 @@ def _fold_metrics(scores: pd.DataFrame) -> pd.DataFrame:
 
 
 def _stability_metrics(scores: pd.DataFrame) -> pd.DataFrame:
-    usable = scores.loc[scores.purged_evaluation_included & scores.multiclass_evaluable].copy()
+    usable = scores.loc[
+        scores.purged_evaluation_included & scores.multiclass_evaluable
+    ].sort_values(["query_id", "lane"], kind="stable").copy()
     rows: list[dict[str, Any]] = []
     for dimension, column in (
         ("fold", "fold_id"), ("calendar_year", "calendar_year"),
@@ -526,7 +530,9 @@ def _stability_metrics(scores: pd.DataFrame) -> pd.DataFrame:
 
 
 def _calibration(scores: pd.DataFrame) -> pd.DataFrame:
-    usable = scores.loc[scores.purged_evaluation_included & scores.multiclass_evaluable].copy()
+    usable = scores.loc[
+        scores.purged_evaluation_included & scores.multiclass_evaluable
+    ].sort_values(["query_id", "lane"], kind="stable").copy()
     rows: list[dict[str, Any]] = []
     scopes = [(fold, usable.loc[usable.fold_id == fold]) for fold in SCORED_NONFINAL_FOLDS]
     scopes.append(("validation_pooled", usable.loc[usable.fold_id.isin(VALIDATION_FOLDS)]))
@@ -553,7 +559,7 @@ def _calibration(scores: pd.DataFrame) -> pd.DataFrame:
 def _risk_coverage(scores: pd.DataFrame) -> pd.DataFrame:
     composite = scores.loc[
         scores.purged_evaluation_included & scores.multiclass_evaluable & (scores.lane == "composite")
-    ].copy()
+    ].sort_values("query_id", kind="stable").copy()
     if composite.risk_score.isna().any():
         raise WalkForwardEvaluationError("composite risk score is missing")
     rows: list[dict[str, Any]] = []
@@ -567,14 +573,20 @@ def _risk_coverage(scores: pd.DataFrame) -> pd.DataFrame:
 
 
 def _inference(scores: pd.DataFrame) -> pd.DataFrame:
-    usable = scores.loc[scores.purged_evaluation_included & scores.multiclass_evaluable]
+    usable = scores.loc[
+        scores.purged_evaluation_included & scores.multiclass_evaluable
+    ].sort_values(["query_id", "lane"], kind="stable")
     rows: list[dict[str, Any]] = []
     scopes = [(fold, usable.loc[usable.fold_id == fold]) for fold in SCORED_NONFINAL_FOLDS]
     scopes.append(("validation_pooled", usable.loc[usable.fold_id.isin(VALIDATION_FOLDS)]))
     for scope, frame in scopes:
-        composite = frame.loc[frame.lane == "composite", ["query_id", "query_cutoff", "multiclass_brier"]]
+        composite = frame.loc[
+            frame.lane == "composite", ["query_id", "query_cutoff", "multiclass_brier"],
+        ].sort_values("query_id", kind="stable")
         for baseline_lane in COMPARISON_BASELINES:
-            baseline = frame.loc[frame.lane == baseline_lane, ["query_id", "multiclass_brier"]]
+            baseline = frame.loc[
+                frame.lane == baseline_lane, ["query_id", "multiclass_brier"],
+            ].sort_values("query_id", kind="stable")
             paired = composite.merge(baseline, on="query_id", suffixes=("_model", "_baseline"), validate="one_to_one")
             monthly = calendar_month_mean_losses(
                 paired.query_cutoff.tolist(), paired.multiclass_brier_model,
