@@ -2013,6 +2013,13 @@
   <p class="pass"><b>Complete-suite result:</b> The repaired staged tree passed the full repository suite at 100% with exit code zero. No preregistration exists, so no frozen real evaluation generation is superseded.</p>
   <p><b>Next:</b> Commit the repaired H0 and rerun the create-only synthetic gate.</p>
 </section>
+<section class="entry">
+  <h2>L-243 — Synthetic receipt self-seal hardening before preregistration</h2>
+  <p><b>Audit finding:</b> The first passing V1 synthetic receipt is internally valid and bound to H0 <code>005f8dd</code>, but the new preregistration input validator checked its pass flag, implementation commit and eventual file hash without independently recomputing its result digest. No preregistration or real evaluation output existed.</p>
+  <p><b>Repair:</b> V2 requires both the established WF-02 receipt and the new WF-04 receipt to pass their content-derived self-seals before their hashes can enter preregistration. V1 remains immutable evidence; V2 writes a separate create-only path and must bind the new H0.</p>
+  <p class="pass"><b>Verification:</b> Focused tests and the complete repository suite both pass at 100% with exit code zero on the hardened staged tree.</p>
+  <p><b>Next:</b> Commit the boundary hardening, execute V2 synthetic verification and only then generate the non-final preregistration.</p>
+</section>
 </main>
 
 <section id="reproduce">

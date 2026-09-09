@@ -26,9 +26,9 @@ from experiments.m04r import m04r14_t14_09_outcome_smoke as smoke
 from experiments.m04r import m04r14_t14_10_wf04_nonfinal_evaluation as target
 
 
-SCHEMA = "m04r14-t14-10-wf04-nonfinal-synthetic-verification-v1"
+SCHEMA = "m04r14-t14-10-wf04-nonfinal-synthetic-verification-v2"
 OUTPUT_RELATIVE = Path(
-    "config/data/analogues/m04r14/t14-10-wf04-nonfinal-synthetic-v1/VERIFIED.json"
+    "config/data/analogues/m04r14/t14-10-wf04-nonfinal-synthetic-v2/VERIFIED.json"
 )
 
 

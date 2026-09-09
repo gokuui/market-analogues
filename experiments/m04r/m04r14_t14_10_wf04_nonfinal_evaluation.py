@@ -61,7 +61,7 @@ SYNTHETIC_RELATIVE = Path(
     "config/data/analogues/m04r14/t14-10-walk-forward-synthetic-scoring-v1/VERIFIED.json"
 )
 WF04_SYNTHETIC_RELATIVE = Path(
-    "config/data/analogues/m04r14/t14-10-wf04-nonfinal-synthetic-v1/VERIFIED.json"
+    "config/data/analogues/m04r14/t14-10-wf04-nonfinal-synthetic-v2/VERIFIED.json"
 )
 REGISTRY_RELATIVE = predictions.REGISTRY_RELATIVE
 PREDICTION_ROOT = predictions.OUTPUT_RELATIVE
@@ -195,8 +195,10 @@ def _verified_inputs(repository: Path) -> dict[str, Any]:
         }),
         contract.get("contract_digest") == "2c65288b45dd79627a1e16f0a4c2d9449919d0602974d7a52440415bd7f96a8e",
         synthetic.get("passed") is True,
+        _valid_seal(synthetic),
         synthetic.get("final_period_result_opened") is False,
         wf04_synthetic.get("passed") is True,
+        _valid_seal(wf04_synthetic),
         wf04_synthetic.get("final_period_result_opened") is False,
     )):
         raise WalkForwardEvaluationError("verified prediction/scoring boundary differs")
