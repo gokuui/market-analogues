@@ -1894,6 +1894,13 @@
   <p><b>Why:</b> Equality of the old 20-row prefix proves that prior results were preserved, but the newly admitted twenty-first row determines the replacement. A fresh exact rerun is therefore required before that row may be trusted or the method may scale to all affected queries.</p>
   <p class="pass"><b>Pre-publication validation:</b> Four independent subset edge tests and the producer/proof tests pass 17/17; Python compilation, strict diff validation and all 1,084 repository tests pass. Ruff and mypy are absent and are not claimed. The verifier must now be committed cleanly and its create-only receipt must pass before full D1 repair is authorized.</p>
 </section>
+
+<section class="entry">
+  <h2>L-229 — Bounded exclusion repair independently verified</h2>
+  <p class="pass"><b>Result:</b> Git-bound verifier <code>376a031</code> recomputed the two composite top-21 lists, one price-only top-21 list and both baseline top-21 lists in 287.70 seconds. All lists, exact-search certificate digests, old top-20 prefixes and independently reconstructed drop-one results agree at verification digest <code>fba5904a…9145</code>.</p>
+  <p><b>Decision:</b> The bounded evidence authorizes full D1 repair. Only the 173-query union of affected cases requires work: 78 composite searches, 94 price-only searches, 16 deterministic-random reconstructions and 24 return/volatility reconstructions; 32 queries overlap composite and price. The other 3,763 queries will retain their exact sealed top-20 by reference and receive an unchanged-over-subset proof.</p>
+  <p><b>Boundary:</b> Full repair has not yet run and D1 is not complete. No outcome, historical query future or final-period result was opened. The next artifact must be preregistered, restart-safe, per-method resumable and independently verified before D2 manifest construction.</p>
+</section>
 </main>
 
 <section id="reproduce">
