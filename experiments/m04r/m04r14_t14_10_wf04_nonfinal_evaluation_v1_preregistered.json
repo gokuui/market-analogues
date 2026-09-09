@@ -1,0 +1,132 @@
+{
+  "benchmark_calendar_digest": "20df0ca5f6a2352a3b07012432c02ef77217c752e1c083e70397902a5995bdac",
+  "benchmark_source_fingerprint": "a414a9c3611320a5343cb0e260c749e0a78d776d225622909d559008053ec55f",
+  "bootstrap_block_length_months": 3,
+  "bootstrap_resamples": 10000,
+  "bootstrap_seed": 20260901,
+  "comparison_baselines": [
+    "unconditional_market_frequency",
+    "regime_only_frequency",
+    "deterministic_random",
+    "recent_return_volatility",
+    "price_only"
+  ],
+  "continuous_lanes": [
+    "composite",
+    "composite_unweighted",
+    "price_only",
+    "deterministic_random",
+    "recent_return_volatility"
+  ],
+  "contract_contradiction_disposition": "retain_literal_failure_and_report_dynamic_diagnostic_without_promotion",
+  "created_at": "2026-09-09T15:18:01.367288+00:00",
+  "dm_hac_lags_months": 3,
+  "final_period_result_opened": false,
+  "folds": [
+    {
+      "end": "2017-12-31",
+      "fold_id": "development",
+      "role": "implementation_diagnostic_no_threshold_tuning",
+      "start": "2014-01-01"
+    },
+    {
+      "end": "2019-12-31",
+      "fold_id": "validation_1",
+      "role": "locked_validation",
+      "start": "2018-01-01"
+    },
+    {
+      "end": "2021-12-31",
+      "fold_id": "validation_2",
+      "role": "locked_validation",
+      "start": "2020-01-01"
+    },
+    {
+      "end": "2023-12-31",
+      "fold_id": "validation_3",
+      "role": "locked_validation",
+      "start": "2022-01-01"
+    },
+    {
+      "end": "2025-08-31",
+      "fold_id": "final_untouched",
+      "role": "single_open_final_test",
+      "start": "2024-01-01"
+    }
+  ],
+  "implementation_h0": "b61e5a073112e7f398d9b93aeb132cdf19bdbefe",
+  "included_query_count": 2304,
+  "included_query_counts": {
+    "development": 1008,
+    "validation_1": 432,
+    "validation_2": 432,
+    "validation_3": 432
+  },
+  "inference_unit": "calendar_month_mean_loss",
+  "literal_minimum_nonabstained_gate_structurally_possible": false,
+  "literal_selective_rule": "all_D4_abstention_reasons",
+  "nonfinal_query_outcomes_accessed_for_scoring": false,
+  "permanent_product_blockers": [
+    "failed_calibration",
+    "poor_data_quality"
+  ],
+  "preregistration_digest": "fb491428871249003280be1f870704261c5c07bc7b92c145d703f194c07c173a",
+  "primary_horizon_sessions": 20,
+  "primary_prefix": 20,
+  "probability_lanes": [
+    "composite",
+    "composite_unweighted",
+    "price_only",
+    "deterministic_random",
+    "recent_return_volatility",
+    "unconditional_market_frequency",
+    "regime_only_frequency"
+  ],
+  "production_promotion_authorized": false,
+  "purge_cutoffs": {
+    "development": "2017-06-30T00:00:00",
+    "final_untouched": null,
+    "validation_1": "2019-07-02T00:00:00",
+    "validation_2": "2021-07-02T00:00:00",
+    "validation_3": "2023-06-30T00:00:00"
+  },
+  "purge_sessions": 126,
+  "research_dynamic_selective_rule": [
+    "historically_novel_query",
+    "insufficient_effective_sample_size",
+    "unstable_neighborhood"
+  ],
+  "runtime_files": {
+    "config/m04r14-t14-10-synthetic-scoring-spec.json": "853907a481dde38ba7295b21fdac87228b956371407c90e9f2291f78df027b18",
+    "config/m04r14-t14-10-walk-forward-contract.json": "4969771ccdef0221db934b377d9e688577ccb6507631067f0f2a990f4fb5f8d1",
+    "experiments/m04r/m04r14_t14_10_wf03d_prediction_store.py": "bbf01ed0b3e7732dd4c27b343d87457fcc3837b2a3a8d9d8676c405fe213739f",
+    "experiments/m04r/m04r14_t14_10_wf04_nonfinal_evaluation.py": "f3d51fe85a385e5f0a27aeda2f125919056c60eb438ad22a5dca8d9b369d9fe8",
+    "experiments/m04r/m04r14_t14_10_wf04_synthetic_gate.py": "1ab4c19e43d49b083cb0dec568740a2be0a873211fb52e1ee26d8b58d9db1d0e",
+    "experiments/m04r/verify_m04r14_t14_10_wf03d_prediction_store.py": "74578ec7ee97bae351c6dfec954cf3cf840b2eb034d23615c890bc8e36bb2c10",
+    "experiments/m04r/verify_m04r14_t14_10_wf04_nonfinal_evaluation.py": "fdca202a7c2e535c5b996f677d1fc03e0d8302ab1f7d662669187c1ed5c3bb94",
+    "pyproject.toml": "9eeb5497e7c3cb4615345e9104cac78d93d45579f2ac71a1540f316c181858c1",
+    "src/market_analogues/walk_forward_evaluation.py": "013ecd32d4ead8f29326844957c6c2b607fc787efc4c7dea359728ec80f14a7c",
+    "src/market_analogues/walk_forward_scoring.py": "125e69b77f024d848c64df872683c9b10e1b8a5ee6c6c81f5a5f9fec33e233e4"
+  },
+  "schema_version": "m04r14-t14-10-wf04-nonfinal-preregistration-v1",
+  "status": "frozen_before_nonfinal_score_calculation",
+  "verified_inputs": {
+    "baseline_predictions_sha256": "aaaa3755d70b0f454ae08778569c7207a62be9050847b839a48b53fab6b110dd",
+    "continuous_predictions_sha256": "427dd83b126371fe9a0b43f8519fd8e4fc842f753d1af8c769c057f4ee0cf88c",
+    "nonfinal_query_outcomes_sha256": "ffdf3ff225ac73103d994f9dd3e1ad90b52584a9ee561478b766f9c5418c1291",
+    "nonfinal_query_paths_sha256": "f5b4198ed6786236f661e9fb7e104c00fabfdbfd5051c38ccccb8102c2029ab6",
+    "path_predictions_sha256": "ce8bcb2086922e43bdd7fbf52864fe21e92b1c4d9c0de4801690032308f0df63",
+    "prediction_store_result_digest": "25f9261322ee597d883c0011e3fdf4fc2fed84903aa59e0cf2d45ab6cb09ca84",
+    "prediction_store_sha256": "eb162bf57e19163bc0f206707b04b597e6f63c2199093d7b23cb275311ea3471",
+    "prediction_verification_digest": "a541894505c0ded88640e95aabe07ccb629f887a842f420a633310e86d3ba13a",
+    "prediction_verification_sha256": "fb60354c14096c4d557a4890a30b9e5991481bfaf19e688754b9c5a2133004dd",
+    "raw_predictions_sha256": "0e08c53415cd200885f9bcbfd3c9085a51d044379afdfcede4dd2bb1d73bf056",
+    "synthetic_scoring_result_digest": "003877106217b7e87221a99c6e80585d92835764037e0203d03474bda8017d90",
+    "synthetic_scoring_sha256": "94ea347ee79b0ba15dd2714cc6c0acbf5eb5f4c86ebd6569c0b1eb09af476272",
+    "walk_forward_contract_digest": "2c65288b45dd79627a1e16f0a4c2d9449919d0602974d7a52440415bd7f96a8e",
+    "walk_forward_contract_sha256": "4969771ccdef0221db934b377d9e688577ccb6507631067f0f2a990f4fb5f8d1",
+    "wf04_synthetic_implementation_h0": "b61e5a073112e7f398d9b93aeb132cdf19bdbefe",
+    "wf04_synthetic_result_digest": "1a9f28b17e62d7ebbed508c639cacb0a85d2dc9a1a2c29391babf84d1e06dc7e",
+    "wf04_synthetic_sha256": "632cc769a260dc7f406b7fda0b509033f5cce9d4e0361000389e27e79c6ab0a3"
+  }
+}
