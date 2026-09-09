@@ -26,7 +26,7 @@ from experiments.m04r import m04r14_t14_10_wf03_feasibility as base
 from experiments.m04r import m04r14_t14_10_wf04_nonfinal_evaluation as target
 
 
-SCHEMA = "m04r14-t14-10-wf04-nonfinal-verification-v1"
+SCHEMA = "m04r14-t14-10-wf04-nonfinal-verification-v2"
 NUMERIC_TOLERANCE = 5e-13
 
 

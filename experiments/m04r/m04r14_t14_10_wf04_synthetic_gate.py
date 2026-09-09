@@ -26,9 +26,9 @@ from experiments.m04r import m04r14_t14_09_outcome_smoke as smoke
 from experiments.m04r import m04r14_t14_10_wf04_nonfinal_evaluation as target
 
 
-SCHEMA = "m04r14-t14-10-wf04-nonfinal-synthetic-verification-v2"
+SCHEMA = "m04r14-t14-10-wf04-nonfinal-synthetic-verification-v3"
 OUTPUT_RELATIVE = Path(
-    "config/data/analogues/m04r14/t14-10-wf04-nonfinal-synthetic-v2/VERIFIED.json"
+    "config/data/analogues/m04r14/t14-10-wf04-nonfinal-synthetic-v3/VERIFIED.json"
 )
 
 
@@ -129,7 +129,9 @@ def execute(repository: Path) -> dict[str, Any]:
     state = {
         "schema_version": SCHEMA, "status": "verified", "passed": True,
         "implementation_h0": h0, "checks": checks, "check_count": len(checks),
-        "real_query_outcomes_accessed": False, "final_period_result_opened": False,
+        "real_query_outcomes_accessed_by_this_gate": False,
+        "historical_nonfinal_evaluation_previously_opened": True,
+        "final_period_result_opened": False,
         "production_promotion_authorized": False,
     }
     result = {**state, "result_digest": stable_hash(state), "created_at": datetime.now(timezone.utc).isoformat()}

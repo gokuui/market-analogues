@@ -142,3 +142,17 @@ def test_complete_aggregate_surface_is_deterministic_on_synthetic_months() -> No
     assert len(risk) == 50
     assert len(inference) == 5 * len(evaluation.COMPARISON_BASELINES)
     assert np.isfinite(inference.bootstrap_lower_pvalue).all()
+
+
+def test_html_report_renders_literal_css_percent() -> None:
+    metrics = pd.DataFrame([{
+        "scope": "validation_1", "lane": "composite", "multiclass_evaluable_rows": 10,
+        "mean_multiclass_brier": .2, "mean_multiclass_log_loss": .4,
+    }])
+    coverage = {
+        "purged_evaluation_query_rows": 10, "multiclass_evaluable_queries": 9,
+        "literal_selective_queries": 0, "research_dynamic_selective_queries": 8,
+    }
+    rendered = evaluation._html(metrics, coverage)
+    assert "width:100%" in rendered
+    assert "Purged queries: 10" in rendered

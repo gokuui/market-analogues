@@ -45,23 +45,26 @@ from experiments.m04r import m04r14_t14_10_wf03_feasibility as base
 from experiments.m04r import m04r14_t14_10_wf03d_prediction_store as predictions
 
 
-SCHEMA = "m04r14-t14-10-wf04-nonfinal-preregistration-v1"
-STORE_SCHEMA = "m04r14-t14-10-wf04-nonfinal-evaluation-v1"
+SCHEMA = "m04r14-t14-10-wf04-nonfinal-preregistration-v2"
+STORE_SCHEMA = "m04r14-t14-10-wf04-nonfinal-evaluation-v2"
 PREREGISTRATION_RELATIVE = Path(
-    "experiments/m04r/m04r14_t14_10_wf04_nonfinal_evaluation_v1_preregistered.json"
+    "experiments/m04r/m04r14_t14_10_wf04_nonfinal_evaluation_v2_preregistered.json"
 )
 OUTPUT_RELATIVE = Path(
-    "config/data/analogues/m04r14/t14-10-wf04-nonfinal-evaluation-v1"
+    "config/data/analogues/m04r14/t14-10-wf04-nonfinal-evaluation-v2"
 )
 VERIFICATION_RELATIVE = Path(
-    "config/data/analogues/m04r14/t14-10-wf04-nonfinal-evaluation-v1-verification"
+    "config/data/analogues/m04r14/t14-10-wf04-nonfinal-evaluation-v2-verification"
+)
+V1_PREREGISTRATION_RELATIVE = Path(
+    "experiments/m04r/m04r14_t14_10_wf04_nonfinal_evaluation_v1_preregistered.json"
 )
 CONTRACT_RELATIVE = Path("config/m04r14-t14-10-walk-forward-contract.json")
 SYNTHETIC_RELATIVE = Path(
     "config/data/analogues/m04r14/t14-10-walk-forward-synthetic-scoring-v1/VERIFIED.json"
 )
 WF04_SYNTHETIC_RELATIVE = Path(
-    "config/data/analogues/m04r14/t14-10-wf04-nonfinal-synthetic-v2/VERIFIED.json"
+    "config/data/analogues/m04r14/t14-10-wf04-nonfinal-synthetic-v3/VERIFIED.json"
 )
 REGISTRY_RELATIVE = predictions.REGISTRY_RELATIVE
 PREDICTION_ROOT = predictions.OUTPUT_RELATIVE
@@ -288,12 +291,27 @@ def build_preregistration(repository: Path) -> dict[str, Any]:
             (registry.fold_id == fold) & registry.purged_evaluation_included
         ].shape[0]) for fold in SCORED_NONFINAL_FOLDS
     }
+    v1_prereg = base._read(repository / V1_PREREGISTRATION_RELATIVE)
+    v1_output = repository / "config/data/analogues/m04r14/t14-10-wf04-nonfinal-evaluation-v1"
+    if v1_prereg.get("preregistration_digest") != "fb491428871249003280be1f870704261c5c07bc7b92c145d703f194c07c173a" \
+            or v1_output.exists():
+        raise WalkForwardEvaluationError("failed V1 publication evidence differs")
     state = {
         "schema_version": SCHEMA,
         "status": "frozen_before_nonfinal_score_calculation",
         "implementation_h0": h0,
         "runtime_files": _runtime_manifest(repository, h0),
         "verified_inputs": inputs,
+        "superseded_v1": {
+            "preregistration_digest": v1_prereg["preregistration_digest"],
+            "preregistration_sha256": _sha(repository / V1_PREREGISTRATION_RELATIVE),
+            "preregistration_h1": "feb5a9912106b615be34dcdf5180db3e4423a164",
+            "nonfinal_scores_computed_in_memory": True,
+            "published_output_exists": False,
+            "failure": "unescaped_percent_in_html_report_template_after_all_numeric_calculations",
+            "formula_or_population_change": False,
+            "final_period_result_opened": False,
+        },
         "benchmark_calendar_digest": calendar_digest,
         "benchmark_source_fingerprint": benchmark_fingerprint,
         "folds": folds,
@@ -318,7 +336,7 @@ def build_preregistration(repository: Path) -> dict[str, Any]:
         "permanent_product_blockers": list(PERMANENT_PRODUCT_BLOCKERS),
         "literal_minimum_nonabstained_gate_structurally_possible": False,
         "contract_contradiction_disposition": "retain_literal_failure_and_report_dynamic_diagnostic_without_promotion",
-        "nonfinal_query_outcomes_accessed_for_scoring": False,
+        "nonfinal_query_outcomes_accessed_for_scoring": True,
         "final_period_result_opened": False,
         "production_promotion_authorized": False,
     }
@@ -745,7 +763,7 @@ def _html(fold_metrics: pd.DataFrame, coverage: Mapping[str, Any]) -> str:
             )) + "</tr>"
         )
     return """<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><title>WF-04 non-final evaluation</title>
-<style>body{font-family:system-ui;max-width:1200px;margin:2rem auto;line-height:1.45}table{border-collapse:collapse;width:100%}th,td{padding:.45rem;border-bottom:1px solid #ddd;text-align:left}.warn{background:#fff4dc;padding:.8rem;border-left:5px solid #b9770e}</style></head><body>
+<style>body{font-family:system-ui;max-width:1200px;margin:2rem auto;line-height:1.45}table{border-collapse:collapse;width:100%%}th,td{padding:.45rem;border-bottom:1px solid #ddd;text-align:left}.warn{background:#fff4dc;padding:.8rem;border-left:5px solid #b9770e}</style></head><body>
 <h1>WF-04 non-final evaluation</h1><p>Final 2024–August-2025 outcomes remain unopened. These results cannot tune the final test.</p>
 <p class=\"warn\">The literal V1 non-abstained gate is structurally impossible because two product blockers are always present. The forced-score evidence remains valid; the diagnostic dynamic-selective count cannot promote V1.</p>
 <p>Purged queries: %d; multiclass evaluable: %d; literal selective: %d; dynamic-selective diagnostic: %d.</p>
