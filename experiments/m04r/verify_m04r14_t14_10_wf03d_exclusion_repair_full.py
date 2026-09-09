@@ -201,6 +201,21 @@ def _independent_subset(
     return selected, proof
 
 
+def _query_binding_matches(
+    entry: dict[str, Any], row: dict[str, Any], methods: tuple[str, ...],
+) -> bool:
+    """Compare manifest bindings with inventory rows across their named ID fields."""
+    return all((
+        entry.get("query_id") == row.get("episode_id"),
+        entry.get("case_id") == row.get("case_id"),
+        entry.get("symbol") == row.get("symbol"),
+        entry.get("cutoff") == row.get("cutoff"),
+        type(entry.get("methods")) is list,
+        [value.get("method") for value in entry.get("methods", [])]
+            == list(methods),
+    ))
+
+
 def _validate_composite_certificate(
     receipt: Mapping[str, Any], episode: Any, source: Any,
     packed_manifest: Mapping[str, Any],
@@ -403,11 +418,7 @@ def verify(repository: Path) -> dict[str, Any]:
 
     for row, entry in zip(rows, manifest["queries"], strict=True):
         query_id = row["episode_id"]
-        if any(entry.get(key) != row[key] for key in (
-            "query_id", "case_id", "symbol", "cutoff",
-        )) or type(entry.get("methods")) is not list \
-                or [value.get("method") for value in entry["methods"]] \
-                    != list(producer.METHODS):
+        if not _query_binding_matches(entry, row, producer.METHODS):
             raise ExclusionRepairFullVerificationError("manifest query binding differs")
         paths = producer._case_paths(repository, query_id)
         cases = {name: base._read(path) for name, path in paths.items()}

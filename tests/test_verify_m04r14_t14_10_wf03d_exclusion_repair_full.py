@@ -28,6 +28,27 @@ def test_independent_full_subset_reconstructs_replacement() -> None:
     assert proof["excluded_rows"] == 1
 
 
+def test_manifest_query_binding_maps_query_id_to_inventory_episode_id() -> None:
+    methods = ("composite", "price_only")
+    row = {
+        "episode_id": "a" * 24,
+        "case_id": "nasdaq-TEST-2020-01-01-252",
+        "symbol": "TEST",
+        "cutoff": "2020-01-01T00:00:00",
+    }
+    entry = {
+        "query_id": row["episode_id"],
+        "case_id": row["case_id"],
+        "symbol": row["symbol"],
+        "cutoff": row["cutoff"],
+        "methods": [{"method": method} for method in methods],
+    }
+    assert subject._query_binding_matches(entry, row, methods)
+    assert not subject._query_binding_matches(
+        {**entry, "query_id": "b" * 24}, row, methods,
+    )
+
+
 @pytest.mark.parametrize("symbols", [
     [f"S{index}" for index in range(21)],
     ["Q", "Q", *[f"S{index}" for index in range(19)]],
