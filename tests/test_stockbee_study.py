@@ -1,0 +1,89 @@
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import pytest
+
+from market_analogues.stockbee_study import (
+    StockbeeStudyError,
+    clustered_winners,
+    symbol_risk_rows,
+)
+from market_analogues.types import stable_hash
+
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def _bars(rows: int = 340) -> pd.DataFrame:
+    close = np.full(rows, 100.0); open_ = close.copy()
+    high = np.full(rows, 101.0); low = np.full(rows, 99.0)
+    start = 252
+    open_[start] = 100.; high[start] = 105.; low[start] = 99.; close[start] = 104.
+    close[start + 20] = 125.; open_[start + 20] = 124.; high[start + 20] = 126.; low[start + 20] = 123.
+    close[start + 62] = 130.; open_[start + 62] = 129.; high[start + 62] = 131.; low[start + 62] = 128.
+    return pd.DataFrame({
+        "timestamp": pd.bdate_range("2020-01-01", periods=rows),
+        "open": open_, "high": np.maximum(high, close), "low": np.minimum(low, close),
+        "close": close, "volume": np.full(rows, 20_000.),
+    })
+
+
+def test_symbol_kernel_uses_previous_close_and_inclusive_horizon() -> None:
+    result = symbol_risk_rows(_bars(), "SYN")
+    row21 = result.loc[(result.start_position == 252) & (result.horizon_sessions == 21)].iloc[0]
+    row63 = result.loc[(result.start_position == 252) & (result.horizon_sessions == 63)].iloc[0]
+    assert row21.forward_close_return == pytest.approx(.25)
+    assert row63.forward_close_return == pytest.approx(.30)
+    assert row21.winner_25pct and row63.winner_25pct
+    assert row21.up_close_4pct_start_day
+    assert row21.true_range_4pct_start_day
+    assert row21.bullish_range_expansion_4pct_start_day
+    assert row21.up_close_4pct_first_5_count == 1
+    assert row21.up_close_4pct_pre_start_20_sessions == 0
+
+
+def test_symbol_kernel_has_exact_history_and_future_boundaries() -> None:
+    bars = _bars(); result = symbol_risk_rows(bars, "SYN")
+    for horizon, group in result.groupby("horizon_sessions"):
+        assert group.start_position.min() == 252
+        assert group.start_position.max() == len(bars) - horizon
+        assert len(group) == len(bars) - horizon - 252 + 1
+    assert result.prior_return_63.notna().all()
+    assert result.prior_volatility_20.notna().all()
+
+
+def test_event_clustering_keeps_earliest_and_peak() -> None:
+    rows = pd.DataFrame({
+        "symbol": ["A"] * 5 + ["B"], "horizon_sessions": [21] * 6,
+        "start": pd.bdate_range("2024-01-01", periods=6),
+        "start_position": [10, 11, 12, 15, 16, 10],
+        "winner_25pct": [True] * 6,
+        "forward_close_return": [.25, .4, .3, .26, .28, .5],
+    })
+    result = clustered_winners(rows)
+    a = result.loc[result.symbol == "A"].sort_values("start_position")
+    assert a.start_position.tolist() == [10, 15]
+    assert a.event_run_length.tolist() == [3, 2]
+    assert a.event_peak_return.tolist() == [.4, .28]
+    assert len(result.loc[result.symbol == "B"]) == 1
+
+
+def test_invalid_order_and_ohlc_are_rejected() -> None:
+    bars = _bars(); bars.loc[2, "timestamp"] = bars.loc[1, "timestamp"]
+    with pytest.raises(StockbeeStudyError, match="timestamps"):
+        symbol_risk_rows(bars, "BAD")
+    bars = _bars(); bars.loc[2, "high"] = 50
+    with pytest.raises(StockbeeStudyError, match="OHLCV"):
+        symbol_risk_rows(bars, "BAD")
+
+
+def test_stockbee_contract_self_seal_and_offset_words_agree() -> None:
+    contract = json.loads((ROOT / "config/m04r14-t14-11-stockbee-contract.json").read_text())
+    digest = contract.pop("contract_digest")
+    assert digest == stable_hash(contract)
+    assert contract["outcomes"]["return_formula"] == "close_at_t_plus_horizon_minus_1_divided_by_close_at_t_minus_1_minus_1"
+    assert contract["exposures"]["windows_relative_to_start"]["full_move"] == [0, "horizon_minus_1"]

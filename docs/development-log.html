@@ -2069,6 +2069,15 @@
   <p><b>Timing note:</b> The V1 diagnostic seal stores <code>elapsed_seconds=0</code> as an unqualified sentinel; observed command wall time was 2.7 seconds, but diagnostic performance is not certified. This metadata limitation does not affect data, formulas, hashes or scientific conclusions.</p>
   <p><b>Next:</b> Freeze the Stockbee controlled-study contract with separate definitions for a +4% close move and a 4% range-expansion day, event clustering, causal feature windows and matched controls. Do not conflate prevalence among winners with predictive lift over non-winners.</p>
 </section>
+<section class="entry">
+  <h2>L-250 — Stockbee controlled-study semantics and kernel frozen</h2>
+  <p><b>Question:</b> Replicate the reported 40-year Compustat observation on the available locked NASDAQ archive: among stocks gaining at least 25% over approximately a month or quarter, how often is a 4% move present at the start or early in the move, and how much more common is it than among non-winners?</p>
+  <p><b>Contract:</b> Digest <code>8cc7c8f2…18379</code> binds 12,080 source-accounted histories, 21/63-session outcomes, an exact previous-close-to-inclusive-endpoint return formula, broad and investable populations, event-run clustering, full-risk-set and five-per-event matched controls, calendar-month block inference and Holm correction.</p>
+  <p><b>Ambiguity retained:</b> A +4% close-to-close move, a 4% true-range day and a bullish 4% range expansion relative to the prior 20-session median are distinct exposures. Start day, first five sessions, full move and pre-start sensitivity windows are all reported. No result may silently substitute one definition for another.</p>
+  <p><b>Correctness/performance design:</b> The vectorized kernel uses only data available through each exposure/matching timestamp while future endpoints define outcomes. Maximal consecutive qualifying start runs retain one earliest representative plus run length and peak return. The full 806 MB archive will use 12 one-thread hash shards with atomic restart receipts; memory is not an acceptance constraint.</p>
+  <p class="pass"><b>Synthetic tests:</b> Five focused tests pass exact 21/63 offsets, +4% and range calculations, first-five/pre-start counts, history/future boundaries, investability, clustering, self-seal and malformed OHLCV rejection.</p>
+  <p><b>Next:</b> Commit the frozen contract/kernel, build the create-only 12-shard risk-set runner and an independent synthetic/reference oracle, then preregister the runner bytes before any real universe prevalence is calculated.</p>
+</section>
 </main>
 
 <section id="reproduce">

@@ -1,0 +1,141 @@
+{
+  "schema_version": "m04r14-t14-11-stockbee-contract-v1",
+  "contract_id": "nasdaq-stockbee-25pct-4pct-controlled-replication-v1",
+  "status": "frozen_before_universe_event_prevalence_calculation",
+  "claim_under_test": "A large majority of stocks advancing at least 25 percent over approximately one month or quarter exhibit one or a series of 4 percent moves, and many such advances begin with a 4 percent range-expansion move.",
+  "interpretation_boundary": {
+    "four_percent_move_and_range_expansion_are_separate_exposures": true,
+    "winner_prevalence_alone_cannot_establish_predictive_value": true,
+    "matched_and_full_risk_set_controls_required": true,
+    "descriptive_replication_not_trading_strategy": true,
+    "analogue_WF04_final_holdout_not_reused_for_model_validation": true,
+    "production_promotion_authorized": false
+  },
+  "source": {
+    "dataset_id": "nasdaq",
+    "adapter": "directory_parquet",
+    "path": "/home/vinay/code/loser-nasdaq/data/nasdaq/validated",
+    "source_accounting": "config/data/analogues/m04r14/t14-10-walk-forward-query-registry-v1/source-accounting.parquet",
+    "source_accounting_sha256": "377bd82f680278f0b4162769bce4cc16fb1906f9da4cfb11bd57465ff48b025a",
+    "locked_symbol_histories": 12080,
+    "benchmark_path": "/home/vinay/code/loser-nasdaq/data/nasdaq/index/IXIC.parquet",
+    "benchmark_sha256": "a414a9c3611320a5343cb0e260c749e0a78d776d225622909d559008053ec55f",
+    "locked_coverage_end": "2026-03-30",
+    "archive_limitation": "historical_and_inactive_symbol_files_are_present_but_exchange_membership_delisting_returns_and_corporate_event_tables_are_not_point_in_time_complete"
+  },
+  "eligible_start": {
+    "minimum_prior_sessions": 252,
+    "required_future_sessions_by_horizon": true,
+    "finite_positive_OHLC": true,
+    "finite_nonnegative_volume": true,
+    "duplicate_or_reordered_timestamps_forbidden": true,
+    "source_rows_after_locked_coverage_ignored": true,
+    "broad_population": "all_rows_meeting_data_and_history_requirements",
+    "investable_sensitivity": {
+      "start_close_minimum": 5.0,
+      "trailing_20_session_median_dollar_volume_minimum": 1000000.0
+    }
+  },
+  "outcomes": {
+    "horizons_sessions": [21, 63],
+    "winner_threshold_close_return": 0.25,
+    "return_formula": "close_at_t_plus_horizon_minus_1_divided_by_close_at_t_minus_1_minus_1",
+    "endpoint_complete_required": true,
+    "event_clustering": {
+      "rule": "maximal_consecutive_run_of_qualifying_start_positions_per_symbol_and_horizon",
+      "representative": "earliest_start_position_in_run",
+      "retain_run_length_and_peak_forward_return": true,
+      "unclustered_population_statistics_also_reported": true
+    }
+  },
+  "exposures": {
+    "up_close_4pct": "close_t_divided_by_close_t_minus_1_minus_1_gte_0.04",
+    "true_range_4pct": "max_high_t_minus_low_t_abs_high_t_minus_prev_close_abs_low_t_minus_prev_close_divided_by_prev_close_gte_0.04",
+    "bullish_range_expansion_4pct": "true_range_4pct_and_close_t_gt_open_t_and_true_range_fraction_gte_1.5_times_trailing_20_session_median_true_range_fraction",
+    "windows_relative_to_start": {
+      "start_day": [0, 0],
+      "first_5_sessions": [0, 4],
+      "full_move": [0, "horizon_minus_1"],
+      "pre_start_20_sessions_sensitivity": [-20, -1]
+    },
+    "series_measures": ["any", "count", "maximum_consecutive_count"],
+    "all_thresholds_and_windows_fixed_before_real_scan": true
+  },
+  "risk_set_controls": {
+    "full_population_comparison": true,
+    "matched_controls_per_clustered_event": 5,
+    "same_start_date_and_horizon_required": true,
+    "control_must_not_be_winner_at_same_horizon": true,
+    "matching_columns": [
+      "trailing_63_session_close_return_decile",
+      "trailing_20_session_log_return_volatility_decile",
+      "start_close_decile",
+      "trailing_20_session_median_dollar_volume_decile"
+    ],
+    "deciles_computed_cross_sectionally_from_causal_same_date_risk_set": true,
+    "relaxation_order": [
+      "exact_all_four_deciles",
+      "within_one_bucket_all_four",
+      "same_date_horizon_unmatched"
+    ],
+    "selection_order": "sha256(contract_digest,event_id,candidate_symbol)_ascending",
+    "replacement": false,
+    "event_symbol_excluded": true,
+    "shortfall_retained_and_reported": true
+  },
+  "estimands": {
+    "winner_prevalence": "P(exposure_given_25pct_winner)",
+    "full_risk_set_prevalence": "P(exposure_given_nonwinner)",
+    "matched_control_prevalence": "P(exposure_given_matched_nonwinner)",
+    "predictive_lift": "P(25pct_winner_given_exposure)_divided_by_P(25pct_winner)",
+    "risk_difference": true,
+    "risk_ratio": true,
+    "odds_ratio": true,
+    "minimum_event_coverage_for_claim": 0.9
+  },
+  "inference": {
+    "primary_unit": "calendar_month_aggregates",
+    "paired_moving_block_bootstrap_resamples": 10000,
+    "seed": 20260909,
+    "block_length_months": 3,
+    "familywise_alpha": 0.05,
+    "multiple_comparison_correction": "holm_across_horizon_population_exposure_window_primary_tests",
+    "effect_size_and_confidence_interval_required": true,
+    "failure_to_reject_is_not_evidence_of_equivalence": true
+  },
+  "primary_tests": {
+    "populations": ["broad", "investable"],
+    "horizons_sessions": [21, 63],
+    "exposures": ["up_close_4pct", "bullish_range_expansion_4pct"],
+    "windows": ["start_day", "first_5_sessions"],
+    "comparators": ["full_nonwinner_risk_set", "matched_nonwinner_controls"],
+    "claim_support_requires": {
+      "winner_prevalence_at_least": 0.5,
+      "holm_adjusted_difference_pvalue_below": 0.05,
+      "risk_ratio_strictly_above": 1.0,
+      "matched_event_coverage_at_least": 0.9,
+      "same_direction_in_broad_and_investable_populations": true
+    }
+  },
+  "required_artifacts": [
+    "source-accounting.json",
+    "risk-set-partitions",
+    "clustered-events.parquet",
+    "matched-controls.parquet",
+    "prevalence.parquet",
+    "inference.parquet",
+    "coverage.json",
+    "index.html",
+    "SEALED.json",
+    "independent-verification"
+  ],
+  "performance": {
+    "worker_processes": 12,
+    "one_thread_per_worker": true,
+    "partition_key": "symbol_hash_shard",
+    "atomic_restartable_shards": true,
+    "maximum_memory_is_not_an_acceptance_gate": true,
+    "correctness_precedes_throughput": true
+  },
+  "contract_digest": "8cc7c8f21c42c8d96c87dfb65bb8dc0d7a2da540135b58ee37b44293aeb18379"
+}
