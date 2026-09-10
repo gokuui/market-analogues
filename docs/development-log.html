@@ -2298,6 +2298,12 @@
   <p class="pass"><b>Pre-freeze verification:</b> Focused prefix/runner/CLI/runtime-manifest tests pass 18/18. The complete 1,209-test repository suite passes with the new modules staged; every tracked HTML document parses and <code>git diff --check</code> passes.</p>
   <p><b>Next:</b> Complete regression, commit H0, create/commit H1, launch the fresh parallel authority build and use a one-shot completion listener. Only the new verified authorities may close E2E-03.</p>
 </section>
+<section class="entry">
+  <h2>L-280 — Fresh NSE authorities completed; independent verifier frozen</h2>
+  <p class="pass"><b>Producer completion:</b> The preregistered 12-process prefix-locked NSE matrix completed 12/12 cases with zero failures at 2026-09-10 14:30:48 UTC. It covered 10,712,224 eligible historical candidates, evaluated 49,152 exact candidates and safely pruned 10,663,072. All cases contain 20 matches, strict next-bound certificates and identical repeated-result digests; no outcome module was accessed.</p>
+  <p><b>Verification design:</b> A separately implemented verifier authenticates the H0/H1 lifecycle and every current semantic source prefix; validates the exact case/frontier inventory and all 22,116 compressed shard digests; independently merges each global lower-bound frontier; reconstructs and scores all 4,096 evaluated candidates per case using requested-position materialization; reapplies temporal, overlap, quality, diversity and stable-order rules; and checks all 240 selected matches with the scalar reference distance implementation.</p>
+  <p><b>Boundary:</b> The verifier implementation and focused tests are committed before its create-only receipt is published. Outcome access and production authorization remain false. Only a 12/12 receipt may authorize the causal NSE outcome/report replay.</p>
+</section>
 </main>
 
 <section id="reproduce">
