@@ -26,11 +26,11 @@ from experiments.m04r import m04r14_t14_12_final_matches as final_matches
 from experiments.m04r import m04r14_t14_12_weight_bakeoff as bakeoff
 
 
-SCHEMA = "m04r14-t14-12-post-signal-final-balance-v4"
-PREREGISTRATION_RELATIVE = Path("experiments/m04r/m04r14_t14_12_final_balance_v4_preregistered.json")
-CACHE_RELATIVE = Path("config/data/analogues/m04r14/t14-12-post-signal-final-balance-v4-cache")
-OUTPUT_RELATIVE = Path("config/data/analogues/m04r14/t14-12-post-signal-final-balance-v4")
-VERIFICATION_RELATIVE = Path("config/data/analogues/m04r14/t14-12-post-signal-final-balance-v4-verification")
+SCHEMA = "m04r14-t14-12-post-signal-final-balance-v5"
+PREREGISTRATION_RELATIVE = Path("experiments/m04r/m04r14_t14_12_final_balance_v5_preregistered.json")
+CACHE_RELATIVE = Path("config/data/analogues/m04r14/t14-12-post-signal-final-balance-v5-cache")
+OUTPUT_RELATIVE = Path("config/data/analogues/m04r14/t14-12-post-signal-final-balance-v5")
+VERIFICATION_RELATIVE = Path("config/data/analogues/m04r14/t14-12-post-signal-final-balance-v5-verification")
 OUTPUT_FILES = base_balance.OUTPUT_FILES
 RUNTIME_FILES = (
     "experiments/m04r/m04r14_t14_12_final_balance.py",

@@ -22,7 +22,7 @@ from experiments.m04r import verify_m04r14_t14_12_balance as oracle
 from experiments.m04r import m04r14_t14_12_final_balance as target
 
 
-SCHEMA = "m04r14-t14-12-post-signal-final-balance-verification-v4"
+SCHEMA = "m04r14-t14-12-post-signal-final-balance-verification-v5"
 
 
 class FinalBalanceVerificationError(RuntimeError): pass
@@ -61,10 +61,11 @@ def execute(repository: Path) -> dict[str, Any]:
         for key, value in stats.items(): oracle._merge(combined[key], value)
         reuse.extend(expected_reuse); digests.append(year_seal["result_digest"])
     summary = oracle._summaries(combined).reset_index(drop=True)
-    oracle._assert_frame(summary, pd.read_parquet(root / "balance-summary.parquet"), "final balance summary")
+    observed_summary = pd.read_parquet(root / "balance-summary.parquet")
+    oracle._assert_frame(summary, observed_summary, "final balance summary")
     oracle._assert_frame(pd.DataFrame(reuse), pd.read_parquet(root / "reuse-summary.parquet"), "final reuse summary")
     selected = target._selected_bakeoff_frame(repository)
-    try: pd.testing.assert_frame_equal(summary, selected, check_exact=True)
+    try: pd.testing.assert_frame_equal(observed_summary, selected, check_exact=True)
     except AssertionError as error: raise FinalBalanceVerificationError("selected bake-off rows differ") from error
     primary = summary.loc[summary.match_tier.eq("all")]
     overall = bool((primary.loc[primary.scope.eq("overall"), "standardized_mean_difference"].abs() <= .10).all())
