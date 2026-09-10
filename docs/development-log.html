@@ -2422,6 +2422,13 @@
   <p><b>Regression correction:</b> the first post-verifier full-suite run exposed one test-order issue: earlier tests had loaded an additional BLAS library into the shared pytest process, so the runtime-hash mutation test stopped at the live-environment guard instead of reaching its intended assertion. The production guard was correct and no artifact was affected. The unit tests now inject the frozen environment only inside preregistration-mutation isolation; real verifier execution still compares the actual clean-process environment with H1.</p>
   <p><b>Next:</b> commit this verifier/log checkpoint, run the complete repository suite, execute the committed verifier once from a clean tree, record its immutable receipt, and only then decide whether the B2 statistic contract may be frozen.</p>
 </section>
+<section class="entry" id="l-296">
+  <h2>L-296 — Balanced N1 matching support independently verified</h2>
+  <p><b>Committed verifier:</b> verifier H0 is <code>63d3d1d</code>; the isolated test-order correction and clean execution authority are commit <code>5a83c37</code>. After that correction, the complete repository suite passed 100% in one process. The verifier ran once from the clean committed tree with exactly 12 source workers.</p>
+  <p class="pass"><b>Independent result:</b> all 12 integrity gates passed. The verifier independently reconstructed 3,270 causal prefixes and 141-column vectors, exact midranks, every K8/K12/K16 recursive split and assignment, all 3,270 case seals and causal eligibility sets, all 369 N0/N1 support rows, both producer RESULT objects and the HTML. Verification digest: <code>f808343c450388521e47ff78303286a1730f46cb40c76c7b74004f1353539d96</code>; receipt-file SHA-256: <code>8a053c7f7fb94b4e927327d3d96b691a6d1761a532c7c2cba7d322311542dc92</code>.</p>
+  <p><b>Decision:</b> primary K8 matching support is verified at 357/369 episodes and 2,791/2,865 links. This clears only the prerequisite for freezing the B2 statistic and shared-priority contracts. B2 has not run; no R1-B statistic, future outcome, prediction, label, ranking change, production promotion or trading claim is authorized.</p>
+  <p><b>Next:</b> reconcile the remaining B0-01/B0-03/B0-04/B0-05 evidence already present in the repository, identify any genuinely open contract, and freeze the complete B2 execution contract before opening its statistic.</p>
+</section>
 </main>
 
 <section id="reproduce">
