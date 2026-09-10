@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import argparse
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import asdict
 import fcntl
 from hashlib import sha256
 from html import escape
@@ -20,22 +22,27 @@ import pandas as pd
 
 from experiments.m04r import m04r14_r1a_exposure_audit as r1a
 from experiments.m04r import audit_m04r14_r1a_exposure_result as r1a_integrity
+from market_analogues.adapters import source_from_spec
 from market_analogues.adequacy_support import (
-    aligned_value, causally_eligible, deterministic_terciles,
-    farthest_first_partition, matched_support,
+    causally_eligible, deterministic_terciles, farthest_first_partition,
+    matched_support,
 )
-from market_analogues.baseline_feature_store import load_feature_generation
+from market_analogues.baseline_neighbors import recent_return_volatility_at_positions
+from market_analogues.causal_prefix import causal_prefix_digest
+from market_analogues.config import load_config
 from market_analogues.packed_bound_store import load_packed_generation
-from market_analogues.types import stable_hash
+from market_analogues.representation import represent, representation_input_digest
+from market_analogues.types import Episode, EpisodeKey, InstrumentKey, stable_hash
 
 
-SCHEMA = "m04r14-r1b-support-pilot-v1"
-OUTPUT = Path("config/data/analogues/m04r14/r1b-support-pilot-v1")
-PREREGISTRATION = Path("experiments/m04r/m04r14_r1b_support_pilot_preregistered.json")
-BASELINE_ROOT = Path(
-    "config/data/analogues/m04r14/t14-10-wf03-baseline-store-full-v1"
-)
+SCHEMA = "m04r14-r1b-support-pilot-v2"
+OUTPUT = Path("config/data/analogues/m04r14/r1b-support-pilot-v2")
+PREREGISTRATION = Path("experiments/m04r/m04r14_r1b_support_pilot_v2_preregistered.json")
+V1_PREREGISTRATION = Path("experiments/m04r/m04r14_r1b_support_pilot_preregistered.json")
+V1_OUTPUT = Path("config/data/analogues/m04r14/r1b-support-pilot-v1")
+CONFIG = Path("config/datasets.example.yaml")
 BENCHMARK = Path("/home/vinay/code/loser-nasdaq/data/nasdaq/index/IXIC.parquet")
+QUERY_FEATURE_WORKERS = 12
 SUPPORT_CAP = 4096
 MIN_EPISODE_COVERAGE = 0.90
 MIN_LINK_COVERAGE = 0.90
@@ -48,18 +55,28 @@ KNOWN_INVENTORY = {
     "queries": 3270, "links": 65400,
     "r1a_episode_max_null_p99": 4,
     "cohort_threshold": 5, "cohort_episodes": 369, "cohort_links": 2865,
+    "v1_query_ids_present_in_historical_pack": 9,
+    "v1_query_ids_absent_from_historical_pack": 3261,
+}
+V1_HISTORY = {
+    "implementation_commit": "d3087a9b0b0605e71ec7d68dd922acade659f7bb",
+    "preregistration_commit": "e30e9eff2225bd747ea68e394cbe7298d726cc5a",
+    "preregistration_digest": "5aa93df5e7416c01e9a999a2fdf7622236788e6a824e00794d2fcd511112c0e0",
+    "failure_stage": "query-to-historical-pack identity lookup before matched-support computation",
+    "output_absent": True,
 }
 DESIGN = {
     "base_order": ["session_21", "session_42", "session_63"],
     "base_fields": ["session_bin", "query_tier", "liquidity_tertile", "balanced_volatility_rank_tercile", "context_available"],
     "session_bin": "floor(IXIC session ordinal / span), anchored at first IXIC row",
-    "volatility": "baseline feature index 2; rank within session-21 bin; value then query-id tie break; balanced terciles",
+    "volatility": "baseline recent_return_volatility_at_positions output index 2 reconstructed from each exact causal query window; rank within session-21 bin; value then query-id tie break; balanced terciles",
     "causal_eligibility": "candidate cutoff <= latest eligible; same-symbol candidate cutoff < query start",
     "structure_requested_k": [8, 12, 16],
     "structure_minimum_cell_size": 30,
     "structure_feature_indices": {
         "coarse": [0, 96], "stage_columns_per_block": [0, 1, 2], "structural": [0, 9],
     },
+    "structure_source": "exact unquantized distance-v1 representation reconstructed from each registered causal query window; never substitute a historical packed row",
     "structure_scaling": "column median center; IQR scale; IQR below 1e-6 replaced by 1",
     "structure_distance": "squared Euclidean after frozen robust column scaling",
     "structure_partition": "first medoid smallest query id; farthest-first equal-distance tie chooses largest query id; nearest-medoid assignment equal-distance tie chooses earliest selected medoid; undersized merge chooses smallest count then smallest medoid id and targets nearest then smallest medoid id; repeat until every cell size >=30 or one remains; final labels ordered by medoid id",
@@ -100,18 +117,6 @@ def _load(path: Path) -> dict[str, Any]:
 
 def _digest(payload: Mapping[str, Any], omitted: set[str]) -> str:
     return stable_hash({key: value for key, value in payload.items() if key not in omitted})
-
-
-def _locate(episode_ids: Sequence[str], packed_ids: np.ndarray) -> np.ndarray:
-    order = np.argsort(packed_ids, kind="stable")
-    ordered = packed_ids[order]
-    requested = np.asarray([np.void(bytes.fromhex(value)) for value in episode_ids], dtype="V12")
-    found = np.searchsorted(ordered, requested)
-    if np.any(found >= len(ordered)):
-        raise SupportPilotError("one or more query episodes are absent from the packed generation")
-    if np.any(ordered[found] != requested):
-        raise SupportPilotError("one or more query episodes are absent from the packed generation")
-    return order[found]
 
 
 def _metadata_from_loaded(loaded: Any) -> r1a.Metadata:
@@ -222,9 +227,33 @@ def _write_fsynced_text(path: Path, value: str) -> None:
         os.fsync(handle.fileno())
 
 
+def _validate_v1_history(repository: Path) -> None:
+    prereg = _load(repository / V1_PREREGISTRATION)
+    if not all((
+        prereg.get("preregistration_digest") == _digest(prereg, {"preregistration_digest"}),
+        prereg.get("preregistration_digest") == V1_HISTORY["preregistration_digest"],
+        prereg.get("implementation_commit") == V1_HISTORY["implementation_commit"],
+        _git(repository, "rev-parse", f"{V1_HISTORY['preregistration_commit']}^")
+            == V1_HISTORY["implementation_commit"],
+        _git(
+            repository, "diff-tree", "--no-commit-id", "--name-only", "-r",
+            V1_HISTORY["preregistration_commit"],
+        ) == V1_PREREGISTRATION.as_posix(),
+    )):
+        raise SupportPilotError("v1 preregistration history differs")
+    blob = subprocess.run(
+        ("git", "show", f"{V1_HISTORY['preregistration_commit']}:{V1_PREREGISTRATION}"),
+        cwd=repository, capture_output=True, check=False,
+    )
+    if blob.returncode or blob.stdout != (repository / V1_PREREGISTRATION).read_bytes():
+        raise SupportPilotError("v1 preregistration bytes differ")
+    if (repository / V1_OUTPUT).exists() or (repository / V1_OUTPUT).is_symlink():
+        raise SupportPilotError("v1 output is no longer absent")
+
+
 def _validate_preregistration(repository: Path, prereg: Mapping[str, Any]) -> None:
     expected_static = {
-        "schema_version": "m04r14-r1b-support-pilot-preregistration-v1",
+        "schema_version": "m04r14-r1b-support-pilot-preregistration-v2",
         "execution": {
             "output_root": str(OUTPUT),
             "publication": "flock-serialized create-only atomic directory rename with parent fsync",
@@ -235,6 +264,8 @@ def _validate_preregistration(repository: Path, prereg: Mapping[str, Any]) -> No
         "prior_exposure": {
             "r1a_graph_and_recurrence_counts_previously_observed": True,
             "terminated_io_preflight_before_support_values": True,
+            "v1_execution_failed_on_query_pack_identity_before_support_values": True,
+            "v1_history": V1_HISTORY,
             "support_values_previously_observed": False,
         },
     }
@@ -243,15 +274,15 @@ def _validate_preregistration(repository: Path, prereg: Mapping[str, Any]) -> No
             raise SupportPilotError(f"preregistered {key} contract differs")
     if set(prereg.get("runtime_sha256", {})) != set(RUNTIME_FILES):
         raise SupportPilotError("preregistered runtime file set differs")
+    _validate_v1_history(repository)
     r1a_result = _load(repository / r1a.OUTPUT / "RESULT.json")
     integrity = _load(repository / r1a_integrity.OUTPUT / "VERIFIED.json")
-    baseline = _load(repository / BASELINE_ROOT / "RESULT.json")
     expected_inputs = {
         "r1a_result_digest": r1a_result["result_digest"],
         "r1a_integrity_digest": integrity["verification_digest"],
         "r1a_case_manifest_digest": r1a_result["inputs"]["case_manifest_digest"],
         "packed_generation_id": r1a_result["inputs"]["packed_generation_id"],
-        "baseline_generation_id": baseline["generation_id"],
+        "source_lock_digest": _load(repository / r1a.REGISTRY)["source_lock"]["source_lock_digest"],
     }
     for key, expected in expected_inputs.items():
         if prereg.get("inputs", {}).get(key) != expected:
@@ -263,10 +294,9 @@ def _validate_preregistration(repository: Path, prereg: Mapping[str, Any]) -> No
             repository / r1a.OUTPUT / "RESULT.json",
             repository / r1a_integrity.OUTPUT / "VERIFIED.json",
             repository / r1a.REGISTRY,
-            repository / BASELINE_ROOT / "RESULT.json",
             packed_manifest,
-            repository / BASELINE_ROOT / "store" / "generations" /
-            str(baseline["generation_id"]) / "manifest.json",
+            repository / V1_PREREGISTRATION,
+            repository / CONFIG,
             BENCHMARK,
         )
     }
@@ -302,21 +332,21 @@ def preregister(repository: Path) -> dict[str, Any]:
         raise SupportPilotError("preregistration requires a clean implementation commit")
     r1a_result = _load(repository / r1a.OUTPUT / "RESULT.json")
     integrity = _load(repository / r1a_integrity.OUTPUT / "VERIFIED.json")
-    baseline_result = _load(repository / BASELINE_ROOT / "RESULT.json")
+    registry = _load(repository / r1a.REGISTRY)
+    _validate_v1_history(repository)
     generation = str(r1a_result["inputs"]["packed_generation_id"])
     packed_manifest = _durable_packed_manifest(repository, generation)
     input_files = (
         repository / r1a.OUTPUT / "RESULT.json",
         repository / r1a_integrity.OUTPUT / "VERIFIED.json",
         repository / r1a.REGISTRY,
-        repository / BASELINE_ROOT / "RESULT.json",
         packed_manifest,
-        repository / BASELINE_ROOT / "store" / "generations" /
-        str(baseline_result["generation_id"]) / "manifest.json",
+        repository / V1_PREREGISTRATION,
+        repository / CONFIG,
         BENCHMARK,
     )
     state = {
-        "schema_version": "m04r14-r1b-support-pilot-preregistration-v1",
+        "schema_version": "m04r14-r1b-support-pilot-preregistration-v2",
         "implementation_commit": _git(repository, "rev-parse", "HEAD"),
         "execution": {
             "output_root": str(OUTPUT),
@@ -327,7 +357,7 @@ def preregister(repository: Path) -> dict[str, Any]:
             "r1a_integrity_digest": integrity["verification_digest"],
             "r1a_case_manifest_digest": r1a_result["inputs"]["case_manifest_digest"],
             "packed_generation_id": generation,
-            "baseline_generation_id": baseline_result["generation_id"],
+            "source_lock_digest": registry["source_lock"]["source_lock_digest"],
             "file_sha256": {str(value.resolve()): _sha(value) for value in input_files},
         },
         "runtime_sha256": {value: _sha(repository / value) for value in RUNTIME_FILES},
@@ -337,6 +367,8 @@ def preregister(repository: Path) -> dict[str, Any]:
         "prior_exposure": {
             "r1a_graph_and_recurrence_counts_previously_observed": True,
             "terminated_io_preflight_before_support_values": True,
+            "v1_execution_failed_on_query_pack_identity_before_support_values": True,
+            "v1_history": V1_HISTORY,
             "support_values_previously_observed": False,
         },
     }
@@ -409,6 +441,106 @@ def _design_result(
     return result, support
 
 
+def _reconstruct_query_feature(
+    query_id: str,
+    row: Mapping[str, Any],
+    stock: pd.DataFrame,
+    benchmark: pd.DataFrame,
+) -> tuple[np.ndarray, float, dict[str, Any]]:
+    """Reconstruct one query and both seals from the same in-memory frames."""
+    cutoff = pd.Timestamp(str(row["cutoff"]))
+    stock_prefix = asdict(causal_prefix_digest(stock, cutoff))
+    benchmark_prefix = asdict(causal_prefix_digest(benchmark, cutoff))
+    if stock_prefix != row["stock_prefix"] or benchmark_prefix != row["benchmark_prefix"]:
+        raise SupportPilotError(f"query causal prefix differs: {query_id}")
+    eligible = stock.loc[pd.to_datetime(stock["timestamp"]) <= cutoff]
+    lookback = int(row["lookback"])
+    if len(eligible) < min(lookback, 126):
+        raise SupportPilotError(f"query history differs: {query_id}")
+    window = eligible.tail(lookback).copy().reset_index(drop=True)
+    actual_cutoff = pd.Timestamp(window["timestamp"].iloc[-1])
+    context = benchmark.loc[
+        pd.to_datetime(benchmark["timestamp"]) <= actual_cutoff
+    ].copy()
+    instrument = InstrumentKey("nasdaq", str(row["symbol"]))
+    episode = Episode(
+        EpisodeKey(
+            instrument, actual_cutoff, lookback, str(row["representation_version"]),
+        ),
+        window,
+        context,
+        str(row["quality_tier"]),
+    )
+    if episode.key.id != query_id:
+        raise SupportPilotError(f"query reconstruction differs: {query_id}")
+    representation = represent(episode)
+    stage = representation.stage.astype(np.float64).reshape(12, 4)[:, :3].ravel()
+    vector = np.r_[
+        representation.coarse[:96].astype(np.float64),
+        stage,
+        representation.structural.astype(np.float64),
+    ]
+    volatility = float(recent_return_volatility_at_positions(
+        episode.bars["close"].to_numpy(dtype=np.float64),
+        np.asarray([len(episode.bars) - 1], dtype=np.int64),
+    )[0, 2])
+    audit = {
+        "query_episode_id": query_id,
+        "query_representation_digest": representation_input_digest(representation),
+        "stock_prefix_digest": stock_prefix["digest"],
+        "benchmark_prefix_digest": benchmark_prefix["digest"],
+        "volatility_hex": volatility.hex() if np.isfinite(volatility) else None,
+    }
+    return vector, volatility, audit
+
+
+def _reconstruct_query_features_from_source(
+    query_ids: Sequence[str],
+    query_rows: Sequence[Mapping[str, Any]],
+    source: Any,
+    *,
+    workers: int,
+) -> tuple[np.ndarray, np.ndarray, tuple[dict[str, Any], ...]]:
+    if workers < 1:
+        raise SupportPilotError("query feature workers must be positive")
+    benchmark = source.load_benchmark()
+    if benchmark is None:
+        raise SupportPilotError("NASDAQ benchmark is absent")
+
+    def one(item: tuple[str, Mapping[str, Any]]) -> tuple[np.ndarray, float, dict[str, Any]]:
+        query_id, row = item
+        stock = source.load(InstrumentKey("nasdaq", str(row["symbol"])))
+        return _reconstruct_query_feature(query_id, row, stock, benchmark)
+
+    items = tuple(zip(query_ids, query_rows, strict=True))
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        reconstructed = tuple(executor.map(one, items))
+    vectors = np.asarray([value[0] for value in reconstructed], dtype=np.float64)
+    volatility = np.asarray([value[1] for value in reconstructed], dtype=np.float64)
+    audits = tuple(value[2] for value in reconstructed)
+    if vectors.shape != (len(query_ids), 141) or not np.isfinite(vectors).all():
+        raise SupportPilotError("query structure reconstruction differs")
+    return vectors, volatility, audits
+
+
+def _reconstruct_query_features(
+    repository: Path,
+    query_ids: Sequence[str],
+    query_rows: Sequence[Mapping[str, Any]],
+    *,
+    workers: int = QUERY_FEATURE_WORKERS,
+) -> tuple[np.ndarray, np.ndarray, tuple[dict[str, Any], ...]]:
+    """Build exact point-in-time query covariates, never a packed-row proxy."""
+    config = load_config(repository / CONFIG)
+    spec = config.datasets.get("nasdaq")
+    if spec is None or spec.benchmark is None \
+            or spec.benchmark.path.resolve() != BENCHMARK.resolve():
+        raise SupportPilotError("NASDAQ source/benchmark configuration differs")
+    return _reconstruct_query_features_from_source(
+        query_ids, query_rows, source_from_spec(spec), workers=workers,
+    )
+
+
 def compute(repository: Path, prereg: Mapping[str, Any]) -> tuple[dict[str, Any], list[dict[str, Any]], list[dict[str, Any]]]:
     repository = repository.resolve()
     integrity = _load(repository / r1a_integrity.OUTPUT / "VERIFIED.json")
@@ -436,6 +568,17 @@ def compute(repository: Path, prereg: Mapping[str, Any]) -> tuple[dict[str, Any]
     )
     metadata = _metadata_from_loaded(loaded)
     registry = _load(repository / r1a.REGISTRY)
+    source_lock = dict(registry["source_lock"])
+    source_lock_digest = source_lock.pop("source_lock_digest", None)
+    if not all((
+        source_lock_digest == stable_hash(source_lock),
+        source_lock_digest == prereg["inputs"]["source_lock_digest"],
+        Path(source_lock["config_path"]).resolve() == (repository / CONFIG).resolve(),
+        source_lock["config_sha256"] == _sha(repository / CONFIG),
+        source_lock["benchmark_sha256"] == _sha(BENCHMARK),
+        source_lock["real_forward_outcomes_accessed"] is False,
+    )):
+        raise SupportPilotError("shadow source lock differs")
     registry_rows = {str(row["episode_id"]): row for row in registry["cases_data"]}
     symbol_ids = {symbol: index for index, symbol in enumerate(metadata.symbols)}
 
@@ -521,29 +664,9 @@ def compute(repository: Path, prereg: Mapping[str, Any]) -> tuple[dict[str, Any]
         if not set(cohort[episode_id]).issubset(eligible[episode_id]):
             raise SupportPilotError(f"selected queries exceed causal risk set: {episode_id}")
 
-    baseline_result = _load(repository / BASELINE_ROOT / "RESULT.json")
-    if baseline_result.get("result_digest") != _digest(baseline_result, {"result_digest"}) \
-            or baseline_result.get("passed") is not True \
-            or not all(baseline_result.get("gates", {}).values()) \
-            or baseline_result.get("outcomes_or_labels_used") is not False:
-        raise SupportPilotError("baseline feature authority differs")
-    feature_generation = load_feature_generation(
-        repository / BASELINE_ROOT / "store",
-        str(baseline_result["generation_id"]),
-        packed_manifest=loaded.manifest,
-        verify_content=True,
+    structure, volatility, query_feature_audit = _reconstruct_query_features(
+        repository, query_ids, query_rows,
     )
-    packed_ids = np.concatenate((loaded.rows["episode_id"], loaded.overflow["episode_id"]))
-    query_locations = _locate(query_ids, packed_ids)
-    main_count = len(loaded.rows)
-    volatility = np.asarray([
-        aligned_value(
-            feature_generation.rows["values"], feature_generation.overflow["values"],
-            int(location),
-        )[2]
-        for location in query_locations
-    ], dtype=np.float64)
-    query_overflow_count = int(np.sum(query_locations >= main_count))
     missing_volatility_count = int(np.sum(~np.isfinite(volatility)))
     missing_context_count = sum(not bool(row["context_available"]) for row in query_rows)
     query_cutoffs = np.asarray([
@@ -568,18 +691,8 @@ def compute(repository: Path, prereg: Mapping[str, Any]) -> tuple[dict[str, Any]
     selected_base = next((row["design"] for row in base_designs if row["passes"]), None)
 
     # Primary N1 support partition deliberately excludes benchmark and relative
-    # channels: coarse[0:96] is close/ATR/volume; every fourth stage value is
-    # relative return and is excluded. Presence bitfields are not metric values.
-    structure = np.zeros((len(queries), 96 + 36 + 9), dtype=np.float64)
-    for out_index, location in enumerate(query_locations):
-        if location < main_count:
-            row = loaded.rows[int(location)]
-            stage = row["stage"].astype(np.float64).reshape(12, 4)[:, :3].ravel()
-            structure[out_index] = np.r_[
-                row["coarse"][:96].astype(np.float64),
-                stage,
-                row["structural"].astype(np.float64),
-            ]
+    # query channels: coarse[0:96] is close/ATR/volume; every fourth stage value
+    # is relative return and is excluded.
     center = np.median(structure, axis=0)
     scale = np.percentile(structure, 75, axis=0) - np.percentile(structure, 25, axis=0)
     scale[scale < 1e-6] = 1.0
@@ -632,9 +745,10 @@ def compute(repository: Path, prereg: Mapping[str, Any]) -> tuple[dict[str, Any]
         "r1a_result_digest": r1a_result["result_digest"],
         "r1a_integrity_digest": integrity["verification_digest"],
         "shadow_registry_digest": registry["registry_digest"],
+        "shadow_source_lock_digest": source_lock_digest,
         "shadow_case_manifest_digest": stable_hash(case_manifest),
         "packed_generation_id": generation,
-        "baseline_generation_id": baseline_result["generation_id"],
+        "query_feature_audit_digest": stable_hash(query_feature_audit),
         "benchmark_sha256": _sha(BENCHMARK),
     }
     permitted_files = {
@@ -645,21 +759,18 @@ def compute(repository: Path, prereg: Mapping[str, Any]) -> tuple[dict[str, Any]
             repository / r1a.OUTPUT / "RESULT.json"
         ),
         str((repository / r1a.REGISTRY).resolve()): _sha(repository / r1a.REGISTRY),
-        str((repository / BASELINE_ROOT / "RESULT.json").resolve()): _sha(
-            repository / BASELINE_ROOT / "RESULT.json"
-        ),
         str(_durable_packed_manifest(repository, generation).resolve()): _sha(
             _durable_packed_manifest(repository, generation)
         ),
-        str((repository / BASELINE_ROOT / "store" / "generations" /
-             str(baseline_result["generation_id"]) / "manifest.json").resolve()): _sha(
-            repository / BASELINE_ROOT / "store" / "generations" /
-            str(baseline_result["generation_id"]) / "manifest.json"
+        str((repository / V1_PREREGISTRATION).resolve()): _sha(
+            repository / V1_PREREGISTRATION
         ),
+        str((repository / CONFIG).resolve()): _sha(repository / CONFIG),
         str(BENCHMARK.resolve()): _sha(BENCHMARK),
     }
     query_cell_rows = [{
         "query_episode_id": query_id,
+        "query_feature_audit": query_feature_audit[index],
         "base_cells": {name: list(base_cells[name][index]) for name in base_cells},
         "structure_cells": {str(k): int(labels[index]) for k, labels in partitions.items()},
     } for index, query_id in enumerate(query_ids)]
@@ -681,7 +792,8 @@ def compute(repository: Path, prereg: Mapping[str, Any]) -> tuple[dict[str, Any]
             "shadow_case_files": len(case_manifest),
             "shadow_case_manifest_digest": stable_hash(case_manifest),
             "packed_binary_content_verified_from_manifest": True,
-            "baseline_binary_content_verified_from_manifest": True,
+            "query_raw_ohlcv_root": str(load_config(repository / CONFIG).datasets["nasdaq"].path),
+            "query_raw_ohlcv_usage": "only bars at or before each registered cutoff enter covariates; every semantic stock/benchmark prefix is rehashed against the sealed registry",
             "forbidden_roots": [
                 "t14-09 evidence/outcome/card stores",
                 "wf03d outcome/prediction stores",
@@ -696,7 +808,8 @@ def compute(repository: Path, prereg: Mapping[str, Any]) -> tuple[dict[str, Any]
             "recurrent_episode_threshold": 5,
             "cohort_episodes": len(cohort),
             "cohort_links": sum(map(len, cohort.values())),
-            "query_overflow_rows": query_overflow_count,
+            "query_representations_reconstructed": len(query_feature_audit),
+            "query_prefix_mismatches": 0,
             "missing_volatility_queries": missing_volatility_count,
             "missing_context_queries": missing_context_count,
         },
@@ -707,9 +820,9 @@ def compute(repository: Path, prereg: Mapping[str, Any]) -> tuple[dict[str, Any]
             "base_design_order": list(prereg["design"]["base_order"]),
             "calendar_bin_formula": "floor(benchmark_session_ordinal / span), anchored at first IXIC row",
             "volatility_cells": "balanced deterministic within-session21-bin rank terciles; value then query-id tie break",
-            "history_fixed": "lookback=252 and stock-prefix rows>=252 for every query",
+            "history_fixed": "lookback=252 and stock-prefix rows>=252 for every query; exact query identity and both semantic causal prefixes reconstructed",
             "context_availability_reconstructed": True,
-            "structure_view": "market-excluded packed coarse[0:96] + stage columns net/volatility/volume + structural; robust column scaling",
+            "structure_view": "market-excluded exact query coarse[0:96] + stage columns net/volatility/volume + structural; robust column scaling",
             "structure_options": [8, 12, 16],
             "minimum_structure_cell_size": 30,
         },
@@ -729,13 +842,13 @@ def compute(repository: Path, prereg: Mapping[str, Any]) -> tuple[dict[str, Any]
             "shadow_cases_reconstructed": True,
             "causal_membership_reconstructed": True,
             "selected_subset_of_eligibility": True,
-            "packed_and_baseline_content_verified": True,
+            "packed_content_and_query_prefixes_verified": True,
             "cohort_threshold_fixed_from_r1a_null_p99": True,
             "support_only_no_scientific_statistics": True,
             "query_covariates_complete": (
-                query_overflow_count == 0
-                and missing_volatility_count == 0
+                missing_volatility_count == 0
                 and missing_context_count == 0
+                and len(query_feature_audit) == len(queries)
             ),
             "history_and_context_contract_reconstructed": True,
             "outcomes_excluded_by_permitted_input_contract": True,

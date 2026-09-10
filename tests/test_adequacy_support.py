@@ -1,7 +1,10 @@
+from copy import deepcopy
+from dataclasses import asdict
 import json
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 import pytest
 
 from experiments.m04r import m04r14_r1b_support_pilot as pilot
@@ -10,6 +13,58 @@ from market_analogues.adequacy_support import (
     causally_eligible, deterministic_terciles, farthest_first_partition,
     matched_support,
 )
+from market_analogues.baseline_neighbors import recent_return_volatility_at_positions
+from market_analogues.causal_prefix import causal_prefix_digest
+from market_analogues.representation import represent
+from market_analogues.types import Episode, EpisodeKey, InstrumentKey
+
+
+def _feature_case(symbol: str, offset: float = 0.0):
+    timestamps = pd.bdate_range("2024-01-02", periods=270)
+    phase = np.linspace(0.0, 7.0, len(timestamps))
+    close = (20.0 + offset) * np.exp(0.0015 * np.arange(len(timestamps)) + 0.03 * np.sin(phase))
+    open_ = close * (1.0 + 0.002 * np.cos(phase))
+    stock = pd.DataFrame({
+        "timestamp": timestamps,
+        "open": open_,
+        "high": np.maximum(open_, close) * 1.01,
+        "low": np.minimum(open_, close) * 0.99,
+        "close": close,
+        "volume": 100_000.0 + offset * 1_000.0 + 20_000.0 * (1.0 + np.sin(phase)),
+    })
+    benchmark_close = 100.0 * np.exp(0.0007 * np.arange(len(timestamps)) + 0.01 * np.cos(phase))
+    benchmark = pd.DataFrame({
+        "timestamp": timestamps,
+        "open": benchmark_close * 0.999,
+        "high": benchmark_close * 1.005,
+        "low": benchmark_close * 0.995,
+        "close": benchmark_close,
+        "volume": np.full(len(timestamps), 1_000_000.0),
+    })
+    cutoff = pd.Timestamp(timestamps[-1])
+    key = EpisodeKey(InstrumentKey("nasdaq", symbol), cutoff, 252, "dense-v1")
+    row = {
+        "symbol": symbol,
+        "cutoff": cutoff.isoformat(),
+        "lookback": 252,
+        "representation_version": "dense-v1",
+        "quality_tier": "A",
+        "stock_prefix": asdict(causal_prefix_digest(stock, cutoff)),
+        "benchmark_prefix": asdict(causal_prefix_digest(benchmark, cutoff)),
+    }
+    return key.id, row, stock, benchmark
+
+
+class _FeatureSource:
+    def __init__(self, rows, benchmark):
+        self.rows = rows
+        self.benchmark = benchmark
+
+    def load(self, key):
+        return self.rows[key.source_symbol].copy()
+
+    def load_benchmark(self):
+        return self.benchmark.copy()
 
 
 def test_matched_support_is_exact_and_capped() -> None:
@@ -119,3 +174,58 @@ def test_packed_store_selection_binds_durable_manifest(
         pilot._select_packed_store(repository, "g1")
     resident_manifest.unlink()
     assert pilot._select_packed_store(repository, "g1") == repository / durable_relative
+
+
+def test_query_feature_reconstruction_matches_direct_exact_values() -> None:
+    query_id, row, stock, benchmark = _feature_case("AAA")
+    vector, volatility, audit = pilot._reconstruct_query_feature(
+        query_id, row, stock, benchmark,
+    )
+    cutoff = pd.Timestamp(row["cutoff"])
+    episode = Episode(
+        EpisodeKey(InstrumentKey("nasdaq", "AAA"), cutoff, 252, "dense-v1"),
+        stock.tail(252).reset_index(drop=True),
+        benchmark.loc[benchmark.timestamp <= cutoff].copy(),
+        "A",
+    )
+    representation = represent(episode)
+    expected_vector = np.r_[
+        representation.coarse[:96].astype(np.float64),
+        representation.stage.astype(np.float64).reshape(12, 4)[:, :3].ravel(),
+        representation.structural.astype(np.float64),
+    ]
+    expected_volatility = recent_return_volatility_at_positions(
+        episode.bars.close.to_numpy(dtype=np.float64),
+        np.asarray([251], dtype=np.int64),
+    )[0, 2]
+    assert np.array_equal(vector, expected_vector)
+    assert volatility == expected_volatility
+    assert audit["query_episode_id"] == query_id
+    assert audit["volatility_hex"] == volatility.hex()
+
+
+def test_query_feature_reconstruction_is_worker_and_order_deterministic() -> None:
+    cases = [_feature_case(symbol, index) for index, symbol in enumerate(("CCC", "AAA", "BBB"))]
+    ids = [value[0] for value in cases]
+    rows = [value[1] for value in cases]
+    source = _FeatureSource(
+        {value[1]["symbol"]: value[2] for value in cases}, cases[0][3],
+    )
+    serial = pilot._reconstruct_query_features_from_source(ids, rows, source, workers=1)
+    threaded = pilot._reconstruct_query_features_from_source(ids, rows, source, workers=12)
+    assert np.array_equal(serial[0], threaded[0])
+    assert np.array_equal(serial[1], threaded[1])
+    assert serial[2] == threaded[2]
+    assert [value["query_episode_id"] for value in threaded[2]] == ids
+
+
+@pytest.mark.parametrize("mutation", ("episode_id", "stock_prefix", "benchmark_prefix"))
+def test_query_feature_reconstruction_refuses_identity_mutation(mutation: str) -> None:
+    query_id, row, stock, benchmark = _feature_case("AAA")
+    changed = deepcopy(row)
+    if mutation == "episode_id":
+        query_id = "0" * 24
+    else:
+        changed[mutation]["digest"] = "0" * 64
+    with pytest.raises(pilot.SupportPilotError, match="query (causal prefix|reconstruction) differs"):
+        pilot._reconstruct_query_feature(query_id, changed, stock, benchmark)
