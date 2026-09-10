@@ -2179,6 +2179,14 @@
   <p><b>Causal boundary:</b> Both receipts state <code>control_matching_or_inference_accessed=false</code>. The verified panel contains outcome columns needed later, but no control was selected and no result was aggregated or inspected while P1 was being certified.</p>
   <p><b>Next:</b> Freeze P2 as a separate outcome-blind identity stage. It may read only date, symbol, population eligibility, at-risk/signal flags, market state and t−1 matching covariates. Select and independently reconstruct five same-date non-signal at-risk controls before any outcome column is opened.</p>
 </section>
+<section class="entry">
+  <h2>L-264 — T14-12 outcome-blind matched-identity stage ready for preflight</h2>
+  <p><b>Physical boundary:</b> The P2 reader explicitly column-prunes the verified panel to identities, dates, investability, t−1 covariates, market state and signal-specific at-risk/trigger flags. It does not read completeness, entry, return, excursion or barrier columns. Output contains only event/control identities, ranks, deciles, relaxation tiers, market audit state and coverage.</p>
+  <p><b>Restart and performance:</b> One in-memory date-sorted causal cross-section avoids repeatedly scanning the 12 symbol-oriented panel shards. Matching publishes atomic year checkpoints, validates and reuses them after restart, and atomically seals aggregate coverage only after every frozen year is present.</p>
+  <p><b>Independent gate:</b> A separately implemented rank/decile/selection oracle reconstructs every signal-specific equal-risk non-signal condition, hash order, selected identity, rank, tier and shortfall. It also validates all year bytes and aggregate accounting while opening no future outcome column.</p>
+  <p class="pass"><b>Validation:</b> Sixteen focused kernel/panel/matching tests and the complete repository suite pass. The final review removed per-event bucket rebuilding from the verifier, replaced a non-independent year-coverage assertion, added empty-year/duplicate-symbol/same-date-market guards, and gave the verifier its own frozen signal and field mapping.</p>
+  <p><b>Next:</b> Commit P2 as H0, freeze a sole-child preregistration and run/verify the real identity store. Only a successful P2 verification may authorize the separate P3 outcome join.</p>
+</section>
 </main>
 
 <section id="reproduce">
