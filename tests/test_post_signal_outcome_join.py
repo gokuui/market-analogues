@@ -50,3 +50,10 @@ def test_join_rejects_missing_control_rank() -> None:
     events, controls, panel = _inputs()
     with pytest.raises(PostSignalOutcomeJoinError, match="control count"):
         join_year_outcomes(events, controls.iloc[:-1], panel)
+
+
+def test_empty_year_retains_schema_and_zero_rows() -> None:
+    events, controls, panel = _inputs()
+    subjects, paired, coverage = join_year_outcomes(events.iloc[0:0], controls.iloc[0:0], panel)
+    assert subjects.empty and paired.empty and coverage.empty
+    assert "paired_complete" in paired and "paired_complete_fraction" in coverage

@@ -79,7 +79,8 @@ def join_year_outcomes(
         rows.append(selected)
     subject_outcomes = pd.concat(rows, ignore_index=True)
     paired_rows = []
-    for horizon, current in subject_outcomes.groupby("horizon_sessions", sort=True):
+    for horizon in horizons:
+        current = subject_outcomes.loc[subject_outcomes.horizon_sessions.eq(horizon)]
         event = current.loc[current.subject_role.eq("event")].set_index(list(IDENTITY_COLUMNS))
         controls_by_event = current.loc[current.subject_role.eq("control")].groupby(list(IDENTITY_COLUMNS), sort=False)
         control_complete = controls_by_event.complete.sum().reindex(event.index, fill_value=0).astype(int)

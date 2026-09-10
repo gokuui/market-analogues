@@ -24,7 +24,7 @@ from experiments.m04r import m04r14_t14_10_wf03_feasibility as io
 from experiments.m04r import m04r14_t14_12_outcome_join as target
 
 
-SCHEMA = "m04r14-t14-12-post-signal-outcome-join-verification-v1"
+SCHEMA = "m04r14-t14-12-post-signal-outcome-join-verification-v2"
 
 
 class OutcomeJoinVerificationError(RuntimeError): pass
@@ -72,7 +72,8 @@ def _subjects(events: pd.DataFrame, controls: pd.DataFrame, panel: pd.DataFrame)
 
 def _paired(subjects: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     outputs = []
-    for horizon, current in subjects.groupby("horizon_sessions", sort=True):
+    for horizon in HORIZONS:
+        current = subjects.loc[subjects.horizon_sessions.eq(horizon)]
         event = current.loc[current.subject_role.eq("event")].set_index(list(IDENTITY_COLUMNS))
         control = current.loc[current.subject_role.eq("control")].groupby(list(IDENTITY_COLUMNS), sort=False)
         counts = control.complete.sum().reindex(event.index, fill_value=0).astype(int)

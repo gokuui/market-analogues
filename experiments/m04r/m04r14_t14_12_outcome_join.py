@@ -25,11 +25,11 @@ from experiments.m04r import m04r14_t14_12_final_balance as final_balance
 from experiments.m04r import m04r14_t14_12_final_matches as final_matches
 
 
-SCHEMA = "m04r14-t14-12-post-signal-outcome-join-v1"
-PREREGISTRATION_RELATIVE = Path("experiments/m04r/m04r14_t14_12_outcome_join_v1_preregistered.json")
-CACHE_RELATIVE = Path("config/data/analogues/m04r14/t14-12-post-signal-outcome-join-v1-cache")
-OUTPUT_RELATIVE = Path("config/data/analogues/m04r14/t14-12-post-signal-outcome-join-v1")
-VERIFICATION_RELATIVE = Path("config/data/analogues/m04r14/t14-12-post-signal-outcome-join-v1-verification")
+SCHEMA = "m04r14-t14-12-post-signal-outcome-join-v2"
+PREREGISTRATION_RELATIVE = Path("experiments/m04r/m04r14_t14_12_outcome_join_v2_preregistered.json")
+CACHE_RELATIVE = Path("config/data/analogues/m04r14/t14-12-post-signal-outcome-join-v2-cache")
+OUTPUT_RELATIVE = Path("config/data/analogues/m04r14/t14-12-post-signal-outcome-join-v2")
+VERIFICATION_RELATIVE = Path("config/data/analogues/m04r14/t14-12-post-signal-outcome-join-v2-verification")
 YEAR_FILES = ("subject-outcomes.parquet", "paired-outcomes.parquet", "coverage.parquet")
 OUTPUT_FILES = ("coverage.parquet", "outcome-join-decision.json")
 RUNTIME_FILES = (
