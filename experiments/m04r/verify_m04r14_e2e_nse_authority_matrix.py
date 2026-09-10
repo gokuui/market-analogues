@@ -217,10 +217,13 @@ def _source_state(
     fingerprints: dict[str, str] = {}
     universe: list[tuple[str, str]] = []
     for key in sorted(source.instruments()):
-        digest = source.fingerprint(key)
-        fingerprints[key.source_symbol] = digest
         tier = tiers.get(key.source_symbol, "A")
         if tier in {"A", "B"}:
+            # This must mirror the frozen searchable universe boundary.  NSE
+            # intentionally retains quarantined/unavailable files that are not
+            # canonical OHLCV inputs and must never be opened by verification.
+            digest = source.fingerprint(key)
+            fingerprints[key.source_symbol] = digest
             universe.append((str(key), digest))
     universe_digest = stable_hash(universe)
     benchmark_digest = source.benchmark_fingerprint()

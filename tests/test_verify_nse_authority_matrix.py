@@ -46,3 +46,46 @@ def test_semantic_digest_omits_only_named_fields() -> None:
     right = {"value": 3, "elapsed": 9.0, "result_digest": "new"}
     assert verifier._semantic_digest(left, "elapsed", "result_digest") \
         == verifier._semantic_digest(right, "elapsed", "result_digest")
+
+
+def test_source_state_filters_quality_before_fingerprinting(monkeypatch, tmp_path) -> None:
+    class Source:
+        def instruments(self):
+            from market_analogues.types import InstrumentKey
+            return [InstrumentKey("nse", "GOOD"), InstrumentKey("nse", "BAD")]
+
+        def fingerprint(self, key):
+            if key.source_symbol == "BAD":
+                raise AssertionError("quarantined source must not be opened")
+            return "good-digest"
+
+        def benchmark_fingerprint(self):
+            return "benchmark-digest"
+
+    class Config:
+        artifact_dir = tmp_path
+        datasets = {"nse": object()}
+
+    import pandas as pd
+    quality = tmp_path / "quality"
+    quality.mkdir()
+    pd.DataFrame({
+        "symbol": ["GOOD", "BAD"], "tier": ["A", "QUARANTINED"],
+        "issues": ["[]", "[]"],
+    }).to_parquet(quality / "nse.parquet")
+    monkeypatch.setattr(verifier, "load_config", lambda _: Config())
+    monkeypatch.setattr(verifier, "source_from_spec", lambda _: object())
+    monkeypatch.setattr(verifier, "PrefixLockedOHLCVSource", lambda *_: Source())
+    expected_universe = verifier.stable_hash([("nse:GOOD", "good-digest")])
+    prereg = {
+        "config_path": str(tmp_path / "config.yaml"),
+        "source_lock": {
+            "maximum_cutoff": "2026-02-11", "cases": [],
+            "universe_prefix_digest": expected_universe,
+            "benchmark_prefix_digest": "benchmark-digest",
+        },
+    }
+    fingerprints, universe, benchmark = verifier._source_state(prereg)
+    assert fingerprints == {"GOOD": "good-digest"}
+    assert universe == expected_universe
+    assert benchmark == "benchmark-digest"
