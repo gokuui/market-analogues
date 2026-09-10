@@ -4,7 +4,8 @@ import pandas as pd
 import pytest
 
 from market_analogues.adapters import (
-    CachedOHLCVSource, DirectorySource, LongTableSource, SourceError,
+    CachedOHLCVSource, DirectorySource, LongTableSource,
+    PrefixLockedOHLCVSource, SourceError,
 )
 from market_analogues.config import DatasetSpec
 from market_analogues.config import BenchmarkSpec
@@ -92,3 +93,43 @@ def test_missing_column_is_rejected(directory_dataset):
     source = DirectorySource(DatasetSpec("demo", "directory", directory_dataset, "parquet", timestamp_column="date"))
     with pytest.raises(SourceError, match="missing required"):
         source.load(InstrumentKey("demo", "BAD"))
+
+
+def test_prefix_locked_source_ignores_future_append_and_rejects_history_revision(
+    tmp_path, bars,
+):
+    root = tmp_path / "data"
+    root.mkdir()
+    path = root / "AAA.parquet"
+    benchmark_path = tmp_path / "benchmark.parquet"
+    bars.to_parquet(path, index=False)
+    bars.to_parquet(benchmark_path, index=False)
+    spec = DatasetSpec(
+        "demo", "directory", root, "parquet", timestamp_column="date",
+        benchmark=BenchmarkSpec(benchmark_path),
+    )
+    cutoff = bars.date.iloc[-11]
+    locked = PrefixLockedOHLCVSource(DirectorySource(spec), cutoff)
+    key = InstrumentKey("demo", "AAA")
+    stock_digest = locked.fingerprint(key)
+    benchmark_digest = locked.benchmark_fingerprint()
+    assert locked.load(key).timestamp.max() == cutoff
+
+    appended = pd.concat([bars, pd.DataFrame([{
+        **bars.iloc[-1].to_dict(),
+        "date": pd.Timestamp(bars.date.iloc[-1]) + pd.offsets.BDay(),
+    }])], ignore_index=True)
+    appended.to_parquet(path, index=False)
+    appended.to_parquet(benchmark_path, index=False)
+    appended_lock = PrefixLockedOHLCVSource(DirectorySource(spec), cutoff)
+    assert appended_lock.fingerprint(key) == stock_digest
+    assert appended_lock.benchmark_fingerprint() == benchmark_digest
+
+    revised = appended.copy()
+    revised.loc[20, "close"] *= 1.01
+    revised.to_parquet(path, index=False)
+    assert PrefixLockedOHLCVSource(DirectorySource(spec), cutoff).fingerprint(key) != stock_digest
+    with pytest.raises(SourceError, match="exceeds"):
+        appended_lock.causal_prefix_fingerprint(
+            key, pd.Timestamp(cutoff) + pd.offsets.BDay(),
+        )

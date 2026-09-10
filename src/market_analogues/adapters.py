@@ -190,6 +190,73 @@ class CachedOHLCVSource(OHLCVSource):
             }
 
 
+class PrefixLockedOHLCVSource(OHLCVSource):
+    """Expose only canonical data visible through one immutable research cutoff.
+
+    Fingerprints bind semantic OHLCV prefix values rather than container bytes,
+    so future appends and harmless Parquet rewrites do not invalidate a historical
+    experiment. Any inserted, deleted or revised row inside the prefix changes the
+    fingerprint and fails provenance validation.
+    """
+
+    def __init__(self, source: OHLCVSource, cutoff: pd.Timestamp | str):
+        self.source = source
+        self.cutoff = pd.Timestamp(cutoff)
+        if self.cutoff.tzinfo is not None:
+            self.cutoff = self.cutoff.tz_convert("UTC").tz_localize(None)
+
+    def instruments(self) -> list[InstrumentKey]:
+        return self.source.instruments()
+
+    def _prefix(self, frame: pd.DataFrame, name: str) -> pd.DataFrame:
+        timestamps = pd.to_datetime(frame["timestamp"])
+        if timestamps.dt.tz is not None:
+            timestamps = timestamps.dt.tz_convert("UTC").dt.tz_localize(None)
+        prefix = frame.loc[timestamps <= self.cutoff].copy().reset_index(drop=True)
+        if prefix.empty:
+            raise SourceError(f"{name} has no rows through prefix lock {self.cutoff}")
+        prefix.attrs.update(frame.attrs)
+        prefix.attrs["prefix_lock_cutoff"] = self.cutoff.isoformat()
+        return prefix
+
+    def load(self, key: InstrumentKey) -> pd.DataFrame:
+        return self._prefix(self.source.load(key), str(key))
+
+    def load_borrowed(self, key: InstrumentKey) -> pd.DataFrame:
+        return self.load(key)
+
+    def fingerprint(self, key: InstrumentKey) -> str:
+        return causal_prefix_digest(self.source.load(key), self.cutoff).digest
+
+    def load_benchmark(self) -> pd.DataFrame | None:
+        benchmark = self.source.load_benchmark()
+        return self._prefix(benchmark, "benchmark") if benchmark is not None else None
+
+    def benchmark_fingerprint(self) -> str | None:
+        prefix = self.source.benchmark_causal_prefix_fingerprint(self.cutoff)
+        return prefix.digest if prefix is not None else None
+
+    def causal_prefix_fingerprint(
+        self, key: InstrumentKey, cutoff: pd.Timestamp | str,
+    ) -> CausalPrefixDigest:
+        requested = pd.Timestamp(cutoff)
+        if requested.tzinfo is not None:
+            requested = requested.tz_convert("UTC").tz_localize(None)
+        if requested > self.cutoff:
+            raise SourceError("requested causal prefix exceeds the source lock")
+        return causal_prefix_digest(self.source.load(key), requested)
+
+    def benchmark_causal_prefix_fingerprint(
+        self, cutoff: pd.Timestamp | str,
+    ) -> CausalPrefixDigest | None:
+        requested = pd.Timestamp(cutoff)
+        if requested.tzinfo is not None:
+            requested = requested.tz_convert("UTC").tz_localize(None)
+        if requested > self.cutoff:
+            raise SourceError("requested benchmark prefix exceeds the source lock")
+        return self.source.benchmark_causal_prefix_fingerprint(requested)
+
+
 class DirectorySource(OHLCVSource):
     def __init__(self, spec: DatasetSpec):
         self.spec = spec

@@ -60,6 +60,9 @@ from .m04r_validation_registry import (
     default_search_contract, validate_m04r_validation_registry,
     write_m04r_validation_registry,
 )
+from .nse_e2e_verification import (
+    run_nse_e2e_verification, write_nse_e2e_verification,
+)
 from .m04r_prefix_verification import (
     verify_m04r_causal_prefixes, write_m04r_prefix_verification,
 )
@@ -219,6 +222,32 @@ def cmd_verify_portable_e2e(args: argparse.Namespace) -> int:
                 result.future_mutation_outcomes_changed
             ),
             "result_digest": result.result_digest,
+            "machine_artifact": str(machine.resolve()),
+            "html_artifact": str(html.resolve()),
+        },
+        list(result.failures),
+    ).write(_gates(config))
+    print(json.dumps(result.to_dict(), indent=2))
+    print(html)
+    return 0 if result.passed else 2
+
+
+def cmd_verify_nse_e2e(args: argparse.Namespace) -> int:
+    config = load_config(args.config)
+    output_dir = Path(args.output_dir) if args.output_dir else (
+        config.artifact_dir / "portability" / "nse-real-e2e-verification-v3"
+    )
+    result, records = run_nse_e2e_verification(
+        config, output_dir, dataset=args.dataset, workers=args.workers,
+    )
+    machine, html = write_nse_e2e_verification(result, records, output_dir)
+    GateReport(
+        "e2e_03_nse_real", result.passed,
+        {
+            **{
+                key: value for key, value in result.to_dict().items()
+                if key not in {"passed", "failures"}
+            },
             "machine_artifact": str(machine.resolve()),
             "html_artifact": str(html.resolve()),
         },
@@ -2284,6 +2313,12 @@ def build_parser() -> argparse.ArgumentParser:
     portable_e2e.add_argument("--config", required=True)
     portable_e2e.add_argument("--output-dir")
     portable_e2e.set_defaults(func=cmd_verify_portable_e2e)
+    nse_e2e = sub.add_parser("verify-nse-e2e")
+    nse_e2e.add_argument("--config", required=True)
+    nse_e2e.add_argument("--dataset", default="nse")
+    nse_e2e.add_argument("--workers", type=int, default=12)
+    nse_e2e.add_argument("--output-dir")
+    nse_e2e.set_defaults(func=cmd_verify_nse_e2e)
     verify = sub.add_parser("verify")
     verify.add_argument("--config", required=True)
     verify.add_argument("--seeds-per-family", type=int, default=5)
