@@ -16,14 +16,14 @@
 
 <section>
   <h2>Decision and reason</h2>
-  <p>R1-B needs an N1 conditional null that preserves coarse query-chart structure in addition to the already verified nuisance cells. V2's farthest-first seeds were extreme outliers: K=8 began with one cell of 3,261 queries and seven cells of at most two; K=12 and K=16 behaved similarly. Deterministic minimum-size merging correctly collapsed every option to one cell, making N1 identical to N0.</p>
+  <p>R1-B needs an N1 conditional null that preserves coarse query-chart structure in addition to the already verified nuisance cells. Diagnostic reconstruction found highly imbalanced farthest-first seed cells. Deterministic minimum-size merging correctly collapsed every K=8, 12 and 16 option to one sealed final cell, making N1 identical to N0.</p>
   <p class="boundary"><b>Frozen response:</b> v2 remains immutable. V3 changes only the outcome-blind structure partition and its support assessment. It does not open R1-B cohesion/specificity statistics, neighbor outcomes, forward returns, labels, prediction or trading rules.</p>
 </section>
 
 <section>
   <h2>Inputs and leakage boundary</h2>
   <ul>
-    <li>Use exactly the same 3,270 registered query identities and the same independently verified 141-value market-excluded query vector: close/ATR/volume coarse paths, stage net/volatility/volume columns and structural features.</li>
+    <li>Use exactly the same 3,270 registered query identities in canonical query-ID order and the same independently verified 141-value market-excluded query vector, in this exact order: <code>coarse[0:96]</code>, then <code>stage.astype(float64).reshape(12,4,order='C')[:,0:3].ravel(order='C')</code>, then <code>structural[0:9]</code>. No additional weight, whitening or block normalization is permitted.</li>
     <li>Reuse the verified session-21 N0 nuisance cells and the frozen recurrent cohort of 369 episodes / 2,865 links. Do not change retrieval or select a new cohort.</li>
     <li>Partition construction may not read benchmark/relative feature channels, candidate identities, eligibility memberships, selected-neighbor memberships, inbound counts, ranks, distances, R1-B statistics, outcomes or future values.</li>
     <li>Support computation may read only query-cell labels, causal eligibility and observed membership. It must finish and be sealed before any R1-B statistic is implemented or opened.</li>
@@ -33,14 +33,15 @@
 <section>
   <h2>Deterministic balanced recursive rank-PCA algorithm</h2>
   <ol>
-    <li><b>Rank transform:</b> for each of 141 columns, assign exact-tie midranks across the 3,270 queries and map ranks to [-1,1]. Constant columns become zero and are excluded from axis choice. Query ID is never used to break feature-value ties.</li>
+    <li><b>Rank transform:</b> require a finite float64 matrix of shape (3,270,141) and unique ordered IDs. Within feature j, canonical float64 values compare by exact numerical equality. For 1-based ordered positions a..b, persist doubled midrank <code>m=a+b</code> and compute <code>z=(m-(N+1))/(N-1)</code>. Endpoints are -1/+1, all-tied columns are +0.0, and -0.0 is normalized to +0.0. Query ID never enters tie-group formation.</li>
     <li><b>Recursive target allocation:</b> for requested K in {8,12,16}, begin with all queries and target K leaves. At a node with n rows and k target leaves, assign kL=floor(k/2), kR=k-kL and nL=floor(n×kL/k); nR=n-nL. This fixes balanced final leaf sizes.</li>
-    <li><b>Local axis:</b> center the node's transformed rows and compute its leading PCA loading. Orient its sign so the largest absolute loading is positive; if several tie, use the lowest feature index.</li>
-    <li><b>Degeneracy fallback:</b> if the leading eigengap is at most 1e-10, use the transformed column with largest exact centered sum of squares; ties use the lowest feature index. If every column is constant, the partition fails closed.</li>
-    <li><b>Exact split:</b> stably order by projection then query ID and put exactly the first nL rows left. Query ID resolves only a projection-boundary tie; it never changes the rank transform or axis.</li>
-    <li><b>Recurse locally:</b> recompute the axis inside each child until exactly K leaves exist. Label leaves by their deterministic left-to-right recursion path.</li>
+    <li><b>Local axis:</b> form <code>Zc=Z[I]-column_mean(Z[I])</code> in fixed row/column order and scatter <code>S=Zc.T@Zc</code>. A symmetric float64 eigensolver runs under a one-thread BLAS limit in the sealed NumPy/LAPACK runtime. With λ1≥λ2, use relative gap <code>(λ1-λ2)/λ1</code>. Orient the leading loading at the lowest original feature index attaining the exact maximum absolute loading; make that pivot positive.</li>
+    <li><b>Degeneracy fallback:</b> if relative gap ≤1e-10, select the original feature maximizing the exact integer quantity <code>n×sum(m²)-sum(m)²</code> inside that node; ties use the lowest feature index and the axis is +e_j. If λ1≤0, every exact variance is zero, the solver is non-finite/nonconvergent, or any node fails, that requested K fails closed with no retry, merge, alternative axis, reuse or coarsening.</li>
+    <li><b>Exact split:</b> compute every projection with <code>math.fsum</code> in fixed feature-index order, then order by projection and query ID. Query ID may resolve an exact bitwise-equal boundary only. Otherwise require <code>pR-pL &gt; 1e-10×max(1,max|p|)</code>; a smaller positive margin makes that K numerically unresolved.</li>
+    <li><b>Recurse locally:</b> require n≥k, use root path empty, append 0/1 for left/right, and label terminal paths in lexicographic order. A node failure invalidates only its requested K. Expected size multisets are K8: 6×409 + 2×408; K12: 6×273 + 6×272; K16: 6×205 + 10×204.</li>
   </ol>
   <p>This construction guarantees non-empty, nearly equal-sized leaves by design while allowing the shape-derived axis to change locally. It avoids the outlier-medoid collapse without using downstream retrieval behavior to manufacture clusters.</p>
+  <p><b>Encoding and runtime:</b> canonical JSON is UTF-8 with sorted keys, compact separators and no NaN. Ordered IDs and integer midranks use canonical JSON digests. Float arrays use shape-prefixed contiguous little-endian float64 bytes; reported scalar floats use <code>float.hex()</code>. Exact byte identity is claimed only in the sealed NumPy/LAPACK/runtime environment; final query memberships must always agree exactly.</p>
 </section>
 
 <section>
@@ -48,9 +49,9 @@
   <table>
     <thead><tr><th>Artifact</th><th>Required content</th></tr></thead>
     <tbody>
-      <tr><td>TRANSFORM.json</td><td>Input query/vector digest, constant columns, midrank contract and transformed-matrix semantic digest; not the full matrix.</td></tr>
-      <tr><td>PARTITIONS.json</td><td>For each K: every query label exactly once, leaf paths/sizes, each node's row count/target leaves, PCA or fallback mode, oriented axis digest, eigengap and split count.</td></tr>
-      <tr><td>SUPPORT.json</td><td>Per-episode N0 and crossed N1 support at cap 4,096 plus episode/link coverage for K=8,12,16.</td></tr>
+      <tr><td>TRANSFORM.json</td><td>Every ordered query's representation/prefix audit digest, exact column order, constant columns, integer-midrank digest and transformed-matrix digest; not the full matrix.</td></tr>
+      <tr><td>PARTITIONS.json</td><td>Published by the partition-only executable. For each K: every query label exactly once; membership digest; leaf paths/sizes; and every node's member-ID digest, n/k/nL/nR, child paths, PCA/fallback mode, pivot/sign, λ1, relative gap, axis digest, boundary values and margin.</td></tr>
+      <tr><td>SUPPORT.json</td><td>Published later by the support-only executable. Per-episode N0 and crossed N1 support at cap 4,096 plus episode/link coverage for K=8,12,16.</td></tr>
       <tr><td>RESULT.json</td><td>Exact inputs/runtime hashes, all gates, selected K or unresolved, digests of all sidecars and literal no-outcome/no-scientific-claim fields.</td></tr>
       <tr><td>report.html</td><td>Human-readable requested/retained cells, leaf-size ranges, support coverage and explicit authority boundary.</td></tr>
     </tbody>
@@ -61,23 +62,24 @@
   <h2>Gates before selection</h2>
   <ul>
     <li>For each K, retain exactly K labels; each label is used; every query appears exactly once; leaf sizes are only floor(3,270/K) or ceil(3,270/K).</li>
-    <li>The crossed N1 cells must have more distinct cells than the 71 session-21 base cells. No merge step is allowed in v3.</li>
-    <li>One-worker and 12-worker runs must produce identical transformed, membership, node and result digests.</li>
+    <li>The crossed N1 cells must have more distinct cells than the 71 session-21 base cells; every global label must appear and contribute at least one crossed cell. No merge is allowed. Do not add post-view silhouette, entropy, compactness, explained-variance or distance gates.</li>
+    <li>One-worker and 12-worker causal-vector reconstruction must produce identical transformed, membership and node digests; PCA itself remains single-threaded.</li>
     <li>An independent implementation must reconstruct midranks, every recursive split, memberships, support counts, artifacts and HTML from the sealed inputs.</li>
     <li>At least 90% of the 369 episodes and 90% of the 2,865 links must retain support of at least 4,096 matched sets after crossing session-21 N0 with the structure label.</li>
   </ul>
-  <p><b>Selection:</b> choose the largest K that passes every structural, reproducibility, integrity and support gate. If none passes, publish <code>unresolved</code>; do not relax thresholds or inspect R1-B statistics.</p>
+  <p><b>Primary decision:</b> K=8 is the sole primary N1 because it is the coarsest non-degenerate control with maximum expected support. K12 and K16 are secondary sensitivity analyses and cannot rescue or change the primary. K8 failure yields <code>unresolved</code>; do not relax thresholds or inspect R1-B statistics.</p>
+  <p><b>Exact support:</b> for episode e, compute the product over crossed cells c of <code>C(A_ec,Q_ec)</code>, saturated at 4,096; observed Qe must be a duplicate-free subset of Ae. Episode coverage denominator is fixed at 369 and link coverage weights the frozen inbound counts totaling 2,865. Evaluate all declared K even if one fails; never early-stop.</p>
 </section>
 
 <section>
   <h2>Implementation and verification sequence</h2>
   <ol>
     <li>Implement the pure rank transform and recursive partition with synthetic fixtures covering exact ties, constants, repeated eigenvalues, sign ambiguity, odd n/k allocation and all-constant refusal.</li>
-    <li>Differentially test scalar and parallel execution and verify exact balanced sizes for K=8,12,16 on the frozen query vectors without calculating support.</li>
-    <li>Commit implementation/tests as H0. Generate and commit a sole-child H1 preregistration that binds all inputs, runtime hashes, algorithm details, K order, gates, selection and claim boundary.</li>
-    <li>Run once to the create-only v3 output, first constructing partitions and then opening support only. Atomically publish only if every declared artifact closes.</li>
+    <li>Before H1, use synthetic fixtures only. Differentially test vector-worker order, ties, constants, repeated eigenvalues, sign ambiguity, odd n/k allocation, boundary instability and all-constant refusal.</li>
+    <li>Implement separate partition and support executables, then commit implementation/tests as H0. Generate and commit a sole-child H1 preregistration binding both runtimes, exact solver environment, canonical JSON/digest rules, inputs, K roles, gates, failure states and claim boundary.</li>
+    <li>After H1, the partition executable receives only the sealed query registry and causal OHLCV/representation inputs—no candidate, eligibility or Qe path—and publishes a create-only partition artifact. Only after that publication may the separate support executable open eligibility/Qe and cross the frozen N0 cells.</li>
     <li>Commit a separate verifier, run the independent reconstruction and record both producer and verifier digests in the development log.</li>
-    <li>Only a verified passing K permits freezing the still-separate B2 statistic/shared-priority contract. It does not itself authorize B2 execution, prediction or labels.</li>
+    <li>Publish a sealed result for <code>partition_invalid</code>, <code>reproducibility_failed</code>, <code>support_inadequate</code> or <code>verified_support_pass</code>; absence is never used to represent failure. Only verified K8 support permits freezing the still-separate B2 statistic/shared-priority contract. It does not authorize B2 execution, prediction or labels.</li>
   </ol>
 </section>
 
@@ -96,6 +98,7 @@
   <h2>Current status and links</h2>
   <p class="pass">V2 producer integrity and N0 support are verified.</p>
   <p class="stop">N1/B2 scientific execution remains blocked until this v3 producer and independent verifier pass.</p>
+  <p class="boundary"><b>Interpretation limit:</b> N1 is a transductive, fixed-query shared-structure sensitivity built from the same representation family. It is not independent validation of that representation and is not evidence of prospective generalization. Using all registered query covariates is valid for this fixed-registry conditional audit; outcome access remains forbidden.</p>
   <p>Parent contract: <a href="r1b-adequacy-diagnostic-plan.html">R1-B adequacy plan</a>. Chronology: <a href="development-log.html#l-292">development log L-292</a>.</p>
 </section>
 </body>
