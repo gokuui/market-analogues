@@ -2306,6 +2306,13 @@
   <p><b>Pre-output verifier repair:</b> The first invocation stopped before creating its output root because the independent source-state loop attempted to fingerprint quarantined files before applying the frozen A/B eligibility filter. The producer had correctly filtered before fingerprinting. Verification now applies that boundary first, with a regression test proving excluded malformed files are never opened; no authority result or outcome was changed or read.</p>
   <p class="pass"><b>Independent result:</b> The corrected verifier passed 12/12 in 80.65 seconds. It reconstructed all 49,152 exact candidates and 240 selected matches; maximum stored-bound delta was <code>4.44e-16</code>, maximum scalar-reference total delta <code>2.22e-16</code> and maximum component delta <code>4.44e-16</code>. Receipt digest <code>e85a2c17…7567dc</code>. This authorizes the post-retrieval causal outcome/report replay, not a predictive claim.</p>
 </section>
+<section class="entry">
+  <h2>L-281 — E2E-03 real NSE evidence path passes</h2>
+  <p class="pass"><b>End-to-end result:</b> The user-facing real NSE replay now consumes only the independently verified fresh prefix-locked authorities. All 12 current/historical × A/B × low/middle/high cases pass, with 240 exact matches, 720 5/20/60-session evidence rows, zero selected-match rescore delta, identical repeated evidence digests and an unchanged source-universe prefix.</p>
+  <p><b>Coverage is explicit:</b> 239, 236 and 231 of the 240 retrieved episodes have complete outcomes observable by the corresponding query cutoff at 5, 20 and 60 sessions. Missing, truncated or not-yet-observable paths remain present and labelled rather than being replaced. All 13 generated HTML files parse and retain the descriptive-not-forecast boundary.</p>
+  <p><b>Bindings:</b> Retrieval verification <code>e85a2c17…7567dc</code>; NSE evidence result <code>982cf6ca…7d42d</code>; semantic universe prefix <code>cffc06d9…d787</code>; maximum prefix cutoff 11 February 2026. The gate ledger records E2E-03 PASS with no failures.</p>
+  <p><b>Next:</b> E2E-04 will bind the already independently sealed T14-05 restart/concurrency/resource qualification to this release path and add current-artifact corruption, atomicity and resume checks. It will not rerun expensive evidence merely to reproduce an already sealed performance measurement.</p>
+</section>
 </main>
 
 <section id="reproduce">
