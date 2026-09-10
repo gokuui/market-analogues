@@ -21,7 +21,7 @@ from market_analogues.types import stable_hash
 
 
 SCHEMA = "m04r14-e2e-release-snapshot-v1"
-OUTPUT = Path("config/data/analogues/portability/e2e-release-snapshot-v1")
+OUTPUT = Path("config/data/analogues/portability/e2e-release-snapshot-v2")
 STATUS_DOCUMENT = Path("docs/release-status.html")
 REQUIRED_GATES = (
     "e2e_02_portable_cross_adapter",
@@ -236,7 +236,7 @@ def _tracked_html(repository: Path) -> tuple[list[dict[str, Any]], bool]:
 def _run_regression(repository: Path) -> dict[str, Any]:
     started = perf_counter()
     result = _run(
-        repository, str(repository / ".venv/bin/python"), "-m", "pytest", "-q",
+        repository, str(repository / ".venv/bin/python"), "-m", "pytest",
         timeout=3600,
     )
     combined = "\n".join(part for part in (result.stdout, result.stderr) if part)
@@ -247,7 +247,7 @@ def _run_regression(repository: Path) -> dict[str, Any]:
         "elapsed_seconds": perf_counter() - started,
         "output_sha256": hashlib.sha256(combined.encode()).hexdigest(),
         "output_tail": combined[-4000:],
-        "command": ".venv/bin/python -m pytest -q",
+        "command": ".venv/bin/python -m pytest",
         "python": sys.version.split()[0],
         "market_analogues_version": version("market-analogues"),
     }

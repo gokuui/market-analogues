@@ -2328,6 +2328,11 @@
   <p><b>Measured resources:</b> The applicable independent monitor recorded 6,226,312 KiB peak process-tree RSS, zero swap and zero OOM. The fresh 12-worker run did not persist peak RSS, so this log continues to make no invented fresh-run memory claim.</p>
   <p><b>E2E-05 implementation:</b> A single human status index now links the three required result digests, exact reproduction commands and the non-predictive boundary. The create-only release snapshot will run the entire pytest suite, strictly parse every tracked HTML file, run Git object-database checks, require a clean tree before and after testing, and reconstruct each upstream semantic receipt.</p>
 </section>
+<section class="entry" id="l-284">
+  <h2>L-284 — E2E-05 V1 refuses an uncounted successful pytest run</h2>
+  <p><b>Observed:</b> The entire suite reached 100% in 307.02 seconds and returned exit code zero. The release harness nevertheless failed <code>full_regression_passed</code> because it added <code>-q</code> to the repository's existing <code>addopts=-q</code>; pytest's double-quiet mode omitted the numeric summary, leaving the required test count at zero.</p>
+  <p><b>Disposition:</b> V1 remains an immutable failed receipt at digest <code>9d9c4ad6…60de5</code>. V2 removes only the redundant command-line quiet flag and adds a unit boundary requiring both zero exit and a numeric <code>N passed</code> summary. It must rerun the complete suite rather than converting the successful-but-uncounted V1 after the fact.</p>
+</section>
 </main>
 
 <section id="reproduce">

@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+import subprocess
 import sys
 
 
@@ -78,3 +79,15 @@ def test_status_links_must_be_local_and_present(tmp_path: Path) -> None:
     assert release._local_links_exist(tmp_path, status)
     status.write_text("<!doctype html><html><a href='../../escape'>x</a></html>")
     assert not release._local_links_exist(tmp_path, status)
+
+
+def test_regression_requires_zero_exit_and_numeric_summary(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(
+        release, "_run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args=[], returncode=0, stdout="1209 passed in 1.00s\n", stderr="",
+        ),
+    )
+    result = release._run_regression(tmp_path)
+    assert result["passed"] is True
+    assert result["tests_passed"] == 1209
