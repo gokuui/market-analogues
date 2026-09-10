@@ -42,3 +42,17 @@ def test_corrupt_real_authority_is_refused(tmp_path: Path) -> None:
 
 def test_html_parser_rejects_missing_file(tmp_path: Path) -> None:
     assert not operational._parse_html([tmp_path / "missing.html"])
+
+
+def test_portable_receipt_publication_time_is_not_semantic() -> None:
+    state = {"schema_version": "portable", "failures": []}
+    payload = {
+        **state, "passed": True, "result_digest": stable_hash(state),
+        "generated_at": "later",
+    }
+    reconstructed = {
+        key: value for key, value in payload.items()
+        if key not in {"passed", "result_digest", "failures", "generated_at"}
+    }
+    reconstructed["failures"] = payload["failures"]
+    assert stable_hash(reconstructed) == payload["result_digest"]

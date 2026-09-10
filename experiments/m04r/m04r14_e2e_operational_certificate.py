@@ -27,7 +27,7 @@ from market_analogues.types import stable_hash
 
 
 SCHEMA = "m04r14-e2e-operational-certificate-v1"
-OUTPUT = Path("config/data/analogues/portability/e2e-operational-certificate-v1")
+OUTPUT = Path("config/data/analogues/portability/e2e-operational-certificate-v2")
 AUTHORITY = Path("config/data/analogues/portability/nse-current-authorities-v1")
 AUTHORITY_VERIFICATION = Path(
     "config/data/analogues/portability/"
@@ -187,7 +187,7 @@ def execute(repository: Path, config_path: Path) -> dict[str, Any]:
     portable_result, portable_raw = _read(repository / PORTABLE_E2E)
     portable_state = {
         key: value for key, value in portable_result.items()
-        if key not in {"passed", "result_digest", "failures"}
+        if key not in {"passed", "result_digest", "failures", "generated_at"}
     }
     portable_state["failures"] = list(portable_result.get("failures") or [])
     portable_bound = all((
