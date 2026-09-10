@@ -1,12 +1,15 @@
 from itertools import permutations
 
 import numpy as np
+import pandas as pd
 
 from market_analogues.adequacy import (
     NullCandidate, concentration_metrics, greedy_accept, intervals_overlap,
     random_priority_selection,
 )
 from experiments.m04r.m04r14_r1a_exposure_audit import Metadata, Query, _pool, _query_mapping
+from market_analogues.certified_packed_search import CompactScoredCandidate, _select_compact_scored
+from market_analogues.types import AnalogueMatch, EpisodeKey, InstrumentKey, SearchQuery
 
 
 def _candidate(symbol: int, ordinal: int, start: int, cutoff: int) -> NullCandidate:
@@ -46,7 +49,9 @@ def test_random_priority_sampler_matches_exact_permutation_distribution() -> Non
 
 
 def test_concentration_metrics_include_unselected_episode_population() -> None:
-    result = concentration_metrics([3, 1], [2, 2], episode_population=4)
+    result = concentration_metrics(
+        [3, 1], [2, 2], episode_population=4, symbol_population=2,
+    )
     assert result["episode_unique"] == 2
     assert result["episode_max"] == 3
     assert result["episode_top_1_percent_share"] == 0.75
@@ -89,3 +94,28 @@ def test_query_mapping_removes_only_overlapping_query_symbol_suffix() -> None:
     assert [(candidate_at(i).symbol_id, candidate_at(i).ordinal) for i in range(3)] == [
         (0, 0), (1, 3), (1, 4),
     ]
+
+
+def test_local_greedy_rule_matches_production_compact_selector() -> None:
+    geometry = (
+        _candidate(0, 0, 0, 2), _candidate(0, 1, 2, 4),
+        _candidate(0, 2, 3, 5), _candidate(0, 3, 6, 8),
+        _candidate(0, 4, 9, 11), _candidate(1, 5, 0, 2),
+    )
+    instruments = (InstrumentKey("x", "A"), InstrumentKey("x", "B"))
+    compact = []
+    for distance, row in enumerate(geometry):
+        key = EpisodeKey(
+            instruments[row.symbol_id], pd.Timestamp("2000-01-01") + pd.Timedelta(days=row.ordinal),
+            252, "dense-v1",
+        )
+        compact.append(CompactScoredCandidate(
+            AnalogueMatch(key, float(distance), {}), instruments[row.symbol_id],
+            row.start_ns, row.cutoff_ns,
+        ))
+    query_key = EpisodeKey(InstrumentKey("x", "Q"), pd.Timestamp("2001-01-01"), 252, "dense-v1")
+    production = _select_compact_scored(
+        compact, SearchQuery(query_key, top_k=4, max_per_instrument=3),
+    )
+    local = greedy_accept(geometry, top_k=4, max_per_symbol=3)
+    assert [item.episode_key.cutoff.day - 1 for item in production] == [item.ordinal for item in local]

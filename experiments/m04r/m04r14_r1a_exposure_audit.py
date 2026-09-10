@@ -23,9 +23,7 @@ from experiments.m04r import m04r14_shadow_run as shadow
 from market_analogues.adequacy import (
     NullCandidate, concentration_metrics, nearest_rank, random_priority_selection,
 )
-from market_analogues.packed_bound_store import (
-    OVERFLOW_DTYPE, PACK_DTYPE, decode_episode_id,
-)
+from market_analogues.packed_bound_store import decode_episode_id, load_packed_generation
 from market_analogues.types import stable_hash
 
 
@@ -39,6 +37,7 @@ SEMANTIC_VERIFICATION = Path(
     "config/data/analogues/m04r14/nasdaq-shadow-interrupted-verification-v1/VERIFIED.json"
 )
 PACKED_DURABLE = Path("config/data/analogues/poc/m04r/packed-bound-full/store")
+PACKED_RESULT = Path("config/data/analogues/poc/m04r/packed-bound-full/packed-bound-full.json")
 PACKED_RESIDENT = Path(
     "/dev/shm/market-analogues/m04r11-candidate-v2/"
     "9fc6ae0ec4451133d8006897162f3443803fd30a3c44b78e80a476fbb18bb483/store"
@@ -101,19 +100,17 @@ def _verify_digest(value: Mapping[str, Any], field: str, omitted: set[str]) -> b
     })
 
 
-def _extract_metadata(store: Path, generation: str) -> tuple[Metadata, dict[str, Any]]:
-    root = store / "generations" / generation
-    manifest = _load(root / "manifest.json")
-    if manifest.get("manifest_digest") != stable_hash({
-        key: value for key, value in manifest.items() if key != "manifest_digest"
-    }):
-        raise AdequacyAuditError("packed manifest digest differs")
+def _extract_metadata(
+    store: Path, generation: str, *, expected_provenance_digest: str | None = None,
+) -> tuple[Metadata, dict[str, Any]]:
+    loaded = load_packed_generation(
+        store, generation, expected_provenance_digest=expected_provenance_digest,
+        verify_content=True, validate_records=True,
+    )
+    manifest = loaded.manifest
     if manifest.get("real_forward_outcomes_accessed") is not False:
         raise AdequacyAuditError("packed source is not outcome blind")
-    main = np.memmap(root / str(manifest["rows_file"]), dtype=PACK_DTYPE, mode="r")
-    overflow = np.memmap(
-        root / str(manifest["overflow_file"]), dtype=OVERFLOW_DTYPE, mode="r",
-    )
+    main, overflow = loaded.rows, loaded.overflow
     total = len(main) + len(overflow)
     compact = np.empty(total, dtype=[
         ("episode_id", "V12"), ("cutoff", "<i8"), ("symbol", "<u4"),
@@ -142,7 +139,7 @@ def _extract_metadata(store: Path, generation: str) -> tuple[Metadata, dict[str,
             raise AdequacyAuditError("packed symbol cutoffs are not strictly ordered")
     return Metadata(
         compact["episode_id"], compact["cutoff"], starts, stops,
-        tuple(str(value) for value in manifest["symbols"]),
+        loaded.symbols,
     ), manifest
 
 
@@ -236,6 +233,7 @@ def _simulate(replicates: tuple[int, ...]) -> dict[str, Any]:
         metrics = concentration_metrics(
             list(episode_counts.values()), list(symbol_counts.values()),
             episode_population=len(metadata.episode_ids),
+            symbol_population=len(metadata.symbols),
         )
         metrics.update({
             "replicate": replicate,
@@ -300,7 +298,9 @@ def _actual(repository: Path, metadata: Metadata, registry: Mapping[str, Any]):
         query_rows.append({
             "query_episode_id": query_id, "query_symbol": symbol,
             "distance_rank_1": distances[0], "distance_rank_20": distances[-1],
-            "distance_rank20_rank1_ratio": distances[-1] / distances[0],
+            "distance_rank20_rank1_ratio": (
+                distances[-1] / distances[0] if distances[0] > 0 else None
+            ),
             "distinct_symbols": len(per_symbol),
             "symbols_repeated_twice": sum(value == 2 for value in repeated),
             "symbols_repeated_thrice": sum(value == 3 for value in repeated),
@@ -312,8 +312,9 @@ def _actual(repository: Path, metadata: Metadata, registry: Mapping[str, Any]):
             episode_meta[episode_id] = (match_symbol, cutoff_ns, rank)
             rows.append({"query_episode_id": query_id, "episode_id": episode_id, "rank": rank})
         case_manifest.append({
-            "path": path.relative_to(repository).as_posix(), "bytes": path.stat().st_size,
-            "sha256": _sha(path), "result_digest": case["result_digest"],
+            "path": path.relative_to(repository / CASES.parent).as_posix(),
+            "bytes": path.stat().st_size,
+            "sha256": _sha(path),
         })
     queries.sort(key=lambda item: item.episode_id)
     query_rows.sort(key=lambda item: item["query_episode_id"])
@@ -321,6 +322,7 @@ def _actual(repository: Path, metadata: Metadata, registry: Mapping[str, Any]):
     metrics = concentration_metrics(
         list(episode_counts.values()), list(symbol_counts.values()),
         episode_population=len(metadata.episode_ids),
+        symbol_population=len(metadata.symbols),
     )
     metrics.update({
         "query_any_repeated_symbol_fraction": sum(
@@ -354,16 +356,27 @@ def _locate_observed(metadata: Metadata, episode_meta: Mapping[str, tuple[str, i
     return located
 
 
-def _summaries(actual: Mapping[str, float | int], null: Sequence[Mapping[str, Any]]):
+def _summaries(
+    actual: Mapping[str, float | int], null: Sequence[Mapping[str, Any]],
+    directions: Mapping[str, str],
+):
     output: dict[str, Any] = {}
     for key, observed in actual.items():
         values = [float(row[key]) for row in null]
+        direction = directions[key]
+        if direction not in {"higher_is_more_concentrated", "lower_is_more_concentrated"}:
+            raise AdequacyAuditError(f"invalid metric direction: {key}")
+        tail = (
+            sum(value >= float(observed) for value in values)
+            if direction == "higher_is_more_concentrated"
+            else sum(value <= float(observed) for value in values)
+        )
         output[key] = {
             "observed": observed, "null_mean": float(np.mean(values)),
             "null_p05": nearest_rank(values, .05), "null_p50": nearest_rank(values, .50),
             "null_p95": nearest_rank(values, .95), "null_p99": nearest_rank(values, .99),
-            "upper_tail_monte_carlo_p": (1 + sum(value >= float(observed) for value in values)) /
-                                          (len(values) + 1),
+            "concentration_direction": direction,
+            "concentration_tail_monte_carlo_p": (1 + tail) / (len(values) + 1),
         }
     return output
 
@@ -372,7 +385,7 @@ def _html(result: Mapping[str, Any]) -> str:
     rows = "".join(
         f"<tr><td>{key}</td><td>{value['observed']:.6g}</td>"
         f"<td>{value['null_p50']:.6g}</td><td>{value['null_p95']:.6g}</td>"
-        f"<td>{value['upper_tail_monte_carlo_p']:.6g}</td></tr>"
+        f"<td>{value['concentration_tail_monte_carlo_p']:.6g}</td></tr>"
         for key, value in result["comparison"].items()
     )
     return f"""<!doctype html><html lang='en'><head><meta charset='utf-8'>
@@ -380,7 +393,7 @@ def _html(result: Mapping[str, Any]) -> str:
 <h1>R1-A analogue exposure and concentration audit</h1>
 <p><b>Status:</b> {result['status']}. This is outcome-blind and leaves all 65,400 retrieved links unchanged.</p>
 <p>{result['inventory']['queries']:,} queries; {result['inventory']['candidate_episodes']:,} candidate episodes; {result['null']['replicates']:,} independent-query random-priority replicates.</p>
-<table><thead><tr><th>Metric</th><th>Observed</th><th>Null median</th><th>Null p95</th><th>Upper-tail p</th></tr></thead><tbody>{rows}</tbody></table>
+<table><thead><tr><th>Metric</th><th>Observed</th><th>Null median</th><th>Null p95</th><th>Concentration-tail p</th></tr></thead><tbody>{rows}</tbody></table>
 <p class='boundary'><b>Boundary:</b> this tests whether retrieval concentration exceeds an iid random-priority risk-set null while preserving the causal pool, cap-three rule, and interval overlap. It does not establish chart adequacy or predictive value. R1-B must test matched query nulls, reciprocity and perturbation/view/cutoff stability before labels are allowed.</p>
 </body></html>"""
 
@@ -398,10 +411,22 @@ def execute(repository: Path, *, workers: int | None = None) -> dict[str, Any]:
     resident = PACKED_RESIDENT
     if not (resident / "generations" / generation / "manifest.json").is_file():
         resident = repository / PACKED_DURABLE
-    metadata, manifest = _extract_metadata(resident, generation)
+    metadata, manifest = _extract_metadata(
+        resident, generation,
+        expected_provenance_digest=str(prereg["inputs"]["packed_provenance_digest"]),
+    )
     registry = _load(repository / REGISTRY); seal = _load(repository / REGISTRY_SEAL)
     verified = _load(repository / SEMANTIC_VERIFICATION)
+    packed_result = _load(repository / PACKED_RESULT)
     verified_state = {key: value for key, value in verified.items() if key not in {"result_digest", "created_at"}}
+    registry_state = {key: value for key, value in registry.items() if key != "registry_digest"}
+    seal_state = {key: value for key, value in seal.items() if key not in {"seal_digest", "created_at"}}
+    for relative, expected in prereg["inputs"]["file_sha256"].items():
+        if _sha(repository / relative) != expected:
+            raise AdequacyAuditError(f"preregistered input changed: {relative}")
+    for relative, expected in prereg["runtime_files"].items():
+        if _sha(repository / relative) != expected:
+            raise AdequacyAuditError(f"preregistered runtime changed: {relative}")
     if not all((
         verified.get("result_digest") == stable_hash(verified_state),
         verified.get("semantic_passed") is True,
@@ -409,13 +434,29 @@ def execute(repository: Path, *, workers: int | None = None) -> dict[str, Any]:
         verified.get("verified_cases") == 3270,
         verified.get("verified_matches") == 65400,
         verified.get("source_content_digest") == prereg["inputs"]["packed_content_digest"],
+        verified.get("registry_digest") == registry.get("registry_digest"),
+        registry.get("registry_digest") == stable_hash(registry_state),
         registry.get("registry_digest") == seal.get("registry_digest"),
+        seal.get("seal_digest") == stable_hash(seal_state),
         registry.get("real_forward_outcomes_accessed") is False,
+        packed_result.get("result_digest") == prereg["inputs"]["packed_result_digest"],
+        packed_result.get("gate_passed") is True,
+        packed_result.get("generation_id") == generation,
+        packed_result.get("eligible_rows") == len(metadata.episode_ids),
+        packed_result.get("real_forward_outcomes_accessed") is False,
     )):
         raise AdequacyAuditError("upstream semantic authority differs")
     queries, query_rows, episode_counts, episode_meta, symbol_counts, actual, case_manifest = _actual(
         repository, metadata, registry,
     )
+    if stable_hash(case_manifest) != verified.get("case_manifest_digest"):
+        raise AdequacyAuditError("case tree differs from upstream semantic verification")
+    source_prefixes = manifest.get("provenance", {}).get("source_prefixes", {})
+    for symbol_id, symbol in enumerate(metadata.symbols):
+        prefix_rows = int(source_prefixes[symbol]["rows"])
+        expected_rows = max((prefix_rows - 252) // 5 + 1, 0)
+        if int(metadata.stops[symbol_id] - metadata.starts[symbol_id]) != expected_rows:
+            raise AdequacyAuditError(f"stride/lookback row accounting differs: {symbol}")
     located = _locate_observed(metadata, episode_meta)
     unique_latest = sorted({query.latest_ns for query in queries})
     pools = {value: _pool(metadata, value) for value in unique_latest}
@@ -443,7 +484,7 @@ def execute(repository: Path, *, workers: int | None = None) -> dict[str, Any]:
     null_symbol_hits = sum((part["symbol_hits"] for part in parts), np.zeros(len(metadata.symbols), dtype=np.uint64))
     if len(null_rows) != replicate_count:
         raise AdequacyAuditError("null replicate accounting differs")
-    comparison = _summaries(actual, null_rows)
+    comparison = _summaries(actual, null_rows, prereg["metric_directions"])
     latest_values = np.asarray([query.latest_ns for query in queries], dtype=np.int64)
     query_by_symbol = {query.symbol: query for query in queries}
     entity_rows = []
@@ -490,6 +531,27 @@ def execute(repository: Path, *, workers: int | None = None) -> dict[str, Any]:
         "query_episode_id": row["query_episode_id"], "episode_id": row["episode_id"],
         "rank": row["rank"],
     } for row in rows]
+    finite_ratios = [
+        float(row["distance_rank20_rank1_ratio"]) for row in query_rows
+        if row["distance_rank20_rank1_ratio"] is not None
+    ]
+    gates = {
+        "upstream_semantics_verified": True,
+        "upstream_case_manifest_unchanged": stable_hash(case_manifest) == verified["case_manifest_digest"],
+        "case_seals_reconstructed": True,
+        "all_risk_set_counts_equal_certificates": True,
+        "packed_main_and_overflow_included": (
+            len(metadata.episode_ids) == int(manifest["row_count"]) +
+            int(manifest["overflow_count"])
+        ),
+        "stride_5_lookback_252_accounting": True,
+        "exact_cap_three_overlap_null": True,
+        "retrieval_unchanged": True,
+        "outcomes_excluded": True,
+        "null_accounting_complete": len(null_rows) == replicate_count,
+    }
+    if not all(gates.values()):
+        raise AdequacyAuditError("one or more audit gates failed")
     state: dict[str, Any] = {
         "schema_version": SCHEMA, "status": "diagnostic_only_r1a_complete",
         "passed": True, "production_promotion_authorized": False,
@@ -511,9 +573,10 @@ def execute(repository: Path, *, workers: int | None = None) -> dict[str, Any]:
             "unique_latest_eligible_cutoffs": len(unique_latest),
         },
         "distance_geometry": {
-            "rank20_rank1_ratio_p10": float(np.quantile([r["distance_rank20_rank1_ratio"] for r in query_rows], .1)),
-            "rank20_rank1_ratio_p50": float(np.quantile([r["distance_rank20_rank1_ratio"] for r in query_rows], .5)),
-            "rank20_rank1_ratio_p90": float(np.quantile([r["distance_rank20_rank1_ratio"] for r in query_rows], .9)),
+            "rank1_zero_count": len(query_rows) - len(finite_ratios),
+            "rank20_rank1_ratio_p10": float(np.quantile(finite_ratios, .1)),
+            "rank20_rank1_ratio_p50": float(np.quantile(finite_ratios, .5)),
+            "rank20_rank1_ratio_p90": float(np.quantile(finite_ratios, .9)),
         },
         "actual": actual, "comparison": comparison,
         "null": {
@@ -521,18 +584,9 @@ def execute(repository: Path, *, workers: int | None = None) -> dict[str, Any]:
             "replicates": replicate_count, "seed": int(prereg["execution"]["seed"]),
             "metrics_digest": stable_hash(null_rows),
         },
-        "top_exposure_adjusted_episodes": entity_rows[:100],
+        "most_recurrent_episodes_with_exposure": entity_rows[:100],
         "top_symbols": symbol_rows[:100],
-        "gates": {
-            "upstream_semantics_verified": True, "case_seals_reconstructed": True,
-            "all_risk_set_counts_equal_certificates": True,
-            "packed_main_and_overflow_included": (
-                len(metadata.episode_ids) == int(manifest["row_count"]) +
-                int(manifest["overflow_count"])
-            ),
-            "exact_cap_three_overlap_null": True, "retrieval_unchanged": True,
-            "outcomes_excluded": True, "null_accounting_complete": True,
-        },
+        "gates": gates,
         "remaining_r1": [
             "matched causal query-distance nulls", "directed reciprocity registry",
             "leave-one-group/input-perturbation/nearby-cutoff stability",

@@ -96,13 +96,13 @@ def random_priority_selection(
     return tuple(selected)
 
 
-def top_share(counts: Sequence[int], fraction: float) -> float:
-    if not counts or not 0 < fraction <= 1:
+def top_share(counts: Sequence[int], fraction: float, population: int) -> float:
+    if not counts or not 0 < fraction <= 1 or population < len(counts):
         return 0.0
     ordered = sorted((int(value) for value in counts if value > 0), reverse=True)
     if not ordered:
         return 0.0
-    take = max(1, int(np.ceil(len(ordered) * fraction)))
+    take = min(len(ordered), max(1, int(np.ceil(population * fraction))))
     return float(sum(ordered[:take]) / sum(ordered))
 
 
@@ -123,7 +123,8 @@ def gini_with_zeros(counts: Sequence[int], population: int) -> float:
 
 
 def concentration_metrics(
-    episode_counts: Sequence[int], symbol_counts: Sequence[int], *, episode_population: int,
+    episode_counts: Sequence[int], symbol_counts: Sequence[int], *,
+    episode_population: int, symbol_population: int,
 ) -> dict[str, float | int]:
     """Global concentration statistics used identically for real and null links."""
 
@@ -132,13 +133,13 @@ def concentration_metrics(
     return {
         "episode_unique": len(episode),
         "episode_max": max(episode, default=0),
-        "episode_top_1_percent_share": top_share(episode, 0.01),
+        "episode_top_1_percent_share": top_share(episode, 0.01, episode_population),
         "episode_hhi": hhi(episode),
         "episode_effective_number": 1.0 / hhi(episode) if hhi(episode) else 0.0,
         "episode_gini": gini_with_zeros(episode, episode_population),
         "symbol_unique": len(symbol),
         "symbol_max": max(symbol, default=0),
-        "symbol_top_1_percent_share": top_share(symbol, 0.01),
+        "symbol_top_1_percent_share": top_share(symbol, 0.01, symbol_population),
         "symbol_hhi": hhi(symbol),
         "symbol_effective_number": 1.0 / hhi(symbol) if hhi(symbol) else 0.0,
     }

@@ -76,7 +76,10 @@ def execute(repository: Path, *, workers: int | None = None) -> dict[str, Any]:
     store = audit.PACKED_RESIDENT
     if not (store / "generations" / generation / "manifest.json").is_file():
         store = repository / audit.PACKED_DURABLE
-    metadata, manifest = audit._extract_metadata(store, generation)
+    metadata, manifest = audit._extract_metadata(
+        store, generation,
+        expected_provenance_digest=str(prereg["inputs"]["packed_provenance_digest"]),
+    )
     registry = audit._load(repository / audit.REGISTRY)
     queries, query_rows, episode_counts, episode_meta, symbol_counts, actual, case_manifest = audit._actual(
         repository, metadata, registry,
@@ -133,7 +136,7 @@ def execute(repository: Path, *, workers: int | None = None) -> dict[str, Any]:
     if not all(gates.values()):
         raise VerificationError(f"verification gates failed: {[k for k,v in gates.items() if not v]}")
     state = {
-        "schema_version": SCHEMA, "passed": True, "status": "independently_replayed",
+        "schema_version": SCHEMA, "passed": True, "status": "deterministically_replayed",
         "production_promotion_authorized": False, "predictive_claim_authorized": False,
         "real_forward_outcomes_accessed": False,
         "verified_result_digest": result["result_digest"],
