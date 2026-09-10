@@ -25,10 +25,10 @@ from experiments.m04r import m04r14_t14_11_stockbee_controls as target
 from experiments.m04r import verify_m04r14_t14_11_stockbee_controls as v1
 
 
-SCHEMA = "m04r14-t14-11-stockbee-controls-verification-v2"
-PREREGISTRATION_RELATIVE = Path("experiments/m04r/verify_m04r14_t14_11_stockbee_controls_v2_preregistered.json")
-OUTPUT_RELATIVE = Path("config/data/analogues/m04r14/t14-11-stockbee-controls-v1-verification-v2")
-INNER_RELATIVE = Path("config/data/analogues/m04r14/t14-11-stockbee-controls-v1-verification-v2-inner")
+SCHEMA = "m04r14-t14-11-stockbee-controls-verification-v3"
+PREREGISTRATION_RELATIVE = Path("experiments/m04r/verify_m04r14_t14_11_stockbee_controls_v3_preregistered.json")
+OUTPUT_RELATIVE = Path("config/data/analogues/m04r14/t14-11-stockbee-controls-v1-verification-v3")
+INNER_RELATIVE = Path("config/data/analogues/m04r14/t14-11-stockbee-controls-v1-verification-v3-inner")
 RUNTIME_FILES = (
     "experiments/m04r/verify_m04r14_t14_11_stockbee_controls_v2.py",
     "experiments/m04r/verify_m04r14_t14_11_stockbee_controls.py",
@@ -85,13 +85,13 @@ def build_preregistration(repository: Path) -> dict[str, Any]:
     if _git(repository, "status", "--porcelain", "--untracked-files=all"):
         raise V2VerificationError("clean worktree required")
     if (repository / OUTPUT_RELATIVE).exists() or (repository / INNER_RELATIVE).exists():
-        raise V2VerificationError("V2 verification output already exists")
+        raise V2VerificationError("V3 verification output already exists")
     h0 = str(_git(repository, "rev-parse", "HEAD"))
     return _seal({
-        "schema_version": SCHEMA, "status": "frozen_before_v2_verification",
+        "schema_version": SCHEMA, "status": "frozen_before_v3_verification",
         "implementation_h0": h0, "runtime_files": _runtime_manifest(repository, h0),
         "producer": _store_binding(repository),
-        "v1_interruption": "no_receipt;manual_interrupt_after_redundant_per_event_bucket_rebuild_was_confirmed",
+        "prior_attempts": "v1_interrupted_without_receipt_after_redundant_rebuild;v2_preregistered_but_preflight_rejected_before_execution",
         "semantic_change_from_v1": False,
         "mechanical_change": "cache_independently_rebuilt_candidate_buckets_once_per_names_deciles_nonwinner_identity",
         "all_control_rows_still_checked": True, "all_inference_rows_still_reconstructed": True,
@@ -110,7 +110,7 @@ def _sole_child(repository: Path, raw: bytes, h0: str) -> str:
             if parents == [child, h0] and changed == [PREREGISTRATION_RELATIVE.as_posix()] \
                     and _git(repository, "show", f"{child}:{PREREGISTRATION_RELATIVE}", raw=True) == raw:
                 found.append(child)
-    if len(set(found)) != 1: raise V2VerificationError("expected exact V2 preregistration-only child")
+    if len(set(found)) != 1: raise V2VerificationError("expected exact V3 preregistration-only child")
     return found[0]
 
 
@@ -119,10 +119,10 @@ def validate_preregistration(repository: Path) -> tuple[dict[str, Any], str]:
         raise V2VerificationError("clean worktree required")
     path = repository / PREREGISTRATION_RELATIVE; raw = path.read_bytes(); prereg = base._read(path)
     if not _valid(prereg, "preregistration_digest") or prereg.get("producer") != _store_binding(repository):
-        raise V2VerificationError("V2 preregistration or producer binding differs")
+        raise V2VerificationError("V3 preregistration or producer binding differs")
     h1 = _sole_child(repository, raw, str(prereg["implementation_h0"]))
     if subprocess.run(["git", "merge-base", "--is-ancestor", h1, "HEAD"], cwd=repository).returncode:
-        raise V2VerificationError("HEAD does not descend from V2 preregistration")
+        raise V2VerificationError("HEAD does not descend from V3 preregistration")
     for name, expected in prereg["runtime_files"].items():
         if _sha(repository / name) != expected: raise V2VerificationError(f"runtime drifted: {name}")
     return prereg, h1
@@ -133,12 +133,11 @@ def cached_selector():
     state: dict[str, Any] = {}
 
     def select(names, deciles, nonwinner, event_symbol, event_deciles, contract, event_id):
-        if state.get("names") is not names or state.get("deciles") is not deciles \
-                or state.get("nonwinner") is not nonwinner:
+        if state.get("names") is not names or state.get("deciles") is not deciles:
             buckets: dict[tuple[int, ...], list[int]] = defaultdict(list)
             for index in np.flatnonzero(nonwinner):
                 buckets[tuple(int(value) for value in deciles[index])].append(int(index))
-            state.clear(); state.update(names=names, deciles=deciles, nonwinner=nonwinner, buckets=buckets,
+            state.clear(); state.update(names=names, deciles=deciles, buckets=buckets,
                                         all_indices=list(np.flatnonzero(nonwinner)))
         key = tuple(int(value) for value in event_deciles); exact = state["buckets"].get(key, [])
         if len(exact) >= 5: pool, tier = exact, "exact_all_four_deciles"
@@ -160,7 +159,7 @@ def execute(repository: Path) -> dict[str, Any]:
     output = repository / OUTPUT_RELATIVE
     if output.exists():
         receipt = base._read(output / "VERIFIED.json")
-        if not _valid(receipt, "verification_digest"): raise V2VerificationError("existing V2 receipt differs")
+        if not _valid(receipt, "verification_digest"): raise V2VerificationError("existing V3 receipt differs")
         return receipt
     started = perf_counter(); inner_root = repository / INNER_RELATIVE
     if inner_root.exists():

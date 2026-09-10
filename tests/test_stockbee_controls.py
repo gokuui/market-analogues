@@ -93,7 +93,8 @@ def test_cached_independent_selector_is_exactly_v1_equivalent_across_groups() ->
         nonwinner = np.array([False, True, True, True, True, True, True, True])
         for event_id in ("one", "two"):
             expected = verifier_v1._select(names, deciles, nonwinner, "EVENT", deciles[0], "contract", event_id)
-            assert cached(names, deciles, nonwinner, "EVENT", deciles[0], "contract", event_id) == expected
+            # V1 constructs ``~winner`` inline, so each call receives a fresh but equal mask.
+            assert cached(names, deciles, nonwinner.copy(), "EVENT", deciles[0], "contract", event_id) == expected
 
 
 @pytest.mark.parametrize("function,args", [

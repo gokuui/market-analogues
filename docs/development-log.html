@@ -2141,6 +2141,12 @@
   <p><b>V2 repair:</b> Retain every independent V1 rank, relaxation, SHA-256, exposure, bootstrap, Holm and decision check. Cache only the candidate buckets by object identity once per date/population group, prove exact V1/V2 selector parity across exact, relaxed, fallback and successive-group fixtures, and preregister V2 against the already sealed producer digest before execution.</p>
   <p><b>Next:</b> Commit the V2 verifier/test/log as H0, generate a sole-file V2 verification preregistration, then run the same exhaustive all-row audit without rerunning or changing the producer.</p>
 </section>
+<section class="entry">
+  <h2>L-259 — Verifier V2 preregistered but rejected at preflight; V3 cache-key repair</h2>
+  <p><b>V2 boundary:</b> H0 <code>94fba52</code> and sole-child preregistration <code>cf162de</code> were frozen, but no V2 execution or receipt was produced. A pre-launch code-flow review found that V1 constructs <code>~winner</code> inline for each event, giving the otherwise equal mask a new object identity every time. V2's proposed cache key included that transient identity and therefore would still have rebuilt buckets per event.</p>
+  <p><b>V3 repair:</b> Key the cache only on the stable per-group symbol and decile array identities; construct the non-winner buckets from the first mask received for that group. The strengthened parity test deliberately supplies a fresh equal mask for successive event calls and then a new group, reproducing the real V1 call behavior while requiring identical selected indices and tiers.</p>
+  <p><b>Next:</b> Re-run focused and complete tests, freeze V3 H0/H1, and execute V3 once. Producer bytes, results, formulas and every exhaustive verification assertion remain unchanged.</p>
+</section>
 </main>
 
 <section id="reproduce">
