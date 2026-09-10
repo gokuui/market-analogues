@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Market Analogues — post-release research and POC plan</title>
+  <style>
+    body{font-family:system-ui,sans-serif;max-width:1180px;margin:2rem auto;padding:0 1rem;color:#17202a;line-height:1.52}
+    h1,h2,h3{line-height:1.2}table{border-collapse:collapse;width:100%;display:block;overflow:auto}
+    th,td{padding:.65rem;border-bottom:1px solid #ccd1d1;text-align:left;vertical-align:top}th{background:#f2f3f4}
+    section{padding:1rem 0;border-bottom:1px solid #d5d8dc}.pass{color:#176b37;font-weight:700}.reject{color:#a61b1b;font-weight:700}.open{color:#8a6500;font-weight:700}
+    .boundary{background:#fff5d8;padding:1rem}code{overflow-wrap:anywhere}li{margin:.35rem 0}sup a{text-decoration:none}
+  </style>
+</head>
+<body>
+<h1>Post-release research and POC plan</h1>
+
+<section>
+  <h2>Executive decision</h2>
+  <p>The released system already answers the mechanical question correctly: retrieve causally valid historical OHLCV/market-context analogues, freeze their ranking, and then report what happened next. E2E-01–05 pass; the final snapshot records 1,226 passing tests, 37 parsed HTML documents, clean Git integrity, restart/concurrency identity and independently reconstructed real-NSE evidence.<sup><a href="#src-1">1</a></sup></p>
+  <p>The next problem is not another speed rewrite. It is whether the returned neighborhood is <em>meaningful enough</em> for a trader: is there a strong precedent or only a least-bad match, do a few generic episodes become hubs, is the match stable across chart views, are price/volume/market moves allowed realistic timing offsets, and did the historical futures form distinct failure/continuation modes?</p>
+  <p class="pass"><b>Selected order:</b> adequacy diagnostics → fixed-neighbor outcome modes → variable-duration/channel-lag POC → stronger synthetic coverage → optional alignment/structure explanations. No new distance replaces <code>distance-v1</code> unless it wins a frozen, outcome-blind gate and receives its own exhaustive authority.</p>
+</section>
+
+<section class="boundary">
+  <h2>Hard boundaries</h2>
+  <ul>
+    <li><b>Retrieval correctness and predictive usefulness are separate.</b> The existing walk-forward composite and 4% post-signal study did not authorize a predictive feature. That negative evidence remains.</li>
+    <li><b>No outcome-guided distance tuning.</b> Forward returns cannot choose windows, channels, weights, lag limits, temperatures or normalization.</li>
+    <li><b>No forced confidence percentage.</b> “75% similar” has no meaning until calibrated against causal null neighborhoods and stability. The output may say that no adequate precedent exists.</li>
+    <li><b>No silent adaptive channel choice.</b> A query-dependent view may be shown as a separate panel, but it cannot quietly redefine the official composite.</li>
+    <li><b>No ML-model workstream.</b> Learned embeddings remain deferred; deterministic representations and transparent retrieval are the active scope.</li>
+    <li><b>Current evidence is local.</b> Large artifacts and source OHLCV live under Git-ignored paths and are not present in a source-only clone.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>What the earlier research already covered</h2>
+  <p>The existing evidence map already addresses ordinary, constrained, derivative and shape DTW; PAA, SAX, SFA and Haar summaries; Matrix Profile/MASS; perceptually important points and directional changes; MPdist, TWED and ERP; exact lower bounds; variable-length indexes; ANN proposal systems; metamorphic testing; delisting bias and backtest overfitting.<sup><a href="#src-2">2</a></sup> The M04R audit also measured and rejected several compact bounds instead of assuming they would work. Re-running those same ideas is low value.</p>
+  <p>The new audit therefore looked specifically for gaps in multichannel timing, pattern maturity, neighborhood trust, future-path presentation, evolving motifs and explanation. No inspected open-source project combines the local system's causal source locks, custom exact score, full-universe certificate, overlap/diversity rules, restart integrity and post-retrieval outcome embargo.</p>
+</section>
+
+<section>
+  <h2>Research findings that change the plan</h2>
+  <table>
+    <thead><tr><th>Gap</th><th>Evidence</th><th>Local implication</th><th>Decision</th></tr></thead>
+    <tbody>
+      <tr><td>Shared versus independent channel timing</td><td>Dependent and independent multidimensional DTW capture different relations; neither universally dominates. Flexible multivariate search can model bounded inter-variable delay.<sup><a href="#src-3">3</a></sup><sup><a href="#src-4">4</a></sup></td><td>The current shared DTW path may punish a legitimate volume lead or let one channel's alignment distort another.</td><td class="pass">Highest-priority representation POC.</td></tr>
+      <tr><td>Variable maturity/boundaries</td><td>PSI-DTW, causal Matrix-Profile segmentation and LoCoMotif address irrelevant prefixes, regime boundaries and variable-length warped motifs.<sup><a href="#src-5">5</a></sup><sup><a href="#src-6">6</a></sup><sup><a href="#src-7">7</a></sup></td><td>A 252-session window can contain the same current setup preceded by unrelated history. Flexible matching can also cheat by selecting a tiny tail.</td><td class="pass">Test with explicit minimum length and trim penalty.</td></tr>
+      <tr><td>One brittle best warp</td><td>Global alignment kernels aggregate alignments; soft-DTW divergence corrects raw soft-DTW's self-bias; DBA/TEKA summarize aligned cohorts.<sup><a href="#src-8">8</a></sup><sup><a href="#src-9">9</a></sup><sup><a href="#src-10">10</a></sup></td><td>Two equal hard-DTW scores can differ in alignment ambiguity. A cohort envelope may be easier to reason about than twenty isolated paths.</td><td class="open">Final-pool POC only; actual cases remain primary.</td></tr>
+      <tr><td>Forced nearest neighbors and hubs</td><td>High-dimensional spaces can create “popular” reverse neighbors; local/global scaling and reciprocity diagnostics reduce or expose this behavior.<sup><a href="#src-11">11</a></sup><sup><a href="#src-12">12</a></sup></td><td>Exactness proves the nearest under a metric, not that it is close in an absolute or locally unusual sense.</td><td class="pass">Measure before altering ranking.</td></tr>
+      <tr><td>Emergence and evolution</td><td>Novelets distinguish emerging behavior from motifs/discords; robust time-series chains trace evolving patterns through incremental neighbors.<sup><a href="#src-13">13</a></sup><sup><a href="#src-14">14</a></sup></td><td>The system should say when a chart has weak precedent and can show how comparable structures evolved, not only a static top-20.</td><td class="pass">Use as adequacy/explanation diagnostics.</td></tr>
+      <tr><td>Unsupervised motif families</td><td>Motiflets chooses a desired occurrence count rather than an arbitrary radius and supplies statistical length selection; recent motif benchmarks emphasize coverage and reproducibility.<sup><a href="#src-15">15</a></sup><sup><a href="#src-16">16</a></sup></td><td>Useful for discovering hard evaluation families without naming cups, VCPs or breakouts in advance.</td><td class="open">Offline query/verifier generation, not query-time truth.</td></tr>
+      <tr><td>Complexity and topology</td><td>CID identifies smooth-series bias; visibility graphs and recurrence plots encode topology/self-recurrence.<sup><a href="#src-17">17</a></sup><sup><a href="#src-18">18</a></sup><sup><a href="#src-19">19</a></sup></td><td>Could distinguish orderly coils from jagged paths, but an indiscriminate complexity correction could erase that distinction.</td><td class="open">Diagnostic component before any blended score.</td></tr>
+      <tr><td>Fixed wave/frequency representation</td><td>Wavelet scattering is deterministic, locally translation-invariant and stable to time warps; second-order coefficients capture transients/modulation.<sup><a href="#src-20">20</a></sup></td><td>Directly tests the “wave/frequency” idea without training a model. Earlier DCT work tested pruning efficiency, not semantic retrieval quality.</td><td class="open">Small semantic ablation after core POCs.</td></tr>
+      <tr><td>Price/volume/market interaction</td><td>Path signatures compactly encode ordered multivariate geometry and signed areas; recent financial evidence finds little incremental equity forecasting value, an important negative prior.<sup><a href="#src-21">21</a></sup><sup><a href="#src-22">22</a></sup></td><td>Lead-lag areas may explain interaction, but should not be presumed predictive.</td><td class="open">Explanation-only POC; low promotion prior.</td></tr>
+      <tr><td>Broader verifier support</td><td>GRATIS generates diverse controllable series across time-series feature space.<sup><a href="#src-23">23</a></sup></td><td>Hand-authored synthetic families can miss difficult stochastic cells, as the earlier million-candidate failure demonstrated.</td><td class="pass">Expand the verifier before promoting distance-v2.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>Repository audit</h2>
+  <table>
+    <thead><tr><th>Repository/system</th><th>Useful idea</th><th>Boundary and use</th></tr></thead>
+    <tbody>
+      <tr><td><a href="https://github.com/grahammccain/chart-library-mcp">Chart Library MCP</a> and <a href="https://chartlibrary.io/methodology">methodology</a></td><td>Closest product framing: analogues, outcome cohorts, market context, state transitions and future-path modes.</td><td>MIT client/MCP; retrieval engine/data are remote and closed. Adopt cohort-handle and playbook-mode ideas, not the engine.</td></tr>
+      <tr><td><a href="https://github.com/ML-KULeuven/SubTSMD">SubTSMD</a></td><td>Motifs in subsets of channels with channel-specific timing variation.</td><td>MIT, new in 2026. Diagnostic/proposal comparison; automatic channel selection cannot become hidden truth.</td></tr>
+      <tr><td><a href="https://github.com/ML-KULeuven/locomotif">LoCoMotif</a></td><td>Variable-length multivariate warped motif sets.</td><td>MIT. Bounded 126–252-session POC with fragment-decoy controls.</td></tr>
+      <tr><td><a href="https://github.com/patrickzib/motiflets">Motiflets</a></td><td>Data-guided motif length/set size and top-N motif retrieval.</td><td>GPL-3.0; concepts usable, code incorporation needs compliance. Offline family discovery only.</td></tr>
+      <tr><td><a href="https://github.com/stumpy-dev/stumpy">STUMPY</a></td><td>MSTUMP, pan-window profiles, snippets, segmentation and chains beyond the MASS path already used.</td><td>BSD-3-Clause and already optional. Lowest-risk external implementation POC.</td></tr>
+      <tr><td><a href="https://github.com/sipemu/motif-rs">motif-rs</a></td><td>Rust MASS, MSTUMP, STIMP, snippets, chains, streaming and MPdist.</td><td>MIT but young; claimed speedups require full differential tests against STUMPY.</td></tr>
+      <tr><td><a href="https://github.com/TheDatumOrg/MTSDistEval">MTSDistEval</a></td><td>Thirty multivariate measures, normalization choices and dependent/independent channel treatments.</td><td>No license found in the audited repository. Reimplement selected ideas; do not copy code.</td></tr>
+      <tr><td><a href="https://github.com/MChatzakis/DaiSy">DaiSy</a></td><td>Unified exact Euclidean indexing benchmark across several research systems.</td><td>MIT alpha. Useful only for a fixed-normalization distance-v2/proposal benchmark; cannot certify the custom score.</td></tr>
+      <tr><td><a href="https://github.com/aeon-toolkit/aeon">aeon</a></td><td>Reference distances plus a newer multivariate SimHash ANN index.</td><td>BSD-3-Clause. Approximate threshold seeder/baseline only.</td></tr>
+      <tr><td><a href="https://arxiv.org/abs/2512.14723">MS-Index</a></td><td>Exact multivariate subsequence search with query-time channel selection under Euclidean distance.</td><td>Useful indexing/channel-selection evidence, but distance semantics do not transfer to <code>distance-v1</code>.</td></tr>
+    </tbody>
+  </table>
+  <p><b>Audit date:</b> 10 September 2026. Repository activity and releases are time-sensitive; verify them again before dependency adoption.</p>
+</section>
+
+<section>
+  <h2>Preliminary local diagnostic</h2>
+  <p>A read-only scan of the sealed NASDAQ evidence store found 65,400 selected rows across 3,270 queries. There are 56,378 distinct matched episodes; 90.13% appear once, the 99th-percentile occurrence count is four, the maximum is 38, and the top 1% account for 5.57% of selections. At symbol level, 7,325 symbols appear and the maximum count is 90. Across queries, the median ratio of rank-20 to rank-1 distance is 1.076.</p>
+  <p class="boundary"><b>Interpretation:</b> these counts justify a formal adequacy audit but do not prove harmful hubness. Older/longer-lived symbols have more eligible episodes, cutoffs differ, and diversity rules cap within-query reuse. The formal POC must normalize observed selections by causal opportunity/exposure and compare with matched null queries before changing anything.</p>
+</section>
+
+<section>
+  <h2>Execution plan and gates</h2>
+  <h3>R1 — Analogue adequacy certificate</h3>
+  <p><b>Goal:</b> decide whether the top-20 is a strong neighborhood, a fragile neighborhood, or merely the nearest available set. Retrieval remains byte-identical.</p>
+  <ol>
+    <li>Freeze a development registry disjoint from all final evaluation cases.</li>
+    <li>Compute causal eligibility exposure per candidate episode/symbol and exposure-normalized reverse-neighbor occurrence.</li>
+    <li>Measure reciprocity where both directed queries are temporally legal, local distance contrast, rank-20/rank-1 ratio, neighbor-set stability under one-group removal, small input perturbations and nearby cutoff shifts.</li>
+    <li>Construct causal null queries matched on cutoff, history length, tier, liquidity and volatility. Report each real query's distance percentile against that null.</li>
+    <li>Publish three labels only: <code>strong precedent</code>, <code>weak/unstable precedent</code>, or <code>insufficient evidence</code>. Thresholds are frozen from synthetic/development data, never future returns.</li>
+  </ol>
+  <p><b>Pass:</b> clone/known-positive adequacy ≥95%; known negatives/novel paths abstain ≥95%; future mutation changes no label; exposure-normalized hub diagnostics reproduce independently; original neighbor identities remain unchanged. If calibration fails, publish raw diagnostics only.</p>
+
+  <h3>R2 — Fixed-neighbor future-path modes</h3>
+  <p><b>Goal:</b> make “what happened next?” more useful without changing which histories were retrieved.</p>
+  <ol>
+    <li>Freeze the existing top-20 and their outcome eligibility before clustering.</li>
+    <li>Normalize each observable 60/126-session future path at the historical cutoff. Keep absolute and benchmark-relative paths separate.</li>
+    <li>Compare deterministic medoid clustering for <code>k=1..4</code>; select only through a frozen stability/separation rule. Never assign trader pattern names automatically.</li>
+    <li>Show actual medoids, membership, frequency, median/IQR envelopes, MFE/MAE/barriers and censored counts. Store a cohort handle so filters can be replayed exactly.</li>
+    <li>Mutate outcomes and prove retrieval digests and neighbors remain identical.</li>
+  </ol>
+  <p><b>Pass:</b> deterministic repeat identity; bootstrap adjusted-Rand stability ≥0.80; every displayed mode has ≥3 effective cases; all censored paths explicit; cluster count becomes one or abstains when modes are unstable. This is descriptive, not predictive.</p>
+
+  <h3>R3 — Variable-duration and channel-lag distance-v2 POC</h3>
+  <p><b>Goal:</b> test how a professional reader tolerates different setup duration and volume/market lead-lag without discarding contradictions.</p>
+  <ol>
+    <li>Implement experiment-only variants: shared-path DTW; independent per-channel DTW; shared price path plus frozen ±1/±3/±5-session volume/context lags; causal boundary proposals with 63/126/189/252 lengths; and prefix-relaxed matching with a trim penalty.</li>
+    <li>Generate synchronized positives, known volume leads, reversed/shifted volume decoys, benchmark contradictions, isolated shocks, irrelevant prefixes, partial maturity and tiny-fragment decoys.</li>
+    <li>Compare every variant against <code>distance-v1</code> on identical cases and compute a small exhaustive authority for each candidate metric.</li>
+  </ol>
+  <p><b>Pass:</b> 100% clone recovery; ≥98% positive-over-decoy ordering; ≤2% context/critical-negative errors; lag recovery within one session; no systematic minimum-length collapse; family nDCG improvement with a predeclared margin; acceptable latency/RSS. Otherwise retain v1.</p>
+
+  <h3>R4 — Verifier-envelope expansion</h3>
+  <p>Measure the causal real-prefix envelope over trend, ACF, spectral entropy, lumpiness, spikiness, volatility, nonlinearity and break strength. Use GRATIS-like generators to fill sparse cells, then synthesize valid OHLCV and benchmark coupling with known transformations. Report failures per cell, not only averages. Add million-distractor and fragment-decoy swarms before any v2 promotion.</p>
+
+  <h3>R5 — Optional final-pool and explanation POCs</h3>
+  <ul>
+    <li>Soft-DTW <em>divergence</em> (not biased raw soft-DTW) and alignment entropy on only the exact top 128–256.</li>
+    <li>Actual medoid plus DBA/TEKA envelope, suppressed on leave-one-out instability.</li>
+    <li>CID, visibility-graph and recurrence diagnostics against coil-versus-chop negatives.</li>
+    <li>Fixed wavelet scattering and path-signature distances as transparent, no-training views.</li>
+    <li>Shapelet/Contrast-Profile highlights explaining supportive and contradictory local fragments. Outcome-derived fragments stay within each historical training fold.</li>
+    <li>STUMPY snippets/chains/multidimensional profiles for difficult-query discovery and developmental explanations.</li>
+  </ul>
+
+  <h3>R6 — Promotion and outcome test</h3>
+  <p>Only a representation that passes R3/R4 may receive a versioned packed store and new untouched authority registry. Then run a preregistered expanding-window comparison against unconditional, recent-return/volatility, price-only and current-composite baselines. Promotion requires both retrieval semantics and out-of-sample Brier/log-loss improvement across populations/eras; persuasive charts alone are insufficient.</p>
+</section>
+
+<section>
+  <h2>Final product output</h2>
+  <pre><code>Current chart: XYZ through 2026-09-10
+Analogue adequacy: WEAK / STABLE / STRONG
+  causal-null percentile: 97.4%
+  leave-one-view-out overlap: 16/20
+  neighborhood concentration: normal after eligibility adjustment
+
+Historical analogues: 20 exact-certified cases
+  price/candle agreement: ...
+  contraction/volatility agreement: ...
+  volume/shock agreement: ...
+  market/relative-strength agreement: ...
+  structural agreement: ...
+  alignment and differing regions highlighted
+
+What followed (descriptive):
+  Mode A — continuation: 8 cases, medoid link, envelope, MFE/MAE
+  Mode B — failed breakout: 6 cases, medoid link, envelope, MFE/MAE
+  Mode C — sideways/chop: 4 cases, medoid link, envelope, MFE/MAE
+  Censored/unusable: 2 cases
+
+Boundary: historical evidence, not a forecast or recommendation.</code></pre>
+  <p>This retains individual historical charts—the core “professional memory” metaphor—while adding enough diagnostics to know when that memory is coherent, contradictory or absent.</p>
+</section>
+
+<section>
+  <h2>Stop rules</h2>
+  <ul>
+    <li>One numbered POC at a time; code, thresholds and evidence schema committed before opening real evaluation results.</li>
+    <li>Failed outputs remain immutable. A correction uses a new namespace and explains exactly why the earlier result failed.</li>
+    <li>A method is rejected when it misses any correctness boundary even if it is faster or visually attractive.</li>
+    <li>A method is closed as “no material improvement” when the declared semantic gain is absent; it is not repeatedly tuned on the same holdout.</li>
+    <li>No full-universe rebuild until a small exhaustive POC wins and an independent verifier reconstructs it.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Sources</h2>
+  <ol>
+    <li id="src-1">Market Analogues. <a href="release-status.html">Verified release status</a>. 2026.</li>
+    <li id="src-2">Market Analogues. <a href="m04r-research-and-poc-report.html">M04R research audit and POC evidence</a>. 2026.</li>
+    <li id="src-3">Shokoohi-Yekta et al. <a href="https://www.cs.ucr.edu/~eamonn/Multi-Dimensional_DTW_Journal.pdf">Generalizing DTW to the multidimensional case requires an adaptive approach</a>. Data Mining and Knowledge Discovery, 2017.</li>
+    <li id="src-4">Gong et al. <a href="https://c3.ndc.nasa.gov/dashlink/static/media/publication/mts_paper.pdf">Discovering temporal patterns in multivariate time series with arbitrary delays</a>. NASA Ames/AAAI paper.</li>
+    <li id="src-5">Silva et al. <a href="https://www.cs.ucr.edu/~eamonn/psi_DTW_10pages.pdf">Prefix and suffix invariant dynamic time warping</a>. ICDM, 2016.</li>
+    <li id="src-6">Gharghabi et al. <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC6373324/">Domain agnostic online semantic segmentation for multi-dimensional time series</a>. Data Mining and Knowledge Discovery, 2019.</li>
+    <li id="src-7">Van Wesenbeeck et al. <a href="https://arxiv.org/abs/2311.17582">LoCoMotif: discovering time-warped motifs in time series</a>. 2023.</li>
+    <li id="src-8">Cuturi et al. <a href="https://marcocuturi.net/Papers/GAkernel-ICASSP.pdf">A kernel for time series based on global alignments</a>. ICASSP, 2007.</li>
+    <li id="src-9">Blondel et al. <a href="https://proceedings.mlr.press/v130/blondel21a.html">Differentiable divergences between time series</a>. AISTATS, 2021.</li>
+    <li id="src-10">Petitjean et al. <a href="https://www.sciencedirect.com/science/article/pii/S003132031000453X">A global averaging method for dynamic time warping</a>. Pattern Recognition, 2011.</li>
+    <li id="src-11">Radovanović et al. <a href="https://www.jmlr.org/beta/papers/v11/radovanovic10a.html">Hubs in space: popular nearest neighbors in high-dimensional data</a>. JMLR, 2010.</li>
+    <li id="src-12">Schnitzer et al. <a href="https://www.jmlr.org/papers/v13/schnitzer12a.html">Local and global scaling reduce hubs in space</a>. JMLR, 2012.</li>
+    <li id="src-13">Mercer and Keogh. <a href="https://static1.squarespace.com/static/56dca322f8baf30cf9752a85/t/631900e16f7b7e792701943a/1662583010347/Novelets_V029_CameraReady.pdf">Novelets: online detection of emerging behaviors</a>. ICDM, 2022.</li>
+    <li id="src-14">Zhang et al. <a href="https://arxiv.org/abs/2211.02146">Robust time-series chain discovery with incremental nearest neighbors</a>. ICDM, 2022.</li>
+    <li id="src-15">Schäfer and Leser. <a href="https://www.vldb.org/pvldb/vol16/p725-schafer.pdf">Motiflets: simple and accurate detection of motifs in time series</a>. PVLDB, 2022.</li>
+    <li id="src-16">Van Wesenbeeck et al. <a href="https://arxiv.org/abs/2412.09346">PROM and TSMD-Bench</a>. 2024.</li>
+    <li id="src-17">Batista et al. <a href="https://www.cs.ucr.edu/~eamonn/Complexity-Invariant%20Distance%20Measure.pdf">A complexity-invariant distance measure for time series</a>. SDM, 2011.</li>
+    <li id="src-18">Lacasa et al. <a href="https://wiki.santafe.edu/images/8/89/2008_LacasaL_PNAS.pdf">From time series to complex networks: the visibility graph</a>. PNAS, 2008.</li>
+    <li id="src-19">Eckmann et al. <a href="https://fiteoweb.unige.ch/~eckmannj/ps_files/recurrenceplots.pdf">Recurrence plots of dynamical systems</a>. Europhysics Letters, 1987.</li>
+    <li id="src-20">Andén and Mallat. <a href="https://arxiv.org/abs/1304.6763">Deep scattering spectrum</a>. IEEE Transactions on Signal Processing, 2014.</li>
+    <li id="src-21">Chevyrev and Kormilitzin. <a href="https://arxiv.org/abs/1603.03788">A primer on the signature method in machine learning</a>. 2016.</li>
+    <li id="src-22">Choi. <a href="https://onlinelibrary.wiley.com/doi/10.1002/for.70176">Efficient computation of lead-lag signature features for financial time-series forecasting</a>. Journal of Forecasting, 2026.</li>
+    <li id="src-23">Kang et al. <a href="https://arxiv.org/abs/1903.02787">GRATIS: generating time series with diverse and controllable characteristics</a>. Statistical Analysis and Data Mining, 2020.</li>
+    <li>Ye and Keogh. <a href="https://link.springer.com/article/10.1007/s10618-010-0179-5">Time-series shapelets: a new primitive for data mining</a>. Data Mining and Knowledge Discovery, 2011.</li>
+    <li>Mercer et al. <a href="https://par.nsf.gov/servlets/purl/10353674">Contrast Profile: a novel time-series primitive</a>. ICDM, 2021.</li>
+    <li>Echihabi et al. <a href="https://www.vldb.org/pvldb/vol13/p403-echihabi.pdf">Return of the lernaean hydra: experimental evaluation of data-series similarity search</a>. PVLDB, 2019.</li>
+    <li>d'Hondt et al. <a href="https://arxiv.org/abs/2512.14723">MS-Index: fast top-k subsequence search for multivariate time series</a>. PVLDB, 2026.</li>
+    <li><a href="https://github.com/stumpy-dev/stumpy">STUMPY</a>. BSD-3-Clause matrix-profile implementation and documentation. Accessed 2026-09-10.</li>
+    <li><a href="https://github.com/ML-KULeuven/SubTSMD">SubTSMD</a>, <a href="https://github.com/ML-KULeuven/locomotif">LoCoMotif</a>, and <a href="https://github.com/patrickzib/motiflets">Motiflets</a>. Repository sources accessed 2026-09-10.</li>
+    <li><a href="https://github.com/grahammccain/chart-library-mcp">Chart Library MCP</a>, <a href="https://github.com/sipemu/motif-rs">motif-rs</a>, <a href="https://github.com/MChatzakis/DaiSy">DaiSy</a>, and <a href="https://github.com/aeon-toolkit/aeon">aeon</a>. Repository sources accessed 2026-09-10.</li>
+  </ol>
+</section>
+</body>
+</html>
