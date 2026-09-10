@@ -2134,6 +2134,13 @@
   <p class="pass"><b>Pre-real gates:</b> Seventeen focused Stockbee tests pass, including tied deciles, exact/relaxed/shortfall matching, unique deterministic hash order and an independently coded bootstrap oracle. Review also corrected a prospective full-risk denominator scope before preregistration; no matched-control result has been opened.</p>
   <p><b>Next:</b> Run the complete repository suite, commit this implementation/log as H0, generate and commit only its preregistration JSON as sole-child H1, then execute the real producer and committed independent verifier.</p>
 </section>
+<section class="entry">
+  <h2>L-258 — Stockbee producer sealed; verifier V1 performance refusal</h2>
+  <p class="pass"><b>Frozen producer:</b> H0 <code>1066ae0</code> and sole-child H1 <code>7449b61</code> fixed matching, inference and all 32 tests before real matched results. The atomic producer completed in 694.35 seconds and sealed 710,373 event/population rows, 3,551,826 control links, 32 primary inference rows and 16 predictive-lift rows at result digest <code>55da5a46…25298</code>.</p>
+  <p class="fail"><b>Verifier V1 refusal:</b> The verifier remained CPU-active with no semantic mismatch, but inspection of the confirmed interrupt traceback showed that it rebuilt the identical date/population non-winner bucket inside every event call. It was manually interrupted after roughly 46 minutes with no receipt. The producer store remains sealed and unchanged; no failed verification artifact exists.</p>
+  <p><b>V2 repair:</b> Retain every independent V1 rank, relaxation, SHA-256, exposure, bootstrap, Holm and decision check. Cache only the candidate buckets by object identity once per date/population group, prove exact V1/V2 selector parity across exact, relaxed, fallback and successive-group fixtures, and preregister V2 against the already sealed producer digest before execution.</p>
+  <p><b>Next:</b> Commit the V2 verifier/test/log as H0, generate a sole-file V2 verification preregistration, then run the same exhaustive all-row audit without rerunning or changing the producer.</p>
+</section>
 </main>
 
 <section id="reproduce">

@@ -2,14 +2,21 @@ from __future__ import annotations
 
 from hashlib import sha256
 import math
+from pathlib import Path
+import sys
 
 import numpy as np
 import pytest
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
 
 from market_analogues.stockbee_controls import (
     StockbeeControlError, bucket_members, control_order_digest,
     cross_sectional_deciles, moving_block_positive_inference, select_control_indices,
 )
+from experiments.m04r import verify_m04r14_t14_11_stockbee_controls as verifier_v1
+from experiments.m04r import verify_m04r14_t14_11_stockbee_controls_v2 as verifier_v2
 
 
 def test_average_rank_deciles_are_deterministic_at_ties() -> None:
@@ -74,6 +81,19 @@ def test_positive_block_bootstrap_matches_independent_seeded_oracle() -> None:
     values = np.array([-.1, .2, .3, .05, .4, .2, -.05, .1])
     observed = moving_block_positive_inference(values, resamples=200, block_length=3, seed=9)
     assert observed == _bootstrap_reference(values, 200, 3, 9)
+
+
+def test_cached_independent_selector_is_exactly_v1_equivalent_across_groups() -> None:
+    cached = verifier_v2.cached_selector()
+    for offset in (0, 2):
+        names = np.array(["EVENT", "A", "B", "C", "D", "E", "F", "G"], dtype=object)
+        deciles = np.array([[5, 5, 5, 5], [5, 5, 5, 5], [5, 5, 5, 5], [4, 5, 5, 5],
+                            [6, 6, 6, 6], [5, 4, 5, 5], [10, 10, 10, 10], [3, 3, 3, 3]], dtype=np.uint8)
+        deciles[:, 0] = np.clip(deciles[:, 0] + offset, 1, 10)
+        nonwinner = np.array([False, True, True, True, True, True, True, True])
+        for event_id in ("one", "two"):
+            expected = verifier_v1._select(names, deciles, nonwinner, "EVENT", deciles[0], "contract", event_id)
+            assert cached(names, deciles, nonwinner, "EVENT", deciles[0], "contract", event_id) == expected
 
 
 @pytest.mark.parametrize("function,args", [
