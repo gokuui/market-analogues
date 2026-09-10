@@ -2312,6 +2312,7 @@
   <p><b>Coverage is explicit:</b> 239, 236 and 231 of the 240 retrieved episodes have complete outcomes observable by the corresponding query cutoff at 5, 20 and 60 sessions. Missing, truncated or not-yet-observable paths remain present and labelled rather than being replaced. All 13 generated HTML files parse and retain the descriptive-not-forecast boundary.</p>
   <p><b>Bindings:</b> Retrieval verification <code>e85a2c17…7567dc</code>; NSE evidence result <code>982cf6ca…7d42d</code>; semantic universe prefix <code>cffc06d9…d787</code>; maximum prefix cutoff 11 February 2026. The gate ledger records E2E-03 PASS with no failures.</p>
   <p><b>Next:</b> E2E-04 will bind the already independently sealed T14-05 restart/concurrency/resource qualification to this release path and add current-artifact corruption, atomicity and resume checks. It will not rerun expensive evidence merely to reproduce an already sealed performance measurement.</p>
+  <p><b>Pre-E2E-04 receipt audit:</b> The successful V4 computation remains valid, but its writer omitted <code>registry_digest</code> from the persisted dataclass even though that value participated in the semantic result digest. A third party therefore could not reconstruct the digest from the saved file alone. V5 adds that field without changing retrieval or outcome logic; E2E-04 will bind only the reconstructible V5 receipt.</p>
 </section>
 </main>
 

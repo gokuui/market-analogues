@@ -236,7 +236,7 @@ def cmd_verify_portable_e2e(args: argparse.Namespace) -> int:
 def cmd_verify_nse_e2e(args: argparse.Namespace) -> int:
     config = load_config(args.config)
     output_dir = Path(args.output_dir) if args.output_dir else (
-        config.artifact_dir / "portability" / "nse-real-e2e-verification-v4"
+        config.artifact_dir / "portability" / "nse-real-e2e-verification-v5"
     )
     if args.dataset != "nse":
         raise SystemExit("the certified real-source replay currently targets nse")

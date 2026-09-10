@@ -6,6 +6,7 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from html import escape
 import json
+import math
 import os
 from pathlib import Path
 from typing import Any, Mapping
@@ -55,6 +56,7 @@ class NseE2EVerification:
     repeated_evidence_equal: bool
     source_lock_unchanged: bool
     workers: int
+    registry_digest: str
     source_universe_digest: str
     authority_generation: str
     authority_verification_digest: str | None
@@ -64,6 +66,65 @@ class NseE2EVerification:
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+
+_RESULT_STATE_FIELDS = (
+    "schema_version", "dataset", "registry_digest", "source_universe_digest",
+    "workers", "benchmark_full_fingerprint_drift", "source_lock_unchanged",
+    "authority_generation", "authority_verification_digest", "prefix_lock_cutoff",
+)
+
+
+def validate_nse_e2e_result_payload(payload: Mapping[str, Any]) -> tuple[str, ...]:
+    """Reconstruct a persisted real-source receipt and all derived counters."""
+    failures: list[str] = []
+    records = payload.get("case_records")
+    if type(records) is not list:
+        return ("case records are missing",)
+    try:
+        state = {
+            **{key: payload[key] for key in _RESULT_STATE_FIELDS},
+            "cases": records,
+            "failures": list(payload["failures"]),
+        }
+    except (KeyError, TypeError):
+        return ("semantic result fields are missing",)
+    if payload.get("result_digest") != stable_hash(state):
+        failures.append("semantic result digest differs")
+    expected = {
+        "cases": len(records),
+        "current_cases": sum(row.get("cutoff_role") == "current" for row in records),
+        "historical_cases": sum(
+            row.get("cutoff_role") == "historical" for row in records
+        ),
+        "quality_tiers": sorted({str(row.get("quality_tier")) for row in records}),
+        "liquidity_strata": sorted({
+            str(row.get("liquidity_stratum")) for row in records
+        }),
+        "exact_matches": sum(int(row.get("matches", -1)) for row in records),
+        "evidence_rows": sum(int(row.get("evidence_rows", -1)) for row in records),
+        "eligible_5": sum(int(row.get("eligible_5", -1)) for row in records),
+        "eligible_20": sum(int(row.get("eligible_20", -1)) for row in records),
+        "eligible_60": sum(int(row.get("eligible_60", -1)) for row in records),
+    }
+    for key, value in expected.items():
+        observed = payload.get(key)
+        if key in {"quality_tiers", "liquidity_strata"} \
+                and isinstance(observed, (list, tuple)):
+            observed = list(observed)
+        if observed != value:
+            failures.append(f"derived field differs: {key}")
+    maximum = max(
+        (float(row.get("maximum_selected_rescore_delta", math.inf)) for row in records),
+        default=math.inf,
+    )
+    if float(payload.get("maximum_selected_rescore_delta", math.inf)) != maximum:
+        failures.append("derived maximum rescore delta differs")
+    if payload.get("selected_match_rescore_equal") is not (maximum <= 1e-12):
+        failures.append("derived rescore equality differs")
+    if payload.get("passed") is not (not payload.get("failures")):
+        failures.append("pass flag differs")
+    return tuple(failures)
 
 
 def analogue_match_from_payload(raw: Mapping[str, Any]) -> AnalogueMatch:
@@ -428,6 +489,7 @@ def run_nse_e2e_verification(
         maximum_selected_rescore_delta=maximum_rescore_delta,
         repeated_evidence_equal=not any("repeated evidence" in value for value in failures),
         source_lock_unchanged=unchanged, workers=workers,
+        registry_digest=registry_digest,
         source_universe_digest=before_digest,
         authority_generation=state["authority_generation"],
         authority_verification_digest=authority_verification_digest,
