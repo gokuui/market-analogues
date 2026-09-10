@@ -14,6 +14,7 @@ import tempfile
 from time import perf_counter
 from typing import Any, Mapping, Sequence
 
+import numpy as np
 import pandas as pd
 
 from market_analogues.types import stable_hash
@@ -25,11 +26,11 @@ from experiments.m04r import m04r14_t14_12_final_matches as final_matches
 from experiments.m04r import m04r14_t14_12_weight_bakeoff as bakeoff
 
 
-SCHEMA = "m04r14-t14-12-post-signal-final-balance-v3"
-PREREGISTRATION_RELATIVE = Path("experiments/m04r/m04r14_t14_12_final_balance_v3_preregistered.json")
-CACHE_RELATIVE = Path("config/data/analogues/m04r14/t14-12-post-signal-final-balance-v3-cache")
-OUTPUT_RELATIVE = Path("config/data/analogues/m04r14/t14-12-post-signal-final-balance-v3")
-VERIFICATION_RELATIVE = Path("config/data/analogues/m04r14/t14-12-post-signal-final-balance-v3-verification")
+SCHEMA = "m04r14-t14-12-post-signal-final-balance-v4"
+PREREGISTRATION_RELATIVE = Path("experiments/m04r/m04r14_t14_12_final_balance_v4_preregistered.json")
+CACHE_RELATIVE = Path("config/data/analogues/m04r14/t14-12-post-signal-final-balance-v4-cache")
+OUTPUT_RELATIVE = Path("config/data/analogues/m04r14/t14-12-post-signal-final-balance-v4")
+VERIFICATION_RELATIVE = Path("config/data/analogues/m04r14/t14-12-post-signal-final-balance-v4-verification")
 OUTPUT_FILES = base_balance.OUTPUT_FILES
 RUNTIME_FILES = (
     "experiments/m04r/m04r14_t14_12_final_balance.py",
@@ -155,7 +156,7 @@ def _write_year(year: int, panel: pd.DataFrame, cache: Path, repository: Path) -
         if not _valid(value, timing=True): raise FinalBalanceError(f"final balance year differs: {year}")
         return value
     started = perf_counter(); controls = pd.read_parquet(repository / final_matches.CACHE_RELATIVE / f"year-{year}" / "control-identities.parquet")
-    stats, reuse = base_balance._year_stats(year, panel, controls)
+    stats, reuse = _year_stats_in_bakeoff_order(year, panel, controls)
     state = {"schema_version": SCHEMA, "status": "year_sealed", "passed": True, "year": year,
         "panel_rows": len(panel), "control_identity_rows": len(controls), "statistics": stats, "reuse": reuse,
         "outcome_columns_read": [], "post_signal_results_accessed": False, "elapsed_seconds": perf_counter() - started}
@@ -164,6 +165,44 @@ def _write_year(year: int, panel: pd.DataFrame, cache: Path, repository: Path) -
     try: smoke._atomic_json(temporary / "YEAR_SEALED.json", seal); os.replace(temporary, final)
     except BaseException: shutil.rmtree(temporary, ignore_errors=True); raise
     return seal
+
+
+def _year_stats_in_bakeoff_order(
+    year: int, panel: pd.DataFrame, controls: pd.DataFrame,
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    """Replay the date/population/signal accumulation order used by the frozen bake-off."""
+    stats: dict[str, dict[str, Any]] = defaultdict(base_balance._empty_stats); era = base_balance._era(year)
+    grouped_controls = {key: group for key, group in controls.groupby(
+        ["signal_date", "population", "signal_name"], sort=False,
+    )}
+    for signal_date, group in panel.groupby("signal_date", sort=True):
+        for population in ("broad", "investable"):
+            current = group if population == "broad" else group.loc[group.investable]
+            if current.empty: continue
+            current = current.reset_index(drop=True); names = current.symbol.astype(str).to_numpy(object)
+            positions = {str(name): index for index, name in enumerate(names)}
+            transformed = {name: base_balance._transform(name, current[name].to_numpy(float))
+                           for name in base_balance.TRANSFORMS}
+            for signal_name in final_matches.v1.SIGNALS:
+                selected = grouped_controls.get((pd.Timestamp(signal_date), population, signal_name))
+                if selected is None or selected.empty: continue
+                event_positions = np.fromiter((positions[str(value)] for value in selected.event_symbol), dtype=np.int64)
+                control_positions = np.fromiter((positions[str(value)] for value in selected.control_symbol), dtype=np.int64)
+                for name in base_balance.TRANSFORMS:
+                    event_values = transformed[name][event_positions]; control_values = transformed[name][control_positions]
+                    gaps = np.abs(selected[f"event_{name}_decile"].to_numpy(int)
+                                  - selected[f"control_{name}_decile"].to_numpy(int))
+                    for scope in ("overall", era):
+                        base_balance._add(stats[f"{population}|{signal_name}|{scope}|all|{name}"],
+                                          event_values, control_values, gaps)
+    reuse_rows = []
+    for (population, signal), group in controls.groupby(["population", "signal_name"], sort=True):
+        usage = group.groupby(["signal_date", "control_symbol"], sort=False).size().to_numpy(float)
+        reuse_rows.append({"year": year, "population": population, "signal_name": signal,
+            "control_rows": len(group), "unique_date_control_identities": len(usage),
+            "maximum_same_date_reuse": int(usage.max()),
+            "reuse_effective_size": float(usage.sum() ** 2 / np.dot(usage, usage))})
+    return dict(stats), reuse_rows
 
 
 def _selected_bakeoff_frame(repository: Path) -> pd.DataFrame:
