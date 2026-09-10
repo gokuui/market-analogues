@@ -2126,6 +2126,14 @@
   <p><b>Why controls still matter:</b> In the investable unclustered risk set, first-five +4% close prevalence is 71.13% among 21-session winners versus 25.66% among non-winners, and 47.96% versus 24.93% at 63 sessions. These gaps are promising but overlapping and unmatched; they are not the final controlled estimate.</p>
   <p><b>Next:</b> Construct deterministic same-date matched controls, retain relaxation/shortfall accounting, calculate paired calendar-month block inference and apply the preregistered Holm family before deciding claim support.</p>
 </section>
+<section class="entry">
+  <h2>L-257 — Stockbee matched-control and inference stage ready</h2>
+  <p><b>Frozen interpretation:</b> Four causal matching variables receive average-rank deciles separately inside each population/date/horizon cross-section. Investable events therefore match against the investable cross-section. Five controls are unique within an event; a non-winner may be reused for a different event because the contract's SHA-256 order is event-specific. The first relaxation tier containing five candidates is used, while final-tier shortfalls remain explicit.</p>
+  <p><b>Primary estimands:</b> Matched inference admits only events with all five controls and reports complete-event coverage. Full-risk inference compares clustered winner-event prevalence with unclustered non-winner prevalence within calendar month. Matched inference uses the monthly mean of event exposure minus the mean exposure of its five controls. Both receive a three-month moving-block, 10,000-resample one-sided positive-effect test and percentile interval; all 32 frozen primary cells share one Holm family.</p>
+  <p><b>Implementation and verifier:</b> The producer performs one column-pruned load of the 37,358,636-row verified risk store, streams control and event-match Parquet rather than retaining millions of Python records, and publishes atomically. The verifier uses a separate rank, bucket, SHA selection, bootstrap and Holm implementation and checks every control identity, rank, decile, exposure, aggregate and decision.</p>
+  <p class="pass"><b>Pre-real gates:</b> Seventeen focused Stockbee tests pass, including tied deciles, exact/relaxed/shortfall matching, unique deterministic hash order and an independently coded bootstrap oracle. Review also corrected a prospective full-risk denominator scope before preregistration; no matched-control result has been opened.</p>
+  <p><b>Next:</b> Run the complete repository suite, commit this implementation/log as H0, generate and commit only its preregistration JSON as sole-child H1, then execute the real producer and committed independent verifier.</p>
+</section>
 </main>
 
 <section id="reproduce">
