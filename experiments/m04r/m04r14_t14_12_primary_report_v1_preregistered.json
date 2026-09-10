@@ -1,0 +1,47 @@
+{
+  "base_seed": 20260910,
+  "block_length_months": 3,
+  "bootstrap_resamples": 10000,
+  "bootstrap_rule": "centered_moving_block_one_sided_positive_pvalue_and_uncentered_percentile_95pct_interval",
+  "complete_coverage_required": 0.9,
+  "coverage_failure_cannot_be_overridden_by_effect_or_pvalue": true,
+  "created_at": "2026-09-10T12:04:41.482060+00:00",
+  "family_size": 16,
+  "holm_alpha": 0.05,
+  "implementation_h0": "57db03fee3c209df8ce5009d35f4837866e4cb19",
+  "monthly_rule": "calendar_month_mean_of_complete_paired_event_differences",
+  "positive_eras_required": 4,
+  "post_signal_inference_authorized": false,
+  "preregistration_digest": "89086643f2d891a22964519657a5b1f265568d58e6c6b9554c3901460617ec84",
+  "primary_horizons": [
+    20,
+    60
+  ],
+  "primary_metrics": [
+    "benchmark_relative_log_return",
+    "endpoint_gain_25pct"
+  ],
+  "production_promotion_authorized": false,
+  "reporting_only": true,
+  "retrieval_feature_authorized": false,
+  "runtime_files": {
+    "config/m04r14-t14-12-post-signal-contract.json": "62eb072618ba9ffb199501e02aeda8ccb00ea66f3e081a7227424c4219ff748f",
+    "experiments/m04r/m04r14_t14_12_primary_report.py": "1843df1057c81c3e82002a8f0d317058bb07eb8004e081b5b7cbffb7a283a6d0",
+    "experiments/m04r/verify_m04r14_t14_12_primary_report.py": "5511c46b450a6dc7b15c003615d6c0141de63919e8cb0f9d52f312ac0e75c0e0",
+    "pyproject.toml": "9eeb5497e7c3cb4615345e9104cac78d93d45579f2ac71a1540f316c181858c1",
+    "src/market_analogues/stockbee_controls.py": "efe482b8eb0465f45cc18d78d4b01988489f930c824c837efd56155e39c5eb3a",
+    "src/market_analogues/walk_forward_scoring.py": "125e69b77f024d848c64df872683c9b10e1b8a5ee6c6c81f5a5f9fec33e233e4"
+  },
+  "schema_version": "m04r14-t14-12-primary-unsupported-report-v1",
+  "seed_rule": "base_seed_plus_first_8_sha256_hex_of_test_id",
+  "status": "frozen_before_unsupported_primary_effect_reporting",
+  "verified_outcomes": {
+    "minimum_paired_complete_fraction": 0.7245750884525147,
+    "outcome_decision_digest": "efb09a550b9758dc4c4bdb6b457731371f758621af2001c39d297ca8ea12b07d",
+    "outcome_decision_sha256": "2258c43624edebcea3a842781df64c1c68d7b27e6185a136bbdad64dd21f4f63",
+    "outcome_store_result_digest": "1290c53adb1674c70de1671eae92bae3c07d3c0e04e1d15afe87e58b50ab5c9a",
+    "outcome_store_sha256": "1f2ae69fb613c226ec8e29d58b5d2d62071a9b197b1d632cca3a9fb0e0b3c51e",
+    "outcome_verification_digest": "aa0c13bd0dc3a98e75a57b6e82f4def75982833b208e8ed39e688b3db22636b9",
+    "outcome_verification_sha256": "5a28e4826545467a0900a6a0b62891a1ff30698bc28c1ebd2cae823f7d94e405"
+  }
+}
