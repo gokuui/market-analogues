@@ -80,9 +80,10 @@
 </section>
 
 <section>
-  <h2>Preliminary local diagnostic</h2>
-  <p>A read-only scan of the sealed NASDAQ evidence store found 65,400 selected rows across 3,270 queries. There are 56,378 distinct matched episodes; 90.13% appear once, the 99th-percentile occurrence count is four, the maximum is 38, and the top 1% account for 5.57% of selections. At symbol level, 7,325 symbols appear and the maximum count is 90. Across queries, the median ratio of rank-20 to rank-1 distance is 1.076.</p>
-  <p class="boundary"><b>Interpretation:</b> these counts justify a formal adequacy audit but do not prove harmful hubness. Older/longer-lived symbols have more eligible episodes, cutoffs differ, and diversity rules cap within-query reuse. The formal POC must normalize observed selections by causal opportunity/exposure and compare with matched null queries before changing anything.</p>
+  <h2>R1-A result — causal exposure and concentration</h2>
+  <p class="pass"><b>Verified diagnostic:</b> the outcome-blind audit covers all 3,270 sealed NASDAQ queries, 65,400 selected links, 3,786,156 candidate episodes, 11,584 candidate symbols and 106 distinct eligibility cutoffs. The producer passed all ten gates, its deterministic replay passed all eleven gates, and a separate post-publication verifier reconstructed the complete preregistration/result chain through 22 integrity gates. Result <code>b22ec5f4…a4e2a</code>; replay <code>e31c31b6…a4df</code>; full integrity reconstruction <code>36d80c00…f3c1</code>; <a href="../config/data/analogues/m04r14/r1a-exposure-audit-v2/report.html">local report</a>.</p>
+  <p>The frozen null assigns independent continuous random priorities within each query's exact causal A/B-tier risk set and then applies the unchanged production selector: at most three episodes per symbol, inclusive same-symbol overlap rejection and top-20 stopping. Across 512 preregistered replicates, the observed retrieval is more concentrated than every replicate on every registered metric (one-sided Monte Carlo floor <code>1/513</code>). Episode maximum reuse is 38 versus null median 3 and p99 4; symbol maximum reuse is 90 versus null median 37 and p99 44; repeated-symbol queries are 13.76% versus null median 3.21%; mean cross-query episode overlap is 0.00408 versus null median 0.000106.</p>
+  <p class="boundary"><b>Interpretation boundary:</b> this diagnostic shows that distance-ranked retrieval has substantially more shared structure than an independent random-priority causal baseline. It does <em>not</em> establish harmful hubness or useful precedent: recurring market states, genuine archetypes, shared query structure and metric domination remain competing explanations. The top-1% statistic uses one percent of the full declared candidate population, including zero-selection entities. No adequacy label, ranking change, predictive claim or production promotion is authorized. R1-B must use matched/shared-structure nulls and stability diagnostics before calibration.</p>
 </section>
 
 <section>
@@ -90,11 +91,11 @@
   <h3>R1 — Analogue adequacy certificate</h3>
   <p><b>Goal:</b> decide whether the top-20 is a strong neighborhood, a fragile neighborhood, or merely the nearest available set. Retrieval remains byte-identical.</p>
   <ol>
-    <li>Freeze a development registry disjoint from all final evaluation cases.</li>
-    <li>Compute causal eligibility exposure per candidate episode/symbol and exposure-normalized reverse-neighbor occurrence.</li>
-    <li>Measure reciprocity where both directed queries are temporally legal, local distance contrast, rank-20/rank-1 ratio, neighbor-set stability under one-group removal, small input perturbations and nearby cutoff shifts.</li>
-    <li>Construct causal null queries matched on cutoff, history length, tier, liquidity and volatility. Report each real query's distance percentile against that null.</li>
-    <li>Publish three labels only: <code>strong precedent</code>, <code>weak/unstable precedent</code>, or <code>insufficient evidence</code>. Thresholds are frozen from synthetic/development data, never future returns.</li>
+    <li><span class="open">OPEN:</span> freeze a development registry disjoint from all final evaluation cases.</li>
+    <li><span class="pass">R1-A COMPLETE:</span> compute exact causal eligibility exposure and compare reverse-neighbor concentration with an outcome-blind random-priority null. This is a structural diagnostic, not yet an adequacy label.</li>
+    <li><span class="open">R1-B:</span> measure local distance contrast, rank-20/rank-1 ratio, symmetric offline pair geometry, and neighbor-set stability under one-group removal, small input perturbations and nearby cutoff shifts. Causal mutual-neighbor reciprocity is structurally impossible for distinct time-ordered episodes and will not be reported as a failure.</li>
+    <li><span class="open">R1-B:</span> construct causal null queries matched on cutoff, history length, tier, liquidity and volatility, plus a shared-structure sensitivity null. Report each real query's distance percentile against those nulls.</li>
+    <li><span class="open">R1-C:</span> publish three labels only after synthetic calibration: <code>strong precedent</code>, <code>weak/unstable precedent</code>, or <code>insufficient evidence</code>. Thresholds are frozen from synthetic/development data, never future returns.</li>
   </ol>
   <p><b>Pass:</b> clone/known-positive adequacy ≥95%; known negatives/novel paths abstain ≥95%; future mutation changes no label; exposure-normalized hub diagnostics reproduce independently; original neighbor identities remain unchanged. If calibration fails, publish raw diagnostics only.</p>
 
