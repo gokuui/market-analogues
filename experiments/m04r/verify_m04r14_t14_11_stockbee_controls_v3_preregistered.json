@@ -1,0 +1,26 @@
+{
+  "all_control_rows_still_checked": true,
+  "all_inference_rows_still_reconstructed": true,
+  "created_at": "2026-09-10T03:55:55.190444+00:00",
+  "implementation_h0": "8e1d4475a1023ef8382576580cb64e076e4eed2d",
+  "mechanical_change": "cache_independently_rebuilt_candidate_buckets_once_per_names_and_deciles_group_identity",
+  "preregistration_digest": "204264019720816a384036669f869f41f9ed51c734ec4afec516810a6ae1da6e",
+  "prior_attempts": "v1_interrupted_without_receipt_after_redundant_rebuild;v2_preregistered_but_preflight_rejected_before_execution",
+  "producer": {
+    "event_match_rows": 710373,
+    "matched_control_rows": 3551826,
+    "store_result_digest": "55da5a4648540cbe5217b03b75b0e46b32e10bd62a430777a204de644e225298",
+    "store_sha256": "8c67bc9250d348b3ef197a11305a07831a8238e001cf7b0a33fd0b26c7dbff24"
+  },
+  "production_promotion_authorized": false,
+  "runtime_files": {
+    "config/m04r14-t14-11-stockbee-contract.json": "8aebc7d6f5ab35d5a842b320ca5ab4b9a86edfd16868162fa294cb4333ec1af1",
+    "experiments/m04r/m04r14_t14_11_stockbee_controls.py": "b46556065efe2d31de083149dafc68350396c04669dd2e8c18dfac704806971d",
+    "experiments/m04r/verify_m04r14_t14_11_stockbee_controls.py": "6af0f9a9fa68f7ac6e46c3e68b458e9dbcd621e9addcdf734853819c018eeb19",
+    "experiments/m04r/verify_m04r14_t14_11_stockbee_controls_v2.py": "1d64887051dd4ef097f60364168d7063702c85d4f45494ccd8c8bb6a52b67d94",
+    "pyproject.toml": "9eeb5497e7c3cb4615345e9104cac78d93d45579f2ac71a1540f316c181858c1"
+  },
+  "schema_version": "m04r14-t14-11-stockbee-controls-verification-v3",
+  "semantic_change_from_v1": false,
+  "status": "frozen_before_v3_verification"
+}
