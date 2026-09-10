@@ -2235,6 +2235,13 @@
   <p><b>Engineering:</b> Each year/weight uses batched spatial selection and vectorized sufficient-statistic accumulation; atomic year seals allow restart. The verifier independently rebuilds all five weighted selections and statistics, plus brute-force all-candidate checks on one deterministic date per year.</p>
   <p><b>Next:</b> Complete focused/full validation, freeze H0/H1, execute and independently verify the bake-off. Only the verified selected weight may be materialized as the final control store.</p>
 </section>
+<section class="entry">
+  <h2>L-272 — Weight bake-off V1 aggregation failure retained; fresh V2 repair</h2>
+  <p class="fail"><b>Failure:</b> H0 <code>d288a03</code>, sole-child H1 <code>c4bf80f</code> and preregistration <code>e6817b0e…f479</code> completed all 27 outcome-blind year computations, then failed before aggregate publication. The adapter removed the weight prefix from a four-field key but did not insert the balance formatter's required literal <code>all</code> tier, causing an unpack error. No output namespace, selection decision or verification receipt exists.</p>
+  <p><b>Repair:</b> Use a new V2 preregistration, cache and output namespace. Explicitly map <code>weight|population|signal|scope|covariate</code> to <code>population|signal|scope|all|covariate</code> in both producer and verifier. Add an integration assertion that all five synthetic weights produce 40 summary rows and exact producer/verifier parity.</p>
+  <p><b>Boundary:</b> The V1 year caches remain retained as failed-at-aggregation evidence; V2 will recompute rather than relabel them. Outcomes were never opened.</p>
+  <p><b>Next:</b> Pass focused and full tests, commit fresh V2 H0/H1 and rerun the complete bake-off once.</p>
+</section>
 </main>
 
 <section id="reproduce">

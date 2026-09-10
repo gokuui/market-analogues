@@ -28,12 +28,12 @@ from experiments.m04r import m04r14_t14_12_rank_matches as rank_matches
 from experiments.m04r import m04r14_t14_12_rank_balance as rank_balance
 
 
-SCHEMA = "m04r14-t14-12-volatility-weight-bakeoff-v1"
+SCHEMA = "m04r14-t14-12-volatility-weight-bakeoff-v2"
 WEIGHTS = (1, 2, 4, 8, 16)
-PREREGISTRATION_RELATIVE = Path("experiments/m04r/m04r14_t14_12_weight_bakeoff_v1_preregistered.json")
-CACHE_RELATIVE = Path("config/data/analogues/m04r14/t14-12-volatility-weight-bakeoff-v1-cache")
-OUTPUT_RELATIVE = Path("config/data/analogues/m04r14/t14-12-volatility-weight-bakeoff-v1")
-VERIFICATION_RELATIVE = Path("config/data/analogues/m04r14/t14-12-volatility-weight-bakeoff-v1-verification")
+PREREGISTRATION_RELATIVE = Path("experiments/m04r/m04r14_t14_12_weight_bakeoff_v2_preregistered.json")
+CACHE_RELATIVE = Path("config/data/analogues/m04r14/t14-12-volatility-weight-bakeoff-v2-cache")
+OUTPUT_RELATIVE = Path("config/data/analogues/m04r14/t14-12-volatility-weight-bakeoff-v2")
+VERIFICATION_RELATIVE = Path("config/data/analogues/m04r14/t14-12-volatility-weight-bakeoff-v2-verification")
 OUTPUT_FILES = ("balance-bakeoff.parquet", "selection-decision.json")
 RUNTIME_FILES = (
     "experiments/m04r/m04r14_t14_12_weight_bakeoff.py",
@@ -204,7 +204,11 @@ def _write_year(year: int, frame: pd.DataFrame, cache: Path, contract: str) -> d
 def _summaries(states: Mapping[str, Mapping[str, Any]]) -> pd.DataFrame:
     rows = []
     for weight in WEIGHTS:
-        selected = {"|".join(key.split("|")[1:]): value for key, value in states.items() if key.startswith(f"{weight}|")}
+        selected = {}
+        for key, value in states.items():
+            if not key.startswith(f"{weight}|"): continue
+            _, population, signal, scope, covariate = key.split("|")
+            selected[f"{population}|{signal}|{scope}|all|{covariate}"] = value
         frame = pd.DataFrame(balance._summary_rows(selected)); frame.insert(0, "volatility_weight", weight); rows.append(frame)
     return pd.concat(rows, ignore_index=True)
 

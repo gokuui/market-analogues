@@ -62,9 +62,9 @@ def test_weight_bakeoff_year_statistics_match_independent_implementation() -> No
     rows = []
     for index in range(12):
         rows.append({"symbol": f"S{index:02d}", "signal_date": pd.Timestamp("2024-01-03"),
-            "signal_position": 300, "investable": True, "prior_return_63": index / 100,
-            "prior_volatility_20": .1 + index / 1000, "prior_close": 10. + index,
-            "prior_median_dollar_volume_20": 2e6 + index,
+            "signal_position": 300, "investable": True, "prior_return_63": index / 20,
+            "prior_volatility_20": .05 + index / 50, "prior_close": 5. + 3 * index,
+            "prior_median_dollar_volume_20": 1e6 + 2e5 * index,
             "up_close_at_risk": True, "up_close_4pct": index == 0, "up_close_signal_event": index == 0,
             "bullish_range_expansion_at_risk": True, "bullish_range_expansion_4pct": index == 1,
             "bullish_range_expansion_signal_event": index == 1})
@@ -75,3 +75,7 @@ def test_weight_bakeoff_year_statistics_match_independent_implementation() -> No
     )
     assert coverage == expected_coverage and exhaustive == 20
     bakeoff_verifier._assert_stats(expected, observed, "synthetic")
+    producer_summary = bakeoff._summaries(observed)
+    verifier_summary = bakeoff_verifier._summaries(expected)
+    assert len(producer_summary) == 160
+    verifier._assert_frame(verifier_summary, producer_summary, "synthetic bake-off summary")

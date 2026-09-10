@@ -27,7 +27,7 @@ from experiments.m04r import verify_m04r14_t14_12_rank_matches as rank_oracle
 from experiments.m04r import m04r14_t14_12_weight_bakeoff as target
 
 
-SCHEMA = "m04r14-t14-12-volatility-weight-bakeoff-verification-v1"
+SCHEMA = "m04r14-t14-12-volatility-weight-bakeoff-verification-v2"
 WEIGHTS = (1, 2, 4, 8, 16)
 TOLERANCE = 5e-12
 
@@ -120,7 +120,11 @@ def _assert_stats(expected: Mapping[str, Any], observed: Mapping[str, Any], labe
 def _summaries(states: Mapping[str, Mapping[str, Any]]) -> pd.DataFrame:
     rows = []
     for weight in WEIGHTS:
-        subset = {"|".join(key.split("|")[1:]): value for key, value in states.items() if key.startswith(f"{weight}|")}
+        subset = {}
+        for key, value in states.items():
+            if not key.startswith(f"{weight}|"): continue
+            _, population, signal, scope, covariate = key.split("|")
+            subset[f"{population}|{signal}|{scope}|all|{covariate}"] = value
         frame = balance_oracle._summaries(subset); frame.insert(0, "volatility_weight", weight); rows.append(frame)
     return pd.concat(rows, ignore_index=True)
 
