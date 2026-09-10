@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import sys
 
 import numpy as np
 import pandas as pd
@@ -12,6 +13,10 @@ from market_analogues.types import stable_hash
 
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
+from experiments.m04r import verify_m04r14_t14_12_panel as panel_verifier
+from experiments.m04r import m04r14_t14_12_panel as panel_stage
 
 
 def _fixture(rows: int = 340) -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -113,3 +118,30 @@ def test_incomplete_source_is_right_censored_and_bad_benchmark_rejected() -> Non
     bad = benchmark.copy(); bad.loc[2, "date"] = bad.loc[1, "date"]
     with pytest.raises(PostSignalStudyError, match="benchmark"):
         symbol_post_signal_panel(stock, bad, "SYN")
+
+
+def test_independent_all_symbol_count_kernel_matches_vector_panel() -> None:
+    stock, benchmark = _fixture(); panel = symbol_post_signal_panel(stock, benchmark, "SYN")
+    positions = {pd.Timestamp(value): i for i, value in enumerate(pd.to_datetime(benchmark.date))}
+    expected = panel_verifier._expected_counts(stock.rename(columns={"timestamp": "date"}), positions)
+    assert expected["panel_rows"] == len(panel)
+    assert expected["up_close_signal_events"] == int(panel.up_close_signal_event.sum())
+    assert expected["bullish_range_expansion_signal_events"] == int(panel.bullish_range_expansion_signal_event.sum())
+    for horizon in (5, 20, 60):
+        assert expected[f"complete_{horizon}_rows"] == int(panel[f"complete_{horizon}"].sum())
+
+
+def test_panel_shard_is_atomic_sealed_and_idempotent(tmp_path: Path) -> None:
+    stock, benchmark = _fixture(); source = tmp_path / "SYN.parquet"; market = tmp_path / "IXIC.parquet"
+    stock.rename(columns={"timestamp": "date"}).to_parquet(source, index=False); benchmark.to_parquet(market, index=False)
+    cache = tmp_path / "cache"; cache.mkdir()
+    record = {
+        "symbol": "SYN", "source_path": str(source), "source_hash_at_lock": panel_stage._sha(source),
+        "rows_through_lock": len(stock), "coverage_last_timestamp": str(stock.timestamp.max()),
+    }
+    first = panel_stage._write_shard(0, [record], str(cache), str(market), str(benchmark.date.max()), "contract")
+    second = panel_stage._write_shard(0, [record], str(cache), str(market), str(benchmark.date.max()), "contract")
+    assert first == second and first["passed"]
+    root = cache / "shard-00"
+    assert sorted(path.name for path in root.iterdir()) == ["SHARD_SEALED.json", "daily-panel.parquet", "symbol-accounting.parquet"]
+    assert len(pd.read_parquet(root / "daily-panel.parquet")) == first["panel_rows"]
