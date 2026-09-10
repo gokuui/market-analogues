@@ -2215,6 +2215,12 @@
   <p><b>Verification:</b> The independent implementation rebuilds every percentile rank, spatial frontier, exact distance, identity and output row. Three deterministic dates per year also compare the optimized frontier against exhaustive selection. The V2 namespace is separate, so the rejected V1 artifacts remain reproducible.</p>
   <p><b>Next:</b> Complete focused/full tests and code-flow review, freeze H0/H1, run and verify V2 identities, then apply the unchanged outcome-blind balance limits before opening P3.</p>
 </section>
+<section class="entry">
+  <h2>L-269 — T14-12 V2 identities verified; unchanged balance gate ready</h2>
+  <p class="pass"><b>V2 identities:</b> H0 <code>c235172</code>, sole-child H1 <code>da10c37</code> and preregistration <code>437c20fd…8e4e</code> bind the continuous-rank design to the verified V1 balance failure. The producer sealed all 659,886 events and 3,299,430 controls in 257.74 seconds, 2.46× faster than V1.</p>
+  <p class="pass"><b>Verification:</b> Digest <code>aa65df57…99ce</code> independently reconstructed every row in 683.92 seconds. All ranks, distances, tie orders, source counts and seals agree; 9,107 stratified event cases additionally reproduce brute-force all-candidate selection. Outcomes remain unopened.</p>
+  <p><b>Next:</b> Apply the identical V1 transforms, overall |SMD| ≤0.10 limit and per-era |SMD| ≤0.20 limit to V2. The audit uses separate atomic year seals and the already independent balance oracle. It may authorize P3 only if both balance gates pass unchanged.</p>
+</section>
 </main>
 
 <section id="reproduce">

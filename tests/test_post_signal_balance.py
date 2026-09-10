@@ -11,6 +11,8 @@ sys.path.insert(0, str(ROOT))
 
 from experiments.m04r import m04r14_t14_12_balance as stage
 from experiments.m04r import verify_m04r14_t14_12_balance as verifier
+from experiments.m04r import m04r14_t14_12_rank_balance as rank_stage
+from experiments.m04r import verify_m04r14_t14_12_rank_balance as rank_verifier
 
 
 def test_balance_transforms_match_independent_oracle() -> None:
@@ -46,3 +48,9 @@ def test_vectorized_year_balance_matches_independent_reconstruction() -> None:
     expected_stats, expected_reuse = verifier._reconstruct_year(2024, panel, controls)
     assert observed_stats.keys() == expected_stats.keys() and observed_reuse == expected_reuse
     for key in observed_stats: verifier._assert_nested(expected_stats[key], observed_stats[key], key)
+
+
+def test_v2_balance_reuses_v1_outputs_and_independent_oracle_contract() -> None:
+    assert rank_stage.OUTPUT_FILES == stage.OUTPUT_FILES
+    assert rank_stage.base_balance.TRANSFORMS == rank_verifier.oracle.VERIFY_TRANSFORMS
+    assert rank_stage.SCHEMA.endswith("v2") and rank_verifier.SCHEMA.endswith("v2")
