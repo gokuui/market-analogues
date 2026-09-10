@@ -2228,6 +2228,13 @@
   <p class="fail"><b>Decision:</b> The untouched overall ≤0.10 rule still rejects V2, so P3 remains closed. The system does not round 0.114 or 0.157 into a pass.</p>
   <p><b>Next:</b> Preregister an outcome-blind bake-off over volatility coordinate weights 1, 2, 4, 8 and 16, using the same continuous-rank matcher and balance limits. Select the smallest weight that passes every overall and era cell; if none pass, stop and redesign overlap/eligibility rather than opening outcomes.</p>
 </section>
+<section class="entry">
+  <h2>L-271 — T14-12 volatility-weight bake-off ready for preflight</h2>
+  <p><b>Candidate family:</b> Hold return, price and liquidity rank weights at one and test prior-volatility weights 1, 2, 4, 8 and 16. Candidate pools, five-control requirement, exact tie order, 90% coverage floor, overall |SMD| ≤0.10 and era |SMD| ≤0.20 remain unchanged.</p>
+  <p><b>Selection:</b> Choose the smallest weight that passes all coverage and balance cells. If none passes, publish failure and keep outcomes closed. The rule is deterministic and sees only t−1 covariates.</p>
+  <p><b>Engineering:</b> Each year/weight uses batched spatial selection and vectorized sufficient-statistic accumulation; atomic year seals allow restart. The verifier independently rebuilds all five weighted selections and statistics, plus brute-force all-candidate checks on one deterministic date per year.</p>
+  <p><b>Next:</b> Complete focused/full validation, freeze H0/H1, execute and independently verify the bake-off. Only the verified selected weight may be materialized as the final control store.</p>
+</section>
 </main>
 
 <section id="reproduce">

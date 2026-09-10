@@ -48,6 +48,19 @@ def test_rank_matcher_rejects_bad_shapes_and_duplicate_indices() -> None:
                                   contract_digest="c", signal_ids=["e"])
 
 
+def test_weighted_tree_matches_weighted_exhaustive_oracle() -> None:
+    rng = np.random.default_rng(41); values = rng.normal(size=(120, 4)); ranks = percentile_rank_matrix(values)
+    names = np.array([f"S{i}" for i in range(120)], dtype=object); candidates = np.arange(20, 120)
+    weights = (1., 8., 1., 1.)
+    observed = select_rank_nearest_batch(symbols=names, percentile_ranks=ranks, candidate_indices=candidates,
+        event_indices=[0, 1, 2], contract_digest="c", signal_ids=["a", "b", "c"], coordinate_weights=weights)
+    for event, signal_id, (selected, distance) in zip([0, 1, 2], ["a", "b", "c"], observed):
+        expected, exact_distance = exhaustive_rank_nearest(symbols=names, percentile_ranks=ranks,
+            candidate_indices=candidates, event_index=event, contract_digest="c", signal_id=signal_id,
+            coordinate_weights=weights)
+        assert selected.tolist() == expected.tolist() and np.array_equal(distance, exact_distance)
+
+
 def test_v2_year_checkpoint_is_atomic_and_restartable(tmp_path) -> None:
     rows = []
     for index in range(12):

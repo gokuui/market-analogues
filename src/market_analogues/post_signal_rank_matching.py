@@ -38,12 +38,16 @@ def _exact_order(
 def select_rank_nearest_batch(
     *, symbols: Sequence[str], percentile_ranks: np.ndarray, candidate_indices: Sequence[int],
     event_indices: Sequence[int], contract_digest: str, signal_ids: Sequence[str], controls: int = 5,
+    coordinate_weights: Sequence[float] = (1., 1., 1., 1.),
 ) -> list[tuple[np.ndarray, np.ndarray]]:
     """Return exact deterministic top-k controls for each event using a batched spatial frontier."""
     names = np.asarray(symbols, dtype=object); ranks = np.asarray(percentile_ranks, dtype=np.float64)
     candidates = np.asarray(candidate_indices, dtype=np.int64); events = np.asarray(event_indices, dtype=np.int64)
+    weights = np.asarray(coordinate_weights, dtype=np.float64)
     if ranks.shape != (len(names), 4) or len(events) != len(signal_ids) or controls < 1:
         raise RankMatchingError("rank matching request differs")
+    if weights.shape != (4,) or not np.isfinite(weights).all() or (weights <= 0).any():
+        raise RankMatchingError("coordinate weights must be four finite positive values")
     if len(np.unique(candidates)) != len(candidates) or len(np.unique(events)) != len(events):
         raise RankMatchingError("rank matching indices must be unique")
     if not len(events): return []
@@ -52,7 +56,7 @@ def select_rank_nearest_batch(
         return [(empty.copy(), distances.copy()) for _ in events]
     if (candidates < 0).any() or (candidates >= len(names)).any() or (events < 0).any() or (events >= len(names)).any():
         raise RankMatchingError("rank matching index is outside the cross-section")
-    candidate_points = ranks[candidates]; query_points = ranks[events]
+    scale = np.sqrt(weights); candidate_points = ranks[candidates] * scale; query_points = ranks[events] * scale
     frontier = min(len(candidates), max(controls, 16)); tree = cKDTree(candidate_points)
     distances, local = tree.query(query_points, k=frontier)
     if frontier == 1:
@@ -84,7 +88,12 @@ def math_isclose(left: float, right: float) -> bool:
 def exhaustive_rank_nearest(
     *, symbols: Sequence[str], percentile_ranks: np.ndarray, candidate_indices: Sequence[int],
     event_index: int, contract_digest: str, signal_id: str, controls: int = 5,
+    coordinate_weights: Sequence[float] = (1., 1., 1., 1.),
 ) -> tuple[np.ndarray, np.ndarray]:
     names = np.asarray(symbols, dtype=object); ranks = np.asarray(percentile_ranks, dtype=float)
-    candidates = np.asarray(candidate_indices, dtype=np.int64)
-    return _exact_order(names, candidates, ranks[candidates], ranks[int(event_index)], contract_digest, signal_id, controls)
+    candidates = np.asarray(candidate_indices, dtype=np.int64); weights = np.asarray(coordinate_weights, dtype=float)
+    if weights.shape != (4,) or not np.isfinite(weights).all() or (weights <= 0).any():
+        raise RankMatchingError("coordinate weights must be four finite positive values")
+    scale = np.sqrt(weights)
+    return _exact_order(names, candidates, ranks[candidates] * scale, ranks[int(event_index)] * scale,
+                        contract_digest, signal_id, controls)

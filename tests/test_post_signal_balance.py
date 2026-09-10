@@ -13,6 +13,8 @@ from experiments.m04r import m04r14_t14_12_balance as stage
 from experiments.m04r import verify_m04r14_t14_12_balance as verifier
 from experiments.m04r import m04r14_t14_12_rank_balance as rank_stage
 from experiments.m04r import verify_m04r14_t14_12_rank_balance as rank_verifier
+from experiments.m04r import m04r14_t14_12_weight_bakeoff as bakeoff
+from experiments.m04r import verify_m04r14_t14_12_weight_bakeoff as bakeoff_verifier
 
 
 def test_balance_transforms_match_independent_oracle() -> None:
@@ -54,3 +56,22 @@ def test_v2_balance_reuses_v1_outputs_and_independent_oracle_contract() -> None:
     assert rank_stage.OUTPUT_FILES == stage.OUTPUT_FILES
     assert rank_stage.base_balance.TRANSFORMS == rank_verifier.oracle.VERIFY_TRANSFORMS
     assert rank_stage.SCHEMA.endswith("v2") and rank_verifier.SCHEMA.endswith("v2")
+
+
+def test_weight_bakeoff_year_statistics_match_independent_implementation() -> None:
+    rows = []
+    for index in range(12):
+        rows.append({"symbol": f"S{index:02d}", "signal_date": pd.Timestamp("2024-01-03"),
+            "signal_position": 300, "investable": True, "prior_return_63": index / 100,
+            "prior_volatility_20": .1 + index / 1000, "prior_close": 10. + index,
+            "prior_median_dollar_volume_20": 2e6 + index,
+            "up_close_at_risk": True, "up_close_4pct": index == 0, "up_close_signal_event": index == 0,
+            "bullish_range_expansion_at_risk": True, "bullish_range_expansion_4pct": index == 1,
+            "bullish_range_expansion_signal_event": index == 1})
+    frame = pd.DataFrame(rows)
+    observed, coverage = bakeoff._year_statistics(2024, frame, "contract")
+    expected, expected_coverage, exhaustive = bakeoff_verifier._year_statistics(
+        2024, frame, "contract", {pd.Timestamp("2024-01-03")},
+    )
+    assert coverage == expected_coverage and exhaustive == 20
+    bakeoff_verifier._assert_stats(expected, observed, "synthetic")
