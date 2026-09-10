@@ -1,0 +1,103 @@
+{
+  "claims": {
+    "adequacy_labels_authorized": false,
+    "b2_execution_authorized": false,
+    "partition_only_before_support": true,
+    "predictive_claim_authorized": false,
+    "production_promotion_authorized": false,
+    "r1b_statistics_opened": false,
+    "real_forward_outcomes_accessed": false
+  },
+  "environment": {
+    "blas": [
+      {
+        "architecture": "SkylakeX",
+        "internal_api": "openblas",
+        "prefix": "libscipy_openblas",
+        "threading_layer": "pthreads",
+        "user_api": "blas",
+        "version": "0.3.30"
+      }
+    ],
+    "numpy": "2.3.5",
+    "partition_blas_threads": 1,
+    "platform": "Linux-6.1.0-52-cloud-amd64-x86_64-with-glibc2.36",
+    "python": "3.11.2"
+  },
+  "execution": {
+    "partition_output": "config/data/analogues/m04r14/r1b-balanced-partition-v3",
+    "publication": "flock-serialized create-only atomic directory rename with fsync",
+    "support_output": "config/data/analogues/m04r14/r1b-balanced-support-v3"
+  },
+  "implementation_commit": "2c01dfce9cb72e4070ab4744108a39314a90ac0b",
+  "inventory": {
+    "cohort_episodes": 369,
+    "cohort_links": 2865,
+    "queries": 3270
+  },
+  "partition_contract": {
+    "column_order": "coarse[0:96] + stage.reshape(12,4,C)[:,0:3].ravel(C) + structural[0:9]",
+    "fallback": "relative eigengap <=1e-10; exact integer n*sum(m^2)-sum(m)^2; lowest column tie",
+    "no_merge_retry_or_coarsening": true,
+    "parallel_reconstruction_workers": 12,
+    "primary_k": 8,
+    "projection": "math.fsum feature order; exact-equal boundary uses query ID; else margin >1e-10*max(1,maxabs)",
+    "query_order": "ascending query episode ID",
+    "rank": "exact float64 ties; doubled 1-based midrank m=a+b; z=(m-(N+1))/(N-1); constants +0.0",
+    "requested_k": [
+      8,
+      12,
+      16
+    ],
+    "scatter": "locally centered float64 Zc.T@Zc under single-thread BLAS",
+    "secondary_k": [
+      12,
+      16
+    ],
+    "shape": [
+      3270,
+      141
+    ]
+  },
+  "partition_file_sha256": {
+    "/home/vinay/code/loser-nasdaq/data/nasdaq/index/IXIC.parquet": "a414a9c3611320a5343cb0e260c749e0a78d776d225622909d559008053ec55f",
+    "/home/vinay/code/market-analogues/config/data/analogues/m04r14/nasdaq-shadow-denominator-v1/query-registry.json": "9efe135c690779d0018260c5cfc3546101e487203a60599ba335ad92136af494",
+    "/home/vinay/code/market-analogues/config/datasets.example.yaml": "3b3821d17563e63318429730fb7aab6fea69b2a0eeab57d08506ca7312e4792f"
+  },
+  "preregistration_digest": "ca8a54dea1db1cb17b8e57314cea41408d0e1491f2fddfa6e8dfb6a8ab0330fd",
+  "prior_exposure": {
+    "v2_base_support_observed": true,
+    "v2_structure_partition_degenerate": true,
+    "v2_verification_digest": "1d14eabe98c2630dd94d5a8fbead62791368477573bcfcc85a80d758c6f0ca03",
+    "v3_real_vectors_or_support_observed": false
+  },
+  "runtime_sha256": {
+    "experiments/m04r/m04r14_r1b_balanced_partition_v3.py": "1a0f77df6f018b7a7654ad5ccf2790776a7e78f7383e31caa29dd47e8a5328e6",
+    "experiments/m04r/m04r14_r1b_balanced_support_v3.py": "0ab22dcbbb47059353e4d424da6277c1f47ac28c57d00a1aeb9ad4acf8f603b0",
+    "src/market_analogues/adequacy_support.py": "5993eb19d31d61da3788444f18cc461d70852bbb3a28b3f284f1e7adc6c10602",
+    "src/market_analogues/balanced_partition.py": "cdf2ddf925257d32ba3ae73c701dc9d039d3ced07e83fe926022a4ba4bb22e24",
+    "tests/test_balanced_partition.py": "82e8b4a3b91ef02a87f49e92730e655b29bd49c3a7415fcba5fa7d8c0cab078e",
+    "tests/test_r1b_balanced_support_v3.py": "039c003a229ed285f4c2779b02cce5f5e42a83ec22b93d2b7e9237eeafb7cb26"
+  },
+  "schema_version": "m04r14-r1b-balanced-v3-preregistration-v1",
+  "support_contract": {
+    "base": "verified v2 session_21 cells",
+    "cap": 4096,
+    "failure_states": [
+      "partition_invalid",
+      "reproducibility_failed",
+      "support_inadequate",
+      "support_pass_pending_independent_verification"
+    ],
+    "minimum_episode_coverage": 0.9,
+    "minimum_link_coverage": 0.9,
+    "primary": "K8 only; K12/K16 sensitivity cannot rescue"
+  },
+  "support_file_sha256": {
+    "/home/vinay/code/market-analogues/config/data/analogues/m04r14/r1a-exposure-audit-v2/RESULT.json": "88dc7d850fa4fc6fa04ad2bddcce47ce04d07456a41b3f5f529aa1b804f2a9ae",
+    "/home/vinay/code/market-analogues/config/data/analogues/m04r14/r1b-support-pilot-v2-integrity-verification-v1/VERIFIED.json": "62f805cbc222133b3a9ab7951aff6829ecc9c5605861d8b871fd21213d1ff056",
+    "/home/vinay/code/market-analogues/config/data/analogues/m04r14/r1b-support-pilot-v2/COHORT_SUPPORT.json": "17d982eaa92f932ecdc2eda8b922fb7d2f8c845ea0b8152d162cd011fb566218",
+    "/home/vinay/code/market-analogues/config/data/analogues/m04r14/r1b-support-pilot-v2/QUERY_CELLS.json": "36e14f1e350424cb2993a108a33d97ea2c82c486fbd735319163f966ed0721cc",
+    "/home/vinay/code/market-analogues/config/data/analogues/m04r14/r1b-support-pilot-v2/RESULT.json": "51aa6cc4507f54f42159051d7f7c1d937103ec1214c3775572a97790c1f71abd"
+  }
+}
