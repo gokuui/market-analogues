@@ -1,0 +1,129 @@
+{
+  "schema_version": "m04r14-t14-12-post-signal-contract-v1",
+  "contract_id": "nasdaq-stockbee-post-4pct-predictive-inversion-v1",
+  "status": "frozen_before_real_post_signal_outcome_access",
+  "question": "After a fully observed 4 percent stock-specific signal, do subsequent returns outperform causal same-date non-signal controls?",
+  "parent_evidence": {
+    "study_contract_digest": "8cc7c8f21c42c8d96c87dfb65bb8dc0d7a2da540135b58ee37b44293aeb18379",
+    "controlled_store_result_digest": "55da5a4648540cbe5217b03b75b0e46b32e10bd62a430777a204de644e225298",
+    "controlled_store_sha256": "8c67bc9250d348b3ef197a11305a07831a8238e001cf7b0a33fd0b26c7dbff24",
+    "independent_verification_digest": "f6594c378ab29f58f7671ed601e5fea46709787189039ab4824f119f7e8c7671",
+    "independent_verification_sha256": "7dee7eb678b28436521ec5f96af6c25f19b6cdffbe86b6c7158aeb5c9c810693",
+    "retrospective_result_used_only_to_motivate_inversion": true,
+    "thresholds_or_primary_metrics_selected_from_parent_results": false
+  },
+  "source": {
+    "dataset_id": "nasdaq",
+    "adapter": "directory_parquet",
+    "path": "/home/vinay/code/loser-nasdaq/data/nasdaq/validated",
+    "source_accounting": "config/data/analogues/m04r14/t14-10-walk-forward-query-registry-v1/source-accounting.parquet",
+    "source_accounting_sha256": "377bd82f680278f0b4162769bce4cc16fb1906f9da4cfb11bd57465ff48b025a",
+    "locked_symbol_histories": 12080,
+    "benchmark_path": "/home/vinay/code/loser-nasdaq/data/nasdaq/index/IXIC.parquet",
+    "benchmark_sha256": "a414a9c3611320a5343cb0e260c749e0a78d776d225622909d559008053ec55f",
+    "locked_coverage_end": "2026-03-30",
+    "point_in_time_membership_and_delisting_limitation_retained": true
+  },
+  "causal_signal": {
+    "decision_timestamp": "qualifying_session_close",
+    "signal_price_is_not_an_assumed_fill": true,
+    "up_close_4pct": "close_t_divided_by_close_t_minus_1_minus_1_gte_0.04",
+    "bullish_range_expansion_4pct": "true_range_fraction_t_gte_0.04_and_close_t_gt_open_t_and_true_range_fraction_t_gte_1.5_times_prior_20_session_median_true_range_fraction",
+    "primary_refractory_rule": "signal_t_and_no_same_signal_in_sessions_t_minus_20_through_t_minus_1",
+    "refractory_sessions": 20,
+    "minimum_prior_sessions": 252,
+    "signal_and_all_prior_252_rows_must_have_valid_OHLCV": true,
+    "future_availability_cannot_affect_signal_inclusion": true,
+    "populations": {
+      "broad": "all_causally_eligible_at_risk_rows",
+      "investable": "prior_close_gte_5_and_prior_20_session_median_dollar_volume_gte_1000000"
+    }
+  },
+  "execution_and_outcomes": {
+    "entry_timestamp": "next_exact_benchmark_session_open",
+    "entry_price": "stock_open_on_that_session",
+    "transaction_costs_and_slippage_included": false,
+    "horizons_subsequent_sessions": [5, 20, 60],
+    "endpoint": "close_of_horizon_session_counted_from_entry_session",
+    "return_formula": "endpoint_close_divided_by_next_session_open_minus_1",
+    "benchmark_return_formula": "benchmark_endpoint_close_divided_by_benchmark_next_session_open_minus_1",
+    "benchmark_relative_log_return": "log_stock_gross_return_minus_log_benchmark_gross_return",
+    "endpoint_gain_25pct": "endpoint_close_divided_by_next_session_open_minus_1_gte_0.25",
+    "maximum_favorable_excursion": "maximum_high_from_entry_through_endpoint_divided_by_entry_open_minus_1",
+    "maximum_adverse_excursion": "minimum_low_from_entry_through_endpoint_divided_by_entry_open_minus_1",
+    "primary_barrier": {
+      "horizon_sessions": 20,
+      "atr": "simple_mean_of_20_true_ranges_ending_on_signal_session",
+      "favorable": "entry_open_plus_2_signal_ATR",
+      "adverse": "entry_open_minus_1_signal_ATR",
+      "same_first_touch_bar": "ambiguous_excluded_from_directional_denominator"
+    },
+    "exact_benchmark_session_continuity_required": true,
+    "missing_or_invalid_future_rows": "censor_affected_horizon_without_removing_signal",
+    "source_end_before_horizon": "right_censored_unknown_delisting_status"
+  },
+  "matching": {
+    "controls_per_signal": 5,
+    "same_signal_date_and_same_horizon_required": true,
+    "control_at_risk": "same_20_session_no_same_signal_history_and_does_not_signal_today",
+    "event_symbol_excluded": true,
+    "matching_information_ends": "session_t_minus_1_except_exact_shared_calendar_date",
+    "matching_columns": [
+      "prior_63_session_close_return_decile",
+      "prior_20_session_log_return_volatility_decile",
+      "prior_close_decile",
+      "prior_20_session_median_dollar_volume_decile"
+    ],
+    "deciles": "population_specific_same_date_average_rank_then_ceil_10_rank_divided_by_n",
+    "relaxation_order": ["exact_all_four_deciles", "within_one_bucket_all_four", "same_date_unmatched"],
+    "selection_order": "sha256(contract_digest,signal_id,candidate_symbol)_ascending",
+    "replacement": "false_within_signal_reuse_across_signals_allowed",
+    "shortfall_retained": true,
+    "market_regime_control": "exact_same_date_matching_makes_benchmark_state_identical;benchmark_state_is_stored_for_audit"
+  },
+  "inference": {
+    "primary_horizons": [20, 60],
+    "secondary_horizon": 5,
+    "primary_metrics": ["benchmark_relative_log_return", "endpoint_gain_25pct"],
+    "secondary_metrics": ["absolute_close_return", "maximum_favorable_excursion", "maximum_adverse_excursion", "twenty_session_barrier_label"],
+    "paired_unit": "signal_value_minus_mean_of_five_matched_control_values",
+    "primary_time_unit": "calendar_month_mean_of_paired_signal_differences",
+    "moving_block_bootstrap_resamples": 10000,
+    "seed": 20260910,
+    "block_length_months": 3,
+    "holm_family_size": 16,
+    "familywise_alpha": 0.05,
+    "eras": {
+      "era_2000_2007": ["2000-01-01", "2007-12-31"],
+      "era_2008_2012": ["2008-01-01", "2012-12-31"],
+      "era_2013_2017": ["2013-01-01", "2017-12-31"],
+      "era_2018_2022": ["2018-01-01", "2022-12-31"],
+      "era_2023_2026": ["2023-01-01", "2026-03-30"]
+    },
+    "cell_support_requires": {
+      "complete_five_control_signal_coverage_at_least": 0.9,
+      "holm_adjusted_one_sided_positive_pvalue_below": 0.05,
+      "bootstrap_95pct_lower_bound_strictly_above": 0.0,
+      "same_direction_broad_and_investable": true,
+      "positive_effect_in_at_least_four_of_five_eras": true
+    },
+    "retrieval_feature_authorization_requires": "for_one_signal_definition_benchmark_relative_log_return_and_endpoint_gain_25pct_both_supported_in_broad_and_investable_at_the_same_primary_horizon"
+  },
+  "verification": {
+    "synthetic_vector_and_scalar_oracles_before_real_scan": true,
+    "future_mutation_must_not_change_signal_or_matching_features": true,
+    "signal_day_mutation_must_change_bound_signal_identity": true,
+    "all_source_shards_restartable_and_atomic": true,
+    "independent_all_symbol_counts_and_stratified_raw_reconstruction": true,
+    "independent_control_and_inference_reconstruction": true,
+    "failed_or_negative_result_must_be_published": true
+  },
+  "claims": {
+    "retrospective_T14_11_result_is_not_a_trading_signal": true,
+    "post_signal_observational_evidence_only": true,
+    "profitability_claimed": false,
+    "buy_or_sell_recommendation": false,
+    "production_promotion_authorized": false
+  },
+  "contract_digest": "e24a9e9d916b52bf6e0de64f9f65067a14e0003038265e477930c2424c943517"
+}
