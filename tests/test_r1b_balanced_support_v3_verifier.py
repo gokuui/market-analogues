@@ -293,6 +293,7 @@ def test_preregistration_refuses_semantic_mutation(
     repository = Path(verify.__file__).resolve().parents[2]
     original_load = verify._load
     prereg = original_load(repository / verify.PREREGISTRATION)
+    frozen_environment = json.loads(json.dumps(prereg["environment"]))
     prereg[section][field] = value
     prereg["preregistration_digest"] = stable_hash({
         key: item for key, item in prereg.items() if key != "preregistration_digest"
@@ -304,6 +305,7 @@ def test_preregistration_refuses_semantic_mutation(
         return original_load(path, expected)
 
     monkeypatch.setattr(verify, "_load", changed_load)
+    monkeypatch.setattr(verify, "_runtime_environment", lambda: frozen_environment)
     monkeypatch.setattr(
         verify, "_preregistration_h1",
         lambda _repository, _prereg: "8890cff2a31b309db7816f8cb4b4ff73edcbbacb",
@@ -331,6 +333,7 @@ def test_preregistration_refuses_runtime_hash_mutation(
         return original_load(path, expected)
 
     monkeypatch.setattr(verify, "_load", changed_load)
+    monkeypatch.setattr(verify, "_runtime_environment", lambda: prereg["environment"])
     monkeypatch.setattr(
         verify, "_preregistration_h1",
         lambda _repository, _prereg: "8890cff2a31b309db7816f8cb4b4ff73edcbbacb",
