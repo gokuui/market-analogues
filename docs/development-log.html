@@ -2208,6 +2208,13 @@
   <p><b>Cause:</b> The unrestricted same-date fallback has maximum overall absolute SMD of 0.499–0.780 broad and 0.389–0.647 investable. Within-one-bucket matches are substantially better (maximum 0.043–0.129), but exact plus within-one covers only 59.15% of event/population rows, so merely dropping fallback rows cannot meet the frozen 90% coverage floor.</p>
   <p><b>Next:</b> Build a fresh outcome-blind V2 matcher using continuous within-date percentile ranks over all four covariates and exact deterministic nearest-neighbour/tie selection. Re-run identity verification and the same untouched balance gate. Outcomes remain closed until one design passes both balance and coverage.</p>
 </section>
+<section class="entry">
+  <h2>L-268 — T14-12 continuous-rank V2 matcher ready for preflight</h2>
+  <p><b>Design:</b> Convert all four frozen t−1 covariates to average percentile ranks inside each same-date population. For each signal-specific equal-risk non-signal pool, select the five smallest four-dimensional squared rank distances; resolve exact distance ties by the already frozen contract/signal/candidate SHA-256 order.</p>
+  <p><b>Performance and exactness:</b> A cKDTree obtains a 16-candidate frontier for all events in a date batch. If a tie reaches the frontier, a radius query expands it; every admitted frontier is then exactly rescored and sorted. Randomized, tied and shortfall tests reproduce an exhaustive all-candidate oracle exactly.</p>
+  <p><b>Verification:</b> The independent implementation rebuilds every percentile rank, spatial frontier, exact distance, identity and output row. Three deterministic dates per year also compare the optimized frontier against exhaustive selection. The V2 namespace is separate, so the rejected V1 artifacts remain reproducible.</p>
+  <p><b>Next:</b> Complete focused/full tests and code-flow review, freeze H0/H1, run and verify V2 identities, then apply the unchanged outcome-blind balance limits before opening P3.</p>
+</section>
 </main>
 
 <section id="reproduce">
