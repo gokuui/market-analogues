@@ -1,0 +1,111 @@
+{
+  "claims": {
+    "adequacy_labels_authorized": false,
+    "passed_meaning": "matching design estimable only",
+    "predictive_claim_authorized": false,
+    "production_promotion_authorized": false,
+    "r1b_test_statistics_opened": false,
+    "real_forward_outcomes_accessed": false,
+    "support_statistics_opened": true
+  },
+  "design": {
+    "base_fields": [
+      "session_bin",
+      "query_tier",
+      "liquidity_tertile",
+      "balanced_volatility_rank_tercile",
+      "context_available"
+    ],
+    "base_order": [
+      "session_21",
+      "session_42",
+      "session_63"
+    ],
+    "causal_eligibility": "candidate cutoff <= latest eligible; same-symbol candidate cutoff < query start",
+    "episode_coverage": "episodes with matched support >=4096 divided by all 369 cohort episodes",
+    "link_coverage": "observed inbound links attached to supported episodes divided by all 2865 cohort links",
+    "matched_support": "min(4096, product over cells of combination(eligible query count, observed selected-query count)); observed membership must be a duplicate-free subset of causal eligibility",
+    "minimum_episode_coverage": 0.9,
+    "minimum_link_coverage": 0.9,
+    "minimum_matched_sets": 4096,
+    "selection": "first passing base design; then passing structure design with largest retained cells, requested-K tie break",
+    "session_bin": "floor(IXIC session ordinal / span), anchored at first IXIC row",
+    "structure_distance": "squared Euclidean after frozen robust column scaling",
+    "structure_feature_indices": {
+      "coarse": [
+        0,
+        96
+      ],
+      "stage_columns_per_block": [
+        0,
+        1,
+        2
+      ],
+      "structural": [
+        0,
+        9
+      ]
+    },
+    "structure_minimum_cell_size": 30,
+    "structure_partition": "first medoid smallest query id; farthest-first equal-distance tie chooses largest query id; nearest-medoid assignment equal-distance tie chooses earliest selected medoid; undersized merge chooses smallest count then smallest medoid id and targets nearest then smallest medoid id; repeat until every cell size >=30 or one remains; final labels ordered by medoid id",
+    "structure_requested_k": [
+      8,
+      12,
+      16
+    ],
+    "structure_scaling": "column median center; IQR scale; IQR below 1e-6 replaced by 1",
+    "structure_source": "exact unquantized distance-v1 representation reconstructed from each registered causal query window; never substitute a historical packed row",
+    "volatility": "baseline recent_return_volatility_at_positions output index 2 reconstructed from each exact causal query window; rank within session-21 bin; value then query-id tie break; balanced terciles"
+  },
+  "execution": {
+    "output_root": "config/data/analogues/m04r14/r1b-support-pilot-v2",
+    "publication": "flock-serialized create-only atomic directory rename with parent fsync"
+  },
+  "implementation_commit": "25382e1a9a8008a62d68c9ba88fb4a42d3790c4a",
+  "inputs": {
+    "file_sha256": {
+      "/home/vinay/code/loser-nasdaq/data/nasdaq/index/IXIC.parquet": "a414a9c3611320a5343cb0e260c749e0a78d776d225622909d559008053ec55f",
+      "/home/vinay/code/market-analogues/config/data/analogues/m04r14/nasdaq-shadow-denominator-v1/query-registry.json": "9efe135c690779d0018260c5cfc3546101e487203a60599ba335ad92136af494",
+      "/home/vinay/code/market-analogues/config/data/analogues/m04r14/r1a-exposure-audit-v2-integrity-verification-v1/VERIFIED.json": "9cfbf5f6e69da017ffdee6dbdbf59e850127137299d26d7e3841c39eb1f90633",
+      "/home/vinay/code/market-analogues/config/data/analogues/m04r14/r1a-exposure-audit-v2/RESULT.json": "88dc7d850fa4fc6fa04ad2bddcce47ce04d07456a41b3f5f529aa1b804f2a9ae",
+      "/home/vinay/code/market-analogues/config/data/analogues/poc/m04r/packed-bound-full/store/generations/9fc6ae0ec4451133d8006897162f3443803fd30a3c44b78e80a476fbb18bb483/manifest.json": "b11c50e626be16805fc05c8f6125b31b545b35c1ac93733470f6d1ed260c732f",
+      "/home/vinay/code/market-analogues/config/datasets.example.yaml": "3b3821d17563e63318429730fb7aab6fea69b2a0eeab57d08506ca7312e4792f",
+      "/home/vinay/code/market-analogues/experiments/m04r/m04r14_r1b_support_pilot_preregistered.json": "122ff5439d6d6b02a67320250f304803be5922902023477a2de366155d8c568b"
+    },
+    "packed_generation_id": "9fc6ae0ec4451133d8006897162f3443803fd30a3c44b78e80a476fbb18bb483",
+    "r1a_case_manifest_digest": "bc446bde4a5e4796487fa57aee336b1bafcde15b71c7ade0fd11a373352b5ed6",
+    "r1a_integrity_digest": "36d80c00328f2b7cdc52cdb98f8ff6669fa292b89f563c4b44da8158cb6af3c1",
+    "r1a_result_digest": "b22ec5f4cc8a23a6f8e9bcede9795e0bc9717f370076a365abc5666a03da4e2a",
+    "source_lock_digest": "f1b3232ed02f86c03e7106495cda1585a7fcfef2bf917f8c7254a1777195aba3"
+  },
+  "known_inventory": {
+    "cohort_episodes": 369,
+    "cohort_links": 2865,
+    "cohort_threshold": 5,
+    "links": 65400,
+    "queries": 3270,
+    "r1a_episode_max_null_p99": 4,
+    "v1_query_ids_absent_from_historical_pack": 3261,
+    "v1_query_ids_present_in_historical_pack": 9
+  },
+  "preregistration_digest": "b93a3f6c0027f59f936c7232048987c2af0052d4a1ff515a69679572f072635c",
+  "prior_exposure": {
+    "r1a_graph_and_recurrence_counts_previously_observed": true,
+    "support_values_previously_observed": false,
+    "terminated_io_preflight_before_support_values": true,
+    "v1_execution_failed_on_query_pack_identity_before_support_values": true,
+    "v1_history": {
+      "failure_stage": "query-to-historical-pack identity lookup before matched-support computation",
+      "implementation_commit": "d3087a9b0b0605e71ec7d68dd922acade659f7bb",
+      "output_absent": true,
+      "preregistration_commit": "e30e9eff2225bd747ea68e394cbe7298d726cc5a",
+      "preregistration_digest": "5aa93df5e7416c01e9a999a2fdf7622236788e6a824e00794d2fcd511112c0e0"
+    }
+  },
+  "runtime_sha256": {
+    "experiments/m04r/m04r14_r1b_support_pilot.py": "dfcb7356c653fe39214911d9cf514ac44efbee969142731b4cfb333f670e43b6",
+    "src/market_analogues/adequacy_support.py": "5993eb19d31d61da3788444f18cc461d70852bbb3a28b3f284f1e7adc6c10602",
+    "tests/test_adequacy_support.py": "7b1c4cb7bc5a5d5b69ea440edb6bc6e8e4b485e4e4dcaf02857409fb44919915"
+  },
+  "schema_version": "m04r14-r1b-support-pilot-preregistration-v2"
+}
