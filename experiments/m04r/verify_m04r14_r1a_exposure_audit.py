@@ -21,7 +21,7 @@ from market_analogues.types import stable_hash
 
 
 SCHEMA = "m04r14-r1a-exposure-audit-verification-v1"
-OUTPUT = Path("config/data/analogues/m04r14/r1a-exposure-audit-v1-verification")
+OUTPUT = Path("config/data/analogues/m04r14/r1a-exposure-audit-v2-verification")
 
 
 class VerificationError(RuntimeError):
@@ -81,7 +81,7 @@ def execute(repository: Path, *, workers: int | None = None) -> dict[str, Any]:
         expected_provenance_digest=str(prereg["inputs"]["packed_provenance_digest"]),
     )
     registry = audit._load(repository / audit.REGISTRY)
-    queries, query_rows, episode_counts, episode_meta, symbol_counts, actual, case_manifest = audit._actual(
+    queries, query_rows, retrieval_rows, episode_counts, episode_meta, symbol_counts, actual, case_manifest = audit._actual(
         repository, metadata, registry,
     )
     located = audit._locate_observed(metadata, episode_meta)

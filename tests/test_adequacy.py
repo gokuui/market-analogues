@@ -7,7 +7,9 @@ from market_analogues.adequacy import (
     NullCandidate, concentration_metrics, greedy_accept, intervals_overlap,
     random_priority_selection,
 )
-from experiments.m04r.m04r14_r1a_exposure_audit import Metadata, Query, _pool, _query_mapping
+from experiments.m04r.m04r14_r1a_exposure_audit import (
+    Metadata, Query, _pool, _query_mapping, _retrieval_identity,
+)
 from market_analogues.certified_packed_search import CompactScoredCandidate, _select_compact_scored
 from market_analogues.types import AnalogueMatch, EpisodeKey, InstrumentKey, SearchQuery
 
@@ -119,3 +121,9 @@ def test_local_greedy_rule_matches_production_compact_selector() -> None:
     )
     local = greedy_accept(geometry, top_k=4, max_per_symbol=3)
     assert [item.episode_key.cutoff.day - 1 for item in production] == [item.ordinal for item in local]
+
+
+def test_retrieval_identity_projects_only_immutable_link_fields() -> None:
+    assert _retrieval_identity([{
+        "query_episode_id": "q", "episode_id": "e", "rank": 2, "distance": 0.4,
+    }]) == [{"query_episode_id": "q", "episode_id": "e", "rank": 2}]

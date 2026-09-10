@@ -28,8 +28,8 @@ from market_analogues.types import stable_hash
 
 
 SCHEMA = "m04r14-r1a-exposure-audit-v1"
-PREREGISTRATION = Path("experiments/m04r/m04r14_r1a_exposure_audit_preregistered.json")
-OUTPUT = Path("config/data/analogues/m04r14/r1a-exposure-audit-v1")
+PREREGISTRATION = Path("experiments/m04r/m04r14_r1a_exposure_audit_v2_preregistered.json")
+OUTPUT = Path("config/data/analogues/m04r14/r1a-exposure-audit-v2")
 REGISTRY = Path("config/data/analogues/m04r14/nasdaq-shadow-denominator-v1/query-registry.json")
 REGISTRY_SEAL = Path("config/data/analogues/m04r14/nasdaq-shadow-denominator-v1/SEALED.json")
 CASES = Path("config/data/analogues/m04r14/nasdaq-shadow-snapshot-v1/cases")
@@ -338,7 +338,10 @@ def _actual(repository: Path, metadata: Metadata, registry: Mapping[str, Any]):
             pair_intersections / (len(query_rows) * (len(query_rows) - 1) / 2)
         ),
     })
-    return tuple(queries), query_rows, episode_counts, episode_meta, symbol_counts, metrics, case_manifest
+    return (
+        tuple(queries), query_rows, rows, episode_counts, episode_meta,
+        symbol_counts, metrics, case_manifest,
+    )
 
 
 def _locate_observed(metadata: Metadata, episode_meta: Mapping[str, tuple[str, int, int]]):
@@ -354,6 +357,13 @@ def _locate_observed(metadata: Metadata, episode_meta: Mapping[str, tuple[str, i
             raise AdequacyAuditError(f"selected episode absent from packed universe: {episode_id}")
         located[episode_id] = index
     return located
+
+
+def _retrieval_identity(rows: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    return [{
+        "query_episode_id": str(row["query_episode_id"]),
+        "episode_id": str(row["episode_id"]), "rank": int(row["rank"]),
+    } for row in rows]
 
 
 def _summaries(
@@ -446,7 +456,7 @@ def execute(repository: Path, *, workers: int | None = None) -> dict[str, Any]:
         packed_result.get("real_forward_outcomes_accessed") is False,
     )):
         raise AdequacyAuditError("upstream semantic authority differs")
-    queries, query_rows, episode_counts, episode_meta, symbol_counts, actual, case_manifest = _actual(
+    queries, query_rows, retrieval_rows, episode_counts, episode_meta, symbol_counts, actual, case_manifest = _actual(
         repository, metadata, registry,
     )
     if stable_hash(case_manifest) != verified.get("case_manifest_digest"):
@@ -527,10 +537,7 @@ def execute(repository: Path, *, workers: int | None = None) -> dict[str, Any]:
             "observed_per_capacity": symbol_counts[symbol] / selection_capacity,
             "null_expected_count": float(null_symbol_hits[symbol_id] / replicate_count),
         })
-    identity = [{
-        "query_episode_id": row["query_episode_id"], "episode_id": row["episode_id"],
-        "rank": row["rank"],
-    } for row in rows]
+    identity = _retrieval_identity(retrieval_rows)
     finite_ratios = [
         float(row["distance_rank20_rank1_ratio"]) for row in query_rows
         if row["distance_rank20_rank1_ratio"] is not None
