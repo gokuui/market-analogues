@@ -1,0 +1,47 @@
+{
+  "assignment_digest": "f126aee521a092b3909cf3b8c62003ae4ab197f1113be7a54df024a63d13bf4b",
+  "benchmark_sha256": "a414a9c3611320a5343cb0e260c749e0a78d776d225622909d559008053ec55f",
+  "contract_digest": "e24a9e9d916b52bf6e0de64f9f65067a14e0003038265e477930c2424c943517",
+  "created_at": "2026-09-10T05:54:00.493959+00:00",
+  "horizons": [
+    5,
+    20,
+    60
+  ],
+  "implementation_h0": "d5c1e47b8a652bb041d78be71caf55cc40b93ca8",
+  "preregistration_digest": "5693b967ae6cd65c984e6be6311f862522ab76388d1f7c085acebaacd58cb2fb",
+  "production_promotion_authorized": false,
+  "real_post_signal_outcomes_accessed": false,
+  "runtime_files": {
+    "config/m04r14-t14-12-post-signal-contract.json": "62eb072618ba9ffb199501e02aeda8ccb00ea66f3e081a7227424c4219ff748f",
+    "experiments/m04r/m04r14_t14_12_panel.py": "1cb37b87ef2e03cc00cf0760b207d7a241d719704c30dffb1f0a2c2e40ae02fd",
+    "experiments/m04r/m04r14_t14_12_synthetic_gate.py": "3127d38253bfa2cb2f9978f628d527732933b745f38382b44a3d4c76e4c78358",
+    "experiments/m04r/verify_m04r14_t14_12_panel.py": "4bae8c23f9e36359918dc82d7e67268a6d102eba14b9b807defb380de5fd42f7",
+    "pyproject.toml": "9eeb5497e7c3cb4615345e9104cac78d93d45579f2ac71a1540f316c181858c1",
+    "src/market_analogues/post_signal_study.py": "07360fc0db054fd428bfbbc2316e37cfb1d54a36379efa34afae69cc0dc48961"
+  },
+  "schema_version": "m04r14-t14-12-post-signal-panel-v1",
+  "shard_symbol_counts": {
+    "0": 966,
+    "1": 1007,
+    "10": 1019,
+    "11": 1006,
+    "2": 994,
+    "3": 988,
+    "4": 1019,
+    "5": 975,
+    "6": 1013,
+    "7": 1029,
+    "8": 1031,
+    "9": 1033
+  },
+  "shards": 12,
+  "source_accounting_sha256": "377bd82f680278f0b4162769bce4cc16fb1906f9da4cfb11bd57465ff48b025a",
+  "status": "frozen_before_real_post_signal_panel",
+  "symbol_count": 12080,
+  "synthetic_receipt": {
+    "implementation_h0": "ef5db876e69e398ca5ab677fa0375a25c00079bf",
+    "sha256": "942db8a0468d37da66e487f4d0020966bb0bb09cbe9fbcd41c41b79112be8b97",
+    "verification_digest": "91c16c982cfa7fb4a9e4429f4e086e0e3d728e90c9fc869d21b73bd039db308c"
+  }
+}
