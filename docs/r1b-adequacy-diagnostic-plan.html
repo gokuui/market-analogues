@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Market Analogues — R1-B adequacy diagnostic plan</title>
+  <style>
+    body{font-family:system-ui,sans-serif;max-width:1120px;margin:2rem auto;padding:0 1rem;line-height:1.52;color:#17202a}
+    h1,h2,h3{line-height:1.2}section{padding:1rem 0;border-bottom:1px solid #d5d8dc}table{border-collapse:collapse;width:100%;display:block;overflow:auto}
+    th,td{padding:.65rem;border-bottom:1px solid #ccd1d1;text-align:left;vertical-align:top}th{background:#f2f3f4}
+    .pass{color:#176b37;font-weight:700}.open{color:#8a6500;font-weight:700}.boundary{background:#fff5d8;padding:1rem}.stop{color:#a61b1b;font-weight:700}
+    code{overflow-wrap:anywhere}li{margin:.4rem 0}
+  </style>
+</head>
+<body>
+<h1>R1-B plan: is recurrence specific or generic?</h1>
+
+<section>
+  <h2>Decision to make</h2>
+  <p>R1-A found that the sealed NASDAQ neighbor graph is much more concentrated than its independent-query random-priority causal baseline. R1-B must determine whether recurrent episodes are specifically close to coherent groups of charts—consistent with reusable historical archetypes—or are generic hubs selected across unrelated charts.</p>
+  <p class="boundary"><b>What R1-B cannot decide:</b> prediction, profitability, buy/sell action, trader pattern names, or final <code>strong/weak/insufficient</code> adequacy labels. It may publish structural diagnostics and, only if its strict conditional gates pass, the phrase <code>structurally localized recurrence</code>. Retrieval stays byte-identical.</p>
+</section>
+
+<section>
+  <h2>Corrections frozen before implementation</h2>
+  <ul>
+    <li><b>No causal reciprocity metric.</b> Historical-only retrieval is a directed acyclic graph. If older A is legal for later B, later B is future information for A. Zero mutual directed edges is structurally required, not a retrieval failure. Symmetric distance may be computed offline only as a clearly labelled geometry diagnostic.</li>
+    <li><b>Top-20 reordering is not set stability.</b> Removing a score component within the stored top 20 cannot reveal candidates that should enter from outside. True neighbor-set stability requires a new certified search.</li>
+    <li><b>Component ablation is not channel ablation.</b> The production price DTW jointly contains close, ATR, volume-z and relative-price paths. Zeroing a named score component does not remove all related input channels.</li>
+    <li><b>Packed stores are bounds, not exact representations.</b> Exact variant scores must be reconstructed from causal source prefixes and independently certified.</li>
+    <li><b>Nearby cutoff has two meanings.</b> Production-risk-set stability allows eligibility to evolve; common-risk-set stability fixes eligibility to the earlier cutoff. They are reported separately.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Reusable evidence already available</h2>
+  <table>
+    <thead><tr><th>Evidence</th><th>Safe reuse</th><th>Not sufficient for</th></tr></thead>
+    <tbody>
+      <tr><td>3,270 current shadow queries / 65,400 links</td><td>Exact rank distances, rank gaps, component contributions, repeated-neighbor structure, within-top-20 sensitivity.</td><td>True ablated neighbor sets or candidate-distance distributions outside top 20.</td></tr>
+      <tr><td>3,936 historical walk-forward queries</td><td>3,360 scored exact top-20 sets over 164 month cutoffs; 1,152 development queries; 65 same-symbol pairs within 40 calendar days and 122 within 65.</td><td>Literal causal mutual-neighbor reciprocity.</td></tr>
+      <tr><td>488,098 walk-forward candidate cells</td><td>Outcome-blind cutoff, tier, history and liquidity matching.</td><td>Exact analogue distances.</td></tr>
+      <tr><td>Baseline row-aligned store</td><td>Point-in-time 20-session volatility for nuisance matching; contemporaneously observable return covariates remain descriptive only.</td><td>A distance authority, forward-outcome evidence or shape-null matching variable.</td></tr>
+      <tr><td>R1-A risk sets and packed generation</td><td>Exact causal eligibility, overlap/cap rules and shared-priority sensitivity nulls.</td><td>Exact full composite scores without source materialization.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>Execution sequence</h2>
+
+  <h3>B0-01 — Freeze and bind the reuse-only audit</h3>
+  <p>Bind the R1-A preregistration/result/full-integrity receipt, shadow registry/case manifest, walk-forward registry, effective query-symbol-excluded link manifest, packed generation and every code/test hash. Enumerate permitted input paths; outcome, evidence-card, prediction, Stockbee and forward-return stores are forbidden.</p>
+  <p><b>Test before proceeding:</b> reconstruct every upstream digest and case/link count; verify all 3,270 current and 3,936 historical query identities; prove no outcome path was opened; require create-only atomic output.</p>
+
+  <h3>B0-02 — Run a support-only matching pilot</h3>
+  <p>Use only causal eligibility memberships and nuisance covariates—never R1-B distances or statistics—to choose the narrowest exact matching cells that give adequate randomization support. Start with 21-session cutoff bin × A/B query tier × liquidity tertile × point-in-time volatility tercile × context-availability. For the later structure-sensitive null, test deterministic coarse partition counts <code>K={8,12,16}</code> and freeze the largest supported K; merge cells smaller than 30 by a deterministic nearest-cell rule.</p>
+  <p><b>Support gate:</b> each tested recurrent episode needs at least 4,096 distinct feasible matched sets; at least 90% of cohort episodes and 90% of recurrent links must pass. If no frozen option passes, publish <code>insufficient-null-support</code>; never broaden cells after observing R1-B statistics.</p>
+
+  <h3>B0-03 — Reuse exact results for local geometry</h3>
+  <p>For all current queries, report <code>d1</code>, <code>d5</code>, <code>d10</code>, <code>d20</code>, normalized gaps/spans, component contribution/dominance and within-top-20 component reordering. Use the 1,152 walk-forward development queries to form outcome-blind empirical peer references matched on the frozen nuisance cells. Call these empirical references, not a generative null.</p>
+  <p><b>Test before proceeding:</b> independently reconstruct source-case seals, totals from frozen weights and component values, rank order and all peer-cell membership. Preserve every unsupported query in the denominator and label it explicitly.</p>
+
+  <h3>B0-04 — Reuse historical queries for production-set cutoff stability</h3>
+  <p>Measure exact episode-ID and symbol Jaccard, rank-biased overlap and distance drift for the 65 same-symbol pairs within 40 calendar days and the 122 within 65 days. This is production-risk-set stability: representation and eligibility both evolve. No causal reciprocity statistic is produced.</p>
+  <p><b>Test before proceeding:</b> use observed sessions for temporal ordering; bind both source sets; reconstruct effective query-symbol exclusion; report the pair inventory and all zero-overlap cases rather than filtering them.</p>
+
+  <h3>B0-05 — Shared-priority sensitivity</h3>
+  <p>Repeat the R1-A concentration comparison with priorities shared across queries, rather than independent for every query. Freeze two nulls before execution: one global episode priority and one hierarchical symbol-then-episode priority. Both retain each query's exact causal risk set and the production cap-three/inclusive-overlap selector. This tests whether R1-A concentration can arise from shared ordering alone.</p>
+  <p><b>Test before proceeding:</b> exhaustively validate the shared sampler on tiny enumerated universes; compare its selector with production; require serial/12-core identity; reconstruct every null replicate and result table. Report this as sensitivity to a specified null, never as a probability that hubness is harmful.</p>
+
+  <h3>B0-06 — Independent integrity verification</h3>
+  <p>A separate verifier reconstructs all frozen hashes, identities, metrics, support decisions, random replicates and HTML. It must refuse any future/outcome access, altered neighbor identity, missing/duplicate query, non-finite metric or partial output.</p>
+  <p><b>B0 output:</b> raw structural evidence and a go/no-go decision for the bounded exact POC. No adequacy label is authorized.</p>
+
+  <h3>B1 — Twenty-four-query exact multi-variant POC</h3>
+  <p>Select 24 queries outcome-blind from the existing warmup/baseline-seed fold, stratified across tier, liquidity and era, excluding later locked validation/final cases. In one shared packed pass per base query, maintain safe frontiers for baseline, score-component ablations, explicitly defined true-channel ablations, valid deterministic OHLC perturbations and observed-session cutoff shifts. Materialize the union of exact candidates once, score all variants and close each certificate independently.</p>
+  <p><b>Test before proceeding:</b> baseline must reproduce its frozen top-20 exactly; every variant must have a unique identity binding base query + contract + seed + representation digest; bounds must be proven safe for that variant; common-risk-set and production-risk-set stability must be separate; scalar and 12-core results must match. Stop at 24 if correctness, latency or certificate closure fails; expand to about 96 only after a frozen pass.</p>
+
+  <h3>B2 — Conditional recurrent-episode specificity</h3>
+  <p>Include every episode with R1-A inbound count at least five—the threshold is fixed because four was R1-A's preregistered null p99. For episode <code>e</code>, define <code>Ue</code> as all queries where it is causally eligible and <code>Qe</code> as queries that actually selected it. Test equal-episode primary aggregates for query cohesion, query-difficulty-normalized candidate specificity and breadth across frozen structure cells. Market-context-excluded chart structure is primary; full distance and market-context-only are mandatory secondary views.</p>
+  <p>Use 4,096 deterministic conditional-randomization replicates. N0 preserves exact causal exposure, recurrence count and nuisance-cell composition. N1 additionally preserves the support-pilot's frozen coarse query-structure composition. Sampling is uniform without replacement within each cell and includes the observed selections in its feasible universe.</p>
+  <p><b>Limited scientific gate:</b> under strict N1, market-excluded cohesion and specificity each require one-sided <code>p≤0.01</code> plus frozen practical effect sizes; directions must also pass N0, hash-even/odd query splits and leave-one-episode-out influence checks. Context-only significance cannot substitute. Low support or instability yields <code>unresolved</code>.</p>
+</section>
+
+<section>
+  <h2>Permitted conclusions</h2>
+  <table>
+    <thead><tr><th>Observed result</th><th>Permitted statement</th></tr></thead>
+    <tbody>
+      <tr><td>N0 and N1 chart-structure gates pass</td><td>R1-A excess recurrence is structurally localized and candidate-specific beyond causal exposure, nuisance matching and coarse shared-query structure; this is consistent with recurring chart archetypes.</td></tr>
+      <tr><td>N0 passes; N1 fails</td><td>Shared query-state composition can explain the concentration; candidate-specific archetypes are not established.</td></tr>
+      <tr><td>Only market-context view passes</td><td>Concentration is associated with common market regime/context, not established chart-shape archetypes.</td></tr>
+      <tr><td>Cohesion/specificity fail and breadth is high</td><td>Results are consistent with generic hub behavior under <code>distance-v1</code>; this does not prove every recurrent episode is harmful.</td></tr>
+      <tr><td>Support, stability or integrity gate fails</td><td>Unresolved; publish raw diagnostics only.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>Final product path</h2>
+  <p>R1-B supplies the evidence needed to design R1-C synthetic positive/novel-path calibration. Only R1-C may authorize <code>strong precedent</code>, <code>weak/unstable precedent</code> or <code>insufficient evidence</code> on a trader-facing evidence card. Even then, the card remains descriptive until a separately frozen prospective outcome study demonstrates predictive value.</p>
+  <p>Parent research plan: <a href="post-release-research-and-poc-plan.html">post-release research and POC plan</a>. Chronology: <a href="development-log.html">development log</a>. Current release boundary: <a href="release-status.html">release status</a>.</p>
+</section>
+</body>
+</html>
