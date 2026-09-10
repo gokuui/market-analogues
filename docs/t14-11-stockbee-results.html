@@ -1,0 +1,19 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>T14-11 verified Stockbee results</title>
+<style>body{font-family:system-ui;max-width:1150px;margin:2rem auto;line-height:1.5}table{border-collapse:collapse;width:100%}th,td{padding:.45rem;border-bottom:1px solid #ddd;text-align:left}.pass{background:#eaf8ee;padding:.8rem}.warn{background:#fff4dc;padding:.8rem}.muted{color:#555}</style></head><body>
+<h1>T14-11 — Verified Stockbee 25% / 4% controlled study</h1>
+<p class="pass"><b>Result:</b> Early 4% moves are substantially more common in stocks undergoing a 25% advance than in same-date controls matched on prior return, volatility, price and liquidity. The result survives calendar-month block inference and Holm correction, but the literal exact-start majority claim does not.</p>
+<h2>What was tested</h2><p>The locked NASDAQ archive contributed 37,358,636 eligible symbol/horizon starts. Consecutive 25%-winner windows were consolidated into 528,114 event runs. Broad and investable analyses together produced 710,373 event/population rows and 3,551,826 deterministic control links.</p>
+<h2>Key matched results</h2><table><thead><tr><th>Population</th><th>Horizon</th><th>Exposure in first five sessions</th><th>Winner events</th><th>Matched controls</th><th>Risk ratio</th></tr></thead><tbody>
+<tr><td>Broad</td><td>21 sessions</td><td>+4% close day</td><td>70.28%</td><td>51.30%</td><td>1.37</td></tr>
+<tr><td>Investable</td><td>21 sessions</td><td>+4% close day</td><td>66.77%</td><td>42.79%</td><td>1.56</td></tr>
+<tr><td>Broad</td><td>21 sessions</td><td>Bullish 4% range expansion</td><td>51.25%</td><td>37.41%</td><td>1.37</td></tr>
+<tr><td>Investable</td><td>21 sessions</td><td>Bullish 4% range expansion</td><td>50.57%</td><td>34.25%</td><td>1.48</td></tr>
+<tr><td>Broad</td><td>63 sessions</td><td>+4% close day</td><td>52.99%</td><td>42.34%</td><td>1.25</td></tr>
+<tr><td>Investable</td><td>63 sessions</td><td>+4% close day</td><td>44.73%</td><td>33.01%</td><td>1.35</td></tr>
+</tbody></table>
+<p>All 32 primary effects are positive and Holm-significant at adjusted p=0.0032. Ten also clear the stricter frozen claim gate, which additionally requires winner prevalence of at least 50%, risk ratio above one, at least 90% matching coverage and agreement across broad/investable directions.</p>
+<h2>What this supports</h2><ul><li>For one-month 25% advances, a +4% close day appears during the first five sessions in a clear majority of both broad and investable events.</li><li>Bullish range expansion narrowly exceeds 50% for those one-month events.</li><li>The association remains large after causal same-date matching.</li></ul>
+<h2>What it does not support</h2><ul><li>Only 13–26% of events contain the studied exposure on the exact first day; therefore a majority do not literally begin that way.</li><li>The investable 63-session winner prevalence is below 50%, despite being materially higher than controls.</li><li>This is not yet a buy signal. The 4% day is part of the same window used to label the 25% advance, so the retrospective association is partly mechanical.</li></ul>
+<h2>Next experiment: predictive inversion</h2><p>Freeze the close of the first qualifying 4% day as the signal timestamp. Starting with the next session, measure 5/20/60-session absolute and benchmark-relative returns, favourable/adverse excursions and barriers. Match against same-date stocks using only information known at the signal, including NASDAQ market regime. Only a verified post-signal advantage should be incorporated into analogue retrieval.</p>
+<p class="muted">Producer digest: <code>55da5a46…25298</code>. Independent verification digest: <code>f6594c37…c7671</code>. Coverage: 99.9987%. This observational archive lacks fully point-in-time exchange membership, delisting returns and corporate-event tables.</p>
+</body></html>
