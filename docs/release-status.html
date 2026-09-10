@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Market Analogues — verified release status</title>
+  <style>body{font-family:system-ui,sans-serif;max-width:1050px;margin:2rem auto;padding:0 1rem;line-height:1.5}table{border-collapse:collapse;width:100%}th,td{padding:.6rem;border-bottom:1px solid #ddd;text-align:left;vertical-align:top}.pass{color:#176b37;font-weight:700}.fail{color:#a61b1b;font-weight:700}.note{background:#fff5d8;padding:1rem}code{overflow-wrap:anywhere}</style>
+</head>
+<body>
+<h1>Market Analogues release status</h1>
+<p class="pass">Engineering release path: VERIFIED through E2E-04; final E2E-05 snapshot runs from this committed document.</p>
+<p class="note"><b>Predictive or trading claim: NOT AUTHORIZED.</b> This system retrieves historically similar OHLCV/market-context paths and reports causal, censored “what happened next” evidence. It does not claim that similarity predicts profit or provide a buy/sell recommendation.</p>
+<table>
+<thead><tr><th>Gate</th><th>Status</th><th>Bound result</th></tr></thead>
+<tbody>
+<tr><td>E2E-01 outcome contract</td><td class="pass">PASS</td><td>5/20/60-session causal outcomes, relative returns, MFE/MAE, barriers, censoring and abstention.</td></tr>
+<tr><td>E2E-02 cross-adapter portability</td><td class="pass">PASS</td><td><a href="../config/data/analogues/portability/portable-e2e-verification-v1/report.html">report</a>; <code>e2a61b87cf266bc1b2a288d5be229802d3af74d34b9694e21f13f8596598502f</code></td></tr>
+<tr><td>E2E-03 real NSE replay</td><td class="pass">PASS</td><td><a href="../config/data/analogues/portability/nse-real-e2e-verification-v5/report.html">report</a>; <code>2c4c6b11d4764aa26e70a01d57791e903b06bc0b15688bd9cdef9072312eadba</code></td></tr>
+<tr><td>E2E-04 operations/performance</td><td class="pass">PASS</td><td><a href="../config/data/analogues/portability/e2e-operational-certificate-v2/report.html">report</a>; <code>7baefc7135a495b22d320d82d29387bbb1e83f1d12bcebd11963bf03423c1ccb</code></td></tr>
+</tbody>
+</table>
+<h2>What is verified</h2>
+<p>Canonical directory/long-table CSV and Parquet ingestion; causal chart representation; full-universe exact certified retrieval for the frozen 252-session NSE cases; stable ranking; post-retrieval outcomes; restart and concurrency identity; corruption refusal; atomic artifacts; report generation; and independently reconstructed receipts.</p>
+<h2>Material boundaries</h2>
+<p>The configured files are not a point-in-time exchange membership database and do not supply complete identifier, delisting-return or corporate-event history. The real replay certifies the frozen 252-session NSE case matrix; 63/126-session full-universe authority coverage and the original five-lock sustained NASDAQ shadow remain separate/open gates. The fresh operational run did not durably record peak RSS, so its memory figure is not claimed; the separately sealed core qualification observed 6,226,312 KiB peak tree RSS, zero swap and zero OOM. NASDAQ and NSE source freshness remains dataset-specific. Negative walk-forward and post-signal studies remain negative evidence, not something hidden by this release.</p>
+<p><b>Publication boundary:</b> the reports and gate ledgers linked here are local frozen evidence under the Git-ignored <code>config/data/analogues</code> tree. The release snapshot binds their byte hashes and semantic digests, but a source-only Git clone does not contain those large artifacts or external OHLCV inputs.</p>
+<h2>Reproduce the closure</h2>
+<pre><code>cd /home/vinay/code/market-analogues
+.venv/bin/pytest
+PYTHONPATH=.:src .venv/bin/python experiments/m04r/verify_m04r14_e2e_nse_authority_matrix.py --repository /home/vinay/code/market-analogues --config config/datasets.example.yaml
+.venv/bin/market-analogues verify-nse-e2e --config config/datasets.example.yaml
+PYTHONPATH=.:src .venv/bin/python experiments/m04r/m04r14_e2e_operational_certificate.py --repository /home/vinay/code/market-analogues --config config/datasets.example.yaml
+PYTHONPATH=.:src .venv/bin/python experiments/m04r/m04r14_e2e_release_snapshot.py --repository /home/vinay/code/market-analogues --config config/datasets.example.yaml</code></pre>
+<p>Detailed chronology: <a href="development-log.html">development log</a>. Gate definitions: <a href="end-to-end-closure-plan.html">end-to-end closure plan</a>.</p>
+</body>
+</html>
