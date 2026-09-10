@@ -1,0 +1,40 @@
+{
+  "bootstrap_block_length_months": 3,
+  "bootstrap_confidence_interval": "uncentered_moving_block_percentile_2.5_97.5",
+  "bootstrap_resamples": 10000,
+  "bootstrap_seed": 20260909,
+  "bootstrap_tail": "one_sided_positive_effect_with_centered_null",
+  "contract_digest": "8cc7c8f21c42c8d96c87dfb65bb8dc0d7a2da540135b58ee37b44293aeb18379",
+  "created_at": "2026-09-10T02:40:07.367827+00:00",
+  "decile_rule": "within_each_population_start_date_horizon_average_rank_then_ceil_10_rank_divided_by_n",
+  "full_comparator_monthly_estimand": "clustered_winner_event_prevalence_minus_unclustered_nonwinner_risk_prevalence_within_calendar_month",
+  "holm_family_size": 32,
+  "implementation_h0": "1066ae061168d56c5ed87e38ad48859c78240806",
+  "investable_deciles_use_investable_cross_section_only": true,
+  "matched_comparator_monthly_estimand": "mean_event_exposure_minus_mean_of_five_selected_controls_within_calendar_month",
+  "partial_and_unmatched_events_retained_in_coverage": true,
+  "preregistration_digest": "4ea3aae2f8ed8c2b11e1dd65fab4982685c9f840e3c8bd6abb5a322b228ee6db",
+  "primary_matched_estimand": "only_events_with_exactly_five_controls",
+  "production_promotion_authorized": false,
+  "real_matched_results_accessed": false,
+  "relaxation_rule": "use_first_tier_containing_at_least_five_candidates_else_final_tier_shortfall",
+  "runtime_files": {
+    "config/m04r14-t14-11-stockbee-contract.json": "8aebc7d6f5ab35d5a842b320ca5ab4b9a86edfd16868162fa294cb4333ec1af1",
+    "experiments/m04r/m04r14_t14_11_stockbee_controls.py": "b46556065efe2d31de083149dafc68350396c04669dd2e8c18dfac704806971d",
+    "experiments/m04r/m04r14_t14_11_stockbee_events.py": "9881994f30846b90abd3402d3b1709664bca9a60c38db410df6ec67620a2f5fc",
+    "experiments/m04r/verify_m04r14_t14_11_stockbee_controls.py": "6af0f9a9fa68f7ac6e46c3e68b458e9dbcd621e9addcdf734853819c018eeb19",
+    "pyproject.toml": "9eeb5497e7c3cb4615345e9104cac78d93d45579f2ac71a1540f316c181858c1",
+    "src/market_analogues/stockbee_controls.py": "efe482b8eb0465f45cc18d78d4b01988489f930c824c837efd56155e39c5eb3a",
+    "src/market_analogues/walk_forward_scoring.py": "125e69b77f024d848c64df872683c9b10e1b8a5ee6c6c81f5a5f9fec33e233e4"
+  },
+  "schema_version": "m04r14-t14-11-stockbee-controls-v1",
+  "selection_serialization": "utf8(contract_digest|event_id|candidate_symbol)",
+  "status": "frozen_before_matched_control_selection_and_inference",
+  "verified_inputs": {
+    "event_store_result_digest": "7066fea26aa5623b1468df4314fd5abb942fdcffe5b2499edd0dade8afbb0ab4",
+    "event_store_sha256": "5a27aaef5a8db633ee1f8d7ca7d2053a521ae7b90c1013478a6d0c625289271b",
+    "event_verification_digest": "ba35db25d7a9204455ae70ba3bacc3d85eff4c6204eb6c3503cc1fb783700d5b",
+    "event_verification_sha256": "1f59ab196cdf681464e40835750f302b5df3a93e131dfe4495abae35226ad0bf"
+  },
+  "without_replacement_interpretation": "five_distinct_controls_within_event;reuse_across_events_allowed"
+}
