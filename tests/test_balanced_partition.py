@@ -5,8 +5,10 @@ import pytest
 
 from market_analogues.balanced_partition import (
     BalancedPartitionError,
+    _oriented_axis,
     array_digest,
     balanced_recursive_partition,
+    integer_array_digest,
     midrank_transform,
 )
 
@@ -57,12 +59,24 @@ def test_partition_is_exact_balanced_complete_and_repeatable(leaves: int) -> Non
 
 
 def test_partition_tie_boundary_is_resolved_by_id() -> None:
-    raw = np.asarray([[0.0], [0.0], [1.0], [1.0]])
+    raw = np.asarray([[0.0], [0.0], [0.0], [1.0]])
     transformed, doubled, _ = midrank_transform(raw)
     result = balanced_recursive_partition(
         transformed, doubled, ("d", "a", "c", "b"), leaves=2,
     )
-    assert result.labels.tolist() == [0, 0, 1, 1]
+    assert result.labels.tolist() == [1, 0, 0, 1]
+    assert result.splits[0].left_boundary_hex == result.splits[0].right_boundary_hex
+
+
+def test_leading_axis_sign_makes_lowest_maximum_loading_positive() -> None:
+    centered = np.asarray([[-2.0, 1.0], [-1.0, 0.5], [1.0, -0.5], [2.0, -1.0]])
+    integers = np.asarray([[2, 8], [4, 6], [6, 4], [8, 2]], dtype=np.int64)
+    axis, mode, pivot, _leading, _gap = _oriented_axis(
+        centered, integers, relative_eigengap_tolerance=1e-10,
+    )
+    assert mode == "leading_pca"
+    assert pivot == 0
+    assert axis[pivot] > 0.0
 
 
 @pytest.mark.parametrize(
@@ -118,3 +132,4 @@ def test_axis_digest_binds_shape_and_values() -> None:
     assert array_digest(base) == array_digest(base.copy())
     assert array_digest(base) != array_digest(base.reshape(1, 2))
     assert array_digest(base) != array_digest(np.asarray([2.0, 1.0]))
+    assert integer_array_digest(np.asarray([1, 2])) != integer_array_digest(np.asarray([[1, 2]]))

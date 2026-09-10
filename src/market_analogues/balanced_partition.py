@@ -52,6 +52,14 @@ def array_digest(values: np.ndarray) -> str:
     return digest.hexdigest()
 
 
+def integer_array_digest(values: np.ndarray) -> str:
+    array = np.ascontiguousarray(np.asarray(values, dtype="<i8"))
+    digest = sha256()
+    digest.update(np.asarray(array.shape, dtype="<i8").tobytes())
+    digest.update(array.tobytes())
+    return digest.hexdigest()
+
+
 def id_digest(ids: Sequence[str]) -> str:
     payload = json.dumps(list(ids), ensure_ascii=False, separators=(",", ":"))
     return sha256(payload.encode("utf-8")).hexdigest()

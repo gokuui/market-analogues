@@ -79,7 +79,7 @@
     <li>Implement separate partition and support executables, then commit implementation/tests as H0. Generate and commit a sole-child H1 preregistration binding both runtimes, exact solver environment, canonical JSON/digest rules, inputs, K roles, gates, failure states and claim boundary.</li>
     <li>After H1, the partition executable receives only the sealed query registry and causal OHLCV/representation inputs—no candidate, eligibility or Qe path—and publishes a create-only partition artifact. Only after that publication may the separate support executable open eligibility/Qe and cross the frozen N0 cells.</li>
     <li>Commit a separate verifier, run the independent reconstruction and record both producer and verifier digests in the development log.</li>
-    <li>Publish a sealed result for <code>partition_invalid</code>, <code>reproducibility_failed</code>, <code>support_inadequate</code> or <code>verified_support_pass</code>; absence is never used to represent failure. Only verified K8 support permits freezing the still-separate B2 statistic/shared-priority contract. It does not authorize B2 execution, prediction or labels.</li>
+    <li>The producer publishes <code>partition_invalid</code>, <code>reproducibility_failed</code>, <code>support_inadequate</code> or <code>support_pass_pending_independent_verification</code>; absence is never used to represent failure. Only the separate verifier may issue <code>verified_support_pass</code>. Verified K8 support permits freezing the still-separate B2 statistic/shared-priority contract; it does not authorize B2 execution, prediction or labels.</li>
   </ol>
 </section>
 
