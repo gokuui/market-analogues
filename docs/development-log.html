@@ -22,7 +22,7 @@
 </header>
 
 <section id="status">
-  <h2>Current status — 9 September 2026</h2>
+  <h2>Current status — 10 September 2026</h2>
   <table>
     <thead><tr><th>Gate</th><th>Status</th><th>Evidence</th></tr></thead>
     <tbody>
@@ -54,7 +54,7 @@
       <tr><td>Original T14-10 OHLCV portability</td><td class="open">PARTIAL — GENERIC CORE/NSE SAMPLE ONLY</td><td>The market-agnostic interfaces and sampled NSE evidence exist, but the original plan's complete NSE/generic replay, dataset-specific calendars/benchmarks and full certification have not run. Later documents reused “T14-10” for walk-forward work; that identifier collision does not close this original gate.</td></tr>
       <tr><td>Walk-forward falsification workstream</td><td class="fail">WF-04 V1 COMPLETE; FAILURE DIAGNOSIS VERIFIED</td><td>The single-open final block and 2,784-query post-hoc decomposition independently verify. Composite beats unconditional in only 46/116 months; final one-v-rest AUCs are 0.502 favorable, 0.522 adverse and 0.558 no-touch. Sharper analogue probabilities add unstable noise rather than durable conditional resolution. V1 remains rejected.</td></tr>
       <tr><td>Stockbee 25% / 4% controlled study</td><td class="pass">COMPLETE — 3,551,826 CONTROLS VERIFIED</td><td>99.9987% five-control coverage; all 32 effects are positive and Holm-significant. The first-five one-month majority is supported, exact-start majority is rejected, and investable quarter prevalence remains below 50%. This is retrospective association, not a post-signal trading result.</td></tr>
-      <tr><td>T14-12 post-signal predictive inversion</td><td class="open">CONTRACT + SYNTHETIC KERNEL IN PROGRESS</td><td>Next-session-open entry, 5/20/60 subsequent sessions, causal 20-session refractory events, pre-signal matching, exact benchmark continuity and a 16-cell primary family are defined. No real post-signal outcome has been calculated.</td></tr>
+      <tr><td>T14-12 post-signal predictive inversion</td><td class="open">P1 PANEL VERIFIED; P2 MATCHING NEXT</td><td>The independently certified causal panel contains all 12,080 locked histories, 19,104,800 eligible rows, 191,660 refractory +4% close events and 265,114 refractory bullish range-expansion events. All shard seals, source identities, counts and 198 raw scalar rows pass; control matching and inference remain unopened.</td></tr>
       <tr><td>M04R-11 untouched truth matrix</td><td class="open">RUNNER READY — 0/60 BEFORE LAUNCH</td><td>Write-isolated eight-process authority runner, atomic semantic/integrity checkpoints, strict certificate/eligibility gates and an independent verifier are implemented. Candidate comparison remains forbidden until all 60 truths aggregate and seal.</td></tr>
       <tr><td>External Kullamagi examples</td><td class="pass">AUDIT COMPLETE — PARTIAL COVERAGE</td><td>132 unique 252-session episodes across 56 NASDAQ-source symbols. Causal top-5 label purity is 51.5% versus a 41.4% frequency baseline (within-query random-candidate p=0.001); causal minority-setup recovery remains weak.</td></tr>
       <tr><td>Yahoo-expanded Kullamagi examples</td><td class="fail">75% TARGET NOT REACHED</td><td>Yahoo expands coverage to 361 episodes across 129 symbols. With one match per candidate symbol, primary causal top-5 purity is 54.44% versus a 50.44% within-query random expectation (p=0.003): measurable but far below the target and concentrated in breakouts.</td></tr>
@@ -2171,6 +2171,13 @@
   <p><b>Producer:</b> Twelve SHA-256 symbol shards each verify locked source bytes, truncate stock and benchmark inputs to their frozen coverage, build causal daily panels, stream Zstandard Parquet and publish by atomic rename. Completed shard receipts are validated and reused after restart. Aggregate publication is also atomic, closing a pre-real empty-directory restart edge case found in review.</p>
   <p><b>Verifier:</b> For all 12,080 histories, independently reconstruct source validity, causal panel counts, refractory signal counts and 5/20/60 exact-calendar completion counts. Five deterministic symbols per shard receive scalar first/middle/last plus signal-event reconstruction from raw OHLCV. Every shard byte, accounting row, aggregate count and source identity must reconcile before matching opens.</p>
   <p><b>Next:</b> Pass focused and complete suites, commit runner/verifier/tests/log as H0, create and commit the sole-child panel preregistration, then launch all 12 workers. Control matching and inference stay unopened until independent panel verification passes.</p>
+</section>
+<section class="entry">
+  <h2>L-263 — T14-12 complete causal panel independently verified</h2>
+  <p class="pass"><b>Result:</b> Producer digest <code>4ef8b374…ccae</code> atomically seals all 12 SHA-256 symbol shards after 142.42 seconds. It accounts for 12,080 histories, 19,104,800 causal panel rows, 191,660 refractory +4% close events and 265,114 refractory bullish range-expansion events.</p>
+  <p class="pass"><b>Independent certification:</b> Verification digest <code>3ab1834d…eac0</code> passed in 173.04 seconds. The verifier checked every shard seal and source fingerprint, independently reconstructed all-symbol eligibility/signal/completion counts, reconciled the aggregate inventory and rebuilt 198 stratified rows directly from raw OHLCV with the scalar oracle.</p>
+  <p><b>Causal boundary:</b> Both receipts state <code>control_matching_or_inference_accessed=false</code>. The verified panel contains outcome columns needed later, but no control was selected and no result was aggregated or inspected while P1 was being certified.</p>
+  <p><b>Next:</b> Freeze P2 as a separate outcome-blind identity stage. It may read only date, symbol, population eligibility, at-risk/signal flags, market state and t−1 matching covariates. Select and independently reconstruct five same-date non-signal at-risk controls before any outcome column is opened.</p>
 </section>
 </main>
 
