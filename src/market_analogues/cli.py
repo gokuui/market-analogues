@@ -61,7 +61,8 @@ from .m04r_validation_registry import (
     write_m04r_validation_registry,
 )
 from .nse_e2e_verification import (
-    run_nse_e2e_verification, write_nse_e2e_verification,
+    run_current_nse_e2e_verification, run_nse_e2e_verification,
+    write_nse_e2e_verification,
 )
 from .m04r_prefix_verification import (
     verify_m04r_causal_prefixes, write_m04r_prefix_verification,
@@ -235,10 +236,21 @@ def cmd_verify_portable_e2e(args: argparse.Namespace) -> int:
 def cmd_verify_nse_e2e(args: argparse.Namespace) -> int:
     config = load_config(args.config)
     output_dir = Path(args.output_dir) if args.output_dir else (
-        config.artifact_dir / "portability" / "nse-real-e2e-verification-v3"
+        config.artifact_dir / "portability" / "nse-real-e2e-verification-v4"
     )
-    result, records = run_nse_e2e_verification(
-        config, output_dir, dataset=args.dataset, workers=args.workers,
+    if args.dataset != "nse":
+        raise SystemExit("the certified real-source replay currently targets nse")
+    repository = Path(__file__).resolve().parents[2]
+    result, records = run_current_nse_e2e_verification(
+        config, output_dir, workers=args.workers,
+        preregistration_path=(
+            repository / "experiments/m04r/"
+            "m04r14_e2e_nse_authority_matrix_preregistered.json"
+        ),
+        authority_verification_path=(
+            config.artifact_dir / "portability/"
+            "nse-current-authorities-v1-verification/VERIFIED.json"
+        ),
     )
     machine, html = write_nse_e2e_verification(result, records, output_dir)
     GateReport(

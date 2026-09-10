@@ -13,7 +13,9 @@ from typing import Any, Mapping
 import pandas as pd
 import yaml
 
-from .adapters import CachedOHLCVSource, OHLCVSource, source_from_spec
+from .adapters import (
+    CachedOHLCVSource, OHLCVSource, PrefixLockedOHLCVSource, source_from_spec,
+)
 from .authority import (
     authority_universe_digest, load_authority_artifact, validate_authority_artifact,
 )
@@ -54,6 +56,9 @@ class NseE2EVerification:
     source_lock_unchanged: bool
     workers: int
     source_universe_digest: str
+    authority_generation: str
+    authority_verification_digest: str | None
+    prefix_lock_cutoff: str | None
     result_digest: str
     failures: tuple[str, ...]
 
@@ -169,6 +174,7 @@ def _case_evidence(
     registry_digest: str,
     universe_digest: str,
     benchmark_drift: bool,
+    authority_verification_digest: str | None = None,
 ) -> dict[str, Any]:
     query = build_episode(
         source, InstrumentKey(str(case["dataset_id"]), str(case["symbol"])),
@@ -241,6 +247,9 @@ def _case_evidence(
             "evidence_contract_digest": evidence.contract_digest,
             "retrieval_identity_digest": evidence.retrieval_identity_digest,
             "outcome_digest": evidence.outcome_digest,
+            **({
+                "authority_verification_digest": authority_verification_digest,
+            } if authority_verification_digest is not None else {}),
         },
         outcome_rows=evidence.rows,
         outcome_notice=(
@@ -277,6 +286,9 @@ def run_nse_e2e_verification(
     *,
     dataset: str = "nse",
     workers: int = 12,
+    authority_root: Path | None = None,
+    source_lock: Mapping[str, Any] | None = None,
+    authority_verification_digest: str | None = None,
 ) -> tuple[NseE2EVerification, list[dict[str, Any]]]:
     if output_root.exists():
         raise FileExistsError(f"verification root already exists: {output_root}")
@@ -286,10 +298,30 @@ def run_nse_e2e_verification(
         raise NseE2EError("workers must be positive")
     output_root.mkdir(parents=True)
     raw_source = source_from_spec(config.datasets[dataset])
+    if source_lock is not None:
+        if source_lock.get("dataset") != dataset:
+            raise NseE2EError("fresh authority dataset differs")
+        raw_source = PrefixLockedOHLCVSource(
+            raw_source, str(source_lock["maximum_cutoff"]),
+        )
     source = CachedOHLCVSource(raw_source, max_entries=None)
-    quality, registry, registry_digest, benchmark_drift = _load_registry(
-        config, source, dataset,
-    )
+    if source_lock is None:
+        quality, registry, registry_digest, benchmark_drift = _load_registry(
+            config, source, dataset,
+        )
+    else:
+        quality = pd.read_parquet(
+            config.artifact_dir / "quality" / f"{dataset}.parquet"
+        )
+        registry = pd.DataFrame(source_lock.get("cases") or []).sort_values(
+            "case_id"
+        ).reset_index(drop=True)
+        if len(registry) != 12:
+            raise NseE2EError(
+                f"fresh authority contract requires 12 cases; found {len(registry)}"
+            )
+        registry_digest = str(source_lock["registry_digest"])
+        benchmark_drift = False
     first_case = registry.sort_values("case_id").iloc[0]
     universe_request = SearchQuery(
         build_episode(
@@ -301,7 +333,13 @@ def run_nse_e2e_verification(
         max_per_instrument=3, minimum_history_gap_bars=60,
     )
     before_digest = authority_universe_digest(source, universe_request, quality)
-    authority_root = config.artifact_dir / "gate12" / "authorities" / dataset
+    if source_lock is not None and before_digest != source_lock.get(
+        "universe_prefix_digest"
+    ):
+        raise NseE2EError("fresh authority universe prefix changed")
+    resolved_authority_root = authority_root or (
+        config.artifact_dir / "gate12" / "authorities" / dataset
+    )
     cases = [row._asdict() for row in registry.sort_values("case_id").itertuples(index=False)]
 
     # Preload every query and matched symbol once using the available cores.
@@ -310,7 +348,7 @@ def run_nse_e2e_verification(
     }
     for case in cases:
         payload = json.loads(
-            (authority_root / "cases" / f"{case['episode_id']}.json").read_text()
+            (resolved_authority_root / "cases" / f"{case['episode_id']}.json").read_text()
         )
         keys.update(
             InstrumentKey(str(match["dataset_id"]), str(match["symbol"]))
@@ -320,8 +358,9 @@ def run_nse_e2e_verification(
 
     def execute(case: dict[str, Any]) -> dict[str, Any]:
         return _case_evidence(
-            case, source, authority_root, output_root, quality,
+            case, source, resolved_authority_root, output_root, quality,
             registry_digest, before_digest, benchmark_drift,
+            authority_verification_digest,
         )
 
     failures: list[str] = []
@@ -351,7 +390,10 @@ def run_nse_e2e_verification(
             f"expected 240 matches/720 evidence rows; received {exact_matches}/{evidence_rows}"
         )
     state = {
-        "schema_version": "nse-real-e2e-verification-v1",
+        "schema_version": (
+            "nse-real-e2e-verification-v2"
+            if source_lock is not None else "nse-real-e2e-verification-v1"
+        ),
         "dataset": dataset,
         "registry_digest": registry_digest,
         "source_universe_digest": before_digest,
@@ -359,6 +401,13 @@ def run_nse_e2e_verification(
         "benchmark_full_fingerprint_drift": benchmark_drift,
         "cases": records,
         "source_lock_unchanged": unchanged,
+        "authority_generation": (
+            "fresh-prefix-locked-v1" if source_lock is not None else "legacy-gate12"
+        ),
+        "authority_verification_digest": authority_verification_digest,
+        "prefix_lock_cutoff": (
+            str(source_lock["maximum_cutoff"]) if source_lock is not None else None
+        ),
         "failures": failures,
     }
     result_digest = stable_hash(state)
@@ -380,9 +429,94 @@ def run_nse_e2e_verification(
         repeated_evidence_equal=not any("repeated evidence" in value for value in failures),
         source_lock_unchanged=unchanged, workers=workers,
         source_universe_digest=before_digest,
+        authority_generation=state["authority_generation"],
+        authority_verification_digest=authority_verification_digest,
+        prefix_lock_cutoff=state["prefix_lock_cutoff"],
         result_digest=result_digest, failures=tuple(failures),
     )
     return result, records
+
+
+def _valid_receipt(
+    payload: Mapping[str, Any], *, omitted: set[str],
+) -> bool:
+    return payload.get("result_digest") == stable_hash({
+        key: value for key, value in payload.items() if key not in omitted
+    })
+
+
+def current_nse_authority_contract(
+    config: AppConfig,
+    *,
+    preregistration_path: Path,
+    authority_verification_path: Path,
+) -> tuple[dict[str, Any], Path, str]:
+    """Authenticate the fresh retrieval authority before outcomes may open."""
+    prereg = json.loads(preregistration_path.read_text())
+    verification = json.loads(authority_verification_path.read_text())
+    prereg_valid = _valid_receipt(
+        prereg, omitted={"preregistration_digest"},
+    ) if "result_digest" in prereg else (
+        prereg.get("preregistration_digest") == stable_hash({
+            key: value for key, value in prereg.items()
+            if key != "preregistration_digest"
+        })
+    )
+    # The verifier's semantic digest deliberately excludes measurements and
+    # publication time, while binding every case result and producer byte hash.
+    verification_valid = _valid_receipt(
+        verification,
+        omitted={"result_digest", "elapsed_seconds", "created_at"},
+    )
+    if not prereg_valid:
+        raise NseE2EError("fresh authority preregistration digest differs")
+    if not all((
+        verification_valid,
+        verification.get("passed") is True,
+        verification.get("status") == "verified",
+        verification.get("verified_cases") == 12,
+        verification.get("verified_matches") == 240,
+        verification.get("all_case_gates_passed") is True,
+        verification.get("outcomes_accessed") is False,
+        verification.get("production_authorized") is False,
+        verification.get("preregistration_digest")
+        == prereg.get("preregistration_digest"),
+    )):
+        raise NseE2EError("fresh authority verification is invalid or incomplete")
+    authority_root = Path(str(prereg["output_root"])).resolve()
+    result = json.loads((authority_root / "RESULT.json").read_text())
+    if result.get("result_digest") != verification.get("producer_result_digest"):
+        raise NseE2EError("fresh authority aggregate binding differs")
+    source_lock = dict(prereg.get("source_lock") or {})
+    if source_lock.get("dataset") != "nse" \
+            or source_lock.get("universe_prefix_digest") \
+            != verification.get("universe_prefix_digest") \
+            or source_lock.get("benchmark_prefix_digest") \
+            != verification.get("benchmark_prefix_digest"):
+        raise NseE2EError("fresh authority prefix binding differs")
+    configured_root = config.artifact_dir / "portability" / "nse-current-authorities-v1"
+    if authority_root != configured_root.resolve():
+        raise NseE2EError("fresh authority root is outside the configured artifact tree")
+    return source_lock, authority_root, str(verification["result_digest"])
+
+
+def run_current_nse_e2e_verification(
+    config: AppConfig,
+    output_root: Path,
+    *,
+    preregistration_path: Path,
+    authority_verification_path: Path,
+    workers: int = 12,
+) -> tuple[NseE2EVerification, list[dict[str, Any]]]:
+    source_lock, authority_root, verification_digest = current_nse_authority_contract(
+        config, preregistration_path=preregistration_path,
+        authority_verification_path=authority_verification_path,
+    )
+    return run_nse_e2e_verification(
+        config, output_root, dataset="nse", workers=workers,
+        authority_root=authority_root, source_lock=source_lock,
+        authority_verification_digest=verification_digest,
+    )
 
 
 def write_nse_e2e_verification(
@@ -403,5 +537,5 @@ def write_nse_e2e_verification(
         for row in records
     )
     failure_rows = "".join(f"<li>{escape(value)}</li>" for value in result.failures) or "<li>None</li>"
-    html.write_text(f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NSE real end-to-end verification</title><style>body{{font-family:system-ui,sans-serif;max-width:1200px;margin:2rem auto;padding:0 1rem}}table{{border-collapse:collapse;width:100%}}th,td{{padding:.55rem;border-bottom:1px solid #ddd;text-align:left}}.pass{{color:#176b37}}.fail{{color:#a61b1b}}code{{overflow-wrap:anywhere}}</style></head><body><h1>NSE real end-to-end verification</h1><p class="{'pass' if result.passed else 'fail'}"><b>{'PASS' if result.passed else 'FAIL'}</b></p><p>All sealed full-universe NSE exact authorities were rebound to the current read-only stock universe, then carried through causal outcome joining and user-facing evidence publication.</p><table><thead><tr><th>Case</th><th>Role</th><th>Tier</th><th>Liquidity</th><th>Matches</th><th>Eligible 5</th><th>Eligible 20</th><th>Eligible 60</th><th>Evidence</th></tr></thead><tbody>{case_rows}</tbody></table><h2>Integrity</h2><p>Cases: {result.cases}; exact matches: {result.exact_matches}; evidence rows: {result.evidence_rows}; workers: {result.workers}; result digest: <code>{result.result_digest}</code>; source-universe digest: <code>{result.source_universe_digest}</code>.</p><p>Benchmark whole-file drift: <code>{result.benchmark_full_fingerprint_drift}</code>. All 240 selected exact matches were reconstructed against the current benchmark with maximum distance/component delta <code>{result.maximum_selected_rescore_delta}</code>.</p><h2>Failures</h2><ul>{failure_rows}</ul><p><b>Boundary:</b> This certifies real NSE 252-session evidence mechanics over 12 internally sealed full-universe authorities and current exact reconstruction of their selected matches. The benchmark file was appended after the old lock, whose contract retained only a whole-file fingerprint; this replay does not claim a newly recomputed exhaustive frontier. It does not establish predictive value, and 63/126-session full-universe authority coverage remains separate.</p></body></html>""")
+    html.write_text(f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NSE real end-to-end verification</title><style>body{{font-family:system-ui,sans-serif;max-width:1200px;margin:2rem auto;padding:0 1rem}}table{{border-collapse:collapse;width:100%}}th,td{{padding:.55rem;border-bottom:1px solid #ddd;text-align:left}}.pass{{color:#176b37}}.fail{{color:#a61b1b}}code{{overflow-wrap:anywhere}}</style></head><body><h1>NSE real end-to-end verification</h1><p class="{'pass' if result.passed else 'fail'}"><b>{'PASS' if result.passed else 'FAIL'}</b></p><p>All sealed full-universe NSE exact authorities were rebound to their read-only semantic source prefix, then carried through causal outcome joining and user-facing evidence publication.</p><table><thead><tr><th>Case</th><th>Role</th><th>Tier</th><th>Liquidity</th><th>Matches</th><th>Eligible 5</th><th>Eligible 20</th><th>Eligible 60</th><th>Evidence</th></tr></thead><tbody>{case_rows}</tbody></table><h2>Integrity</h2><p>Cases: {result.cases}; exact matches: {result.exact_matches}; evidence rows: {result.evidence_rows}; workers: {result.workers}; result digest: <code>{result.result_digest}</code>; source-universe digest: <code>{result.source_universe_digest}</code>.</p><p>Authority generation: <code>{result.authority_generation}</code>; authority verification: <code>{result.authority_verification_digest}</code>; prefix cutoff: <code>{result.prefix_lock_cutoff}</code>. All 240 selected exact matches were reconstructed with maximum distance/component delta <code>{result.maximum_selected_rescore_delta}</code>.</p><h2>Failures</h2><ul>{failure_rows}</ul><p><b>Boundary:</b> This certifies real NSE 252-session descriptive evidence mechanics over 12 independently verified full-universe authorities. Censored or not-yet-observable outcomes remain explicit and cannot change retrieval identity. It does not establish predictive value, and 63/126-session full-universe authority coverage remains separate.</p></body></html>""")
     return machine, html

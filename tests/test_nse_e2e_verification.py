@@ -1,8 +1,9 @@
 import pytest
 
 from market_analogues.nse_e2e_verification import (
-    NseE2EError, analogue_match_from_payload,
+    NseE2EError, _valid_receipt, analogue_match_from_payload,
 )
+from market_analogues.types import stable_hash
 
 
 def _payload() -> dict:
@@ -32,3 +33,18 @@ def test_authority_match_payload_requires_exact_episode_identity() -> None:
     payload["episode_id"] = "tampered"
     with pytest.raises(NseE2EError, match="identity"):
         analogue_match_from_payload(payload)
+
+
+def test_fresh_verification_receipt_excludes_only_publication_measurements() -> None:
+    state = {"passed": True, "verified_cases": 12}
+    receipt = {
+        **state, "result_digest": stable_hash(state),
+        "elapsed_seconds": 1.25, "created_at": "now",
+    }
+    assert _valid_receipt(
+        receipt, omitted={"result_digest", "elapsed_seconds", "created_at"},
+    )
+    receipt["verified_cases"] = 11
+    assert not _valid_receipt(
+        receipt, omitted={"result_digest", "elapsed_seconds", "created_at"},
+    )
