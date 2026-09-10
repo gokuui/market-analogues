@@ -93,7 +93,7 @@ def build_preregistration(repository: Path) -> dict[str, Any]:
         "producer": _store_binding(repository),
         "prior_attempts": "v1_interrupted_without_receipt_after_redundant_rebuild;v2_preregistered_but_preflight_rejected_before_execution",
         "semantic_change_from_v1": False,
-        "mechanical_change": "cache_independently_rebuilt_candidate_buckets_once_per_names_deciles_nonwinner_identity",
+        "mechanical_change": "cache_independently_rebuilt_candidate_buckets_once_per_names_and_deciles_group_identity",
         "all_control_rows_still_checked": True, "all_inference_rows_still_reconstructed": True,
         "production_promotion_authorized": False,
     }, "preregistration_digest")
