@@ -99,7 +99,6 @@ from .m04r_certified_matrix_verification import (
 from .multiresolution_verification import (
     verify_multiresolution_state, write_multiresolution_verification,
 )
-from .outcomes import compute_outcomes, summarize_match_outcomes
 from .oracle import run_oracle_suite, write_oracle_artifacts
 from .pruning_verification import verify_exact_safe_pruning, write_pruning_report
 from .production_verification import (
@@ -111,10 +110,14 @@ from .precision_verification import (
 from .product_contract import (
     load_product_contract, validate_trial_ledger, write_contract_artifacts,
 )
+from .portability_verification import (
+    run_portability_verification, write_portability_verification,
+)
 from .quality import audit_source
 from .report import write_search_report
 from .representation import represent
 from .search import SearchCandidate, exact_search
+from .search_evidence import build_search_evidence
 from .scale_ladder import (
     collect_scale_history, run_scale_ladder, write_scale_ladder_report,
 )
@@ -188,6 +191,42 @@ def cmd_verify(args: argparse.Namespace) -> int:
     print(json.dumps(report.to_dict(), indent=2))
     print(path)
     return 0 if report.passed else 2
+
+
+def cmd_verify_portable_e2e(args: argparse.Namespace) -> int:
+    config = load_config(args.config)
+    output_dir = Path(args.output_dir) if args.output_dir else (
+        config.artifact_dir / "portability" / "portable-e2e-verification-v1"
+    )
+    result = run_portability_verification(output_dir)
+    machine, html = write_portability_verification(result, output_dir)
+    GateReport(
+        "e2e_02_portable_cross_adapter", result.passed,
+        {
+            "schema_version": result.schema_version,
+            "variants": list(result.variants),
+            "maximum_distance_delta": result.maximum_distance_delta,
+            "retrieval_semantics_equal": result.retrieval_semantics_equal,
+            "same_format_identity_equal": result.same_format_identity_equal,
+            "evidence_rows_equivalent": result.evidence_rows_equivalent,
+            "evidence_summary_equivalent": result.evidence_summary_equivalent,
+            "maximum_evidence_numeric_delta": result.maximum_evidence_numeric_delta,
+            "source_files_unchanged": result.source_files_unchanged,
+            "future_mutation_retrieval_invariant": (
+                result.future_mutation_retrieval_invariant
+            ),
+            "future_mutation_outcomes_changed": (
+                result.future_mutation_outcomes_changed
+            ),
+            "result_digest": result.result_digest,
+            "machine_artifact": str(machine.resolve()),
+            "html_artifact": str(html.resolve()),
+        },
+        list(result.failures),
+    ).write(_gates(config))
+    print(json.dumps(result.to_dict(), indent=2))
+    print(html)
+    return 0 if result.passed else 2
 
 
 def cmd_verify_case_memory_contract(args: argparse.Namespace) -> int:
@@ -2175,20 +2214,28 @@ def cmd_search(args: argparse.Namespace) -> int:
             "search_backend": "persisted_coarse_index",
             "candidate_index": str(index_path),
         }
-    outcome_frames = []
-    for match in matches:
-        full = source.load(match.episode_key.instrument)
-        outcome_frames.append(compute_outcomes(full, match.episode_key.cutoff))
-    summary = summarize_match_outcomes(outcome_frames)
+    evidence = build_search_evidence(
+        source, matches, query_cutoff=query.key.cutoff,
+    )
     report_path = Path(args.output) if args.output else (
         config.artifact_dir / "reports" / f"{args.dataset}-{args.symbol}-{query.key.cutoff.date()}.html"
     )
-    write_search_report(query, matches, report_path, summary, {
+    write_search_report(query, matches, report_path, evidence.summary, {
         "representation_version": config.representation_version,
         "query_episode_id": query.key.id,
         "source_fingerprint": source.fingerprint(query.key.instrument),
+        "evidence_contract_digest": evidence.contract_digest,
+        "retrieval_identity_digest": evidence.retrieval_identity_digest,
+        "outcome_digest": evidence.outcome_digest,
+        "benchmark_available": str(evidence.benchmark_available).lower(),
         **search_provenance,
-    })
+    }, outcome_rows=evidence.rows, outcome_notice=(
+        "Configured benchmark calendar and relative-return context were applied. "
+        "Only outcomes fully observable by the query cutoff enter the summary."
+        if evidence.benchmark_available else
+        "No benchmark was configured. Stock-only outcomes are shown, but market-calendar "
+        "continuity and benchmark-relative returns cannot be certified."
+    ))
     print(report_path)
     return 0
 
@@ -2233,6 +2280,10 @@ def build_parser() -> argparse.ArgumentParser:
     search.add_argument("--workers", type=int, default=1)
     search.add_argument("--output")
     search.set_defaults(func=cmd_search)
+    portable_e2e = sub.add_parser("verify-portable-e2e")
+    portable_e2e.add_argument("--config", required=True)
+    portable_e2e.add_argument("--output-dir")
+    portable_e2e.set_defaults(func=cmd_verify_portable_e2e)
     verify = sub.add_parser("verify")
     verify.add_argument("--config", required=True)
     verify.add_argument("--seeds-per-family", type=int, default=5)

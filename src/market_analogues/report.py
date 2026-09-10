@@ -19,6 +19,8 @@ def write_search_report(
     path: Path,
     outcome_summary: pd.DataFrame | None = None,
     provenance: dict[str, str] | None = None,
+    outcome_rows: pd.DataFrame | None = None,
+    outcome_notice: str | None = None,
 ) -> Path:
     rows = []
     for rank, match in enumerate(matches, 1):
@@ -35,6 +37,23 @@ def write_search_report(
     outcome_html = "<p>No complete historical outcomes were supplied.</p>"
     if outcome_summary is not None and len(outcome_summary):
         outcome_html = outcome_summary.to_html(index=False, border=0, float_format=lambda x: f"{x:.4f}")
+    detail_html = ""
+    if outcome_rows is not None and len(outcome_rows):
+        visible = [
+            "match_rank", "matched_symbol", "matched_cutoff", "horizon_sessions",
+            "observable_at_query", "eligibility_reason", "close_return",
+            "benchmark_relative_return", "maximum_favorable_excursion",
+            "maximum_adverse_excursion", "barrier_label",
+        ]
+        detail_html = (
+            "<h2>Per-match outcome evidence</h2>"
+            + outcome_rows.loc[:, visible].to_html(
+                index=False, border=0, float_format=lambda x: f"{x:.4f}",
+            )
+        )
+    notice_html = (
+        f"<p class='notice'>{escape(outcome_notice)}</p>" if outcome_notice else ""
+    )
     provenance_rows = "".join(
         f"<tr><th>{escape(k)}</th><td><code>{escape(v)}</code></td></tr>"
         for k, v in sorted((provenance or {}).items())
@@ -52,7 +71,7 @@ table{{width:100%;border-collapse:collapse;background:white;margin:1rem 0}} th,t
 <p class="meta">Query: <b>{escape(str(query.key.instrument))}</b> through {escape(query.key.cutoff.date().isoformat())}; lookback {query.key.lookback} bars. Generated {datetime.now(timezone.utc).isoformat()}.</p>
 <p class="notice"><b>Descriptive evidence, not a forecast.</b> Ranking uses information available at each cutoff. Subsequent returns are displayed only after retrieval and never enter similarity.</p>
 <h2>Nearest episodes</h2><table><thead><tr><th>#</th><th>Instrument</th><th>Historical cutoff</th><th>Distance ↓</th><th>Distance breakdown</th><th>Quality</th></tr></thead><tbody>{''.join(rows)}</tbody></table>
-<h2>What happened next across these matches</h2>{outcome_html}
+<h2>What happened next across these matches</h2>{notice_html}{outcome_html}{detail_html}
 <h2>Provenance</h2><table>{provenance_rows}</table>
 </body></html>"""
     path.parent.mkdir(parents=True, exist_ok=True)

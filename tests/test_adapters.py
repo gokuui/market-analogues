@@ -7,6 +7,7 @@ from market_analogues.adapters import (
     CachedOHLCVSource, DirectorySource, LongTableSource, SourceError,
 )
 from market_analogues.config import DatasetSpec
+from market_analogues.config import BenchmarkSpec
 from market_analogues.types import InstrumentKey
 
 
@@ -59,6 +60,30 @@ def test_long_table_matches_directory(tmp_path, bars):
     source = LongTableSource(spec)
     assert len(source.instruments()) == 2
     assert len(source.load(InstrumentKey("demo", "AAA"))) == len(bars)
+
+
+def test_long_table_supports_external_benchmark_and_rejects_foreign_key(
+    tmp_path, bars,
+):
+    frame = pd.concat([bars.assign(symbol="AAA"), bars.assign(symbol="BBB")])
+    path = tmp_path / "long.parquet"
+    benchmark_path = tmp_path / "benchmark.parquet"
+    frame.to_parquet(path, index=False)
+    bars.assign(close=bars.close * 1.01).to_parquet(benchmark_path, index=False)
+    spec = DatasetSpec(
+        "demo", "long_table", path, "parquet", symbol_from="column",
+        symbol_column="symbol", timestamp_column="date",
+        benchmark=BenchmarkSpec(path=benchmark_path),
+    )
+    source = LongTableSource(spec)
+    benchmark = source.load_benchmark()
+    assert benchmark is not None
+    assert list(benchmark.columns) == [
+        "timestamp", "open", "high", "low", "close", "volume",
+    ]
+    assert source.benchmark_fingerprint()
+    with pytest.raises(KeyError):
+        source.load(InstrumentKey("foreign", "AAA"))
 
 
 def test_missing_column_is_rejected(directory_dataset):

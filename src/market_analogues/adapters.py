@@ -255,7 +255,7 @@ class LongTableSource(OHLCVSource):
         return [InstrumentKey(self.spec.dataset_id, s) for s in self._symbols]
 
     def load(self, key: InstrumentKey) -> pd.DataFrame:
-        if key.source_symbol not in self._symbols:
+        if key.dataset_id != self.spec.dataset_id or key.source_symbol not in self._symbols:
             raise KeyError(str(key))
         rows = self._raw[self._raw[self.spec.symbol_column].astype(str) == key.source_symbol]
         return canonicalize(rows, self.spec, symbol=key.source_symbol)
@@ -266,6 +266,35 @@ class LongTableSource(OHLCVSource):
     @lru_cache(maxsize=1)
     def _source_fingerprint(self) -> str:
         return file_fingerprint(self.spec.path)
+
+    def load_benchmark(self) -> pd.DataFrame | None:
+        cached = self._load_benchmark()
+        return cached.copy() if cached is not None else None
+
+    def benchmark_fingerprint(self) -> str | None:
+        if not self.spec.benchmark:
+            return None
+        return file_fingerprint(self.spec.benchmark.path)
+
+    @lru_cache(maxsize=1)
+    def _load_benchmark(self) -> pd.DataFrame | None:
+        if not self.spec.benchmark:
+            return None
+        benchmark = self.spec.benchmark
+        fmt = benchmark.format or benchmark.path.suffix.lstrip(".").lower()
+        benchmark_spec = DatasetSpec(
+            dataset_id=self.spec.dataset_id,
+            adapter="directory",
+            path=benchmark.path.parent,
+            format=fmt,
+            timestamp_column=benchmark.timestamp_column or self.spec.timestamp_column,
+            timezone=self.spec.timezone,
+            interval=self.spec.interval,
+            column_map=self.spec.column_map,
+        )
+        return canonicalize(
+            _read(benchmark.path, fmt), benchmark_spec, symbol="__benchmark__",
+        )
 
 
 def source_from_spec(spec: DatasetSpec) -> OHLCVSource:

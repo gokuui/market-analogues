@@ -151,6 +151,7 @@ missing benchmark context remains missing rather than becoming an observed zero.
 - [Repository comparison and adopted ideas](docs/repository-comparison.html)
 - [Complete-universe verification and next-step plan](docs/universe-verification-plan.html)
 - [Current verification status and next implementation plan](docs/verification-status-and-next-plan.html)
+- [End-to-end closure plan](docs/end-to-end-closure-plan.html)
 - [Gate 12 exhaustive reference and independent validation plan](docs/gate12-exhaustive-reference-plan.html)
 - [Case-based market memory: implementation and verification plan](docs/case-based-market-memory-plan.html)
 - [M04R research audit and preflight POC evidence](docs/m04r-research-and-poc-report.html)
@@ -180,7 +181,8 @@ positives must beat reversed/context-contradictory negatives, future mutation mu
 have zero effect, and persisted coarse-index serialization must preserve neighbors.
 Gate JSON keeps an immutable history beneath `artifact_dir/gates/history`.
 
-The current regression record is 171 passing tests. M03's first locked unseen
+The complete regression suite is the release authority; its current count is
+recorded in the running development log rather than duplicated here. M03's first locked unseen
 trial failed and remains in the ledger. The separately preregistered M03b holdout
 passes all eight unnamed families at 100% top-1, 100% precision@5 and zero
 critical-negative errors in 33.71 seconds. This establishes a verified retrieval baseline, not trading
