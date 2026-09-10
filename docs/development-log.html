@@ -2314,6 +2314,12 @@
   <p><b>Next:</b> E2E-04 will bind the already independently sealed T14-05 restart/concurrency/resource qualification to this release path and add current-artifact corruption, atomicity and resume checks. It will not rerun expensive evidence merely to reproduce an already sealed performance measurement.</p>
   <p><b>Pre-E2E-04 receipt audit:</b> The successful V4 computation remains valid, but its writer omitted <code>registry_digest</code> from the persisted dataclass even though that value participated in the semantic result digest. A third party therefore could not reconstruct the digest from the saved file alone. V5 adds that field without changing retrieval or outcome logic; E2E-04 will bind only the reconstructible V5 receipt.</p>
 </section>
+<section class="entry">
+  <h2>L-282 — E2E-04 operational certificate implemented before execution</h2>
+  <p><b>Reuse decision:</b> T14-05 already has an independently verified real SIGKILL/failed-closed test, clean-root restart, P1/P2/P4/P8 semantic parity, three full repeated runs and a 5,221-sample process-tree resource monitor with zero swap and zero OOM events. E2E-04 re-runs that independent reconstruction and binds its immutable digests rather than spending hours repeating exposed evidence.</p>
+  <p><b>Current-path additions:</b> The certificate reconstructs the V5 NSE receipt, authenticates the fresh authority verifier, checks all 12 strict-stop/repeated/resume certificates, mutates a copied real authority and requires rejection, scans all current trees for partial files, parses all 13 NSE reports and proves the physical benchmark now extends beyond the still-stable semantic prefix.</p>
+  <p><b>Resource boundary:</b> The fresh 12-worker run persisted elapsed time and disk footprint but not peak RSS. The certificate reports that absence explicitly and applies the independently sealed core resource observation; it does not manufacture a fresh-run memory number from transient monitoring.</p>
+</section>
 </main>
 
 <section id="reproduce">
