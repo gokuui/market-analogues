@@ -1,0 +1,87 @@
+{
+  "schema_version": "m04r14-r1a-exposure-audit-preregistration-v2",
+  "status": "frozen_after_v1_postprocessing_failure_before_v2_full_null_distribution",
+  "implementation_commit": "2fda0976f51b2694c7bf6c7e92d312e98709b162",
+  "supersedes": {
+    "preregistration_digest": "a2b21c1724d9bce91beea6a79436171a6d681600a5c6a638cc2ff422c3d172eb",
+    "failure": "post-simulation NameError because retrieval identity rows were not returned from the source reader",
+    "v1_result_published": false
+  },
+  "claims": {
+    "development_diagnostic_only": true,
+    "adequacy_labels_authorized": false,
+    "predictive_claim_authorized": false,
+    "production_promotion_authorized": false,
+    "real_forward_outcomes_accessed": false
+  },
+  "prior_exposure": {
+    "sealed_actual_concentration_summary_previously_observed": true,
+    "single_replicate_engineering_smoke_observed": true,
+    "v1_full_simulation_completed_before_postprocessing_failure": true,
+    "v1_full_null_distribution_not_printed_or_published": true,
+    "smoke_observation": {"actual_episode_max": 38, "null_episode_max": 3},
+    "inferential_holdout_claim_allowed": false
+  },
+  "contract": {
+    "null_hypothesis": "within each query, all causally eligible episode distances are iid from one continuous distribution; query random orderings are independent",
+    "selection": "uniform random permutation of each exact causal risk set followed by the unchanged greedy ascending-distance selector, inclusive same-symbol interval-overlap rejection, maximum three episodes per symbol, stop at twenty",
+    "eligibility": "candidate cutoff <= query latest eligible cutoff; A/B packed NASDAQ universe; query episode excluded; same-symbol candidate cutoff < query start",
+    "interval_coordinates": "full 252-session windows at frozen five-session stride; [5*i,5*i+251] inclusive after complete per-symbol row-accounting proof",
+    "tie_policy": "continuous null has zero tie probability; observed retrieval retains exact (distance,episode_id) order",
+    "cross_query_dependence": "independent query permutations; shared-priority sensitivity is explicitly deferred",
+    "future_outcomes_or_labels_used": false
+  },
+  "metric_directions": {
+    "episode_unique": "lower_is_more_concentrated",
+    "episode_max": "higher_is_more_concentrated",
+    "episode_top_1_percent_share": "higher_is_more_concentrated",
+    "episode_hhi": "higher_is_more_concentrated",
+    "episode_effective_number": "lower_is_more_concentrated",
+    "episode_gini": "higher_is_more_concentrated",
+    "symbol_unique": "lower_is_more_concentrated",
+    "symbol_max": "higher_is_more_concentrated",
+    "symbol_top_1_percent_share": "higher_is_more_concentrated",
+    "symbol_hhi": "higher_is_more_concentrated",
+    "symbol_effective_number": "lower_is_more_concentrated",
+    "query_any_repeated_symbol_fraction": "higher_is_more_concentrated",
+    "repeated_symbol_twice_per_query": "higher_is_more_concentrated",
+    "repeated_symbol_thrice_per_query": "higher_is_more_concentrated",
+    "mean_pairwise_query_episode_overlap": "higher_is_more_concentrated"
+  },
+  "execution": {
+    "output_root": "config/data/analogues/m04r14/r1a-exposure-audit-v2",
+    "verification_root": "config/data/analogues/m04r14/r1a-exposure-audit-v2-verification",
+    "null_replicates": 512,
+    "seed": 947221,
+    "workers": 12,
+    "publication": "create-only temporary-directory rename",
+    "reproduction": "all 512 per-replicate metric rows replayed byte-for-byte"
+  },
+  "inputs": {
+    "queries": 3270,
+    "retrieved_links": 65400,
+    "packed_candidate_episodes": 3786156,
+    "packed_candidate_symbols": 11584,
+    "packed_generation_id": "9fc6ae0ec4451133d8006897162f3443803fd30a3c44b78e80a476fbb18bb483",
+    "packed_provenance_digest": "83ccfa62ac7ffec03e48d0f8a5634c7b8f1b8b0dde1426be22cc343fe116f62d",
+    "packed_content_digest": "27dfa03eea244c1c13d27dcae7970707c60505141a297502de36588b6928437e",
+    "packed_result_digest": "43e7246ac20e35fe696fe816764e102e4f04472ba3eb3b36fa09615dee42662f",
+    "registry_digest": "e5a1024e021425cace30d2172fee426ff1e6490702ea4f30583ad056e1ca89f2",
+    "semantic_verification_digest": "a8bdd370d757208075cb648eb35a81b52e872995891f12ec527fa45e804ef701",
+    "case_manifest_digest": "bc446bde4a5e4796487fa57aee336b1bafcde15b71c7ade0fd11a373352b5ed6",
+    "file_sha256": {
+      "config/data/analogues/m04r14/nasdaq-shadow-denominator-v1/query-registry.json": "9efe135c690779d0018260c5cfc3546101e487203a60599ba335ad92136af494",
+      "config/data/analogues/m04r14/nasdaq-shadow-denominator-v1/SEALED.json": "e0f9898a1d0d2e41dbe9ac89d3cdef771562916ee1a89dcdc1b7daf3bca935b8",
+      "config/data/analogues/m04r14/nasdaq-shadow-interrupted-verification-v1/VERIFIED.json": "b94d36ebccfcfbef5abf85898a1ad6f3c2c50e845839923428d850fd25d87e77",
+      "config/data/analogues/poc/m04r/packed-bound-full/store/generations/9fc6ae0ec4451133d8006897162f3443803fd30a3c44b78e80a476fbb18bb483/manifest.json": "b11c50e626be16805fc05c8f6125b31b545b35c1ac93733470f6d1ed260c732f",
+      "config/data/analogues/poc/m04r/packed-bound-full/packed-bound-full.json": "a52255e69e00fcb82dc376d4214dc45108b59c24f966796970716c50f8af758e"
+    }
+  },
+  "runtime_files": {
+    "src/market_analogues/adequacy.py": "bee0d8789f5f5a4e9542381b5582bb9f014b88a7d45d4dc238a3783cd6c55b02",
+    "experiments/m04r/m04r14_r1a_exposure_audit.py": "7a49e5d9af0e8ae3cd6ce79c48d305744e899c15acc4cf869808080ef10e6b08",
+    "experiments/m04r/verify_m04r14_r1a_exposure_audit.py": "ae4c79f73b665f14ccebc5af51475026b81e3e06084e4c3401992948cdfb9129",
+    "tests/test_adequacy.py": "72293c35a1e92166bcc0ee227a110fbe753ef305f38132895edaf60138dcc668"
+  },
+  "preregistration_digest": "6a125b098aee5deca3f3d3c00a0ceaef4de99e22e93ee0184e1ed13a584af584"
+}
