@@ -6,6 +6,7 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from hashlib import sha256
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -22,7 +23,7 @@ from experiments.m04r import verify_m04r14_t14_12_balance as oracle
 from experiments.m04r import m04r14_t14_12_final_balance as target
 
 
-SCHEMA = "m04r14-t14-12-post-signal-final-balance-verification-v5"
+SCHEMA = "m04r14-t14-12-post-signal-final-balance-verification-v6"
 
 
 class FinalBalanceVerificationError(RuntimeError): pass
