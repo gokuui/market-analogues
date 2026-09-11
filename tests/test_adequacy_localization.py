@@ -100,9 +100,21 @@ def test_recurrence_does_not_weight_episodes_and_cohesion_uses_pairs_once():
 def test_entropy_effective_k8_count():
     assert entropy_breadth([0, 1, 2, 3], [0, 0, 0, 0]) == .25
     assert entropy_breadth([0, 1, 2, 3], [0, 1, 2, 3]) == 1
+    # The raw exp/log expression is 1.0000000000000002 for five uniform
+    # labels on float64; the published statistic must preserve its exact bound.
+    assert entropy_breadth([0, 1, 2, 3, 4], [0, 1, 2, 3, 4]) == 1
     assert entropy_breadth([0], [7]) == 1
     with pytest.raises(LocalizationError):
         entropy_breadth([0], [8])
+
+
+def test_entropy_breadth_remains_in_exact_unit_range_for_integer_histograms():
+    rng = np.random.default_rng(20260911)
+    for size in range(1, 129):
+        for _ in range(16):
+            labels = rng.integers(0, 8, size=size).tolist()
+            value = entropy_breadth(range(size), labels)
+            assert 0 < value <= 1
 
 
 def test_priority_exact_wire_format_and_full_hash_reproducibility():

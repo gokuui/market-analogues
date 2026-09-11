@@ -31,8 +31,9 @@ def _small_spec(tmp_path: Path) -> Path:
     payload["validation_query_seeds"] = [500, 501, 502, 503, 504]
     payload["acceptance"]["maximum_total_seconds"] = 60.0
     # ru_maxrss is process-global, so this synthetic gate must include pytest's
-    # collection/plugin footprint.  The frozen production spec is unchanged.
-    payload["acceptance"]["maximum_rss_mb"] = 1536.0
+    # collection/plugin and long-lived harness high-water mark.  This is not a
+    # resource qualification; the frozen production spec remains unchanged.
+    payload["acceptance"]["maximum_rss_mb"] = 4096.0
     path = tmp_path / "structural.yaml"
     path.write_text(yaml.safe_dump(payload, sort_keys=False))
     return path
@@ -72,7 +73,7 @@ def test_small_unseen_structural_gate_and_artifacts(tmp_path: Path, monkeypatch)
     monkeypatch.setattr(verification, "LATENT_SPECS", LATENT_SPECS[:2])
     spec = load_structural_verifier_spec(_small_spec(tmp_path))
     result = verify_latent_structures(spec)
-    assert result.passed
+    assert result.passed, result.failures
     assert result.metrics["latent_id_used_by_distance"] is False
     assert result.metrics["real_forward_outcomes_accessed"] is False
     assert result.metrics["validation_queries"] == 10

@@ -161,7 +161,12 @@ def entropy_breadth(selected: Sequence[int], k8_labels: Sequence[int]) -> float:
         raise LocalizationError("breadth requires nonempty membership and K8 labels")
     counts = Counter(int(k8_labels[index]) for index in indices)
     probabilities = [count / len(indices) for _, count in sorted(counts.items())]
-    return math.exp(-math.fsum(p * math.log(p) for p in probabilities)) / min(8, len(indices))
+    # The normalized effective number is mathematically at most one. Direct
+    # exp/log evaluation can exceed that bound by one ULP for a perfectly
+    # uniform five-label selection, so publish the canonical bounded value
+    # rather than weakening downstream artifact validation with a tolerance.
+    value = math.exp(-math.fsum(p * math.log(p) for p in probabilities)) / min(8, len(indices))
+    return min(1.0, value)
 
 
 def equal_episode_mean(values: Sequence[float]) -> float:
