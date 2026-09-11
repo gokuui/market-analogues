@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Analogue improvement metric and acceptance plan</title>
+  <style>
+    :root{color-scheme:light;--ink:#18212b;--muted:#536170;--line:#d8dee6;--blue:#185fa5;--green:#176b37;--amber:#9a6700;--red:#b42318;--soft:#f6f8fa;--warn:#fff4dc}
+    body{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;max-width:1150px;margin:2rem auto;padding:0 1rem;color:var(--ink);line-height:1.55}
+    h1,h2,h3{line-height:1.2} h1{margin-bottom:.35rem} h2{margin-top:0} a{color:var(--blue)}
+    section{border:1px solid var(--line);border-radius:10px;padding:1rem 1.2rem;margin:1rem 0}
+    table{border-collapse:collapse;width:100%} th,td{padding:.58rem;border-bottom:1px solid #e3e7eb;text-align:left;vertical-align:top} th{background:var(--soft)}
+    code{overflow-wrap:anywhere} .formula{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;background:var(--soft);padding:.8rem;border-radius:7px;overflow-x:auto}
+    .warn{background:var(--warn);border-left:5px solid #b9770e;padding:.85rem 1rem}.fail{color:var(--red)}.pass{color:var(--green)}.muted{color:var(--muted)}
+    .gate{font-weight:700}.compact li{margin:.3rem 0}
+  </style>
+</head>
+<body>
+<h1>Analogue improvement metric and acceptance plan</h1>
+<p><b>Purpose:</b> define the one gate a new analogue method must pass before anyone may say it improves decision evidence. The test is an untouched, causal, rolling walk-forward comparison. It rewards accurate probabilities, not attractive charts, in-sample fit, neighbour similarity, or a profitable-looking hand-picked example.</p>
+
+<p class="warn"><b>Existing result that must not be erased:</b> the locked composite produced <b>−3.22% Brier skill versus the unconditional base rate on pooled validation</b> and <b>−3.46% on the consumed final block</b>. Those periods are now development evidence; neither may be called untouched again or used to certify a redesign.</p>
+
+<section>
+  <h2>1. What is—and is not—being required</h2>
+  <p>The candidate remains a case-based market-memory system: select causally eligible historical analogues, then form a nonparametric outcome distribution from those analogues. A direct weighted empirical distribution is sufficient. No neural network, regression, classifier, or other fitted ML model is required.</p>
+  <p>For example, after outcome-blind retrieval and weighting, a three-class forecast may be formed as:</p>
+  <div class="formula">p̂<sub>ic</sub> = (½ + Σ<sub>j∈N(i)</sub> w<sub>ij</sub> · 1[y<sub>j</sub>=c]) / (3/2 + Σ<sub>j∈N(i)</sub> w<sub>ij</sub>)</div>
+  <p>The neighbour set <i>N(i)</i> and weights <i>w<sub>ij</sub></i> must depend only on information available at query cutoff <i>i</i>. Historical outcomes may summarize already-selected neighbours; they may not choose the representation, neighbours, distance weights, or stopping rule during the untouched evaluation.</p>
+</section>
+
+<section>
+  <h2>2. Frozen primary question</h2>
+  <table>
+    <thead><tr><th>Item</th><th>Frozen definition</th></tr></thead>
+    <tbody>
+      <tr><td>Primary horizon</td><td><b>20 subsequent observed stock sessions.</b> Five- and 60-session results are secondary disclosures and cannot rescue failure at 20.</td></tr>
+      <tr><td>Primary outcome</td><td>The existing causal barrier route: <code>favorable_first</code> at origin close + 2 ATR, <code>adverse_first</code> at origin close − 1 ATR, or <code>no_touch</code> through session 20. ATR, origin, touch, ambiguity, censoring, and session-alignment rules remain byte-bound to the locked outcome contract.</td></tr>
+      <tr><td>Primary lane</td><td><b>Forced three-class probability lane.</b> Every query with an evaluable label receives a forecast. Abstention cannot remove a difficult query from the primary score.</td></tr>
+      <tr><td>Unit of prediction</td><td>One stock/query cutoff. Predictions for a cutoff month seal before any outcome from that month is opened.</td></tr>
+      <tr><td>Primary population</td><td>A new outcome-blind registry whose cutoffs are strictly later than the already consumed August 2025 final boundary. Exact first/last dates, folds, universe lock, and minimum sample size must be preregistered using availability metadata only.</td></tr>
+      <tr><td>Candidate</td><td>Exactly one versioned representation, retriever, weighting rule, smoothing rule, and fallback policy, sealed before untouched outcomes. Multiple candidate variants require a new outer untouched authority or multiplicity correction fixed in advance.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>3. The two mandatory comparators</h2>
+  <h3>A. Matched causal base rate</h3>
+  <p>At each query cutoff, estimate class frequencies only from earlier registry queries whose complete 20-session outcomes were observable before that cutoff. Match using frozen, cutoff-known strata: market regime × prefix-quality class × trailing-liquidity cell. Use the exact stratum when it has at least 30 resolved observations; otherwise follow the preregistered fallback <code>regime × liquidity → regime → unconditional</code>. Apply the same half-count smoothing as the candidate. Bin definitions, support threshold, fallback order, and warm-up period freeze before outcomes.</p>
+  <p>This is the “what usually happens in comparable causal conditions?” baseline. It prevents a retriever from receiving credit merely for rediscovering the prevailing market frequency.</p>
+  <h3>B. Current locked retriever</h3>
+  <p>Run the presently locked composite retriever and probability construction unchanged on the same query rows, source snapshot, eligible historical information, outcome definition, and scoring code. Bind its implementation commit, configuration, representation digest, and runtime-file hashes in the preregistration. It is the incumbent—not a reimplemented approximation.</p>
+  <p><b>Common-support rule:</b> all primary comparisons use exactly the rows on which the candidate, matched base rate, incumbent, and label are present. Coverage outside that intersection remains visible and is separately gated.</p>
+</section>
+
+<section>
+  <h2>4. Primary score and improvement formula</h2>
+  <p>For query <i>i</i> and classes <i>c</i> ∈ {favorable first, adverse first, no touch}, the multiclass Brier loss is:</p>
+  <div class="formula">BS<sub>i</sub>(m) = Σ<sub>c=1..3</sub> (p̂<sub>ic</sub><sup>(m)</sup> − 1[y<sub>i</sub>=c])²<br><br>
+BS(m) = (1/N) Σ<sub>i=1..N</sub> BS<sub>i</sub>(m)<br><br>
+BrierSkill(candidate, baseline) = 1 − BS(candidate) / BS(baseline)<br><br>
+Δ<sub>i,b</sub> = BS<sub>i</sub>(candidate) − BS<sub>i</sub>(baseline)</div>
+  <p>Positive skill means lower loss. The candidate must have <b>strictly positive Brier skill against both mandatory comparators</b>. The paired statistical test is expressed on Δ: improvement means E[Δ] &lt; 0.</p>
+  <p>Scores are first computed per query. For inference, paired loss differences are averaged within calendar month so correlated stocks in one market episode are not treated as independent trials.</p>
+</section>
+
+<section>
+  <h2>5. Confidence and paired-test gate</h2>
+  <ol class="compact">
+    <li>Use the same query/month pairs for candidate and comparator; never compare means from different coverage sets.</li>
+    <li>The primary inference unit is the calendar month. Use a preregistered, seeded moving-block bootstrap of monthly mean paired loss differences with 10,000 replicates and fixed six-month blocks. Disclose three- and 12-month block sensitivities.</li>
+    <li>For each mandatory comparator, test one-sided <i>H</i><sub>0</sub>: E[Δ] ≥ 0 versus <i>H</i><sub>1</sub>: E[Δ] &lt; 0. Apply Holm correction across the two primary comparisons.</li>
+    <li><span class="gate">Pass only if</span> both Holm-adjusted p-values are below 0.05 and both simultaneous 95% upper confidence bounds for mean Δ are below zero.</li>
+    <li>Report the effect size as Brier skill with confidence intervals, mean paired loss reduction, fraction of months improved, and fraction of queries improved. Statistical significance without positive practical effect does not pass.</li>
+  </ol>
+  <p>A Newey–West/Diebold–Mariano calculation on monthly differences is a confirmation diagnostic. It cannot override a failed primary bootstrap gate.</p>
+</section>
+
+<section>
+  <h2>6. Rolling walk-forward and untouched-data discipline</h2>
+  <ol class="compact">
+    <li><b>Develop:</b> use only previously opened WF-04 data and synthetic fixtures to choose the candidate. Preserve the old negative result.</li>
+    <li><b>Preregister:</b> freeze the candidate, both comparators, query registry, exact chronological folds, targets, exclusions, score code, random seeds, minimum coverage, tests, and performance budgets before opening any new query outcome.</li>
+    <li><b>Predict:</b> at each monthly cutoff, retrieve only episodes already observable at that time. A neighbour outcome contributes only if its full relevant horizon completed before the query cutoff; early barrier touch never shortens the embargo.</li>
+    <li><b>Seal then reveal:</b> atomically seal all candidate and baseline predictions, eligibility rows, provenance, and digests for a month before computing that month’s future labels.</li>
+    <li><b>Expand:</b> later months may use earlier months only after their outcomes mature. They may not revise any earlier prediction.</li>
+    <li><b>Evaluate once:</b> open the frozen untouched folds once and publish pass or failure. A failed method may inspire a new version, but needs a new future authority to make a new untouched claim.</li>
+  </ol>
+  <p>Use at least four preregistered chronological folds. Fold boundaries must be calendar-derived without inspecting performance. Purge boundaries by the maximum disclosed 60-session horizon so no label can cross from a training/available-outcome interval into an evaluation interval.</p>
+</section>
+
+<section>
+  <h2>7. Complete acceptance gate</h2>
+  <table>
+    <thead><tr><th>Gate</th><th>Mandatory pass condition</th></tr></thead>
+    <tbody>
+      <tr><td>Primary improvement</td><td>20-session forced-lane Brier skill is &gt; 0 against both matched causal base rate and current locked retriever.</td></tr>
+      <tr><td>Confidence</td><td>Both Holm-adjusted one-sided paired tests pass and both simultaneous 95% upper bounds for Δ are &lt; 0.</td></tr>
+      <tr><td>No negative fold</td><td>Candidate Brier skill is &gt; 0 against <em>each</em> mandatory comparator in every preregistered chronological fold. Pooled strength cannot hide an era failure.</td></tr>
+      <tr><td>Calibration</td><td>Finite probabilities summing to one; log loss no worse than either comparator; classwise reliability plots, fixed-bin ECE, calibration-in-the-large, and Brier reliability/resolution terms all disclosed. The preregistration must freeze a simultaneous classwise calibration test, and it must not reject the candidate after Holm correction.</td></tr>
+      <tr><td>Coverage</td><td>Candidate emits a primary forecast for 100% of label-evaluable registered queries and for every row forecast by both comparators. At least 90% of registered queries must have evaluable labels overall and in each fold; all censoring, ambiguity, missingness, and unsupported counts remain in the denominator report.</td></tr>
+      <tr><td>Leakage</td><td>Zero future-dependent features, neighbours, weights, strata, membership repairs, labels, or outcome-informed selection. Future-label mutation leaves every prediction and neighbour ID unchanged. Maximum-horizon embargo and prediction-before-outcome receipts reconcile exactly.</td></tr>
+      <tr><td>Determinism</td><td>Independent reconstruction agrees on query IDs, neighbour IDs/order, probabilities, per-row scores, aggregates, and artifact digests. One-worker and 12-worker executions are scientifically identical; interrupted/resumed execution equals clean execution.</td></tr>
+      <tr><td>Performance</td><td>On a frozen host/data benchmark, report build time, query throughput, p50/p95/p99 latency, peak aggregate RSS, bytes read/written, and resume time. Candidate p95 latency, total wall time, and peak RSS must each be no more than 2× the locked retriever unless a stricter preregistered absolute budget passes. No per-query full-universe resort/hash or unbounded quadratic materialization is permitted.</td></tr>
+    </tbody>
+  </table>
+  <p class="warn"><b>Conjunctive decision:</b> every row above must pass. Strong similarity, CRPS, a favorable subgroup, or a single strong fold cannot compensate for failure of either primary Brier comparison.</p>
+</section>
+
+<section>
+  <h2>8. Five-, 20-, and 60-session disclosure</h2>
+  <table>
+    <thead><tr><th>Horizon</th><th>Status</th><th>Required report</th></tr></thead>
+    <tbody>
+      <tr><td>5 sessions</td><td>Secondary</td><td>Separate Brier skill, paired confidence interval/test, calibration, coverage, and continuous-return score. Never pool its rows with another horizon.</td></tr>
+      <tr><td><b>20 sessions</b></td><td><b>Primary</b></td><td>All acceptance gates in this document. The existing +2 ATR/−1 ATR first-touch route remains the primary categorical target.</td></tr>
+      <tr><td>60 sessions</td><td>Secondary</td><td>Separate Brier skill, paired confidence interval/test, calibration, coverage, and continuous-return score. Its longer censoring and embargo are reported explicitly.</td></tr>
+    </tbody>
+  </table>
+  <p>No “best horizon” headline is permitted. If 5 or 60 sessions is later proposed as primary, that choice needs a fresh preregistration and untouched authority.</p>
+</section>
+
+<section>
+  <h2>9. Continuous-return evidence: CRPS is secondary</h2>
+  <p>For each horizon separately, construct a causal predictive CDF <i>F</i><sub>i,h</sub> of stock close return and benchmark-relative return from the weighted analogue outcomes. Score it with the continuous ranked probability score:</p>
+  <div class="formula">CRPS(F<sub>i,h</sub>, y<sub>i,h</sub>) = ∫<sub>−∞</sub><sup>∞</sup> (F<sub>i,h</sub>(z) − 1[y<sub>i,h</sub> ≤ z])² dz</div>
+  <p>For an empirical sample, use the exact weighted discrete CRPS implementation frozen and verified on synthetic cases. Compare paired CRPS with both mandatory comparator distributions on common rows, using the same month-level dependence treatment. Also disclose median and 10/25/75/90% quantiles, interval width, empirical coverage, and benchmark-relative results.</p>
+  <p><b>Role:</b> CRPS tests whether the analogue outcome distribution is useful beyond the categorical barrier target. It is supportive evidence only; superior CRPS cannot rescue a failed primary 20-session Brier gate.</p>
+</section>
+
+<section>
+  <h2>10. Required artifacts and decision language</h2>
+  <ul class="compact">
+    <li>Outcome-blind preregistration with Git commit, source/config/runtime hashes, exact fold dates, sample-size gate, algorithm, baselines, metrics, seeds, and budgets.</li>
+    <li>Create-only monthly prediction receipts proving prediction-before-outcome order, plus complete neighbour/eligibility and fallback provenance.</li>
+    <li>Outcome store with explicit complete, ambiguous, censored, delisted/unavailable, and benchmark-missing accounting.</li>
+    <li>Per-query score table; monthly paired-difference table; fold/horizon/calibration/coverage/performance reports; immutable result digest.</li>
+    <li>Independent verifier that recomputes causal eligibility, predictions, labels, scores, inference, guardrails, and digests without calling producer scientific-validation code.</li>
+  </ul>
+  <p class="pass"><b>If every gate passes:</b> “The frozen nonparametric analogue outcome method improved untouched 20-session probabilistic forecasts over both the matched causal base rate and the prior locked retriever in this research archive.”</p>
+  <p class="fail"><b>If any gate fails:</b> publish the failure and retain the method as descriptive research only. Do not claim calibrated predictive value, trading profitability, production readiness, or a buy/sell signal.</p>
+</section>
+
+<section>
+  <h2>11. Implementation sequence</h2>
+  <ol class="compact">
+    <li><b>M0:</b> write the machine-readable metric contract and synthetic oracle; independently verify formulas, folds, embargo, coverage, CRPS, paired inference, and failure paths.</li>
+    <li><b>M1:</b> freeze one candidate and the two comparator implementations; produce a source/runtime/authority manifest.</li>
+    <li><b>M2:</b> build the untouched outcome-blind rolling query registry and prediction listener with restart-safe, create-only monthly seals.</li>
+    <li><b>M3:</b> run and seal monthly predictions; reveal outcomes only when all horizons mature.</li>
+    <li><b>M4:</b> execute the single-open evaluation and independent verification.</li>
+    <li><b>M5:</b> issue a pass/fail receipt using only the decision language above and append the immutable result to the running development log.</li>
+  </ol>
+</section>
+
+<p class="muted">Frozen on 11 September 2026. This document defines the evaluation target. The candidate representation and retrieval mechanics require their own outcome-blind preregistration; changing them after the untouched outcome window begins invalidates this gate.</p>
+</body>
+</html>
