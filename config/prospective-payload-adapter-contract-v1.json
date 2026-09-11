@@ -1,0 +1,63 @@
+{
+  "schema_version": "prospective-payload-adapter-contract-v1",
+  "status": "frozen_for_consumed_fixture_parity_before_real_source_launch",
+  "upstream": {
+    "candidate_contract_digest": "75c5b8cb4557e0ed6bc65081a33bc9463bf1075b0e9ea3ebfbc71f8a819463a3",
+    "m1_result_digest": "5a1839447a767048b6554758d9250bb0804d8d6c7523bec9158a9f6d85aba469",
+    "listener_contract_digest": "9b0c4fd0593be7912cc65b3222c4fe3f51e3d6f12a3873fd0dda2c5fb4750660",
+    "listener_result_digest": "ca241a07cf1a0f28a2df530938a510378cf3aa20cd2dbb0dbebad59af41d75b9",
+    "listener_verification_digest": "a0ddf2e652d46f52d6a5b51bf02e028af3406bb13f7323af8e894d0f9b9d1752"
+  },
+  "consumed_fixture": {
+    "dataset_id": "nasdaq",
+    "month": "2025-07",
+    "cutoff": "2025-07-31",
+    "query_count": 24,
+    "queries_each_quality_liquidity_cell": 4,
+    "registry_seal_digest": "c7e07d78b785e9695a34388a3ef43c48bd3839a9bafa890b39b65f0718434a16",
+    "registry_digest": "784e771be69fe77a8684af6b56815ba701c90164400a2f93e53fa835a5da82c4",
+    "input_sha256": {
+      "registry_seal": "2d5fefa9eff5b948d70b62cd1856f46c43bc4dea9ca517515397750e532a38f1",
+      "query_registry": "6faba7922aef36d669c712aa441c9fd2fae0ff274386128c5e0dbed642861a55",
+      "m1_result": "177bcb1446fc859d34c85de327cf2dcdde7cfd0336b17643526b7eab853c5e88",
+      "nonfinal_scores": "bf2e86717557edb5ff6ae32e50ef098d7ba954852bc2d5d43b93e377f4c9591d",
+      "final_scores": "c862f6cadc82abd40e4fbea422682f8ddb1ffc898d961325b9555cf67a8af581",
+      "nonfinal_outcomes": "ffdf3ff225ac73103d994f9dd3e1ad90b52584a9ee561478b766f9c5418c1291",
+      "final_outcomes": "f929ac6c037b5fab90f80d7b8e2c77aed7296fc3a67692e1733912bd0efa99fd"
+    }
+  },
+  "adapter": {
+    "registry_input_columns_exact": [
+      "episode_id", "symbol", "cutoff", "quality_tier", "liquidity_stratum",
+      "selection_hash", "stock_prefix_digest", "benchmark_prefix_digest"
+    ],
+    "target_score_input_columns_exact": [
+      "query_id", "query_cutoff", "lane", "favorable_probability",
+      "adverse_probability", "no_touch_probability"
+    ],
+    "target_score_lanes": ["composite", "price_only", "recent_return_volatility"],
+    "current_query_labels_or_losses_accepted": false,
+    "prior_history_requires_full_completion_lte_cutoff": true,
+    "candidate_weights": {
+      "matched_causal_history": 0.4,
+      "composite": 0.1,
+      "price_only": 0.2,
+      "recent_return_volatility": 0.3
+    },
+    "prospective_methods": ["candidate", "matched_causal_history", "locked_composite"]
+  },
+  "real_launch": {
+    "adapter_may_override_m2_00_block": false,
+    "currently_authorized": false
+  },
+  "claims": {
+    "consumed_fixture_is_new_validation": false,
+    "new_post_freeze_outcomes_opened": false,
+    "real_registry_created": false,
+    "real_prediction_created": false,
+    "predictive_claim_authorized": false,
+    "production_promotion_authorized": false,
+    "trading_claim_authorized": false
+  },
+  "contract_digest": "49a7855de1902403f550ee5a1d2d2fbe169310804e374e7d7b5029cc61668d7c"
+}
