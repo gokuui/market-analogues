@@ -1,0 +1,78 @@
+{
+  "schema_version": "analogue-candidate-mixture-v1",
+  "status": "frozen_on_consumed_development_evidence_before_new_untouched_outcomes",
+  "m0_metric_contract_digest": "c2350617df4d69cf5064828d6adc4161b3abc65e1f9a55dfbc14979553c9ccf3",
+  "candidate": {
+    "name": "causal_shrunk_three_retriever_mixture_v1",
+    "kind": "one_frozen_nonparametric_mixture_distribution",
+    "component_weights": {
+      "matched_causal_history": 0.4,
+      "composite": 0.1,
+      "price_only": 0.2,
+      "recent_return_volatility": 0.3
+    },
+    "primary_probability": "convex_sum_of_four_half_count_smoothed_three_class_component_probabilities",
+    "top_k_each_retrieval": 20,
+    "one_best_episode_per_symbol_within_each_retrieval": true,
+    "query_symbol_excluded_from_every_retrieval": true,
+    "original_rank_weight": "2**(-(rank-1)/10)",
+    "duplicate_episode_across_retrieval_components": "retained_as_consensus_mass",
+    "outcomes_cannot_change_component_neighbors_ranks_or_weights": true
+  },
+  "components": {
+    "matched_causal_history": {
+      "cells": ["market_regime", "prefix_quality_class", "trailing_liquidity_cell"],
+      "minimum_support_each_nonterminal_level": 30,
+      "fallback": ["regime_and_liquidity", "regime", "unconditional", "uniform_no_history"],
+      "eligible": "primary_label_present_and_origin_cutoff_lt_query_cutoff_and_full_twenty_session_completion_lte_query_cutoff",
+      "smoothing_half_count_each_class": 0.5
+    },
+    "composite": {
+      "retriever": "current_byte_bound_certified_distance_v1_locked_retriever",
+      "role": "full_chart_pattern_and_market_context"
+    },
+    "price_only": {
+      "retriever": "current_causal_price_component_distance_with_exact_final_order",
+      "role": "normalized_price_path"
+    },
+    "recent_return_volatility": {
+      "retriever": "wf03_return_volatility_feature_store_v2_and_wf03_baseline_neighbors_v1",
+      "features": ["twenty_session_return", "sixty_three_session_return", "sample_volatility_of_final_twenty_log_returns"],
+      "distance": "unweighted_L1_of_query_inclusive_ordinal_ranks_with_episode_id_ties",
+      "role": "coarse_momentum_and_volatility_state"
+    }
+  },
+  "secondary_continuous_distribution": {
+    "construction": "concatenate_each_component_empirical_sample_after_internal_weight_normalization_and_apply_same_component_mass",
+    "matched_history_values": "fully_mature_prior_registry_continuous_outcomes_under_same_fallback_cell",
+    "retrieval_values": "causally_mature_neighbor_outcomes_with_original_rank_weights",
+    "sort": "once_per_scored_CRPS_or_quantile_operation_not_full_universe",
+    "unbounded_quadratic_materialization": false
+  },
+  "development_selection": {
+    "data": "already_consumed_verified_WF04_nonfinal_and_final_query_predictions_and_outcomes_only",
+    "candidate_grid": "all_nonnegative_component_weights_in_tenths_summing_to_one",
+    "objective": "maximize_minimum_fold_Brier_skill_against_reconstructed_matched_causal_history_and_locked_composite",
+    "folds": ["development", "validation_1", "validation_2", "validation_3", "final_untouched"],
+    "selected_weights": [0.4, 0.1, 0.2, 0.3],
+    "selection_order": ["matched_causal_history", "composite", "price_only", "recent_return_volatility"],
+    "new_untouched_outcomes_used": false
+  },
+  "mandatory_comparators": {
+    "matched_causal_base_rate": "the_matched_causal_history_component_unchanged",
+    "locked_retriever": "composite_component_unchanged_with_weight_one"
+  },
+  "immutability": {
+    "one_candidate_version_per_new_untouched_authority": true,
+    "no_weight_or_fallback_change_after_registry_or_prediction_open": true,
+    "failed_candidate_requires_new_future_authority": true
+  },
+  "claims": {
+    "development_result_is_predictive_validation": false,
+    "real_new_forward_outcomes_opened": false,
+    "predictive_claim_authorized": false,
+    "production_promotion_authorized": false,
+    "trading_claim_authorized": false
+  },
+  "contract_digest": "75c5b8cb4557e0ed6bc65081a33bc9463bf1075b0e9ea3ebfbc71f8a819463a3"
+}
