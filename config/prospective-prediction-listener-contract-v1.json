@@ -1,0 +1,57 @@
+{
+  "schema_version": "prospective-prediction-listener-contract-v1",
+  "status": "frozen_for_synthetic_state_machine_verification_before_real_launch",
+  "upstream": {
+    "candidate_contract_digest": "75c5b8cb4557e0ed6bc65081a33bc9463bf1075b0e9ea3ebfbc71f8a819463a3",
+    "m2_availability_contract_digest": "129ddd6a8bf25e0e581766be1aabc0bd5ada72dc0d51dc38aea8e88f3bda96f7",
+    "m2_blocked_result_digest": "4bd14ecd7c2b580bc48f3d63d9b4459a01744013b1ba611b797f1cae2dc44519",
+    "m2_blocked_verification_digest": "6d30a481ff9382f4741352d4adb6504b9617f1bda74b40a38c471d5f871549c7"
+  },
+  "listener": {
+    "invocation": "one_decision_after_source_change_event_or_external_schedule_no_internal_poll_loop",
+    "first_cutoff": "first_completed_benchmark_calendar_month_after_M1_freeze",
+    "completed_batches_must_form_exact_chronological_prefix": true,
+    "required_monthly_batches": 12,
+    "minimum_eligible_stock_files_at_cutoff": 1000,
+    "actions": [
+      "wait_for_completed_month",
+      "wait_for_stock_source",
+      "run_prediction_batch",
+      "collection_complete"
+    ]
+  },
+  "prediction_batch": {
+    "queries_per_month": 24,
+    "query_selection": "four_selection_hash_rows_per_quality_A_or_B_times_low_middle_or_high_liquidity_cell",
+    "methods": ["candidate", "matched_causal_history", "locked_composite"],
+    "classes": ["favorable_first", "adverse_first", "no_touch"],
+    "probability_sum_tolerance": 1e-12,
+    "files": ["SOURCE_LOCK.json", "QUERY_REGISTRY.json", "PREDICTIONS.json"],
+    "seal": "PREDICTIONS_SEALED.json_created_last_then_staging_directory_atomically_renamed",
+    "resume": "accept_exact_existing_prerequisites_or_complete_batch_never_overwrite",
+    "source_prefix_maximum_timestamp_lte_query_cutoff": true,
+    "query_outcomes_opened_before_prediction_seal": false
+  },
+  "outcome_firewall": {
+    "loader_callable_before_valid_prediction_seal": false,
+    "loader_callable_before_sixty_subsequent_benchmark_sessions": false,
+    "loader_callable_before_source_and_wall_clock_maturity": false,
+    "maximum_horizon_sessions": 60,
+    "future_outcome_mutation_changes_prediction_seal": false
+  },
+  "real_launch": {
+    "m2_00_readiness_required": true,
+    "currently_authorized": false,
+    "reason": "canonical_stock_and_benchmark_sources_predate_the_candidate_freeze"
+  },
+  "claims": {
+    "synthetic_gate_is_predictive_validation": false,
+    "real_registry_created": false,
+    "real_prediction_created": false,
+    "post_freeze_outcomes_opened": false,
+    "predictive_claim_authorized": false,
+    "production_promotion_authorized": false,
+    "trading_claim_authorized": false
+  },
+  "contract_digest": "9b0c4fd0593be7912cc65b3222c4fe3f51e3d6f12a3873fd0dda2c5fb4750660"
+}
