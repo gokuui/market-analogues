@@ -1,0 +1,121 @@
+{
+  "schema_version": "analogue-improvement-metric-contract-v1",
+  "status": "frozen_before_new_untouched_outcomes",
+  "purpose": "test whether one frozen nonparametric analogue method improves probabilistic what-happened-next evidence",
+  "population": {
+    "source": "new outcome-blind rolling registry strictly after the consumed 2025-08 final boundary",
+    "unit": "one stock and query cutoff",
+    "minimum_chronological_folds": 4,
+    "maximum_outcome_horizon_sessions": 60,
+    "purge_sessions": 60,
+    "minimum_overall_evaluable_fraction": 0.9,
+    "minimum_each_fold_evaluable_fraction": 0.9,
+    "forced_lane_forecast_fraction_of_evaluable": 1.0
+  },
+  "primary_target": {
+    "horizon_sessions": 20,
+    "classes": ["favorable_first", "adverse_first", "no_touch"],
+    "favorable_barrier_atr": 2.0,
+    "adverse_barrier_atr": 1.0,
+    "ambiguous_and_censored": "not_label_evaluable_but_retained_in_coverage_denominator",
+    "score": "multiclass_brier_sum_over_three_classes",
+    "probability_smoothing": "symmetric_half_count",
+    "categorical_labels_at_other_horizons": false
+  },
+  "candidate": {
+    "kind": "one_frozen_nonparametric_weighted_empirical_analogue_distribution",
+    "outcomes_may_summarize_already_selected_neighbors": true,
+    "outcomes_may_change_representation_neighbors_weights_or_stopping": false,
+    "one_candidate_version_per_untouched_authority": true
+  },
+  "mandatory_comparators": {
+    "matched_causal_base_rate": {
+      "cells": ["market_regime", "prefix_quality_class", "trailing_liquidity_cell"],
+      "minimum_exact_cell_observations": 30,
+      "fallback": ["regime_and_liquidity", "regime", "unconditional"],
+      "uses_only_fully_mature_prior_registry_outcomes": true,
+      "smoothing": "same_symmetric_half_count_as_candidate"
+    },
+    "locked_retriever": {
+      "implementation": "current_byte_bound_locked_retriever_without_reimplementation",
+      "same_rows_source_eligibility_target_and_score_code": true
+    },
+    "primary_common_support": "candidate_and_both_comparators_and_label_present"
+  },
+  "primary_formulas": {
+    "row_brier": "sum_c((p_ic-one_hot_y_ic)^2)",
+    "mean_brier": "arithmetic_mean_of_row_brier",
+    "brier_skill": "1-candidate_mean_brier/comparator_mean_brier",
+    "paired_difference": "candidate_row_brier-comparator_row_brier",
+    "log_loss": "negative_natural_log_observed_class_probability"
+  },
+  "inference": {
+    "unit": "calendar_month_mean_paired_loss_difference",
+    "moving_block": "overlapping_non_circular_blocks_sampled_with_replacement_then_truncated",
+    "block_length_months": 6,
+    "sensitivity_block_lengths_months": [3, 12],
+    "resamples": 10000,
+    "seed": 20260911,
+    "alternative": "candidate_mean_loss_strictly_lower",
+    "one_sided_centered_null_pvalue": "(1+count(centered_bootstrap_mean_lte_observed_mean))/(resamples+1)",
+    "simultaneous_upper_bound": "per_comparison_97.5_percentile_giving_95_percent_familywise_coverage_by_Bonferroni_for_two_comparisons",
+    "pvalue_correction": "Holm_across_two_mandatory_comparisons",
+    "alpha": 0.05,
+    "confirmation_only": "Newey_West_Diebold_Mariano_on_monthly_differences"
+  },
+  "calibration": {
+    "reliability_diagram": "ten_equal_count_bins_minimum_30_rows_per_bin",
+    "ece": "row_weighted_absolute_forecast_frequency_gap",
+    "calibration_in_the_large": "mean_probability_minus_mean_one_hot_outcome_per_class",
+    "classwise_test": "two_sided_centered_six_month_moving_block_bootstrap_of_monthly_mean_residual",
+    "classwise_pvalue_correction": "Holm_across_three_classes",
+    "simultaneous_interval": "Bonferroni_98.333333_percent_two_sided_percentile_interval_per_class",
+    "brier_decomposition": "ten_fixed_width_one_vs_all_bins_summed_across_classes",
+    "log_loss_not_worse_than_either_comparator": true
+  },
+  "secondary_continuous": {
+    "horizons_sessions": [5, 20, 60],
+    "measures": ["stock_close_return", "benchmark_relative_return"],
+    "score": "weighted_empirical_CRPS",
+    "formula": "sum_i(w_i_abs(x_i-y))/W-sum_i_sum_j(w_i_w_j_abs(x_i-x_j))/(2_W_squared)",
+    "complexity": "stable_sort_then_linear_pair_accumulation_O_n_log_n",
+    "role": "supportive_only_cannot_rescue_primary_failure"
+  },
+  "causality": {
+    "neighbor_full_outcome_completion_lte_query_cutoff": true,
+    "early_barrier_touch_does_not_shorten_embargo": true,
+    "prediction_sealed_strictly_before_outcome_opened": true,
+    "future_label_mutation_must_leave_predictions_and_neighbor_ids_byte_identical": true
+  },
+  "acceptance": {
+    "all_gates_conjunctive": true,
+    "positive_brier_skill_against_both_comparators": true,
+    "both_Holm_adjusted_pvalues_lt": 0.05,
+    "both_simultaneous_upper_bounds_lt": 0.0,
+    "positive_skill_every_fold_against_both_comparators": true,
+    "candidate_log_loss_not_worse_than_both_comparators": true,
+    "calibration_not_rejected_after_Holm": true,
+    "coverage_gate": true,
+    "leakage_gate": true,
+    "determinism_and_restart_gate": true,
+    "performance_gate": true
+  },
+  "performance": {
+    "report": ["build_time", "query_throughput", "p50_latency", "p95_latency", "p99_latency", "peak_aggregate_RSS", "bytes_read", "bytes_written", "resume_time"],
+    "candidate_p95_wall_and_RSS_each_at_most_multiple_of_locked": 2.0,
+    "per_query_full_universe_resort_or_hash_forbidden": true,
+    "unbounded_quadratic_materialization_forbidden": true
+  },
+  "claims": {
+    "similarity_percentage_is_acceptance_metric": false,
+    "hit_rate_alone_can_pass": false,
+    "secondary_horizon_or_CRPS_can_rescue_primary": false,
+    "failed_candidate_may_reuse_same_untouched_authority": false,
+    "ML_model_required": false,
+    "real_forward_outcomes_opened_by_M0": false,
+    "predictive_claim_authorized_by_M0": false,
+    "production_promotion_authorized_by_M0": false,
+    "trading_claim_authorized_by_M0": false
+  },
+  "contract_digest": "c2350617df4d69cf5064828d6adc4161b3abc65e1f9a55dfbc14979553c9ccf3"
+}
