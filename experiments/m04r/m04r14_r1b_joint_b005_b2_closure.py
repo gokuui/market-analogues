@@ -14,12 +14,16 @@ from typing import Any, Mapping, Sequence
 from uuid import uuid4
 
 
-SCHEMA = "m04r14-r1b-joint-b005-b2-closure-v2"
+SCHEMA = "m04r14-r1b-joint-b005-b2-closure-v3"
 H1 = "0476e694c2d13b5d2e75b642b81597a03a5c6f76"
 VERIFIER_COMMIT = "ace0b3b3bcf58cc4f1e233d744610d69ac79d67d"
 PREREG_DIGEST = "734e65768f04cc9c8108e2dae480258f5fc48094c1db80517fc0f5bbe62af191"
-OUTPUT = Path("config/data/analogues/m04r14/r1b-joint-b005-b2-closure-v2/LOCKED.json")
-SUPERSEDED_V1_DIGEST = "2bbf07f386223af6a85d43261f212314c58c75232e0df291681fc2a5db197e81"
+OUTPUT = Path("config/data/analogues/m04r14/r1b-joint-b005-b2-closure-v3/LOCKED.json")
+SUPERSEDED_CLOSURE_DIGEST = "d3f524ea5d05de7b68fe3ac37b6db95ddeded4c7cbaaf2fa48b08d6acaec2a32"
+SCOPE = {
+    "locked": ["B0-01", "B0-02", "B0-05", "B2"],
+    "deferred_nonblocking_research": ["B0-03", "B0-04", "B0-06-full", "B1"],
+}
 RUNTIME = (
     "experiments/m04r/m04r14_r1b_joint_b005_b2_closure.py",
     "tests/test_r1b_joint_b005_b2_closure.py",
@@ -217,12 +221,9 @@ def run(root: Path) -> dict[str, Any]:
         "closure_commit": head,
         "runtime_sha256": {relative: sha256(content).hexdigest()
                            for relative, content in runtime.items()},
-        "supersedes_closure_digest": SUPERSEDED_V1_DIGEST,
+        "supersedes_closure_digest": SUPERSEDED_CLOSURE_DIGEST,
         "evidence": evidence,
-        "scope": {
-            "locked": ["B0-01", "B0-02", "B0-05", "B2"],
-            "deferred_nonblocking_research": ["B0-03", "B0-04", "B0-06-full", "B1"],
-        },
+        "scope": SCOPE,
         "claims": {
             "structural_localization_verified": True,
             "b005_sensitivity_verified": True,
@@ -256,7 +257,7 @@ def validate_locked(root: Path) -> dict[str, Any]:
     require(receipt["schema_version"] == SCHEMA
             and receipt["status"] == "joint_b005_b2_verified_and_locked"
             and receipt["passed"] is True
-            and receipt["supersedes_closure_digest"] == SUPERSEDED_V1_DIGEST,
+            and receipt["supersedes_closure_digest"] == SUPERSEDED_CLOSURE_DIGEST,
             "lock envelope differs")
     deterministic = {key: value for key, value in receipt.items()
                      if key not in {"closure_digest", "created_at"}}
@@ -269,6 +270,7 @@ def validate_locked(root: Path) -> dict[str, Any]:
         require(sha256(blob).hexdigest() == receipt["runtime_sha256"][relative],
                 f"historical closure runtime differs: {relative}")
     require(receipt["evidence"] == validate(root), "locked evidence differs")
+    require(receipt["scope"] == SCOPE, "locked scope boundary differs")
     require(receipt["claims"] == {
         "structural_localization_verified": True,
         "b005_sensitivity_verified": True,

@@ -71,9 +71,9 @@ def test_validate_locked_checks_historical_runtime_and_claims(tmp_path: Path, mo
         "passed": True,
         "closure_commit": "c" * 40,
         "runtime_sha256": {path: sha256(value).hexdigest() for path, value in runtime.items()},
-        "supersedes_closure_digest": closure.SUPERSEDED_V1_DIGEST,
+        "supersedes_closure_digest": closure.SUPERSEDED_CLOSURE_DIGEST,
         "evidence": evidence,
-        "scope": {"locked": [], "deferred_nonblocking_research": []},
+        "scope": closure.SCOPE,
         "claims": {
             "structural_localization_verified": True,
             "b005_sensitivity_verified": True,
@@ -91,10 +91,18 @@ def test_validate_locked_checks_historical_runtime_and_claims(tmp_path: Path, mo
     monkeypatch.setattr(closure, "git", lambda root, *args, binary=False:
                         runtime[args[1].split(":", 1)[1]] if args[0] == "show" else "")
     assert closure.validate_locked(tmp_path)["closure_digest"] == receipt["closure_digest"]
-    receipt["claims"]["adequacy_labels_authorized"] = True
-    path.write_text(json.dumps(receipt))
+    bad_claim = json.loads(json.dumps(receipt))
+    bad_claim["claims"]["adequacy_labels_authorized"] = True
+    path.write_text(json.dumps(bad_claim))
     with pytest.raises(closure.ClosureError):
         closure.validate_locked(tmp_path)
+    for key in ("locked", "deferred_nonblocking_research"):
+        changed = json.loads(json.dumps(state))
+        changed["scope"][key] = []
+        changed_receipt = {**changed, "closure_digest": closure.stable(changed), "created_at": "now"}
+        path.write_text(json.dumps(changed_receipt))
+        with pytest.raises(closure.ClosureError, match="scope"):
+            closure.validate_locked(tmp_path)
 
 
 def test_real_lock_validates_after_publication() -> None:
