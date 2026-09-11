@@ -4,7 +4,6 @@ from __future__ import annotations
 import argparse
 from datetime import datetime, timezone
 from hashlib import sha256
-from itertools import combinations
 import json
 from math import fsum
 import os
@@ -47,11 +46,28 @@ def _assign(matrix, medoids, weights):
 def _fit(matrix, k, weights=None):
     weights = [1.0] * len(matrix) if weights is None else weights
     positive = [index for index, weight in enumerate(weights) if weight > 0]
-    candidates = []
-    for medoids in combinations(positive, k):
-        labels, objective = _assign(matrix, medoids, weights)
-        candidates.append((objective, medoids, labels))
-    return min(candidates)
+    medoids = ()
+    while len(medoids) < k:
+        candidates = []
+        for added in positive:
+            if added in medoids: continue
+            proposed = tuple(sorted((*medoids, added)))
+            labels, objective = _assign(matrix, proposed, weights)
+            candidates.append((objective, proposed, labels))
+        _, medoids, _ = min(candidates)
+    labels, objective = _assign(matrix, medoids, weights)
+    while True:
+        candidates = [(objective, medoids, labels)]
+        for removed in medoids:
+            for added in positive:
+                if added in medoids: continue
+                proposed = tuple(sorted(index for index in (*medoids, added) if index != removed))
+                proposed_labels, proposed_objective = _assign(matrix, proposed, weights)
+                if proposed_objective < objective:
+                    candidates.append((proposed_objective, proposed, proposed_labels))
+        best_objective, best_medoids, best_labels = min(candidates)
+        if best_objective >= objective: return objective, medoids, labels
+        objective, medoids, labels = best_objective, best_medoids, best_labels
 
 
 def _ari(left, right):
@@ -181,7 +197,7 @@ def verify(repository: Path, result_path: Path | None = None) -> dict[str, Any]:
              "producer_result_digest": result["result_digest"],
              "producer_result_sha256": sha256(raw).hexdigest(),
              "implementation_commit": commit,
-             "independent_oracle": "exhaustive_weighted_medoid_and_sha256_block_bootstrap",
+             "independent_oracle": "standalone_scalar_pam_and_sha256_block_bootstrap",
              "producer_modules_imported": False, "verified_case_count": 4,
              "real_future_path_store_opened": False,
              "bounded_consumed_data_poc_authorized": True, "real_full_build_authorized": False,

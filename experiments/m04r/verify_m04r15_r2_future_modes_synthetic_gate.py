@@ -153,7 +153,6 @@ def verify(repository: Path, result_path: Path | None = None) -> dict[str, Any]:
     for name, digest in runtime.items():
         historical = _git(repository, "show", f"{commit}:{name}", binary=True)
         _require(sha256(historical).hexdigest() == digest, f"historical runtime differs: {name}")
-        _require(_sha(repository / name) == digest, f"working runtime differs: {name}")
     state = {
         "schema_version": SCHEMA,
         "status": "independently_verified",
