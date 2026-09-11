@@ -28,6 +28,7 @@ from market_analogues.future_mode_store import (
 
 SCHEMA = "m04r15-r2-full-runner-engineering-gate-v1"
 CONTRACT = Path("config/m04r15-r2-fixed-neighbor-modes-contract-v1.json")
+BOUNDED_CONTRACT = Path("config/m04r15-r2-bounded-poc-contract-v1.json")
 POC_VERIFICATION = Path(
     "config/data/analogues/m04r15/r2-bounded-real-poc-v1-verification/VERIFIED.json"
 )
@@ -42,11 +43,13 @@ OUTPUT = Path(
 )
 RUNTIME = (
     "config/m04r15-r2-fixed-neighbor-modes-contract-v1.json",
+    "config/m04r15-r2-bounded-poc-contract-v1.json",
     "config/data/analogues/m04r15/r2-bounded-real-poc-v1/RESULT.json",
     "config/data/analogues/m04r15/r2-bounded-real-poc-v1-verification/VERIFIED.json",
     "src/market_analogues/future_mode_store.py",
     "experiments/m04r/m04r15_r2_full_runner_engineering_gate.py",
     "tests/test_future_mode_store.py",
+    "tests/test_m04r15_r2_full_runner_engineering_gate.py",
 )
 WORKERS = 12
 PARTITIONS = 12
@@ -119,19 +122,35 @@ def _partition_bytes(root: Path, count: int) -> tuple[bytes, ...]:
     )
 
 
-def execute(repository: Path) -> dict[str, Any]:
-    repository = repository.resolve(strict=True)
-    contract = _json(repository / CONTRACT)
-    poc = _json(repository / POC_RESULT)
-    prior = _json(repository / POC_VERIFICATION)
+def _validate_lineage(
+    contract: Mapping[str, Any], bounded: Mapping[str, Any],
+    poc: Mapping[str, Any], prior: Mapping[str, Any],
+) -> None:
+    contract_state = {key: value for key, value in contract.items()
+                      if key != "contract_digest"}
+    bounded_state = {key: value for key, value in bounded.items()
+                     if key != "contract_digest"}
     _require(all((
+        contract.get("contract_digest") == _stable(contract_state),
+        bounded.get("contract_digest") == _stable(bounded_state),
+        bounded.get("upstream", {}).get("r2_contract_digest") ==
+            contract.get("contract_digest"),
+        poc.get("contract_digest") == bounded.get("contract_digest"),
         prior.get("passed") is True,
         prior.get("full_query_build_authorized") is True,
         prior.get("producer_result_digest") == poc.get("result_digest"),
-        poc.get("contract_digest") == contract.get("contract_digest"),
         contract.get("contract_digest") ==
             "6bec009810afce7c58508fca28179579f5904382376dc9c5bce74aa74f41e08c",
     )), "R2-03 verification chain differs")
+
+
+def execute(repository: Path) -> dict[str, Any]:
+    repository = repository.resolve(strict=True)
+    contract = _json(repository / CONTRACT)
+    bounded = _json(repository / BOUNDED_CONTRACT)
+    poc = _json(repository / POC_RESULT)
+    prior = _json(repository / POC_VERIFICATION)
+    _validate_lineage(contract, bounded, poc, prior)
 
     commit = str(_git(repository, "rev-parse", "HEAD"))
     runtime = {name: _sha(repository / name) for name in RUNTIME}
