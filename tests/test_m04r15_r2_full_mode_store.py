@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
 from experiments.m04r import m04r15_r2_bounded_real_poc as bounded
 from experiments.m04r import m04r15_r2_full_mode_store as full
@@ -38,7 +39,10 @@ def test_selection_summary_is_exactly_the_bounded_poc_shape() -> None:
     )
 
 
-def test_query_result_has_two_frozen_views_and_outcome_blind_cohort(tmp_path: Path) -> None:
+@pytest.mark.parametrize("eligible_count", [2, 20])
+def test_query_result_has_two_frozen_views_and_outcome_blind_cohort(
+    tmp_path: Path, eligible_count: int,
+) -> None:
     path = tmp_path / "paths.parquet"
     episodes = tuple(f"episode-{index}" for index in range(20))
     pd.DataFrame([
@@ -53,7 +57,8 @@ def test_query_result_has_two_frozen_views_and_outcome_blind_cohort(tmp_path: Pa
         "matched_symbol": f"S{rank}", "matched_cutoff": "2020-01-31",
         "source_fingerprint": f"fingerprint-{episodes[rank - 1]}",
         "outcome_eligibility_json": json.dumps({"60": {
-            "eligible": True, "reason": None,
+            "eligible": rank <= eligible_count,
+            "reason": None if rank <= eligible_count else "incomplete_horizon",
         }}),
     } for rank in range(1, 21))}
     result = full._query_result("query")
@@ -62,7 +67,17 @@ def test_query_result_has_two_frozen_views_and_outcome_blind_cohort(tmp_path: Pa
     assert tuple(result["views"]) == (
         "absolute_close_return", "benchmark_relative_close_return",
     )
-    assert all(view["complete_members"] == 20 for view in result["views"].values())
+    assert all(view["complete_members"] == eligible_count
+               for view in result["views"].values())
+    if eligible_count == 2:
+        assert all(
+            view["selection"] == {
+                "status": "abstain_insufficient_complete_primary_members",
+                "selected_k": 0, "medoid_episode_ids": [],
+                "member_to_mode": {}, "candidates": [],
+            }
+            for view in result["views"].values()
+        )
 
 
 def test_coverage_counts_each_ineligible_member_once_across_two_views() -> None:

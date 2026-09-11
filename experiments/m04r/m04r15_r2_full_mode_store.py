@@ -28,15 +28,15 @@ from market_analogues.future_mode_store import (
 )
 
 
-SCHEMA = "m04r15-r2-full-mode-store-v1"
-PREREG_SCHEMA = "m04r15-r2-full-mode-store-preregistration-v1"
+SCHEMA = "m04r15-r2-full-mode-store-v2"
+PREREG_SCHEMA = "m04r15-r2-full-mode-store-preregistration-v2"
 CONTRACT = Path("config/m04r15-r2-fixed-neighbor-modes-contract-v1.json")
 ENGINEERING = Path(
     "config/data/analogues/m04r15/r2-full-runner-engineering-gate-v1-verification/VERIFIED.json"
 )
 STORE = Path("config/data/analogues/m04r14/t14-09-full-outcome-store-v1")
-PREREG = Path("experiments/m04r/m04r15_r2_full_mode_store_preregistered.json")
-OUTPUT = Path("config/data/analogues/m04r15/r2-full-mode-store-v1")
+PREREG = Path("experiments/m04r/m04r15_r2_full_mode_store_v2_preregistered.json")
+OUTPUT = Path("config/data/analogues/m04r15/r2-full-mode-store-v2")
 RUNTIME = (
     "config/m04r15-r2-fixed-neighbor-modes-contract-v1.json",
     "config/data/analogues/m04r15/r2-full-runner-engineering-gate-v1-verification/VERIFIED.json",
@@ -117,15 +117,23 @@ def _selection_summary(selection: Any, paths: Sequence[Any]) -> dict[str, Any]:
                     if stability.adjusted_rand_indices else None,
             },
         })
+    if selection.selected_k == 0:
+        _require(not selection.medoid_indices and not selection.labels,
+                 "abstention unexpectedly contains mode assignments")
+        member_to_mode: dict[str, int] = {}
+    else:
+        _require(len(selection.labels) == len(paths),
+                 "selected mode assignment count differs")
+        member_to_mode = {
+            path.member.episode_id: int(selection.labels[index])
+            for index, path in enumerate(paths)
+        }
     return {
         "status": selection.status,
         "selected_k": selection.selected_k,
         "medoid_episode_ids": [paths[index].member.episode_id
                                for index in selection.medoid_indices],
-        "member_to_mode": {
-            path.member.episode_id: int(selection.labels[index])
-            for index, path in enumerate(paths)
-        },
+        "member_to_mode": member_to_mode,
         "candidates": candidates,
     }
 
@@ -386,7 +394,7 @@ def _seal_store(root: Path, prereg: Mapping[str, Any], groups: Sequence[Sequence
         directory = root / f"partitions/partition-{partition_id:04d}"
         payload = validate_partition(
             directory, partition_id, group,
-            contract_digest=str(prereg["contract_digest"]),
+            contract_digest=str(prereg["preregistration_digest"]),
         )
         results.extend(payload["results"])
         partition_hashes.append(_sha(directory / "PARTITION.json"))
@@ -491,7 +499,7 @@ def run(repository: Path) -> dict[str, Any]:
         if directory.exists() or directory.is_symlink():
             validate_partition(
                 directory, partition_id, group,
-                contract_digest=str(prereg["contract_digest"]),
+                contract_digest=str(prereg["preregistration_digest"]),
             )
             existing_ids.add(partition_id)
     missing = [(partition_id, group) for partition_id, group in enumerate(groups)
@@ -518,7 +526,7 @@ def run(repository: Path) -> dict[str, Any]:
                 worker_pids.add(int(value["worker_pid"]))
                 status = publish_partition(
                     root, partition_id, groups[partition_id], value["results"],
-                    contract_digest=str(prereg["contract_digest"]),
+                    contract_digest=str(prereg["preregistration_digest"]),
                 )
                 _require(status == "created", "missing partition was not created")
     elapsed = perf_counter() - started
