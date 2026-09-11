@@ -1,0 +1,76 @@
+{
+  "schema_version": "m04r15-r2-bounded-poc-contract-v1",
+  "contract_id": "r2-selection-blind-32-query-consumed-data-poc-v1",
+  "status": "frozen_before_bounded_real_future_path_access",
+  "upstream": {
+    "r2_contract_digest": "6bec009810afce7c58508fca28179579f5904382376dc9c5bce74aa74f41e08c",
+    "r202_producer_result_digest": "64dc369dce88bb4f5c1f65e0372cd1effa763803e563457e25c3c886da20ed2b",
+    "r202_producer_sha256": "a0eb37c8ce95789997a4387be248b4f32349370f4b142f0533ec45d8d0f532b6",
+    "r202_verification_result_digest": "cd1100f17984aac88d1b3109057e482a1c5aacb526693e00162d50328fc75888",
+    "r202_verification_sha256": "6faa67b10dd8ddcb600e3933d87b6002c8ab9018414e18a75e079dfd6b8b8b1c"
+  },
+  "selection": {
+    "source_column": "query_case_id_from_verified_query_match_links",
+    "method": "first_32_by_ascending_sha256_of_utf8_r2_contract_digest_nul_query_case_id_then_query_id",
+    "sample_size": 32,
+    "selection_digest": "f70f05a347f10246f236d1a33dd8970b672acac3d590e9f5e011e189621748e6",
+    "query_case_ids": [
+      "nasdaq-NEWT-shadow-current-252",
+      "nasdaq-AGNCL-shadow-current-252",
+      "nasdaq-DXR-shadow-current-252",
+      "nasdaq-SVCO-shadow-current-252",
+      "nasdaq-XHG-shadow-current-252",
+      "nasdaq-HWBK-shadow-current-252",
+      "nasdaq-ACT-shadow-current-252",
+      "nasdaq-SGHT-shadow-current-252",
+      "nasdaq-CELH-shadow-current-252",
+      "nasdaq-KALA-shadow-current-252",
+      "nasdaq-XENE-shadow-current-252",
+      "nasdaq-HNNA-shadow-current-252",
+      "nasdaq-PRE-shadow-current-252",
+      "nasdaq-PAA-shadow-current-252",
+      "nasdaq-UFCS-shadow-current-252",
+      "nasdaq-GAIN-shadow-current-252",
+      "nasdaq-OPTX-shadow-current-252",
+      "nasdaq-HBANL-shadow-current-252",
+      "nasdaq-AUTL-shadow-current-252",
+      "nasdaq-RELL-shadow-current-252",
+      "nasdaq-BTBT-shadow-current-252",
+      "nasdaq-ACLX-shadow-current-252",
+      "nasdaq-BLRX-shadow-current-252",
+      "nasdaq-ASTE-shadow-current-252",
+      "nasdaq-TLSA-shadow-current-252",
+      "nasdaq-ABSI-shadow-current-252",
+      "nasdaq-PMTS-shadow-current-252",
+      "nasdaq-TTAN-shadow-current-252",
+      "nasdaq-GAIA-shadow-current-252",
+      "nasdaq-ROAD-shadow-current-252",
+      "nasdaq-UPBD-shadow-current-252",
+      "nasdaq-PBMWW-shadow-current-252"
+    ],
+    "future_outcomes_or_path_values_used": false
+  },
+  "computation": {
+    "views": ["absolute_close_return", "benchmark_relative_close_return"],
+    "horizon_sessions": 60,
+    "bootstrap_replicates": 256,
+    "threshold_changes_authorized": false,
+    "full_query_build_authorized": false,
+    "selected_episode_filter_only": true,
+    "record_wall_cpu_peak_rss_and_input_rows": true
+  },
+  "verification": {
+    "exact_selection_reconstruction": true,
+    "all_20_raw_links_each_query": true,
+    "outcome_mutation_must_not_change_primary_cohort_digest": true,
+    "repeat_identity": true,
+    "independent_reconstruction_required": true
+  },
+  "claim_boundary": {
+    "descriptive_poc_only": true,
+    "predictive_claim_authorized": false,
+    "production_promotion_authorized": false,
+    "trading_claim_authorized": false
+  },
+  "contract_digest": "469aee4e79e578dabcbd29edaa3618d3e24f0ddd3044248e07cfecdfcc2b0cac"
+}
