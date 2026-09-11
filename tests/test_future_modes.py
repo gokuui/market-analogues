@@ -5,10 +5,12 @@ from itertools import combinations
 from math import fsum
 
 import pytest
+from sklearn.metrics import adjusted_rand_score
 
 from market_analogues.future_modes import (
-    FutureModeError, Member, PreparedPath, mean_silhouette, pairwise_l1, pam,
-    prepare_paths, select_primary_members,
+    FutureModeError, Member, PreparedPath, adjusted_rand_index,
+    bootstrap_stability, calendar_quarter, mean_silhouette, pairwise_l1, pam,
+    prepare_paths, select_modes, select_primary_members,
 )
 
 
@@ -154,3 +156,119 @@ def test_silhouette_single_mode_and_singletons_are_explicit() -> None:
     matrix = ((0.0, 1.0, 4.0), (1.0, 0.0, 3.0), (4.0, 3.0, 0.0))
     assert mean_silhouette(matrix, [0, 0, 0]) == 0.0
     assert mean_silhouette(matrix, [0, 0, 1]) == pytest.approx((0.75 + 2 / 3 + 0.0) / 3)
+
+
+def test_calendar_quarter_and_adjusted_rand_are_exact() -> None:
+    assert calendar_quarter("2024-01-31T00:00:00") == "2024-Q1"
+    assert calendar_quarter("2024-12-30") == "2024-Q4"
+    with pytest.raises(FutureModeError, match="cutoff"):
+        calendar_quarter("not-a-date")
+    assert adjusted_rand_index([0, 0, 1, 1], [7, 7, 3, 3]) == 1.0
+    assert adjusted_rand_index([0, 0, 1, 1], [0, 1, 0, 1]) == pytest.approx(-0.5)
+
+
+@pytest.mark.parametrize("left,right", [
+    ([0, 0, 0, 1, 1, 2], [1, 1, 0, 0, 2, 2]),
+    ([0, 0, 1, 1, 2, 2], [2, 2, 1, 1, 0, 0]),
+    ([0, 0, 0, 0], [1, 1, 1, 1]),
+])
+def test_adjusted_rand_matches_independent_sklearn(left, right) -> None:
+    assert adjusted_rand_index(left, right) == pytest.approx(adjusted_rand_score(left, right))
+
+
+def test_stable_three_family_selection_passes_all_frozen_gates() -> None:
+    paths = prepared([
+        [-1.01] * 12, [-1.0] * 12, [-0.99] * 12,
+        [-0.01] * 12, [0.0] * 12, [0.01] * 12,
+        [0.99] * 12, [1.0] * 12, [1.01] * 12,
+    ])
+    matrix = pairwise_l1(paths)
+    keys = [path.member.key for path in paths]
+    blocks = [f"20{20 + index // 4}-Q{index % 4 + 1}" for index in range(9)]
+    result = select_modes(
+        matrix, keys, blocks, contract_digest="a" * 64,
+        query_case_id="query", view_id="absolute", replicates=64,
+    )
+    assert result.status == "stable_multiple_modes"
+    assert result.selected_k == 3
+    assert result.medoid_indices == (1, 4, 7)
+    selected = next(value for value in result.candidates if value.k == 3)
+    assert selected.accepted is True
+    assert selected.stability is not None
+    assert selected.stability.valid_replicates >= 52
+    assert selected.stability.median_adjusted_rand_index == 1.0
+
+
+def test_date_confounded_modes_fail_block_diversity_and_fall_back() -> None:
+    paths = prepared([
+        [-1.01] * 8, [-1.0] * 8, [-0.99] * 8,
+        [0.99] * 8, [1.0] * 8, [1.01] * 8,
+    ])
+    matrix = pairwise_l1(paths)
+    keys = [path.member.key for path in paths]
+    base = pam(matrix, keys, 2)
+    stability = bootstrap_stability(
+        matrix, keys, ["2020-Q1"] * 3 + ["2020-Q2"] * 3, base,
+        contract_digest="b" * 64, query_case_id="query", view_id="absolute",
+        replicates=32,
+    )
+    assert stability.valid_replicates == 0
+    assert stability.median_adjusted_rand_index is None
+    result = select_modes(
+        matrix, keys, ["2020-Q1"] * 3 + ["2020-Q2"] * 3,
+        contract_digest="b" * 64, query_case_id="query", view_id="absolute",
+        replicates=32,
+    )
+    assert result.status == "one_mode_fallback"
+    assert result.selected_k == 1
+    assert "fewer_than_80_percent_valid_block_bootstraps" in result.candidates[0].rejection_reasons
+
+
+def test_tight_single_family_falls_back_and_tiny_cohort_abstains() -> None:
+    paths = prepared([[0.0] * 6 for _ in range(6)])
+    result = select_modes(
+        pairwise_l1(paths), [path.member.key for path in paths],
+        [f"202{i}-Q1" for i in range(6)], contract_digest="c" * 64,
+        query_case_id="query", view_id="absolute", replicates=16,
+    )
+    assert result.status == "one_mode_fallback"
+    assert result.selected_k == 1
+    assert "mode_smaller_than_3" in result.candidates[0].rejection_reasons
+    tiny = prepared([[0.0] * 6, [1.0] * 6])
+    abstain = select_modes(
+        pairwise_l1(tiny), [path.member.key for path in tiny], ["2020-Q1", "2021-Q1"],
+        contract_digest="d" * 64, query_case_id="query", view_id="absolute",
+        replicates=16,
+    )
+    assert abstain.status == "abstain_insufficient_complete_primary_members"
+    assert abstain.selected_k == 0
+
+
+def test_block_stability_is_exactly_repeatable_and_order_invariant() -> None:
+    paths = prepared([
+        [-1.0] * 5, [-0.9] * 5, [-1.1] * 5,
+        [1.0] * 5, [0.9] * 5, [1.1] * 5,
+    ])
+    matrix = pairwise_l1(paths)
+    keys = [path.member.key for path in paths]
+    blocks = ["2019-Q1", "2020-Q1", "2021-Q1", "2019-Q3", "2020-Q3", "2021-Q3"]
+    base = pam(matrix, keys, 2)
+    first = bootstrap_stability(
+        matrix, keys, blocks, base, contract_digest="e" * 64,
+        query_case_id="query", view_id="relative", replicates=32,
+    )
+    second = bootstrap_stability(
+        matrix, keys, blocks, base, contract_digest="e" * 64,
+        query_case_id="query", view_id="relative", replicates=32,
+    )
+    assert first == second
+    order = [5, 2, 4, 1, 3, 0]
+    reordered_matrix = [[matrix[left][right] for right in order] for left in order]
+    reordered_base = pam(reordered_matrix, [keys[i] for i in order], 2)
+    reordered = bootstrap_stability(
+        reordered_matrix, [keys[i] for i in order], [blocks[i] for i in order],
+        reordered_base, contract_digest="e" * 64, query_case_id="query",
+        view_id="relative", replicates=32,
+    )
+    assert first.adjusted_rand_indices == reordered.adjusted_rand_indices
+    assert first.median_adjusted_rand_index == reordered.median_adjusted_rand_index
