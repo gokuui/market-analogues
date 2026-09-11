@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>R2 fixed-neighbor future-path modes — execution plan</title>
+<style>body{font-family:system-ui,sans-serif;max-width:1180px;margin:2rem auto;padding:0 1rem;color:#18212b;line-height:1.5}section{border:1px solid #d8dee6;border-radius:10px;padding:1rem 1.2rem;margin:1rem 0}code{overflow-wrap:anywhere}.warn{background:#fff4dc;border-left:5px solid #b9770e;padding:.8rem}.pass{color:#176b37}.open{color:#8a5700}table{border-collapse:collapse;width:100%}th,td{padding:.55rem;border-bottom:1px solid #ddd;text-align:left;vertical-align:top}li{margin:.3rem 0}</style></head><body>
+<h1>R2 — Fixed-neighbor future-path modes</h1>
+<p><b>Purpose:</b> take each already certified set of historical analogues and show whether their observed futures formed one coherent path or several recurring continuation/failure paths. R2 does not search again, rename chart patterns, or train a predictor.</p>
+<p class="warn"><b>Claim boundary:</b> R2 is a descriptive view of consumed historical outcomes. It cannot authorize a probability, expected return, trading rule, recommendation, or production promotion. M2 remains the only prospective claim path, and M2 is correctly waiting for a post-freeze source refresh.</p>
+
+<section><h2>Frozen starting point</h2>
+<table><thead><tr><th>Input</th><th>Verified fact</th><th>Identity</th></tr></thead><tbody>
+<tr><td>Full outcome store</td><td>3,270 queries; 65,400 ordered top-20 links; 56,378 unique outcome episodes; 6,917,999 future-path rows.</td><td>Seal result <code>5626b55b…a1f76</code>; independent verification <code>5f6d313e…3e942</code>; seal SHA-256 <code>15d33224…b771</code>.</td></tr>
+<tr><td>Evidence-card store</td><td>Every raw member and component distance is visible. Existing dependence control excludes the query symbol and retains the lowest-ranked occurrence of each matched symbol.</td><td>Seal result <code>11ccd344…56530</code>; independent verification <code>5f53f14a…7c5f</code>; seal SHA-256 <code>46fc77bc…cb15</code>.</td></tr>
+<tr><td>Observed duplication</td><td>There are 810 repeated-symbol links within queries and 50 same-symbol links. Raw top-20 rows remain disclosed, but these rows may not masquerade as independent primary mode members.</td><td>Reconstructed from link SHA-256 <code>8c25c572…024c</code>.</td></tr>
+</tbody></table>
+<p><b>Immutable cohort:</b> original ranks and membership come only from <code>query-match-links.parquet</code>. Primary mode members apply the already frozen evidence-card dependence rule; outcomes may determine mode labels but may never change retrieval order, membership, weights, the query, or an outcome-blind comparison selection.</p></section>
+
+<section><h2>Execution order and stopping gates</h2>
+<table><thead><tr><th>Task</th><th>Work</th><th>Required verification</th><th>State</th></tr></thead><tbody>
+<tr><td>R2-00</td><td>Freeze the input, member, path, censoring, algorithm, uncertainty, output and claim contract. Metadata-only preflight; do not compute real modes.</td><td>Independent contract verifier rejects every altered upstream digest, rank/member rule, horizon, channel, threshold, seed, output or claim flag.</td><td class="open">NEXT</td></tr>
+<tr><td>R2-01</td><td>Implement deterministic path preparation and k-medoids on synthetic fixtures only.</td><td>Independent scalar oracle; exact medoid/member identity; row-order, duplicate, tie and persistence invariance; censoring and non-finite rejection.</td><td>Blocked by R2-00</td></tr>
+<tr><td>R2-02</td><td>Implement deterministic calendar-block stability and mode selection on synthetic fixtures.</td><td>Coherent, conflicting, tiny, unstable, censored and duplicated-block families; exact repeat identity; correct one-mode fallback or abstention.</td><td>Blocked by R2-01</td></tr>
+<tr><td>R2-03</td><td>Run one bounded consumed-data POC selected without reading outcomes, then freeze any purely operational amendment.</td><td>No threshold tuning from attractive outcomes; runtime/memory measured; outcome mutation changes only outcome-derived fields and never the cohort.</td><td>Blocked by R2-02</td></tr>
+<tr><td>R2-04</td><td>Build all 3,270 query results as create-only, restart-safe partitions, using bounded process parallelism.</td><td>Exactly one result per query; complete manifest; no missing/duplicate members; resume identity; sequential/parallel result identity.</td><td>Blocked by R2-03</td></tr>
+<tr><td>R2-05</td><td>Independently reconstruct all inputs, paths, medoids, assignments, summaries and seals without importing producer modules.</td><td>Exact equality for 100% of queries and files plus frozen adversarial tamper tests. Any mismatch blocks publication.</td><td>Blocked by R2-04</td></tr>
+<tr><td>R2-06</td><td>Publish version-pinned JSON/HTML evidence panels from only the verified R2 seal.</td><td>All members disclosed; medoids and envelopes trace to rows; disagreement/fit/censoring visible; forbidden claims absent.</td><td>Blocked by R2-05</td></tr>
+</tbody></table></section>
+
+<section><h2>R2-00 contract to freeze before opening real paths</h2>
+<ol>
+<li><b>Primary members:</b> preserve ranks 1–20, separate matches with <code>matched_symbol == query_symbol</code>, then retain only the lowest original rank for each remaining matched symbol. Display excluded and censored rows with reasons.</li>
+<li><b>Horizon:</b> mode discovery uses sessions 1–60. A member is complete only when all 60 expected sessions exist, timestamps match the stored expected calendar, and both the selected path channel and its source bindings are valid. No interpolation, forward fill or survivor substitution is permitted.</li>
+<li><b>Views:</b> run two separately labelled analyses: cumulative close return and cumulative benchmark-relative close return. Never blend the two into one score. ATR-normalized, high/low and 126-session data remain visible supporting evidence, not hidden clustering degrees of freedom in R2-v1.</li>
+<li><b>Path distance:</b> mean absolute pointwise difference over the fixed 60 cumulative-return observations. This transparent metric is robust to a single extreme step and introduces no learned parameters. All arithmetic uses float64 with deterministic lexicographic tie-breaking by <code>(original rank, episode_id)</code>.</li>
+<li><b>Clustering:</b> deterministic Partitioning Around Medoids for <code>k=1..min(4,floor(n/3))</code>. A displayed multi-mode result must have at least three complete primary members per mode. Every medoid is an actual historical path.</li>
+<li><b>Separation:</b> a multi-mode candidate requires mean silhouette at least 0.25. Among qualifying stable candidates, select the greatest silhouette; ties within the frozen numeric tolerance choose smaller <code>k</code>, then lexicographically smaller medoid identities.</li>
+<li><b>Stability:</b> use 256 deterministically seeded matched-cutoff calendar-quarter block bootstraps. Refit weighted PAM to sampled blocks, assign all base members to bootstrap medoids and compare with base labels. At least 205/256 replicates must be valid and median adjusted Rand index must be at least 0.80. Report the full validity count and ARI distribution.</li>
+<li><b>Fallback:</b> if no multi-mode candidate passes size, separation and stability, report one medoid and one cohort envelope. If fewer than three complete primary members exist, abstain from modes. Never force <code>k&gt;1</code>.</li>
+<li><b>Mutation firewall:</b> changing future values may change medoids, memberships and descriptive summaries—that is R2's purpose—but must leave upstream seals, raw retrieval ranks, primary-member identities and every outcome-blind selection byte-identical.</li>
+</ol>
+<p class="warn"><b>Preflight caveat:</b> the exact calendar-block construction and availability of a defensible outcome-blind context contradiction must be measured in R2-00. If verified point-in-time context is absent, the product must say unavailable; it must not invent a negative analogue or sector/regime slice.</p></section>
+
+<section><h2>Synthetic verifier matrix</h2>
+<table><thead><tr><th>Fixture</th><th>Expected result</th></tr></thead><tbody>
+<tr><td>One tight continuation family</td><td><code>k=1</code>; no manufactured disagreement.</td></tr>
+<tr><td>Three separated continuation/flat/failure families</td><td>Exact three medoids and membership; all modes meet size, separation and stability.</td></tr>
+<tr><td>Visually separated but date-confounded groups</td><td>Calendar-block instability prevents a confident multi-mode display.</td></tr>
+<tr><td>Two-point apparent mode</td><td>Rejected by minimum mode size.</td></tr>
+<tr><td>Missing step, wrong timestamp, NaN/Inf and truncated future</td><td>Member stays visible as censored/invalid and is excluded from mode fitting.</td></tr>
+<tr><td>Same symbol, duplicate symbol and shuffled input rows</td><td>Frozen dependence rule and output digest remain exact and order-invariant.</td></tr>
+<tr><td>Exact distance/tie symmetry</td><td>Frozen rank/episode tie-break produces identical medoids across process counts.</td></tr>
+<tr><td>Outcome mutation</td><td>Retrieval/cohort bytes remain identical while only permitted future-derived bytes change.</td></tr>
+<tr><td>Seal/file tampering and partial restart</td><td>Fail closed; never overwrite a complete identity; resume only matching incomplete partitions.</td></tr>
+</tbody></table></section>
+
+<section><h2>Final evidence panel</h2>
+<p>Each query shows the version-pinned cohort handle; all 20 raw analogues; primary/excluded/censored membership; the selected absolute and benchmark-relative mode count; actual medoid charts; member lists; frequency; median and interquartile path envelopes; 5/20/60-session return, MFE, MAE and barrier summaries; stability/separation diagnostics; and a clear disagreement banner when stable modes differ materially.</p>
+<p>Context slices may appear only with verified point-in-time fields and must show the unsliced fixed cohort beside each slice, effective sample size, calendar-block interval and multiplicity-adjusted exploratory decision. The current evidence contract says sector, regime and event-cluster histories are unavailable, so absence is the default.</p>
+<p class="warn"><b>Language:</b> “Among these fixed historical analogues, these future paths occurred.” Never: “the stock will follow this mode,” “80% confidence,” “expected profit,” “buy/sell,” or a trader pattern name asserted as truth.</p></section>
+
+<section><h2>Performance, restart and audit requirements</h2>
+<ul>
+<li>Read the 272.6 MB path store once into a query-addressable episode layout; do not rescan it 3,270 times.</li>
+<li>Partition deterministically by sorted query ID. Use up to 12 available cores only after single-process correctness; worker count is an execution setting and may not affect bytes.</li>
+<li>Write each partition to a sibling temporary directory, fsync, hash and atomically rename. Store <code>RUN_STARTED</code>, per-partition receipts, <code>COVERAGE</code> and final create-only <code>SEALED</code>.</li>
+<li>On restart, validate and reuse matching completed partitions, quarantine conflicts, and compute only missing work. A complete sealed store is immutable.</li>
+<li>Record wall time, CPU time, peak resident memory, read volume and per-stage timing. Performance is accepted only after exact correctness; there is no artificial low-memory target.</li>
+</ul></section>
+
+<section><h2>Definition of complete</h2>
+<p>R2 is complete only when R2-00 through R2-06 pass in order, the independent verifier reconstructs every query, the HTML parser and relevant/full test suites pass once at their appropriate checkpoints, Git and artifact identities are recorded in the running log, and the output still carries false predictive/trading authorization. Until then, the currently released retrieval and evidence-card system remains the authoritative end-to-end result.</p></section>
+</body></html>
