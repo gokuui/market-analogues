@@ -1,0 +1,63 @@
+{
+  "schema_version": "analogue-untouched-availability-contract-v1",
+  "status": "frozen_before_any_prospective_query_or_outcome_access",
+  "upstream": {
+    "m1_candidate_contract_digest": "75c5b8cb4557e0ed6bc65081a33bc9463bf1075b0e9ea3ebfbc71f8a819463a3",
+    "m1_producer_result_digest": "5a1839447a767048b6554758d9250bb0804d8d6c7523bec9158a9f6d85aba469",
+    "m1_verification_digest": "e1d2e3dd5fdcc2369650db598b3f3805cf1f89f5ea0943d5ac5f3434779dd1ec",
+    "consumed_query_boundary": "2025-08-29"
+  },
+  "dataset": {
+    "dataset_id": "nasdaq",
+    "adapter": "canonical_directory_parquet",
+    "stock_root": "/home/vinay/code/loser-nasdaq/data/nasdaq/validated",
+    "stock_glob": "*.parquet",
+    "benchmark_path": "/home/vinay/code/loser-nasdaq/data/nasdaq/index/IXIC.parquet",
+    "timestamp_column": "date",
+    "required_stock_columns": ["date", "open", "high", "low", "close", "volume"],
+    "minimum_history_rows_at_cutoff": 312,
+    "minimum_eligible_stock_files_each_cutoff": 1000
+  },
+  "availability_access": {
+    "permitted": [
+      "filesystem_path_name_size_and_stable_identity",
+      "Parquet_schema_row_count_row_group_count_and_date_column_footer_statistics",
+      "benchmark_date_column_only"
+    ],
+    "forbidden_before_prediction_seal": [
+      "stock_or_benchmark_open_high_low_close_volume_values_after_prediction_cutoff",
+      "barrier_labels_returns_or_any_future_derived_value",
+      "candidate_or_weight_changes_from_post_freeze_data"
+    ],
+    "source_values_opened_by_preflight": false
+  },
+  "prospective_schedule": {
+    "candidate_freeze_source": "M1 producer created_at",
+    "first_query_cutoff": "last benchmark session of the first calendar month ending strictly after candidate freeze",
+    "initial_consumed_boundary_purge_sessions": 60,
+    "chronological_folds": 4,
+    "months_per_fold": 3,
+    "evaluation_months": 12,
+    "primary_horizon_sessions": 20,
+    "maximum_disclosed_horizon_sessions": 60,
+    "all_horizons_mature_before_single_open_evaluation": true,
+    "fold_boundaries": "four_consecutive_calendar_three_month_blocks_fixed_by_schedule_not_performance"
+  },
+  "readiness": {
+    "all_twelve_benchmark_month_end_cutoffs_observed": true,
+    "minimum_eligible_stock_files_met_each_cutoff": true,
+    "sixty_subsequent_benchmark_sessions_observed_after_final_cutoff": true,
+    "minimum_eligible_stock_files_extend_through_final_maturity": true,
+    "source_refreshed_before_each_prediction_batch": true,
+    "prediction_receipt_created_before_any_batch_outcome": true,
+    "registry_creation_on_failed_preflight": false
+  },
+  "claims": {
+    "availability_pass_is_predictive_validation": false,
+    "post_freeze_outcomes_opened": false,
+    "predictive_claim_authorized": false,
+    "production_promotion_authorized": false,
+    "trading_claim_authorized": false
+  },
+  "contract_digest": "129ddd6a8bf25e0e581766be1aabc0bd5ada72dc0d51dc38aea8e88f3bda96f7"
+}
