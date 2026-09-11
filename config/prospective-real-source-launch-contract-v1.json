@@ -1,0 +1,52 @@
+{
+  "schema_version": "prospective-real-source-launch-contract-v1",
+  "status": "frozen_before_real_source_launch",
+  "upstream": {
+    "availability_contract_digest": "129ddd6a8bf25e0e581766be1aabc0bd5ada72dc0d51dc38aea8e88f3bda96f7",
+    "blocked_result_digest": "4bd14ecd7c2b580bc48f3d63d9b4459a01744013b1ba611b797f1cae2dc44519",
+    "blocked_verification_digest": "6d30a481ff9382f4741352d4adb6504b9617f1bda74b40a38c471d5f871549c7",
+    "listener_contract_digest": "9b0c4fd0593be7912cc65b3222c4fe3f51e3d6f12a3873fd0dda2c5fb4750660",
+    "payload_adapter_contract_digest": "49a7855de1902403f550ee5a1d2d2fbe169310804e374e7d7b5029cc61668d7c"
+  },
+  "launcher": {
+    "invocation": "one_shot_after_source_change_event_or_external_schedule",
+    "internal_polling": false,
+    "blocked_action": "wait_for_source_refresh",
+    "ready_action": "run_registry_and_prediction",
+    "registry_and_prediction_callbacks_on_blocked_receipt": 0,
+    "requires_independently_verified_metadata_preflight": true,
+    "requires_result_and_verification_readiness_true": true,
+    "requires_exact_result_verification_pair": true
+  },
+  "refresh": {
+    "provider": "EODHD",
+    "credential_environment_variable": "EODHD_API_TOKEN",
+    "credential_value_may_be_recorded": false,
+    "source_repository": "/home/vinay/code/loser-nasdaq",
+    "canonical_stock_root": "/home/vinay/code/loser-nasdaq/data/nasdaq/validated",
+    "canonical_benchmark": "/home/vinay/code/loser-nasdaq/data/nasdaq/index/IXIC.parquet",
+    "canonical_inputs_mutable_by_refresh": false,
+    "staging_must_be_new_and_sibling_to_canonical_data": true,
+    "minimum_free_bytes": 12884901888,
+    "fallback_provider_automatically_authorized": false,
+    "post_refresh_requirement": "new_create_only_metadata_snapshot_and_independent_verification",
+    "workflow": [
+      "create_a_new_sibling_staging_root_never_reuse_or_overwrite_canonical_inputs",
+      "execute_pinned_provider_and_quality_code_against_staging_paths_only",
+      "validate_full_staged_stock_and_benchmark_inventory",
+      "publish_a_new_create_only_metadata_preflight_snapshot",
+      "independently_reconstruct_and_live_match_that_snapshot",
+      "freeze_a_successor_launch_contract_binding_the_new_result_verification_pair",
+      "invoke_the_one_shot_launcher"
+    ]
+  },
+  "claims": {
+    "real_registry_created": false,
+    "real_prediction_created": false,
+    "post_freeze_outcomes_opened": false,
+    "predictive_claim_authorized": false,
+    "production_promotion_authorized": false,
+    "trading_claim_authorized": false
+  },
+  "contract_digest": "8ba52c97caf40d1b9d6dbc9d11898acca4d8016efdde9c8e78609f739e27c701"
+}
