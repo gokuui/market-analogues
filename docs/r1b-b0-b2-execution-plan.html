@@ -40,10 +40,10 @@
     <tr><td>B0-02 matching support</td><td class="done">VERIFIED</td><td>N0 receipt <code>1d14eabe…ca03</code>; balanced N1 receipt <code>f808343c…39d96</code>.</td><td>Nothing. Do not rerun.</td></tr>
     <tr><td>B0-03 local geometry</td><td class="open">PARTIAL</td><td>R1-A stores d1, d20 and d20/d1. Sealed cases contain exact totals and components.</td><td>d5/d10, normalized gaps/spans, component dominance/reordering, and 1,152-development-query matched peer references.</td></tr>
     <tr><td>B0-04 cutoff stability</td><td class="open">OPEN</td><td>Historical/current registries. Direct sealed-registry reconstruction gives 65 same-symbol pairs within 40 calendar days and 123 within 65 days.</td><td>Exact episode/symbol overlap, rank-biased overlap, distance drift, zero-overlap disclosure and independent verifier. The old count 122 silently excluded one cross-fold-role pair and is rejected.</td></tr>
-    <tr><td>B0-05 shared priority</td><td class="open">OPEN</td><td>R1-A has 512 independent-per-query random-priority replicates.</td><td>Global-episode and hierarchical symbol-then-episode shared-priority nulls. Existing R1-A replicates cannot substitute.</td></tr>
+    <tr><td>B0-05 shared priority</td><td class="done">H0 READY</td><td>The exact restartable producer, full-hash shared orders, direct oracle differentials, production-scale benchmark and independent code/data audit pass.</td><td>Commit H0, freeze the sole-child joint H1, run 512 global and hierarchical replicates, then independently verify.</td></tr>
     <tr><td>B0-06 integrity decision</td><td class="open">OPEN</td><td>Strong component verifiers exist.</td><td>One verifier and B0 go/no-go covering B0-01/03/04/05 together.</td></tr>
     <tr><td>B1 24-query variants</td><td class="open">OPEN</td><td>WF-03 proves exact search/topology/DTW machinery.</td><td>The planned outcome-blind, common-risk-set multi-variant perturbation and nearby-cutoff experiment.</td></tr>
-    <tr><td>B2 specificity</td><td class="open">CONTRACT ONLY</td><td>Verified cohort, N0 cells and balanced K8 labels.</td><td>Freeze-safe geometry/statistics, exact randomization, effects and robustness; then implementation and independent verification.</td></tr>
+    <tr><td>B2 specificity</td><td class="done">H0 READY</td><td>Verified cohort/cells/K8 labels plus exact, authenticated geometry/localization producers; full-cohort replay, restart, 12-process identity and independent audits pass.</td><td>Commit H0, freeze the joint H1, materialize geometry, execute 4,096-replicate N0/N1 tests, then independently verify.</td></tr>
   </tbody>
 </table>
 
@@ -74,6 +74,7 @@
   <li><b>Hierarchical:</b> shared symbol priority followed by shared episode priority and episode ID, then the same production selector.</li>
 </ul>
 <p>Freeze seed 947221, 512 replicates and the complete 15-metric R1-A vector/directions for direct comparison.</p>
+<p><b>Exact priority/runtime contract:</b> encode <code>lp16(domain) || uint64be(seed) || uint32be(replicate) || lp16(entity)</code> and order by all 32 SHA-256 bytes plus explicit IDs. Per replicate compute <code>H_episode</code> exactly once for each of 3,786,156 candidates and reuse it in both families; compute <code>H_symbol</code> once for each of 11,584 symbols; create exactly one global and one hierarchical full-universe order; perform zero per-query full-universe hashes or sorts. Each query filters these common orders before applying the unchanged selector. Integer interval coordinates are the packed window ordinals <code>[5*i,5*i+251]</code>, not timestamps.</p>
 <p><b>Pass test:</b> exhaustive tiny universes, marginal selector checks, serial/12-core byte identity, all replicate digests independently reconstructed, plus-one tail p-values. These are specified sensitivity mechanisms, not probability models for real distances.</p>
 
 <h3>6. B0-06 — unified B0 verification</h3>
@@ -109,7 +110,7 @@
 <ul>
   <li>N0 cell = verified session-21 nuisance tuple. N1 cell = that tuple crossed with frozen primary K8.</li>
   <li>For each episode/cell draw exactly the observed count uniformly without replacement from eligible members. The observed set remains in the feasible universe.</li>
-  <li>Use 4,096 deterministic replicates plus the observation. Episode-specific SHA-256 priorities use a length-prefixed canonical tuple of contract digest, null name, big-endian uint32 replicate, episode ID and query ID. Within each cell take the required smallest <code>(digest, query_id)</code>. Freeze the common-random-number derivation across N0/N1.</li>
+  <li>Use 4,096 deterministic replicates plus the observation. Priorities use uint32-length-prefixed fields: domain, decoded contract digest, the common family <code>N0-N1-common</code>, scheme, big-endian uint32 replicate, episode ID and query ID. The null/design name is deliberately absent, so N0/N1/K12/K16 use common random numbers and differ only through their cells. The shared-query sensitivity omits episode ID entirely.</li>
   <li>Lower-tail p-value: <code>(1 + count(T_null &lt;= T_observed))/4097</code>; ties count against the claim.</li>
 </ul>
 
@@ -120,8 +121,8 @@
   <li>This is an intersection-union claim, so both co-primary alternatives must pass; no multiplicity discount is taken. N0 must agree in direction/effect but is not a rescue.</li>
   <li>Use hash-even/odd <b>episode</b> splits, not query splits: <code>int(episode_id,16)&amp;1</code>. Require both split effects to meet the practical threshold; no split p-value claim. This preserves each episode’s verified support.</li>
   <li>Leave-one-episode-out effects are derived from the same replicate table; all 357 deletions must keep both effects positive, with no separate p-value fishing.</li>
-  <li>A shared-query-priority B2 sensitivity omits episode ID from the priority so a query’s priority is shared across episodes. Both effects must remain positive; this cannot rescue the episode-independent primary.</li>
-  <li>K12/K16, production total and market-context component are secondary. If inferential p-values are shown, freeze one Holm-adjusted family; otherwise label raw values descriptive.</li>
+  <li>A shared-query-priority B2 sensitivity omits episode ID from the priority so a query’s priority is shared across episodes. Both cohesion and specificity effects must remain strictly positive under <b>each</b> of shared N0 and shared N1; this cannot rescue the episode-independent primary.</li>
+  <li>K12/K16, production total and market-context component are secondary. The two distance diagnostics retain one exact row for every frozen primary <code>(episode_id, query_id)</code> selected link, sorted by episode then query; require exactly 2,791 rows copied from the H1-bound top-20 cases. For each distance publish the raw-row digest, fixed-order <code>math.fsum/count</code> selected-link mean, and the equal-primary-episode mean of within-episode means. They have no null, p-value, decision gate or rescue role.</li>
 </ul>
 
 <h3>Fail-closed states</h3>

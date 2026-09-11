@@ -67,9 +67,7 @@ def _path(value: str | Path, base: Path) -> Path:
     return p if p.is_absolute() else (base / p).resolve()
 
 
-def load_config(path: str | Path) -> AppConfig:
-    config_path = Path(path).resolve()
-    raw: dict[str, Any] = yaml.safe_load(config_path.read_text()) or {}
+def _config_from_mapping(raw: dict[str, Any], config_path: Path) -> AppConfig:
     datasets: dict[str, DatasetSpec] = {}
     for dataset_id, item in (raw.get("datasets") or {}).items():
         benchmark = None
@@ -104,3 +102,20 @@ def load_config(path: str | Path) -> AppConfig:
         lookbacks=tuple(int(x) for x in raw.get("lookbacks", [21, 63, 126, 252])),
     )
 
+
+def load_config_bytes(content: bytes, *, path: str | Path) -> AppConfig:
+    """Parse already-read configuration bytes using ``path`` as their base.
+
+    This entry point lets integrity-sensitive callers hash and parse the same
+    immutable byte buffer instead of reopening a pathname between those steps.
+    """
+    config_path = Path(path).resolve()
+    raw: Any = yaml.safe_load(content) or {}
+    if not isinstance(raw, dict):
+        raise ConfigError("configuration root must be a mapping")
+    return _config_from_mapping(raw, config_path)
+
+
+def load_config(path: str | Path) -> AppConfig:
+    config_path = Path(path).resolve()
+    return load_config_bytes(config_path.read_bytes(), path=config_path)

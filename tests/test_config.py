@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from market_analogues.config import ConfigError, DatasetSpec, load_config
+from market_analogues.config import ConfigError, DatasetSpec, load_config, load_config_bytes
 
 
 def test_load_config_resolves_relative_paths(tmp_path: Path):
@@ -20,6 +20,7 @@ datasets:
     assert loaded.artifact_dir == (tmp_path / "artifacts").resolve()
     assert loaded.datasets["demo"].path == (tmp_path / "bars").resolve()
     assert loaded.lookbacks == (21, 63, 126, 252)
+    assert load_config_bytes(cfg.read_bytes(), path=cfg) == loaded
 
 
 @pytest.mark.parametrize("field,value", [("adapter", "api"), ("format", "json"), ("symbol_from", "magic")])
@@ -28,4 +29,3 @@ def test_invalid_dataset_contract(field, value, tmp_path):
     args[field] = value
     with pytest.raises(ConfigError):
         DatasetSpec(**args)
-
