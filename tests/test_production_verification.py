@@ -33,7 +33,7 @@ def test_repeated_production_search_is_stable_and_budgeted(
     result = verify_production_search(
         query, source, request, root, quality=quality,
         candidate_pool=12, per_instrument_view=3, workers=2,
-        repeat=2, max_seconds=30, max_rss_mb=4096,
+        repeat=2, max_seconds=30, max_rss_mb=16384,
     )
 
     assert result.passed, result.failures

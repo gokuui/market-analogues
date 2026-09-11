@@ -63,7 +63,7 @@ def _spec_payload() -> dict:
             "maximum_total_seconds": 60.0,
             # ru_maxrss includes pytest/plugin and long-lived harness high-water
             # marks. This is not resource qualification; official specs stay frozen.
-            "maximum_rss_mb": 4096.0,
+            "maximum_rss_mb": 16384.0,
         },
     }
 

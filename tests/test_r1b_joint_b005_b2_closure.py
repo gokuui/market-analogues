@@ -60,3 +60,46 @@ def test_create_only_lock(tmp_path: Path) -> None:
     assert json.loads(path.read_text()) == {"passed": True}
     with pytest.raises(closure.ClosureError, match="already exists"):
         closure.publish(path, {"passed": False})
+
+
+def test_validate_locked_checks_historical_runtime_and_claims(tmp_path: Path, monkeypatch) -> None:
+    evidence = {"x": 1}
+    runtime = {path: b"committed-" + path.encode() for path in closure.RUNTIME}
+    state = {
+        "schema_version": closure.SCHEMA,
+        "status": "joint_b005_b2_verified_and_locked",
+        "passed": True,
+        "closure_commit": "c" * 40,
+        "runtime_sha256": {path: sha256(value).hexdigest() for path, value in runtime.items()},
+        "supersedes_closure_digest": closure.SUPERSEDED_V1_DIGEST,
+        "evidence": evidence,
+        "scope": {"locked": [], "deferred_nonblocking_research": []},
+        "claims": {
+            "structural_localization_verified": True,
+            "b005_sensitivity_verified": True,
+            "adequacy_labels_authorized": False,
+            "predictive_claim_authorized": False,
+            "ranking_change_authorized": False,
+            "production_promotion_authorized": False,
+            "trading_claim_authorized": False,
+            "real_forward_outcomes_accessed": False,
+        },
+    }
+    receipt = {**state, "closure_digest": closure.stable(state), "created_at": "now"}
+    path = tmp_path / closure.OUTPUT; path.parent.mkdir(parents=True); path.write_text(json.dumps(receipt))
+    monkeypatch.setattr(closure, "validate", lambda root: evidence)
+    monkeypatch.setattr(closure, "git", lambda root, *args, binary=False:
+                        runtime[args[1].split(":", 1)[1]] if args[0] == "show" else "")
+    assert closure.validate_locked(tmp_path)["closure_digest"] == receipt["closure_digest"]
+    receipt["claims"]["adequacy_labels_authorized"] = True
+    path.write_text(json.dumps(receipt))
+    with pytest.raises(closure.ClosureError):
+        closure.validate_locked(tmp_path)
+
+
+def test_real_lock_validates_after_publication() -> None:
+    root = Path(__file__).resolve().parents[1]
+    if not (root / closure.OUTPUT).exists():
+        pytest.skip("v2 create-only lock has not been published yet")
+    receipt = closure.validate_locked(root)
+    assert receipt["passed"] is True

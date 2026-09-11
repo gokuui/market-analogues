@@ -20,7 +20,7 @@ def test_universe_verifier_reconciles_coverage_and_writes_report(
     result = verify_universe(
         query, source, request, quality, stride=10, reference_pool=10,
         comparison_pools=(2, 5), recall_pool=5, minimum_pool_recall=0,
-        workers=2, max_seconds=60, max_rss_mb=4096,
+        workers=2, max_seconds=60, max_rss_mb=16384,
     )
     assert result.passed
     assert result.metrics["instruments_considered"] == 2

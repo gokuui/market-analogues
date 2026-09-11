@@ -113,9 +113,9 @@ BrierSkill(candidate, baseline) = 1 − BS(candidate) / BS(baseline)<br><br>
   <table>
     <thead><tr><th>Horizon</th><th>Status</th><th>Required report</th></tr></thead>
     <tbody>
-      <tr><td>5 sessions</td><td>Secondary</td><td>Separate Brier skill, paired confidence interval/test, calibration, coverage, and continuous-return score. Never pool its rows with another horizon.</td></tr>
+      <tr><td>5 sessions</td><td>Secondary</td><td>Continuous stock and benchmark-relative return distributions scored with CRPS, paired confidence intervals/tests, quantile calibration and coverage. The locked outcome contract has no 5-session categorical barrier label, so no 5-session Brier claim is made.</td></tr>
       <tr><td><b>20 sessions</b></td><td><b>Primary</b></td><td>All acceptance gates in this document. The existing +2 ATR/−1 ATR first-touch route remains the primary categorical target.</td></tr>
-      <tr><td>60 sessions</td><td>Secondary</td><td>Separate Brier skill, paired confidence interval/test, calibration, coverage, and continuous-return score. Its longer censoring and embargo are reported explicitly.</td></tr>
+      <tr><td>60 sessions</td><td>Secondary</td><td>Continuous stock and benchmark-relative return distributions scored with CRPS, paired confidence intervals/tests, quantile calibration and coverage. The locked outcome contract has no 60-session categorical barrier label; its longer censoring and embargo are reported explicitly.</td></tr>
     </tbody>
   </table>
   <p>No “best horizon” headline is permitted. If 5 or 60 sessions is later proposed as primary, that choice needs a fresh preregistration and untouched authority.</p>

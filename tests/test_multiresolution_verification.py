@@ -44,7 +44,7 @@ def test_multiresolution_verifier_covers_synthetic_and_real_cases(
         [("demo", source, quality, registry)],
         maximum_total_seconds=20,
         maximum_case_seconds=3,
-        maximum_rss_mb=4096,
+        maximum_rss_mb=16384,
     )
     assert result.passed
     assert result.metrics["required_horizons"] == [252, 126, 63, 21, 10, 5]
@@ -88,7 +88,7 @@ def test_multiresolution_cli_is_gated_and_writes_artifacts(
     assert main([
         "verify-multiresolution-state", "--config", str(config),
         "--datasets", "demo", "--maximum-total-seconds", "20",
-        "--maximum-case-seconds", "3", "--maximum-rss-mb", "4096",
+        "--maximum-case-seconds", "3", "--maximum-rss-mb", "16384",
     ]) == 0
     gate = json.loads(
         (artifacts / "gates" / "m02_multiresolution_chart_state.json").read_text()

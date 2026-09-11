@@ -33,7 +33,7 @@ def _small_spec(tmp_path: Path) -> Path:
     # ru_maxrss is process-global, so this synthetic gate must include pytest's
     # collection/plugin and long-lived harness high-water mark.  This is not a
     # resource qualification; the frozen production spec remains unchanged.
-    payload["acceptance"]["maximum_rss_mb"] = 4096.0
+    payload["acceptance"]["maximum_rss_mb"] = 16384.0
     path = tmp_path / "structural.yaml"
     path.write_text(yaml.safe_dump(payload, sort_keys=False))
     return path

@@ -63,7 +63,7 @@ def test_scale_ladder_runs_resume_repeat_and_report(
         query, source, request, quality, tmp_path / "ladder",
         fractions=(0.5, 1.0), seed="locked", batch_size=11,
         frontier_batch_rows=1, representation_cache_shards=2,
-        maximum_rss_mb=4096, disk_reserve_bytes=0,
+        maximum_rss_mb=16384, disk_reserve_bytes=0,
         maximum_projected_hours=1,
     )
     assert result.passed

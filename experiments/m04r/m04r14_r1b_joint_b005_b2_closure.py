@@ -14,11 +14,12 @@ from typing import Any, Mapping, Sequence
 from uuid import uuid4
 
 
-SCHEMA = "m04r14-r1b-joint-b005-b2-closure-v1"
+SCHEMA = "m04r14-r1b-joint-b005-b2-closure-v2"
 H1 = "0476e694c2d13b5d2e75b642b81597a03a5c6f76"
 VERIFIER_COMMIT = "ace0b3b3bcf58cc4f1e233d744610d69ac79d67d"
 PREREG_DIGEST = "734e65768f04cc9c8108e2dae480258f5fc48094c1db80517fc0f5bbe62af191"
-OUTPUT = Path("config/data/analogues/m04r14/r1b-joint-b005-b2-closure-v1/LOCKED.json")
+OUTPUT = Path("config/data/analogues/m04r14/r1b-joint-b005-b2-closure-v2/LOCKED.json")
+SUPERSEDED_V1_DIGEST = "2bbf07f386223af6a85d43261f212314c58c75232e0df291681fc2a5db197e81"
 RUNTIME = (
     "experiments/m04r/m04r14_r1b_joint_b005_b2_closure.py",
     "tests/test_r1b_joint_b005_b2_closure.py",
@@ -203,8 +204,10 @@ def run(root: Path) -> dict[str, Any]:
             "joint closure requires a clean committed tree")
     head = str(git(root, "rev-parse", "HEAD"))
     git(root, "merge-base", "--is-ancestor", H1, head)
-    for relative in RUNTIME:
-        require(git(root, "show", f"{head}:{relative}", binary=True) == snapshot(root / relative),
+    git(root, "merge-base", "--is-ancestor", VERIFIER_COMMIT, head)
+    runtime = {relative: snapshot(root / relative) for relative in RUNTIME}
+    for relative, content in runtime.items():
+        require(git(root, "show", f"{head}:{relative}", binary=True) == content,
                 f"closure runtime not committed: {relative}")
     evidence = validate(root)
     state = {
@@ -212,8 +215,9 @@ def run(root: Path) -> dict[str, Any]:
         "status": "joint_b005_b2_verified_and_locked",
         "passed": True,
         "closure_commit": head,
-        "runtime_sha256": {relative: sha256(snapshot(root / relative)).hexdigest()
-                           for relative in RUNTIME},
+        "runtime_sha256": {relative: sha256(content).hexdigest()
+                           for relative, content in runtime.items()},
+        "supersedes_closure_digest": SUPERSEDED_V1_DIGEST,
         "evidence": evidence,
         "scope": {
             "locked": ["B0-01", "B0-02", "B0-05", "B2"],
@@ -222,6 +226,7 @@ def run(root: Path) -> dict[str, Any]:
         "claims": {
             "structural_localization_verified": True,
             "b005_sensitivity_verified": True,
+            "adequacy_labels_authorized": False,
             "predictive_claim_authorized": False,
             "ranking_change_authorized": False,
             "production_promotion_authorized": False,
@@ -233,14 +238,57 @@ def run(root: Path) -> dict[str, Any]:
     receipt = {**deterministic, "created_at": datetime.now(timezone.utc).isoformat()}
     publish(root / OUTPUT, receipt)
     require(validate(root) == evidence, "evidence changed during closure")
+    require({relative: snapshot(root / relative) for relative in RUNTIME} == runtime,
+            "closure runtime changed during publication")
+    validate_locked(root)
+    return receipt
+
+
+def validate_locked(root: Path) -> dict[str, Any]:
+    """Validate the sealed lock from its historical Git runtime without republishing it."""
+    root = root.resolve(); path = root / OUTPUT
+    receipt = decode(snapshot(path), path)
+    required = {
+        "schema_version", "status", "passed", "closure_commit", "runtime_sha256",
+        "supersedes_closure_digest", "evidence", "scope", "claims", "closure_digest", "created_at",
+    }
+    require(set(receipt) == required, "lock field closure differs")
+    require(receipt["schema_version"] == SCHEMA
+            and receipt["status"] == "joint_b005_b2_verified_and_locked"
+            and receipt["passed"] is True
+            and receipt["supersedes_closure_digest"] == SUPERSEDED_V1_DIGEST,
+            "lock envelope differs")
+    deterministic = {key: value for key, value in receipt.items()
+                     if key not in {"closure_digest", "created_at"}}
+    require(receipt["closure_digest"] == stable(deterministic), "lock self-digest differs")
+    commit = receipt["closure_commit"]
+    git(root, "merge-base", "--is-ancestor", H1, commit)
+    git(root, "merge-base", "--is-ancestor", VERIFIER_COMMIT, commit)
+    for relative in RUNTIME:
+        blob = git(root, "show", f"{commit}:{relative}", binary=True)
+        require(sha256(blob).hexdigest() == receipt["runtime_sha256"][relative],
+                f"historical closure runtime differs: {relative}")
+    require(receipt["evidence"] == validate(root), "locked evidence differs")
+    require(receipt["claims"] == {
+        "structural_localization_verified": True,
+        "b005_sensitivity_verified": True,
+        "adequacy_labels_authorized": False,
+        "predictive_claim_authorized": False,
+        "ranking_change_authorized": False,
+        "production_promotion_authorized": False,
+        "trading_claim_authorized": False,
+        "real_forward_outcomes_accessed": False,
+    }, "locked claim boundary differs")
     return receipt
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("action", choices=("run", "validate"))
     parser.add_argument("--repository", type=Path, default=Path.cwd())
     try:
-        result = run(parser.parse_args(argv).repository)
+        args = parser.parse_args(argv)
+        result = run(args.repository) if args.action == "run" else validate_locked(args.repository)
     except ClosureError as error:
         print(f"joint closure refused: {error}", file=os.sys.stderr)
         return 2
