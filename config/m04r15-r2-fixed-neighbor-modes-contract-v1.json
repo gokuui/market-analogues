@@ -1,0 +1,141 @@
+{
+  "algorithm": {
+    "candidate_k": "integers_1_through_minimum_of_4_and_floor_complete_primary_members_divided_by_3",
+    "distance": "mean_absolute_pointwise_difference_over_60_cumulative_return_values",
+    "implementation": "deterministic_partitioning_around_medoids_build_and_swap",
+    "maximum_modes": 4,
+    "medoids_are_observed_paths": true,
+    "minimum_members_per_displayed_mode": 3,
+    "multi_mode_selection": "greatest_mean_silhouette_among_candidates_passing_size_separation_and_stability",
+    "separation_minimum_mean_silhouette": 0.25,
+    "tie_break": [
+      "smaller_k_for_equal_silhouette",
+      "lower_original_match_rank",
+      "lexicographically_smaller_episode_id"
+    ],
+    "tie_equality": "exact_float64_equality_no_rounding"
+  },
+  "claim_boundary": {
+    "allowed_claim": "historical_conditional_descriptive_evidence_only",
+    "mode_labels_are_trader_pattern_names": false,
+    "predictive_claim_authorized": false,
+    "production_promotion_authorized": false,
+    "trading_claim_authorized": false
+  },
+  "contract_id": "m04r15-r2-fixed-neighbor-future-path-modes-v1",
+  "member_rules": {
+    "censored_or_invalid_members_disclosed": true,
+    "duplicate_selection": "lowest_original_match_rank",
+    "maximum_primary_episodes_per_matched_symbol": 1,
+    "outcomes_may_change_primary_member_identity": false,
+    "preserve_original_ranks_1_through_20": true,
+    "query_symbol_matches": "disclose_in_separate_panel_and_exclude_from_primary_modes"
+  },
+  "output": {
+    "context_slices": "unavailable_until_verified_point_in_time_context_fields_exist",
+    "disagreement_banner_required_for_materially_different_stable_modes": true,
+    "evidence_panels": [
+      "all_raw_members",
+      "primary_excluded_and_censored_members",
+      "actual_medoid_paths",
+      "complete_mode_membership",
+      "frequency_and_path_envelopes",
+      "returns_mfe_mae_and_barriers",
+      "separation_and_stability_diagnostics",
+      "limitations_and_claim_boundary"
+    ],
+    "negative_analogue": "unavailable_until_outcome_blind_point_in_time_selector_is_verified",
+    "version_pinned_cohort_handle": true
+  },
+  "path_contract": {
+    "cluster_horizon_sessions": 60,
+    "completion": "all_steps_1_through_60_present_unique_expected_session_match_true_and_source_bindings_valid",
+    "excluded_supporting_channels": [
+      "atr_normalized_close_move",
+      "high_return",
+      "low_return",
+      "sessions_61_through_126"
+    ],
+    "imputation": "forbidden",
+    "nonfinite_values": "reject_member_and_disclose_reason",
+    "views": [
+      {
+        "field": "close_return",
+        "id": "absolute_close_return",
+        "label": "cumulative close return"
+      },
+      {
+        "field": "benchmark_relative_close_return",
+        "id": "benchmark_relative_close_return",
+        "label": "cumulative benchmark-relative close return"
+      }
+    ]
+  },
+  "population": {
+    "dataset_id": "nasdaq",
+    "duplicate_matched_symbol_links_within_query": 810,
+    "future_path_rows": 6917999,
+    "query_count": 3270,
+    "query_link_count": 65400,
+    "query_symbol_links": 50,
+    "raw_neighbors_per_query": 20,
+    "unique_outcome_episode_count": 56378
+  },
+  "schema_version": "m04r15-r2-fixed-neighbor-modes-contract-v1",
+  "stability": {
+    "block": "matched_cutoff_calendar_quarter",
+    "bootstrap_replicates": 256,
+    "fallback": "report_k1_if_no_multi_mode_candidate_passes_or_abstain_if_fewer_than_3_complete_primary_members",
+    "minimum_valid_replicates": 205,
+    "minimum_valid_replicate_fraction": 0.8,
+    "randomness": "sha256_counter_stream_seeded_by_contract_digest_query_case_id_view_id_and_replicate",
+    "refit": "weighted_pam_on_calendar_quarter_blocks_sampled_with_replacement_then_assign_all_base_members_to_bootstrap_medoids",
+    "statistic": "adjusted_rand_index_against_full_sample_labels",
+    "threshold_median_adjusted_rand_index": 0.8
+  },
+  "status": "frozen_before_real_future_path_mode_computation",
+  "upstream": {
+    "evidence_analogue_rows_sha256": "59ef8aeb98f320a20c3d89361d82d4d5b65ee2665012ba0dc2bdae9633e94fe5",
+    "evidence_store_result_digest": "11ccd344aaab71e70c63dd8f4e93a7b1a43c28e4e6a6ab621032d9664a356530",
+    "evidence_store_seal_sha256": "46fc77bcc2c5440ec8056623fcaf1cabdb83c9f2db125877baa4d634cf59cb15",
+    "evidence_verification_result_digest": "5f53f14a00918469e06048ab9be6179b0ea517a251de2dfdaff6f976d2fe7c5f",
+    "evidence_verification_sha256": "b1443de724d97a1bec530890a5c3189bce903f136bef9a3dad00e0d23754bbe5",
+    "future_paths_sha256": "8e3a26f1bd40ed4dcf4c0fdf81b6c9dbcca1359689604f12c0a2b5258f5ba819",
+    "outcome_store_result_digest": "5626b55bbcf9ff24f7e203bec6e1d8a5d55761c2fa7ae2b79556ecaf602a1f76",
+    "outcome_store_seal_sha256": "15d33224b0197429552f592197fe8d9e880fcf17b1c46a0ad237d3b6c65cb771",
+    "outcome_verification_result_digest": "5f6d313e938c894a78ec9df1d0052d3e9571b364010bf2d7e2420023d1e3e942",
+    "outcome_verification_sha256": "fbfb2bab06ea6a2b40ea00554d58dc477fde7d15ee7d9b3e81dd8fdec33a8688",
+    "query_match_links_sha256": "8c25c57275de6ecedc9f2b00f2a3ba169eef1dd67bf8f73c332fc75b109f024c"
+  },
+  "verification": {
+    "all_queries_required": 3270,
+    "all_raw_links_required": 65400,
+    "independent_full_reconstruction_after_build": true,
+    "metadata_only_preflight": true,
+    "outcome_columns_opened_during_contract_verification": false,
+    "outcome_mutation_must_not_change_cohort_or_retrieval": true,
+    "real_future_path_mode_computation_opened": false,
+    "required_input_schemas": {
+      "analogue_evidence": [
+        "query_case_id", "query_episode_id", "query_symbol", "query_cutoff", "match_rank",
+        "matched_episode_id", "matched_symbol", "matched_cutoff", "total_distance",
+        "component_distances_json", "quality_tier", "eligibility_by_horizon_json",
+        "outcomes_by_horizon_json", "primary_barrier_label", "future_path_episode_reference",
+        "match_digest", "candidate_case_result_digest", "source_fingerprint", "card_digest"
+      ],
+      "future_paths": [
+        "atr_normalized_close_move", "benchmark_relative_close_return", "close_return",
+        "contract_digest", "cutoff", "episode_id", "expected_session_match", "high_return",
+        "low_return", "source_content_digest", "source_fingerprint", "step", "timestamp"
+      ],
+      "query_match_links": [
+        "query_case_id", "query_episode_id", "query_symbol", "query_cutoff", "match_rank",
+        "matched_episode_id", "matched_symbol", "matched_cutoff", "total_distance",
+        "match_digest", "candidate_case_result_digest", "source_fingerprint",
+        "outcome_eligibility_json"
+      ]
+    },
+    "synthetic_gate_required_before_real_paths": true
+  },
+  "contract_digest": "6bec009810afce7c58508fca28179579f5904382376dc9c5bce74aa74f41e08c"
+}
