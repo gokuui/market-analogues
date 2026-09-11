@@ -22,6 +22,13 @@
 <p class="warn"><b>Existing result that must not be erased:</b> the locked composite produced <b>−3.22% Brier skill versus the unconditional base rate on pooled validation</b> and <b>−3.46% on the consumed final block</b>. Those periods are now development evidence; neither may be called untouched again or used to certify a redesign.</p>
 
 <section>
+  <h2>Implementation status — M0 complete</h2>
+  <p class="pass"><b>Machine gate and independent oracle pass.</b> The metric contract is frozen at digest <code>c2350617df4d69cf5064828d6adc4161b3abc65e1f9a55dfbc14979553c9ccf3</code>. Producer implementation <code>ec0f013</code> sealed synthetic result <code>011e7df31f4b13c880c2b45deca59eb09f0f618e1079a85dcffed749e964fffa</code>. A separately committed verifier at <code>3a3da8b</code>, which imports neither the producer nor project scientific code, reconstructed the fixture and all ten checks at verification digest <code>e1bf47be33fe9c7ebbd84b8f5c971952ca0b1d1a8d48a82ad3c414f7bb5b467c</code>.</p>
+  <p>The independent path recomputed multiclass Brier and log loss, two-comparator skill, every-fold results, month-level moving-block inference, Holm decisions, calibration, Brier decomposition, 60-session fold purge, coverage, causal seal ordering, future-outcome mutation invariance and the weighted empirical CRPS quadratic oracle. Its first focused run corrected a mistaken verifier-only hand constant for the CRPS fixture to the exact value <code>59/98</code>; producer code and evidence were already correct and unchanged. All 1,624 repository tests then passed.</p>
+  <p class="warn"><b>Boundary:</b> M0 used synthetic data only. It validates the evaluation machinery; it does not demonstrate predictive value and authorizes no production or trading claim. M1 is next: freeze exactly one candidate plus the matched causal base-rate and byte-bound incumbent implementations, along with their source/runtime/authority manifest, before opening any new outcomes.</p>
+</section>
+
+<section>
   <h2>1. What is—and is not—being required</h2>
   <p>The candidate remains a case-based market-memory system: select causally eligible historical analogues, then form a nonparametric outcome distribution from those analogues. A direct weighted empirical distribution is sufficient. No neural network, regression, classifier, or other fitted ML model is required.</p>
   <p>For example, after outcome-blind retrieval and weighting, a three-class forecast may be formed as:</p>
@@ -145,7 +152,7 @@ BrierSkill(candidate, baseline) = 1 − BS(candidate) / BS(baseline)<br><br>
 <section>
   <h2>11. Implementation sequence</h2>
   <ol class="compact">
-    <li><b>M0:</b> write the machine-readable metric contract and synthetic oracle; independently verify formulas, folds, embargo, coverage, CRPS, paired inference, and failure paths.</li>
+    <li><b>M0 — complete:</b> machine contract, synthetic oracle, independent reconstruction, adversarial failure tests, immutable producer receipt and restart-safe read-only verification all pass.</li>
     <li><b>M1:</b> freeze one candidate and the two comparator implementations; produce a source/runtime/authority manifest.</li>
     <li><b>M2:</b> build the untouched outcome-blind rolling query registry and prediction listener with restart-safe, create-only monthly seals.</li>
     <li><b>M3:</b> run and seal monthly predictions; reveal outcomes only when all horizons mature.</li>
