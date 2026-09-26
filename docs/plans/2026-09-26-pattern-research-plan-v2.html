@@ -44,6 +44,38 @@ ol.phases>li{margin-bottom:12px}
 </ol>
 </div>
 
+<div class="callout warn">
+<strong>Amendments from review (2026-09-26). These override the sections below.</strong>
+<ol>
+<li><strong>Vault.</strong> WF-04's final block already opened NASDAQ cutoffs 2024-01-31 → 2025-08-29 (verified from the query registry). M1 weight selection and the Step 1 run then used that block. So:
+  <ul>
+  <li>The vault is now <strong>cutoffs ≥ 2025-09-01</strong>: NASDAQ to about 2026-02 (data ends 2026-03-30), NSE to about 2026-01 (data ends 2026-02-11).</li>
+  <li>NASDAQ 2024-01 → 2025-08 is reported separately as <em>previously opened</em>. It is never treated as independent confirmation.</li>
+  <li>NSE was not used by WF-04, but the loser strategies were tuned on NSE data. That makes any NSE strategy-entry result optimistic.</li>
+  </ul></li>
+<li><strong>Delisting.</strong> The survivorship audit found that ended names had a <em>higher</em> median final 60-day return than survivors (+1.4% vs −7.3%): many exits are acquisitions. So:
+  <ul>
+  <li>The penalty applies only to <em>likely failures</em>: last close &lt; $1 (NSE: ₹5), or last close &lt; 50% of the 60-session high.</li>
+  <li>Other ended names are censored.</li>
+  <li>Every result is reported both with and without the penalty.</li>
+  </ul></li>
+<li><strong>First go/no-go on the trader's own setups, right after P0.</strong> Score the entries of the existing loser strategies (gen498, gen182/191, VCP+RS) with the baseline GBM, on liquid stocks, before any E1–E3 or S work. Those strategies were built on this data, so an improvement there is optimistic.</li>
+<li><strong>Similarity is off the critical path.</strong>
+  <ul>
+  <li>S1 and S2 run only as diagnostics or viewer explanations, after some forecaster passes.</li>
+  <li>S3 and S4 run only if P2 shows query-specific signal.</li>
+  <li>A GBM already implements "similar inputs → similar outcomes".</li>
+  </ul></li>
+<li><strong>Decision metric.</strong> After-cost expectancy (in R) of each day's top picks among <em>liquid</em> stocks. t-statistics are supporting evidence only.</li>
+<li><strong>Expectations.</strong>
+  <ul>
+  <li>The old label was already volatility-scaled (+2 ATR vs −1 ATR), so P(≥2R) will look like the old "favorable first", and the baseline should look similar.</li>
+  <li>Any real gain must come from new inputs (E1–E3) or from conditioning on the trader's setups.</li>
+  <li>Timeline: P0 plus the strategy-entry test is about 4–5 days. That is the only commitment now.</li>
+  </ul></li>
+</ol>
+</div>
+
 <h2>0. Why the first system failed</h2>
 <div class="table-wrap"><table>
 <tr><th>Design choice</th><th>Problem</th><th>v2 fix</th></tr>
