@@ -34,3 +34,12 @@ def test_realistic_attrition_is_not_flagged():
     assert result["median_yearly_attrition_percent"] > audit.LOW_ATTRITION_PERCENT
     assert result["final_60_log_return_median"]["ended_early"] < 0
     assert result["ended_early_last_close_below_1_percent"] == 100.0
+
+
+def test_benchmark_running_past_stock_snapshot_does_not_mark_survivors_ended():
+    symbols, sessions = _universe(ended_per_year=40)
+    longer_benchmark = pd.bdate_range(sessions[0], "2025-03-31")
+    result = audit.summarize(symbols, longer_benchmark)
+    assert result["snapshot_end"] == str(sessions[-1].date())
+    assert result["ended_early_symbols"] == 8 * 40
+    assert result["final_60_log_return_median"]["survivors"] == 0.05

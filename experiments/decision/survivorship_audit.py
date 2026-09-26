@@ -52,6 +52,9 @@ def _summary(args: tuple[str, str, str]) -> dict[str, object] | None:
 
 
 def summarize(symbols: pd.DataFrame, benchmark_sessions: pd.DatetimeIndex) -> dict[str, object]:
+    # The stock snapshot can end before the benchmark file; measure "ended early"
+    # against the last session any symbol reached, not the benchmark's last session.
+    benchmark_sessions = benchmark_sessions[benchmark_sessions <= symbols["last"].max()]
     end = benchmark_sessions.max()
     threshold = benchmark_sessions[max(0, len(benchmark_sessions) - 1 - ENDED_EARLY_SESSIONS)]
     symbols = symbols.copy()
