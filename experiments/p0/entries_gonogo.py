@@ -60,7 +60,16 @@ def load_entries() -> pd.DataFrame:
     return pd.concat(frames, ignore_index=True)
 
 
-def entry_features(entries: pd.DataFrame, config: str) -> pd.DataFrame:
+FEATURE_SETS = ("baseline", "e1", "e2", "e1e2")
+
+
+def feature_columns(feature_set: str) -> list[str]:
+    from experiments.p1.features import BREADTH, E1, E2
+    extra = {"baseline": (), "e1": E1 + BREADTH, "e2": E2, "e1e2": E1 + E2 + BREADTH}
+    return list(FEATURES) + list(extra[feature_set])
+
+
+def entry_features(entries: pd.DataFrame, config: str, with_p1: bool = False) -> pd.DataFrame:
     from market_analogues.adapters import SourceError, source_from_spec
     from market_analogues.config import load_config
     from market_analogues.types import InstrumentKey
@@ -68,6 +77,7 @@ def entry_features(entries: pd.DataFrame, config: str) -> pd.DataFrame:
     bench = source.load_benchmark()
     sessions = session_key(bench["timestamp"])
     bfeat = benchmark_features(bench)
+    bench_close = pd.Series(bench["close"].to_numpy(float), index=sessions)
     rows = []
     for symbol, group in entries.groupby("symbol"):
         try:
@@ -77,7 +87,18 @@ def entry_features(entries: pd.DataFrame, config: str) -> pd.DataFrame:
             continue
         stock = stock.dropna(subset=["open", "high", "low", "close", "volume"])
         stock = stock.drop_duplicates("timestamp", keep=False).reset_index(drop=True)
+        if len(stock) < 300:
+            continue
         feats = p0_stock_features(stock, bfeat)
+        if with_p1:
+            from experiments.p1.build_extra import features_at
+            keys = session_key(stock["timestamp"])
+            wanted = [sessions[sessions.searchsorted(d.normalize()) - 1]
+                      for d in group["entry_date"]]
+            positions = np.unique(keys.get_indexer(pd.DatetimeIndex(wanted)))
+            positions = positions[positions >= 0]
+            p1 = features_at(stock, bench_close, positions).set_index("date")
+            feats = feats.join(p1, how="left")
         for index, row in group.iterrows():
             pos = sessions.searchsorted(row["entry_date"].normalize()) - 1
             if pos < 0:
@@ -148,9 +169,17 @@ def main(argv=None) -> int:
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--config", default="config/datasets.example.yaml")
     parser.add_argument("--max-rows", type=int, default=1_000_000)
+    parser.add_argument("--feature-set", choices=FEATURE_SETS, default="baseline")
     args = parser.parse_args(argv)
+    columns = feature_columns(args.feature_set)
+    with_p1 = args.feature_set != "baseline"
+    output = OUTPUT if not with_p1 else OUTPUT.with_name(f"gonogo_{args.feature_set}")
     entries = load_entries()
-    feats = entry_features(entries, str(Path(args.config).resolve()))
+    feats = entry_features(entries, str(Path(args.config).resolve()), with_p1)
+    if with_p1:
+        breadth = pd.read_parquet(ROOT / "nse" / "breadth.parquet")
+        feats = feats.merge(breadth.rename(columns={"date": "signal_date"}), on="signal_date",
+                            how="left").set_index(feats.index)
     entries = entries.join(feats, how="inner")
     vault = entries["signal_date"] >= VAULT_START
     print(f"entries with features: {len(entries)}; vault excluded: {int(vault.sum())}",
@@ -158,6 +187,9 @@ def main(argv=None) -> int:
     entries = entries.loc[~vault]
     store = pd.read_parquet(ROOT / "nse" / "store.parquet")
     store = clean_store(store.loc[(store["date"] < VAULT_START) & (store["y20"] >= 0)])
+    if with_p1:
+        store = store.merge(pd.read_parquet(ROOT / "nse" / "p1_features.parquet"),
+                            on=["symbol", "date"], how="left")
     rng = np.random.default_rng(7)
     scored = []
     for year, group in entries.groupby(entries["signal_date"].dt.year):
@@ -167,12 +199,13 @@ def main(argv=None) -> int:
             continue
         if len(train) > args.max_rows:
             train = train.iloc[np.sort(rng.choice(len(train), args.max_rows, replace=False))]
-        probs, er = fit_predict(train, group, list(FEATURES), "y20")
+        probs, er = fit_predict(train, group, columns, "y20")
         group = group.assign(er=er, p_ge2=probs[:, 3:].sum(axis=1), p_stop=probs[:, 0])
         scored.append(group)
         print(f"{year}: scored {len(group)} entries (train {len(train):,})", file=sys.stderr)
     scored = pd.concat(scored)
-    result = {"stop_rule": STOP_RULE, "skip_fraction": SKIP_FRACTION,
+    result = {"feature_set": args.feature_set, "features": columns,
+              "stop_rule": STOP_RULE, "skip_fraction": SKIP_FRACTION,
               "vault_start": str(VAULT_START.date()),
               "caveats": ["strategies developed on the same NSE data",
                           "NSE files contain survivors only"],
@@ -192,9 +225,9 @@ def main(argv=None) -> int:
         "pass": bool(pooled["bootstrap_90_month_pct"][0] > 0
                      and pooled["positive_primary_eras"] >= STOP_RULE["min_positive_eras"]),
     }
-    OUTPUT.mkdir(parents=True, exist_ok=True)
-    scored.to_parquet(OUTPUT / "scored_entries.parquet")
-    (OUTPUT / "report.json").write_text(json.dumps(result, indent=2, default=str) + "\n")
+    output.mkdir(parents=True, exist_ok=True)
+    scored.to_parquet(output / "scored_entries.parquet")
+    (output / "report.json").write_text(json.dumps(result, indent=2, default=str) + "\n")
     print(json.dumps(result, indent=2, default=str))
     return 0
 

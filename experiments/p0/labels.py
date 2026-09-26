@@ -27,6 +27,8 @@ N_CLASSES = 6
 
 def true_range_atr(high: np.ndarray, low: np.ndarray, close: np.ndarray,
                    lookback: int = ATR_LOOKBACK) -> np.ndarray:
+    if len(close) == 0:
+        return np.array([], dtype=float)
     previous = np.r_[np.nan, close[:-1]]
     tr = np.fmax(high - low, np.fmax(np.abs(high - previous), np.abs(low - previous)))
     tr[0] = np.nan
