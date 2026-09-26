@@ -29,7 +29,7 @@ import pandas as pd
 
 from experiments.decision.chart_value import FEATURES, benchmark_features, session_key
 from experiments.p0.features import REQUIRED, p0_stock_features
-from experiments.p0.evaluate import ROOT, VAULT_START, fit_predict
+from experiments.p0.evaluate import ROOT, VAULT_START, clean_store, fit_predict
 
 LOSER = Path("/home/vinay/code/loser")
 STRATEGIES = {
@@ -157,7 +157,7 @@ def main(argv=None) -> int:
           file=sys.stderr)
     entries = entries.loc[~vault]
     store = pd.read_parquet(ROOT / "nse" / "store.parquet")
-    store = store.loc[(store["date"] < VAULT_START) & (store["y20"] >= 0)]
+    store = clean_store(store.loc[(store["date"] < VAULT_START) & (store["y20"] >= 0)])
     rng = np.random.default_rng(7)
     scored = []
     for year, group in entries.groupby(entries["signal_date"].dt.year):

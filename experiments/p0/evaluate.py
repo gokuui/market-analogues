@@ -45,9 +45,25 @@ ROOT = Path("config/data/analogues/p0")
 # ------------------------------------------------------------------ data
 
 
+MIN_R_PCT = 0.002          # R below 0.2% of price means stale or flat quotes
+REALIZED_CLIP = (-10.0, 20.0)
+
+
+def clean_store(store: pd.DataFrame) -> pd.DataFrame:
+    """Drop rows whose risk unit is degenerate and cap realized R.
+
+    A near-zero ATR (stale prices) makes realized R explode (values near -1e9 were
+    seen), which poisoned the per-class mean R used for expected R.
+    """
+    store = store.loc[store["r_pct"] >= MIN_R_PCT].copy()
+    for col in [c for c in store.columns if c.startswith("realized_r")]:
+        store[col] = store[col].clip(*REALIZED_CLIP)
+    return store
+
+
 def load_store(dataset: str, extra: Path | None = None) -> tuple[pd.DataFrame, list[str]]:
     store = pd.read_parquet(ROOT / dataset / "store.parquet")
-    store = store.loc[store["date"] < VAULT_START].reset_index(drop=True)
+    store = clean_store(store.loc[store["date"] < VAULT_START]).reset_index(drop=True)
     features = list(FEATURES)
     if extra is not None:
         more = pd.read_parquet(extra)
