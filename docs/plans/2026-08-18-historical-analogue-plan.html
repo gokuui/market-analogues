@@ -1,0 +1,742 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Historical Stock Analogue System — Review Plan</title>
+  <style>
+    :root {
+      --page: #f4f1ea;
+      --paper: #fffdf8;
+      --ink: #1e2a31;
+      --muted: #617078;
+      --line: #d9d7cf;
+      --navy: #16324f;
+      --blue: #2c6e91;
+      --teal: #2a7f78;
+      --green: #317353;
+      --amber: #b86b1b;
+      --red: #a2463d;
+      --soft-blue: #eaf2f6;
+      --soft-green: #e9f3ed;
+      --soft-amber: #fbf0df;
+      --soft-red: #f8e9e6;
+      --shadow: 0 18px 45px rgba(28, 42, 49, 0.09);
+      --radius: 16px;
+    }
+
+    * { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 10% 0%, rgba(44,110,145,.10), transparent 28rem),
+        radial-gradient(circle at 100% 30%, rgba(42,127,120,.08), transparent 24rem),
+        var(--page);
+      font: 16px/1.65 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    a { color: var(--blue); text-underline-offset: 3px; }
+    a:hover { color: var(--navy); }
+
+    .shell {
+      width: min(1180px, calc(100% - 32px));
+      margin: 28px auto 72px;
+      display: grid;
+      grid-template-columns: 235px minmax(0, 1fr);
+      gap: 26px;
+      align-items: start;
+    }
+
+    .sidebar {
+      position: sticky;
+      top: 22px;
+      padding: 20px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(255,253,248,.88);
+      backdrop-filter: blur(14px);
+      box-shadow: var(--shadow);
+    }
+
+    .sidebar .eyebrow {
+      color: var(--teal);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+
+    .sidebar strong {
+      display: block;
+      margin: 5px 0 16px;
+      color: var(--navy);
+      font-size: 18px;
+      line-height: 1.25;
+    }
+
+    nav a {
+      display: block;
+      margin: 3px 0;
+      padding: 7px 9px;
+      border-radius: 8px;
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 14px;
+    }
+
+    nav a:hover { background: var(--soft-blue); color: var(--navy); }
+
+    .sidebar-note {
+      margin-top: 16px;
+      padding-top: 14px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    main {
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      background: var(--paper);
+      box-shadow: var(--shadow);
+    }
+
+    header {
+      position: relative;
+      overflow: hidden;
+      padding: 58px clamp(25px, 6vw, 74px) 50px;
+      color: white;
+      background: linear-gradient(135deg, #102b44 0%, #1d5268 60%, #26736e 100%);
+    }
+
+    header::after {
+      content: "";
+      position: absolute;
+      width: 330px;
+      height: 330px;
+      right: -100px;
+      top: -135px;
+      border: 1px solid rgba(255,255,255,.18);
+      border-radius: 50%;
+      box-shadow: 0 0 0 50px rgba(255,255,255,.035), 0 0 0 100px rgba(255,255,255,.025);
+    }
+
+    .kicker {
+      position: relative;
+      z-index: 1;
+      margin-bottom: 10px;
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      opacity: .82;
+    }
+
+    h1 {
+      position: relative;
+      z-index: 1;
+      max-width: 820px;
+      margin: 0;
+      font: 700 clamp(34px, 6vw, 59px)/1.05 Georgia, "Times New Roman", serif;
+      letter-spacing: -.025em;
+    }
+
+    .subtitle {
+      position: relative;
+      z-index: 1;
+      max-width: 740px;
+      margin: 22px 0 0;
+      color: rgba(255,255,255,.84);
+      font-size: 18px;
+    }
+
+    .meta {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 9px;
+      margin-top: 25px;
+    }
+
+    .chip {
+      padding: 7px 11px;
+      border: 1px solid rgba(255,255,255,.26);
+      border-radius: 999px;
+      background: rgba(255,255,255,.09);
+      color: rgba(255,255,255,.92);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    section { padding: 44px clamp(24px, 6vw, 70px); }
+    section + section { border-top: 1px solid var(--line); }
+
+    h2 {
+      margin: 0 0 8px;
+      color: var(--navy);
+      font: 700 clamp(26px, 4vw, 37px)/1.15 Georgia, "Times New Roman", serif;
+      letter-spacing: -.015em;
+    }
+
+    h3 { margin: 26px 0 8px; color: var(--navy); font-size: 19px; }
+    p { margin: 10px 0; }
+    .lead { max-width: 780px; color: var(--muted); font-size: 17px; }
+
+    .decision {
+      margin: 25px 0;
+      padding: 22px 24px;
+      border-left: 5px solid var(--teal);
+      border-radius: 0 12px 12px 0;
+      background: var(--soft-green);
+      color: #214a3c;
+      font-size: 18px;
+      font-weight: 650;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 15px;
+      margin-top: 24px;
+    }
+
+    .card {
+      padding: 21px;
+      border: 1px solid var(--line);
+      border-radius: 13px;
+      background: #fff;
+    }
+
+    .card .num {
+      display: grid;
+      place-items: center;
+      width: 31px;
+      height: 31px;
+      margin-bottom: 12px;
+      border-radius: 9px;
+      color: white;
+      background: var(--blue);
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .card h3 { margin: 0 0 6px; font-size: 17px; }
+    .card p { margin: 0; color: var(--muted); font-size: 14px; }
+
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 9px;
+      margin: 27px 0 12px;
+    }
+
+    .flow-step {
+      position: relative;
+      min-height: 128px;
+      padding: 16px 13px;
+      border: 1px solid #c9d9df;
+      border-radius: 12px;
+      background: var(--soft-blue);
+      text-align: center;
+    }
+
+    .flow-step:not(:last-child)::after {
+      content: "→";
+      position: absolute;
+      z-index: 2;
+      right: -15px;
+      top: 44%;
+      display: grid;
+      place-items: center;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      color: white;
+      background: var(--blue);
+      font-weight: 800;
+    }
+
+    .flow-step b { display: block; color: var(--navy); font-size: 14px; line-height: 1.3; }
+    .flow-step span { display: block; margin-top: 8px; color: var(--muted); font-size: 12px; line-height: 1.4; }
+
+    .callout {
+      margin-top: 22px;
+      padding: 18px 20px;
+      border-radius: 12px;
+      background: var(--soft-amber);
+      color: #6e471c;
+    }
+
+    table {
+      width: 100%;
+      margin-top: 23px;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+
+    th, td {
+      padding: 13px 12px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+      text-align: left;
+    }
+
+    th { color: var(--navy); background: #f3f5f4; font-size: 12px; letter-spacing: .04em; text-transform: uppercase; }
+    tr:last-child td { border-bottom: 0; }
+
+    .tag {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 999px;
+      white-space: nowrap;
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .p0 { color: #1f6345; background: var(--soft-green); }
+    .p1 { color: #7a4b13; background: var(--soft-amber); }
+    .p2 { color: #556168; background: #ecefef; }
+
+    .timeline { margin: 28px 0 0; }
+
+    .phase {
+      display: grid;
+      grid-template-columns: 70px minmax(0, 1fr);
+      gap: 18px;
+      padding: 0 0 25px;
+    }
+
+    .phase-no {
+      position: relative;
+      display: grid;
+      place-items: center;
+      width: 49px;
+      height: 49px;
+      border-radius: 50%;
+      color: white;
+      background: var(--navy);
+      font-weight: 850;
+    }
+
+    .phase:not(:last-child) .phase-no::after {
+      content: "";
+      position: absolute;
+      top: 49px;
+      width: 2px;
+      height: calc(100% + 5px);
+      background: #bed0d4;
+    }
+
+    .phase h3 { margin: 1px 0 4px; }
+    .phase p { margin: 0; color: var(--muted); }
+    .gate { margin-top: 7px; color: var(--green); font-size: 13px; font-weight: 750; }
+
+    .guardrails {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 21px;
+    }
+
+    .guardrail {
+      padding: 17px;
+      border-radius: 11px;
+      background: var(--soft-red);
+      color: #6f3732;
+      font-size: 14px;
+    }
+
+    .guardrail b { display: block; margin-bottom: 4px; color: var(--red); }
+
+    .choices {
+      counter-reset: choice;
+      margin: 24px 0 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .choices li {
+      position: relative;
+      margin: 10px 0;
+      padding: 15px 18px 15px 54px;
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      background: white;
+    }
+
+    .choices li::before {
+      counter-increment: choice;
+      content: counter(choice);
+      position: absolute;
+      left: 16px;
+      top: 14px;
+      display: grid;
+      place-items: center;
+      width: 25px;
+      height: 25px;
+      border-radius: 7px;
+      color: white;
+      background: var(--teal);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    details {
+      margin: 13px 0;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #fff;
+    }
+
+    summary {
+      padding: 16px 18px;
+      cursor: pointer;
+      color: var(--navy);
+      font-weight: 750;
+    }
+
+    .detail-body { padding: 0 20px 20px; color: var(--muted); }
+    .detail-body li { margin: 8px 0; }
+
+    .footer {
+      padding: 30px clamp(24px, 6vw, 70px);
+      color: rgba(255,255,255,.78);
+      background: var(--navy);
+      font-size: 13px;
+    }
+
+    .footer b { color: white; }
+
+    @media (max-width: 900px) {
+      .shell { grid-template-columns: 1fr; }
+      .sidebar { position: static; }
+      nav { display: flex; flex-wrap: wrap; }
+      nav a { margin-right: 4px; }
+      .flow { grid-template-columns: 1fr; }
+      .flow-step { min-height: 0; text-align: left; }
+      .flow-step:not(:last-child)::after { content: "↓"; right: 15px; top: auto; bottom: -15px; }
+    }
+
+    @media (max-width: 620px) {
+      .shell { width: min(100% - 16px, 1180px); margin-top: 8px; }
+      .grid, .guardrails { grid-template-columns: 1fr; }
+      section { padding-block: 34px; }
+      .phase { grid-template-columns: 52px minmax(0, 1fr); gap: 10px; }
+      table { display: block; overflow-x: auto; }
+    }
+
+    @media print {
+      body { background: white; font-size: 11pt; }
+      .shell { display: block; width: 100%; margin: 0; }
+      .sidebar { display: none; }
+      main { border: 0; box-shadow: none; }
+      header { print-color-adjust: exact; }
+      section { break-inside: avoid; }
+      details > * { display: block; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="eyebrow">Review document</div>
+      <strong>Historical Stock Analogue System</strong>
+      <nav aria-label="Page sections">
+        <a href="#decision">1. The decision</a>
+        <a href="#reading-set">Research & execution</a>
+        <a href="#picture">2. Complete picture</a>
+        <a href="#architecture">3. Architecture</a>
+        <a href="#methods">4. Methods</a>
+        <a href="#roadmap">5. Roadmap</a>
+        <a href="#safety">6. Guardrails</a>
+        <a href="#review">7. Review choices</a>
+        <a href="#appendix">8. Appendix</a>
+      </nav>
+      <div class="sidebar-note">
+        Start here, then use the linked evidence map and gated execution plan for the auditable detail.
+      </div>
+    </aside>
+
+    <main>
+      <header>
+        <div class="kicker">Representation research · proposed plan</div>
+        <h1>Find historical stocks that developed like this one.</h1>
+        <p class="subtitle">
+          A practical plan for representing the whole chart a professional trader sees, retrieving genuinely similar historical episodes, and showing what happened next—without forcing a named pattern or prediction model.
+        </p>
+        <div class="meta">
+          <span class="chip">Prepared 18 August 2026</span>
+          <span class="chip">US equities</span>
+          <span class="chip">Point-in-time</span>
+          <span class="chip">For review</span>
+        </div>
+      </header>
+
+      <section id="reading-set">
+        <h2>The complete review set</h2>
+        <p class="lead">This overview explains the design. Two companion HTML documents now supply the depth needed before implementation.</p>
+        <div class="grid">
+          <article class="card">
+            <div class="num">R</div>
+            <h3><a href="2026-08-18-historical-analogue-research-evidence.html">Research evidence map</a></h3>
+            <p>Fifty primary-source evidence entries, including negative findings, plus the search protocol, limitations, open gaps, and paper-to-build traceability.</p>
+          </article>
+          <article class="card">
+            <div class="num">E</div>
+            <h3><a href="2026-08-18-historical-analogue-execution-plan.html">Gated execution plan</a></h3>
+            <p>Twenty-nine work packages from research and data audit through retrieval, scaling, outcomes, and release—each with correctness, performance, artifacts, and a stop/go gate.</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="decision">
+        <h2>The decision</h2>
+        <p class="lead">We should not choose one magical representation such as a wave, a string, or DTW. Each solves a different part of the problem.</p>
+        <div class="decision">
+          Keep the exact historical episode intact, then create several complementary views of it: the raw path, the swing structure, the behavior at different time scales, and the market context.
+        </div>
+        <p>This gives us two protections:</p>
+        <div class="grid">
+          <article class="card">
+            <div class="num">A</div>
+            <h3>We do not lose the original chart</h3>
+            <p>Every match can be traced back to the exact OHLCV, market, sector, and data-quality observations available at the cutoff.</p>
+          </article>
+          <article class="card">
+            <div class="num">B</div>
+            <h3>We do not trust one mathematical opinion</h3>
+            <p>Dense paths, swing geometry, elastic timing, and market context can agree or disagree—and the interface shows those scores separately.</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="picture">
+        <h2>What “the complete stock picture” means</h2>
+        <p class="lead">The representation must preserve what the trader could have known at that moment, across several chart zoom levels.</p>
+        <div class="grid">
+          <article class="card">
+            <div class="num">1</div>
+            <h3>Price behavior</h3>
+            <p>Open, high, low, close, overnight gaps, candle bodies and wicks, closes near highs/lows, moving-average structure, distance from prior highs, and the prior advance.</p>
+          </article>
+          <article class="card">
+            <div class="num">2</div>
+            <h3>Shocks and participation</h3>
+            <p>Unusual returns, gaps, true-range expansion, relative volume, up-volume versus down-volume, dry-ups, liquidity, and whether a shock held or was rejected.</p>
+          </article>
+          <article class="card">
+            <div class="num">3</div>
+            <h3>Structure over time</h3>
+            <p>Advances, pullbacks, recoveries, tightening, shakeouts, contraction ratios, duration, volatility compression, expansion, and coiling near a boundary.</p>
+          </article>
+          <article class="card">
+            <div class="num">4</div>
+            <h3>Relative strength</h3>
+            <p>Stock versus NASDAQ, broad market, and sector; leadership percentile; whether relative strength improves before price; and whether the sector itself is strengthening.</p>
+          </article>
+          <article class="card">
+            <div class="num">5</div>
+            <h3>Market environment</h3>
+            <p>QQQ/IXIC, SPY, IWM, sector paths, volatility, drawdown, breadth, new highs/lows, distribution, and cross-sectional participation—not only one “bull/bear” flag.</p>
+          </article>
+          <article class="card">
+            <div class="num">6</div>
+            <h3>Several zoom levels</h3>
+            <p>21, 63, 126, and 252 daily sessions plus two years of weekly structure, all ending at the same information cutoff.</p>
+          </article>
+        </div>
+        <div class="callout">
+          <b>Important boundary:</b> earnings and news catalysts are not visible in OHLCV alone. They can be added later as clearly marked optional context, especially for EP searches.
+        </div>
+      </section>
+
+      <section id="architecture">
+        <h2>How the system works</h2>
+        <p class="lead">The process is deliberately split so representation, similarity, and outcomes cannot leak into each other.</p>
+        <div class="flow" role="img" aria-label="Five-stage historical analogue retrieval flow">
+          <div class="flow-step"><b>1. Exact episode</b><span>Point-in-time stock, market, sector, volume, metadata, and quality.</span></div>
+          <div class="flow-step"><b>2. Multiple views</b><span>Dense paths, swing skeleton, multiscale behavior, and context.</span></div>
+          <div class="flow-step"><b>3. Fast search</b><span>Find a few hundred plausible candidates across history.</span></div>
+          <div class="flow-step"><b>4. Careful re-rank</b><span>Compare structure and allow limited differences in development speed.</span></div>
+          <div class="flow-step"><b>5. Show outcomes</b><span>Overlay the matches and reveal only futures already knowable at the query date.</span></div>
+        </div>
+
+        <h3>What the user sees</h3>
+        <ul>
+          <li>The current chart and 10–20 historical analogues ending at clearly marked cutoffs.</li>
+          <li>Separate scores for price shape, volume, swing structure, relative strength, market, sector, and timing warp.</li>
+          <li>Shape-only results and market-context-matched results as separate views.</li>
+          <li>Subsequent paths, MFE, MAE, target-before-stop, and failed analogues—not only winners.</li>
+          <li>A plain explanation: “smaller contractions, drying volume, improving relative strength, but a weaker market than today.”</li>
+        </ul>
+      </section>
+
+      <section id="methods">
+        <h2>Where each research method fits</h2>
+        <p class="lead">The table gives each technique one job. This prevents the project from becoming an uncontrolled collection of algorithms.</p>
+        <table>
+          <thead>
+            <tr><th>Method</th><th>What it is good at</th><th>Main weakness</th><th>Decision</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><b>Dense normalized path</b></td><td>Preserves order, magnitude, candles, volume and context.</td><td>Too rigid when two formations unfold at different speeds.</td><td><span class="tag p0">Build first</span></td></tr>
+            <tr><td><b>Swing / pivot skeleton</b></td><td>Expresses advance → pullback → tighter pullback → shakeout.</td><td>Pivot thresholds can be unstable.</td><td><span class="tag p0">Build first</span></td></tr>
+            <tr><td><b>Constrained DTW</b></td><td>Aligns similar developments that happen somewhat faster or slower.</td><td>Unconstrained warping can manufacture false similarity.</td><td><span class="tag p0">Re-ranker</span></td></tr>
+            <tr><td><b>Wavelets / scattering</b></td><td>Locates shocks, oscillations and compression at several time scales.</td><td>Coefficients are less intuitive and can become large.</td><td><span class="tag p1">Experiment</span></td></tr>
+            <tr><td><b>SAX / SFA / ABBA strings</b></td><td>Compact indexing, motif search and readable up/down grammar.</td><td>Compression loses magnitude and candle detail.</td><td><span class="tag p1">Supplement</span></td></tr>
+            <tr><td><b>Matrix Profile</b></td><td>Scalable unnamed motif and unusual-pattern discovery.</td><td>Its default distance is not the full trader definition.</td><td><span class="tag p1">Discovery</span></td></tr>
+            <tr><td><b>Path signatures</b></td><td>Captures ordered price-volume-market interactions.</td><td>Harder to explain and expensive with many channels.</td><td><span class="tag p2">Later challenger</span></td></tr>
+            <tr><td><b>Learned embeddings</b></td><td>May learn complex multichannel similarity from trader judgments.</td><td>Can learn era, ticker, volatility or data-source artifacts.</td><td><span class="tag p2">Only if earned</span></td></tr>
+            <tr><td><b>Chart images / topology</b></td><td>Alternative visual or global dynamical descriptions.</td><td>Indirect, parameter-heavy, and less inspectable for this problem.</td><td><span class="tag p2">Defer</span></td></tr>
+          </tbody>
+        </table>
+        <div class="callout">
+          <b>Recommended starting hypothesis:</b> dense multiscale OHLCV-relative-market paths + a multithreshold swing skeleton + constrained elastic alignment will match professional chart judgments better than scalar features or any single transform.
+        </div>
+      </section>
+
+      <section id="roadmap">
+        <h2>Roadmap with proof gates</h2>
+        <p class="lead">Each phase must prove something before more sophistication is added.</p>
+        <div class="timeline">
+          <div class="phase">
+            <div class="phase-no">0</div>
+            <div><h3>Make the historical record trustworthy</h3><p>Stable security IDs, ticker changes, active and delisted universe, corporate actions, volume adjustment, bar-quality flags, indices, sectors, and breadth.</p><div class="gate">Gate: randomly selected historical charts reproduce exactly with no future inputs.</div></div>
+          </div>
+          <div class="phase">
+            <div class="phase-no">1</div>
+            <div><h3>Build the canonical episode</h3><p>Create causal stock, volume, relative-strength, market, sector, quality, and multiscale views. Render the same episode for human review.</p><div class="gate">Gate: split, gap, missing-bar and rolling-window tests pass.</div></div>
+          </div>
+          <div class="phase">
+            <div class="phase-no">2</div>
+            <div><h3>Establish the simplest retrieval baseline</h3><p>Compare close-only, full OHLC, OHLC+volume, OHLC+volume+RS, and complete context-aware paths.</p><div class="gate">Gate: added information improves blind chart-similarity judgments.</div></div>
+          </div>
+          <div class="phase">
+            <div class="phase-no">3</div>
+            <div><h3>Add swing structure and limited time flexibility</h3><p>Test constrained DTW, derivative/shape-aware DTW, multivariate alignment, and multithreshold swing skeletons.</p><div class="gate">Gate: better held-out human ranking justifies the latency and complexity.</div></div>
+          </div>
+          <div class="phase">
+            <div class="phase-no">4</div>
+            <div><h3>Challenge the baseline</h3><p>Test wavelets, symbolic strings, Matrix Profile and change-point sequences. Reject anything that does not add relevance, stability, or speed.</p><div class="gate">Gate: freeze representation version 1 before examining outcome advantage.</div></div>
+          </div>
+          <div class="phase">
+            <div class="phase-no">5</div>
+            <div><h3>Build the analogue explorer</h3><p>Scale the historical index; show synchronized overlays, component scores, alignments, context tabs and future-path distributions.</p><div class="gate">Gate: usable query speed and repeatable, explainable neighbors.</div></div>
+          </div>
+          <div class="phase">
+            <div class="phase-no">6</div>
+            <div><h3>Study outcomes and discover families</h3><p>Compare mature neighbor outcomes with matched controls. Only then cluster unnamed setup families or test learned similarity.</p><div class="gate">Gate: walk-forward evidence survives regimes, costs and research-selection controls.</div></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="safety">
+        <h2>Non-negotiable guardrails</h2>
+        <p class="lead">These matter more than choosing a clever distance formula.</p>
+        <div class="guardrails">
+          <div class="guardrail"><b>No future bars</b>Every episode ends exactly at its declared decision time.</div>
+          <div class="guardrail"><b>Mature outcomes only</b>At a historical query date, a 60-day outcome is usable only if those 60 sessions had already elapsed.</div>
+          <div class="guardrail"><b>No survivorship bias</b>Failed, acquired and delisted securities remain in the search universe.</div>
+          <div class="guardrail"><b>No winner-built similarity</b>Trader similarity—not subsequent return—chooses the representation and weights.</div>
+          <div class="guardrail"><b>No silent bad data</b>Bar-level quality, missingness and corrections remain visible to the matcher and user.</div>
+          <div class="guardrail"><b>No duplicate domination</b>Overlapping windows and repeated episodes from one stock are collapsed or capped.</div>
+          <div class="guardrail"><b>No fake US-wide claim</b>NASDAQ is only one exchange. Add NYSE and NYSE American before calling the universe all US stocks.</div>
+          <div class="guardrail"><b>No hidden similarity score</b>Keep shape, volume, structure, RS, market, sector and time-warp contributions inspectable.</div>
+        </div>
+      </section>
+
+      <section id="review">
+        <h2>Recommended choices for approval</h2>
+        <p class="lead">These defaults allow implementation to begin without closing off later research.</p>
+        <ol class="choices">
+          <li><b>Decision time:</b> begin with after-close daily episodes. Treat gap-open/EP searches as a distinct later episode type.</li>
+          <li><b>History:</b> search 126- and 252-session developments, emphasize the recent 21/63 days, and retain two years of weekly context.</li>
+          <li><b>Universe:</b> a NASDAQ-only proof of concept is acceptable; production should cover major US exchanges, including delisted stocks.</li>
+          <li><b>Context:</b> retrieve stock-shape candidates first, then show context-matched results separately instead of hiding market context inside one score.</li>
+          <li><b>First matcher:</b> fast fixed-vector search followed by swing-structure and constrained-DTW re-ranking.</li>
+          <li><b>Ground truth:</b> use blind trader pair judgments to decide what “similar” means. Hide outcomes during that review.</li>
+          <li><b>Discovery:</b> do not name or cluster setup families until representation version 1 is frozen.</li>
+        </ol>
+      </section>
+
+      <section id="appendix">
+        <h2>Expandable technical appendix</h2>
+        <p class="lead">Open only the parts you want to inspect. The main plan above is sufficient for the product decision.</p>
+
+        <details>
+          <summary>Exact representation layers</summary>
+          <div class="detail-body">
+            <ol>
+              <li><b>Lossless source:</b> raw/adjusted OHLCV, adjustment factors, session status, security metadata, indices, sector, breadth and quality provenance.</li>
+              <li><b>Dense trajectories:</b> candle mechanics, gaps, return/range shocks, volume, compression, moving-average relationships, relative paths and ranks.</li>
+              <li><b>Structural skeleton:</b> pivots at several prominence levels, swing amplitude/duration, retracements, contraction ratios and price-volume behavior.</li>
+              <li><b>Time-scale descriptor:</b> controlled wavelet/scattering summaries for returns, range, relative volume, RS and benchmark paths.</li>
+              <li><b>Context trajectory:</b> broad market, NASDAQ, small-cap, sector, breadth, volatility and participation as separate inspectable channels.</li>
+            </ol>
+          </div>
+        </details>
+
+        <details>
+          <summary>How “best representation” will be tested</summary>
+          <div class="detail-body">
+            <ul>
+              <li>Build 300–500 query charts: known examples ending before success, random dates, failures, different eras, regimes and liquidity groups.</li>
+              <li>Ask blind 0–4 judgments for overall development, swings, endpoint, shock, volume, RS and market-context similarity.</li>
+              <li>Use pairwise questions—“which candidate is closer?”—because they are easier to answer consistently.</li>
+              <li>Test harmless transformations: nominal price/volume scaling, legitimate splits, tiny timing shifts and small time stretches.</li>
+              <li>Test meaningful changes: materially deeper pullback, reversed RS, reordered shocks and different market behavior.</li>
+              <li>Measure human ranking agreement, precision at K, stability, sensitivity, diversity, latency, index size and explanation quality.</li>
+              <li>Reject sophistication that does not improve held-out human relevance or speed.</li>
+            </ul>
+          </div>
+        </details>
+
+        <details>
+          <summary>Representative primary research</summary>
+          <div class="detail-body">
+            <ul>
+              <li><a href="https://www.nber.org/papers/w7613">Lo, Mamaysky &amp; Wang — Foundations of Technical Analysis</a></li>
+              <li><a href="https://doi.org/10.1016/j.eswa.2017.10.055">Tsinaslanidis — Subsequence DTW for NYSE charting</a></li>
+              <li><a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC5668684/">Shokoohi-Yekta et al. — Multidimensional DTW</a></li>
+              <li><a href="https://doi.org/10.1016/j.patcog.2017.09.020">Zhao &amp; Itti — shapeDTW</a></li>
+              <li><a href="https://www.cs.ucr.edu/~eamonn/PID4481997_extend_Matrix%20Profile_I.pdf">Yeh et al. — Matrix Profile I</a></li>
+              <li><a href="https://mcyeh.github.io/paper/2017_icdm_meaningful_multidimensional_motif.pdf">Yeh, Kavantzas &amp; Keogh — Multidimensional Matrix Profile</a></li>
+              <li><a href="https://arxiv.org/abs/1101.2286">Mallat — Wavelet scattering</a></li>
+              <li><a href="https://www.cs.ucr.edu/~stelo/papers/DMKD07b.pdf">Lin et al. — SAX symbolic representation</a></li>
+              <li><a href="https://link.springer.com/article/10.1007/s10618-020-00689-6">Elsworth &amp; Güttel — ABBA adaptive symbolic representation</a></li>
+              <li><a href="https://ora.ox.ac.uk/objects/uuid%3Acf684258-560a-41b4-bb39-efdb0ecc792e/">Lyons, Ni &amp; Oberhauser — Path signatures for financial streams</a></li>
+              <li><a href="https://ojs.aaai.org/index.php/AAAI/article/view/20881">Yue et al. — TS2Vec</a></li>
+              <li><a href="https://doi.org/10.1111/1468-0262.00152">White — A Reality Check for Data Snooping</a></li>
+            </ul>
+            <p>The complete annotated survey of 36 primary sources is retained in the accompanying technical Markdown document.</p>
+          </div>
+        </details>
+
+        <details>
+          <summary>Repository-specific data work required</summary>
+          <div class="detail-body">
+            <ul>
+              <li>Introduce stable security identity across ticker changes and ticker reuse.</li>
+              <li>Audit active/delisted membership and security type at each date.</li>
+              <li>Audit volume adjustment against adjusted OHLC and preserve raw adjustment factors.</li>
+              <li>Add QQQ, SPY, IWM, sector/industry proxies and point-in-time breadth; IXIC alone is insufficient.</li>
+              <li>Keep bar-level quality flags. Previous NASDAQ experiments documented bad-symbol and delisting artifacts that materially changed results.</li>
+              <li>Separate the representation store from the outcome store so future information is unavailable by construction.</li>
+            </ul>
+          </div>
+        </details>
+      </section>
+
+      <div class="footer">
+        <b>Document relationship:</b> this HTML file is the reader-facing plan. The detailed research record remains in <code>2026-08-18-historical-analogue-representation-research-plan.md</code> as the technical appendix.
+      </div>
+    </main>
+  </div>
+</body>
+</html>
