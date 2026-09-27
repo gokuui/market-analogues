@@ -2637,6 +2637,56 @@
   <p><b>Meaning:</b> the system now reliably answers the structural part of the goal: for each current query, its fixed historical analogues can be separated into repeatable observed future-path families or explicitly shown as one family/insufficient evidence. It does not yet prove those families predict the live stock or yield profitable trades; M2 prospective evaluation remains the predictive gate.</p>
   <p class="warn"><b>Next:</b> R2-06 must render version-pinned JSON/HTML evidence panels from only this verified seal: every raw/primary/excluded/censored member, actual medoids, assignments, path envelopes and outcome summaries, stability/fit diagnostics, disagreement banners and the claim boundary. Parser, manifest and traceability tests must pass before R2 is called complete.</p>
 </section>
+<section class="entry" id="l-324">
+  <h2>L-324 — Decision checkpoint: chart similarity adds nothing over simple features</h2>
+  <p><b>Why:</b> before spending more time, ask whether the chart retriever is where any forecast skill comes from. The kill tests live in <code>experiments/decision/</code>; the local results are in <code>LOCAL_RUN_RESULTS.md</code>.</p>
+  <p class="warn"><b>Result:</b></p>
+  <ul>
+    <li>Versus the no-chart mixture, the chart parts added +0.84 Brier-skill points (90% CI +0.13 to +1.57).</li>
+    <li>Versus a 22-feature GBM, they added only +0.15 (CI −0.09 to +0.40). That fails the preset 0.5 bar, and the full retriever received 0% weight.</li>
+    <li>M2 would need about 99 months to confirm the effect.</li>
+    <li>Survivorship: 6.9% yearly attrition, so the files are not a survivor snapshot, but delisting returns are missing.</li>
+    <li>Fixed along the way: the survivorship audit took its snapshot end from the benchmark calendar.</li>
+  </ul>
+</section>
+<section class="entry" id="l-325">
+  <h2>L-325 — Pattern-encoding track P0–P2: stopped; momentum test bed is phantom under circuit realism</h2>
+  <p><b>Plan:</b> <code>docs/plans/2026-09-26-pattern-research-plan-v2.html</code>, with the review amendments. This track was exploratory research for personal trading, run with pass rules fixed before each result. It did not follow the sealed M-gate process.</p>
+  <p><b>P0:</b></p>
+  <ul>
+    <li>A stop-aware ordinal R-ladder label store: NASDAQ 3.58M rows, NSE 1.12M rows (NSE is survivors only).</li>
+    <li>A walk-forward cumulative-head evaluator.</li>
+    <li>A go/no-go that scores existing loser strategy entries.</li>
+  </ul>
+  <p>Bugs found and fixed:</p>
+  <ul>
+    <li>Flat (circuit) bars made features NaN, which silently dropped 58% of NSE entries, and the best ones.</li>
+    <li>Near-zero ATR rows produced realized R near −7e8.</li>
+  </ul>
+  <p>The baseline entry gate then failed narrowly (CI −0.15 to +1.48%).</p>
+  <p><b>P1:</b></p>
+  <ul>
+    <li>E1 anchored/event features plus E2 online ZigZag swing legs passed the preregistered trade-level gate: +1.11%, CI +0.32 to +1.97.</li>
+    <li>E1 drove the pass; E2 alone failed.</li>
+    <li>Paired against the baseline, the improvement was not significant (CI −0.27 to +1.33).</li>
+    <li>On NASDAQ, ΔRankIC was +0.006 (t 4–5), which is economically nil.</li>
+  </ul>
+  <p class="warn"><b>P2:</b></p>
+  <ul>
+    <li>Vault, opened once (112 fillable entries): E1+E2 −0.09%, baseline +0.70%.</li>
+    <li>Loser-engine portfolio backtests with circuit-lock realism on changed the picture. Momentum S-2 fell from 81.4% CAGR / 11% DD to −5.3% / 64%. BestV2 fell from 78.5% / 18.7% to −4.9% / 68%.</li>
+    <li>Causal score filters cannot rescue either strategy, and E1+E2 is worse than the baseline filter.</li>
+    <li>The trade-level P0/P1 results are superseded, because they used circuit-off trades.</li>
+  </ul>
+  <p class="warn"><b>Gen books (live) under the same realism:</b> they survive but roughly halve. CAGR drops from 64–75% to 30–42%, and Calmar from 1.8–2.8 to 0.67–1.31. gen498 is the weakest. See P2_RESULTS §4.</p>
+  <p><b>Decision:</b></p>
+  <ul>
+    <li>Stop the predictive pattern track. E3 (chart CNN) and S-track retrieval are not pursued.</li>
+    <li>The harness (<code>experiments/p0</code>) remains available to test any future signal.</li>
+    <li>R2 remains a descriptive viewer.</li>
+  </ul>
+  <p>Details: <code>experiments/p0/P0_RESULTS.md</code>, <code>experiments/p1/P1_RESULTS.md</code>, <code>experiments/p2/P2_RESULTS.md</code>.</p>
+</section>
 </main>
 
 <section id="reproduce">

@@ -86,3 +86,41 @@ the harness matches the original engine. Turning realism on removes the whole ed
   daily comparison and the entry go/no-go. They can be reused to test any future signal honestly.
 - **The descriptive analogue viewer** (R2 modes): still available as a research and visual tool, not as
   a signal.
+
+## 4. Live gen books with circuit-lock realism (2026-09-27)
+
+`experiments/p2/gen_circuit_check.py` mirrors loser's `pilot_backtest.run_gen` config:
+- 1L capital, 3 positions, 2.5% risk, 33% maximum position, liquidity 5%;
+- a 650-day warmup, with trading starting 2015-01-01;
+- the same two circuit flags as `apply_circuit`, switched off and then on.
+
+| Book | Data | Realism | CAGR 2015→2025-08 | Max DD | Calmar | Sharpe | CAGR 2025-09+ |
+|---|---|---|---|---|---|---|---|
+| gen498 | validated | off | 66.1% | 36.3% | 1.82 | 2.19 | 29.6% |
+| gen498 | validated | **on** | **30.3%** | **45.5%** | **0.67** | 1.21 | 19.0% |
+| gen182 | validated | off | 74.7% | 31.4% | 2.38 | 2.37 | 36.1% |
+| gen182 | validated | **on** | **37.0%** | **32.3%** | **1.15** | 1.40 | 12.3% |
+| gen191 | validated | off | 65.9% | 33.9% | 1.95 | 2.22 | 21.7% |
+| gen191 | validated | **on** | **34.4%** | **47.0%** | **0.73** | 1.35 | 17.7% |
+| gen498 | truedata | off | 63.8% | 26.9% | 2.37 | 2.09 | 117.7% |
+| gen498 | truedata | **on** | **29.6%** | **33.7%** | **0.88** | 1.16 | 67.2% |
+| gen182 | truedata | off | 70.6% | 25.1% | 2.81 | 2.24 | 97.6% |
+| gen182 | truedata | **on** | **31.9%** | **29.9%** | **1.07** | 1.21 | 47.3% |
+| gen191 | truedata | off | 70.1% | 26.2% | 2.67 | 2.25 | 66.1% |
+| gen191 | truedata | **on** | **42.2%** | **32.2%** | **1.31** | 1.52 | 43.5% |
+
+**Reading the table**
+- The gen books keep a real edge under realism, unlike the momentum strategies.
+- Realism roughly halves their backtested CAGR and deepens drawdowns. Calmar falls from about 2–2.8
+  to about 0.7–1.3, and this holds on both data sources.
+- **gen498, the current champion, is the weakest** under realism on both sources (Calmar 0.67 / 0.88).
+  gen182 and gen191 hold up better.
+
+**Suggested actions (for the loser owner)**
+1. Plan live sizing and expectations on the realism-on numbers: roughly 30–40% CAGR and 30–47% drawdowns.
+2. Re-run the gen182/gen191/gen498 capital-allocation decision on these numbers.
+3. Add a live pre-trade guard against circuit-locked entries, which is still an open TODO in loser.
+
+**Caveat:** lock detection is `(high−low)/low < 0.1%`. In older, sparser data (`data/validated`
+before TrueData), some flat bars may be stale quotes rather than true locks. That could make the
+realism-on results slightly pessimistic. The TrueData runs agree in direction.
