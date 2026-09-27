@@ -124,3 +124,51 @@ the harness matches the original engine. Turning realism on removes the whole ed
 **Caveat:** lock detection is `(high−low)/low < 0.1%`. In older, sparser data (`data/validated`
 before TrueData), some flat bars may be stale quotes rather than true locks. That could make the
 realism-on results slightly pessimistic. The TrueData runs agree in direction.
+
+## 5. The whole loser leaderboard, and a stricter lock rule (2026-09-27)
+
+`experiments/p2/leaderboard_circuit_check.py` re-runs every row of the loser `CLAUDE.md` leaderboard.
+- Definitions come from `validate_all_strategies.py` at git `708eda5^`: the same capital, positions,
+  1% risk, 10% maximum position, liquidity 5%, 2015 start and `data/validated`.
+- Blends are rebuilt from their legs, as `build_blend` did.
+- Three strategies were deleted from loser's `release/prod-v1` (`7bdbc73`). They are restored
+  verbatim, with absolute imports, in `experiments/p2/restored_strategies/`.
+
+**Two lock rules.**
+- **Engine rule:** any bar with range < 0.1% is locked.
+- **Strict rule** (`strict_lock.py`, monkeypatched; loser is unchanged): a flat bar only blocks a fill
+  if the open also moved at least 1.9% from the previous close in the locked direction (up for
+  entries, down for exits). NSE's narrowest band is 2%.
+
+| Row | Realism off: CAGR / DD / Cal | Engine rule: CAGR / DD / Cal | Strict rule: CAGR / DD / Cal |
+|---|---|---|---|
+| #1 mom30+h52w70 blend | 69.7% / 12.7% / 5.51 | −8.8% / 62.0% / −0.14 | −7.8% / 59.0% / −0.13 |
+| #2 mom30+tr70 blend | 68.0% / 7.4% / 9.21 | −1.9% / 28.3% / −0.07 | −1.2% / 31.1% / −0.04 |
+| #14 ml_features atr3.0 p5 | 21.1% / 6.8% / 3.12 | 5.0% / 21.1% / 0.23 | 4.7% / 21.4% / 0.22 |
+| #23 elder_impulse er50 p3 | 46.4% / 11.6% / 4.00 | −0.2% / 34.7% / −0.01 | −0.6% / 32.9% / −0.02 |
+| #18 momentum v2 (no stop) | 75.8% / 19.4% / 3.90 | −4.2% / 66.7% / −0.06 | −5.5% / 71.4% / −0.08 |
+| #19 VCP+er55 p5 | 18.8% / 5.9% / 3.19 | 3.9% / 22.0% / 0.18 | 3.7% / 22.4% / 0.17 |
+| #9 ElderLV+LVT blend | 16.8% / 4.3% / 3.88 | 2.4% / 13.4% / 0.18 | 4.9% / 13.9% / 0.36 |
+| #8 Elder+TQ blend | 43.6% / 11.3% / 3.86 | −1.7% / 37.3% / −0.04 | −0.8% / 38.5% / −0.02 |
+| #20 VCP+RS75 p5 | 13.6% / 4.0% / 3.37 | 1.6% / 19.3% / 0.08 | 1.1% / 19.3% / 0.06 |
+| #25 lvt atr2.5 er40 p3 | 17.2% / 5.4% / 3.16 | 2.7% / 16.1% / 0.17 | 5.7% / 17.6% / 0.32 |
+
+The mom atr0.7 and BestV2 standalone rows are in section 2.
+
+**Gen books under the strict rule** (2015→2025-08):
+
+| Book | validated: CAGR / DD / Cal | truedata: CAGR / DD / Cal |
+|---|---|---|
+| gen498 | 27.5% / 45.5% / 0.60 | 26.9% / 33.7% / 0.80 |
+| gen182 | 39.0% / 29.6% / 1.32 | 32.3% / 29.9% / 1.08 |
+| gen191 | 39.3% / 32.2% / 1.22 | 42.2% / 34.3% / 1.23 |
+
+**Conclusions**
+- The strict rule changes almost nothing. The collapse comes from genuine circuit locks, not from
+  flat bars in thin stocks.
+- **No leaderboard strategy is viable** under realistic fills. The best has Calmar 0.36, and seven of
+  ten lose money.
+- **The gen books are the only NSE strategies here with a realistic edge:** Calmar about 1.1–1.3 for
+  gen182 and gen191, and 0.6–0.8 for gen498.
+- **Allocation (section 4):** the equal three-way split is best or near best. Do not concentrate in
+  gen498.

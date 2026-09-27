@@ -70,6 +70,11 @@ def run(book: str, source: str, circuit: bool) -> dict[str, object]:
 
 
 def main() -> int:
+    global OUT
+    if "--strict" in sys.argv:
+        import strict_lock
+        strict_lock.install()
+        OUT = OUT.with_name(OUT.name + "_strict")
     results = []
     for source in SOURCES:
         for book in BOOKS:
