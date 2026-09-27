@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Setup Analogue Plan</title>
+<style>
+:root{--bg:#fbfaf7;--fg:#1d1d1b;--muted:#5c5a55;--line:#e3e0d8;--card:#fff;--accent:#2f5d8a;--good:#2e7d4f;--warn:#a86412;--bad:#a33a3a;--code:#f2efe8}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#171716;--fg:#e9e7e2;--muted:#a09d96;--line:#33322f;--card:#1f1f1d;--accent:#7fb0e0;--good:#6cc08f;--warn:#e0a458;--bad:#e07a7a;--code:#262624}}
+:root[data-theme="dark"]{--bg:#171716;--fg:#e9e7e2;--muted:#a09d96;--line:#33322f;--card:#1f1f1d;--accent:#7fb0e0;--good:#6cc08f;--warn:#e0a458;--bad:#e07a7a;--code:#262624}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:940px;margin:0 auto;padding:32px 16px 80px}h1{font-size:1.9rem;margin:0 0 4px;line-height:1.2}
+h2{font-size:1.3rem;margin:42px 0 10px;padding-top:12px;border-top:1px solid var(--line)}h3{font-size:1.05rem;margin:22px 0 6px}
+p,li{max-width:76ch}.sub{color:var(--muted);margin:0 0 20px}
+.callout{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--accent);padding:14px 16px;border-radius:6px;margin:16px 0}
+.callout.warn{border-left-color:var(--warn)}.table-wrap{overflow-x:auto;margin:12px 0}
+table{border-collapse:collapse;width:100%;font-size:.92rem;background:var(--card)}th,td{border:1px solid var(--line);padding:7px 9px;text-align:left;vertical-align:top}th{background:var(--code)}
+code{background:var(--code);padding:1px 5px;border-radius:4px;font-size:.88em}.tag{display:inline-block;font-size:.78rem;padding:1px 7px;border-radius:10px;border:1px solid currentColor;white-space:nowrap}
+.hi{color:var(--good)}.mid{color:var(--warn)}.lo{color:var(--bad)}.small{font-size:.88rem;color:var(--muted)}ol.phases>li{margin-bottom:12px}
+</style>
+</head>
+<body>
+<main>
+<h1>Setup analogues: plan v3</h1>
+<p class="sub">market-analogues · 2026-09-27 · This plan follows the P0–P2 results (<code>experiments/p2/P2_RESULTS.md</code>). It is based on four literature reviews: evidence on setup events, similarity within a setup type, catalyst data, and evaluation method. It supersedes the v2 plan's direction. Nothing here has been run yet.</p>
+
+<div class="callout">
+<strong>Reframing.</strong> The old question was <em>"Which stocks will rise, judged from their whole chart?"</em> That is now answered no.
+<p>The new question is <em>"This stock just had a setup: a breakout from a base, a gap of at least 2σ, a +4% burst, or a new 52-week high after consolidation. Among past setups of the same type that looked like this one, what happened, and which ones worked?"</em></p>
+<p>This is the owner's analogue idea, applied only where patterns plausibly matter. It is scored by payoff in R after costs, against matched controls and a simple model.</p>
+</div>
+
+<h2>1. What the research says</h2>
+<h3>Which variables separate winners from losers within a setup</h3>
+<div class="table-wrap"><table>
+<tr><th>Discriminator</th><th>Evidence</th><th>Effect</th></tr>
+<tr><td>Gap size in σ units</td><td><span class="tag hi">strong</span> 104k gaps (O'Neil Global Advisors)</td><td>A gap under 2σ earns no alpha. 2–4σ earns +1.06% and above 4σ +2.19% over 50 days.</td></tr>
+<tr><td>Breakout-day volume vs its 50-day average</td><td><span class="tag hi">strong</span> 197k breakouts</td><td>Alpha rises from +0.67% to +2.79% over 63 days. The hit rate stays flat at about 57%, so volume makes the payoff bigger, not the win rate higher.</td></tr>
+<tr><td>A catalyst, especially earnings</td><td><span class="tag hi">strong</span> Savor 2012, Chan 2003, Brandt et al.</td><td>Price jumps on news keep drifting; jumps without news reverse. The earnings-announcement return (EAR) earns 6–7.5% a year and does not reverse.</td></tr>
+<tr><td>How many setups fire the same day (breadth/rarity)</td><td><span class="tag mid">moderate</span> O'Neil "New Highs", Seasholes–Wu</td><td>New highs made on days with few other new highs earn about twice the alpha.</td></tr>
+<tr><td>Market state</td><td><span class="tag hi">strong</span> Cooper–Gutierrez–Hameed 2004</td><td>Momentum earns +0.93%/month after up markets and −0.37% after down markets.</td></tr>
+<tr><td>How recent the prior 52-week high was</td><td><span class="tag mid">moderate</span> Bhootra–Hur 2013</td><td>0.70%/month</td></tr>
+<tr><td>Smoothness of the prior trend (information discreteness)</td><td><span class="tag mid">moderate</span> Da–Gurun–Warachka 2014; not tested on events</td><td>A trend built from many jumps follows through worse.</td></tr>
+<tr><td>Tightness, VCP and base shape</td><td><span class="tag lo">weak or contrary</span></td><td>No rigorous support. This matches our E2 null result. Keep them as features, not filters.</td></tr>
+</table></div>
+<p><b>Base rates:</b></p>
+<ul>
+<li>Unconditioned breakouts are close to break-even.</li>
+<li>Practitioner setups (EP and breakout) have a <em>negative median</em>. All their profit sits in a fat right tail.</li>
+<li>Breakout failure rates roughly doubled from the 1990s to the 2000s, so expect edges to decay.</li>
+<li>Meta-labelling usually lifts precision by only a few points. Its value is in sizing and in skipping bad-regime setups.</li>
+</ul>
+<p><b>India:</b></p>
+<ul>
+<li>The 52-week-high effect is present, and India showed the strongest post-new-high returns in one multi-country study.</li>
+<li>Big moves in large caps reverse, and so do extreme opening moves.</li>
+<li>There is no rigorous study of returns after an NSE upper-circuit hit. Our own circuit-lock finding makes locked entries the first thing to exclude.</li>
+<li>Stocks added to surveillance lists (ASM) underperform afterwards.</li>
+</ul>
+
+<h3>Similarity within a setup type</h3>
+<ul>
+<li><b>Condition first, then match.</b> This is the core of two-step analogue methods in weather forecasting, and Lo–Mamaysky–Wang also found pattern-conditioned return distributions are informative. However, <b>supervised trees usually still beat analogues</b> on the same data (Taillardat 2019: analogues −12% CRPSS, quantile forests +10%). Expect analogues to be mainly an <em>explanation</em> layer.</li>
+<li><b>The data format matters more than the model.</b> Scale each event window to its own base high and low (the Jiang–Kelly–Xiu ablation).</li>
+<li><b>Cheapest strong sequence features:</b> MiniRocket, MultiRocket+Hydra and QUANT (random convolutional kernels; minutes on CPU; best in the 2024 time-series benchmark). Test them as <em>extra GBM features</em>. With 10k–200k events, a GBM on good features should match or beat deep models.</li>
+<li><b>Outcome-defined neighbours for free:</b> two events are similar if they fall in the same GBM or quantile-forest leaves. This is "similar setups → similar outcomes" learned directly.</li>
+</ul>
+
+<h3>Information beyond the chart</h3>
+<ul>
+<li><b>Earnings dates are the biggest single addition, and they are free.</b>
+  <ul>
+  <li>US: SEC EDGAR 8-K Item 2.02 filings, from 2004, including delisted companies, with the acceptance time (so pre-market or after-close is known).</li>
+  <li>NSE: results broadcast timestamps from NSE and BSE filings.</li>
+  <li>EAR, the gap and volume can then be computed from existing OHLCV.</li>
+  <li>Caveat: US post-earnings drift has largely gone in non-microcaps since about 2006–2016. Test by era.</li>
+  </ul></li>
+<li><b>Group strength</b> can be built at near-zero cost once there is a sector map: SIC codes from EDGAR for the US, NSE industry codes plus the sector indices already in Azure for India.</li>
+<li><b>Later additions:</b> EPS and sales acceleration from XBRL (US from 2009 onward), NSE delivery % and bulk deals, and surveillance lists. Surveillance-list history is hard to rebuild, so start archiving it now.</li>
+<li><b>Deferred:</b> analyst revisions and short interest.</li>
+</ul>
+
+<h2>2. Design</h2>
+<h3>Setup events (causal, fixed before any outcome is computed)</h3>
+<div class="table-wrap"><table>
+<tr><th>Event</th><th>Definition at close t (entry at open t+1)</th></tr>
+<tr><td>GAP2S</td><td><code>(ln L<sub>t</sub> − ln H<sub>t−1</sub>)/σ<sub>252</sub> ≥ 2</code>, tiered 2–4σ and &gt;4σ</td></tr>
+<tr><td>BASE_BO</td><td>Close above the maximum high of the prior 20–60 sessions; base depth ≤ 35%; prior uptrend (close above a rising SMA50, or ≥ 30% gain over 63 days)</td></tr>
+<tr><td>BURST4</td><td><code>C/C<sub>−1</sub> ≥ 1.04</code>, volume above the previous day's, plus a volume/turnover floor</td></tr>
+<tr><td>NH52_CONS</td><td>Close at a 252-day high, with the previous 252-day high set at least 20 sessions earlier</td></tr>
+</table></div>
+<p class="small">VCP is a feature of BASE_BO, not a separate event. Each event type has a 20-session cooldown per stock. Overlapping events are tagged, not deduplicated away.</p>
+
+<h3>Outcome labels (fixes from P0–P2)</h3>
+<ul>
+<li><b>Fillability.</b> An NSE entry bar locked at the upper circuit cannot be filled. An exit on a lower-circuit-locked bar rolls to the next unlocked open. Every result reports both realistic R and filled-anyway R; the difference is the phantom share.</li>
+<li><b>Ordinal R-ladder</b> with the stop-out class split into a clean −1R stop and a gap-through loss. Realized R is never clipped at −1.</li>
+<li><b>Costs in R:</b> <code>cost_R = round-trip % ÷ (R/price)</code>, using spreads from Abdi–Ranaldo / Corwin–Schultz, with a floor of 5 bp (US) or 10 bp (NSE), plus a square-root impact term.</li>
+<li><b>Delistings:</b> an exit for poor performance gets −30%, with −55% as a stress test. An exit by merger closes at the last price.</li>
+<li><b>Universe:</b> price ≥ $2 (NASDAQ) or ≥ ₹20 (NSE), a minimum dollar volume floor, and at least 250 bars of history.</li>
+</ul>
+
+<h3>Controls and baselines (for every event)</h3>
+<ul>
+<li><b>C1, matched non-event:</b> same date, nearest match on size or ADV, ATR%, 120-day momentum and 20-day return, run through the same exit policy. This separates the value of the setup from the value of the exit policy.</li>
+<li><b>C2:</b> a random non-event date on the same stock.</li>
+<li><b>Base rate:</b> the ladder distribution for each event type and year.</li>
+<li><b>B1:</b> a GBM on about 10 obvious features. The main question is whether a candidate beats B1.</li>
+<li><b>B0:</b> random selection among the day's events, used in the portfolio simulation.</li>
+</ul>
+
+<h3>Candidates, cheapest first</h3>
+<div class="table-wrap"><table>
+<tr><th>ID</th><th>Candidate</th><th>Cost</th></tr>
+<tr><td>M1</td><td>Event-context features in the GBM: gap σ, volume ratio, catalyst flag, number of setups the same day, market state, recency of the prior high, information discreteness, and base depth/length/tightness in ATR</td><td>Hours</td></tr>
+<tr><td>A0</td><td>Analogues from GBM or quantile-forest leaves: the outcome distribution of past events that land in the same leaves</td><td>About free</td></tr>
+<tr><td>A1</td><td>kNN on standardised event features, weighted by importance, with hubness correction, excluding the same stock within ±60 bars and any event within ±5 days</td><td>Minutes</td></tr>
+<tr><td>M2</td><td>MiniRocket / MultiRocket+Hydra features of the event window scaled to base range, added to the GBM and also used as a retrieval space</td><td>Minutes to 1 hour</td></tr>
+<tr><td>M3</td><td>Earnings catalyst layer: the EDGAR 8-K date, EAR, the previous quarter's EAR and days to the next report; later NSE results dates</td><td>2–3 days of data work</td></tr>
+<tr><td>M4</td><td>A small CNN on event windows, only if M2 adds at least 0.01 AUC</td><td>Hours per fit</td></tr>
+</table></div>
+
+<h2>3. Evaluation protocol</h2>
+<ul>
+<li><b>Unit of inference: the weekly cohort, not the individual event.</b> Setups cluster heavily in the same week, so each week's mean paired difference is one observation. Use Newey–West with lag ≥ 4, or a stationary bootstrap by week. Report the design effect, which is how much the clustering inflates the variance.</li>
+<li><b>Primary metric</b>, for each event type × market: the incremental net expectancy of the top quintile under the candidate, minus the top quintile under B1, measured within each event-week.</li>
+<li><b>Secondary metrics:</b> ranked probability skill (RPSS) vs the base rate and vs B1, reliability/ECE, the within-event-day rank correlation, monotonic expectancy by decile, and the tail share of total R.</li>
+<li><b>Portfolio simulation (final gate):</b> each day, rank the fillable events, fill only free slots, risk 0.5–1% per 1R, cap position size by ADV, and don't carry unfilled signals forward. Run the identical simulation with the candidate ranking, the B1 ranking and random selection (B0).</li>
+<li><b>Power:</b> the standard deviation of R is about 1.3. With clustering and correction for multiple tests, detecting +0.2R needs about <b>3,400 events per arm per test</b>; +0.1R needs about 13,600. Event counts per type are measured first (E0). An underpowered test is dropped or pooled <em>before</em> looking at results.</li>
+<li><b>Multiple testing:</b> preregister the family (about 4 events × 2 markets × a few candidates). Use Romano–Wolf StepM or Holm correction across it, SPA for "does anything beat B1", DSR and PBO for portfolio Sharpe ratios, and t &gt; 3 for exploratory claims. The trial count comes from an automatic log.</li>
+</ul>
+<h3>Holdout</h3>
+<ul>
+<li><b>Development on NASDAQ; confirmation on NSE</b> (survivors only, circuit rules on).</li>
+<li><b>Primary vault: about 20% of NASDAQ tickers sealed by hash, across all years.</b> No event-conditioned work has touched them.</li>
+<li><b>Time vault: origins from 2025-09 onward</b> (NASDAQ to about 2026-02). NASDAQ 2023 to 2025-08 was seen in aggregate by WF-04 and P0/P1, so it is not treated as sealed time.</li>
+<li>Each vault is opened once per event type, with a frozen model and a preregistered test.</li>
+</ul>
+<h3>Gates (for each event type × market)</h3>
+<div class="table-wrap"><table>
+<tr><th>Gate</th><th>Pass if</th></tr>
+<tr><td>G0 Data</td><td>Look-ahead audit clean; circuit, delisting and cost handling verified; phantom share reported</td></tr>
+<tr><td>G1 Setup edge</td><td>Mean(R<sub>event</sub> − R<sub>C1</sub>) net of costs &gt; 0 with a calendar-time NW t &gt; 2. <em>Setup types that fail are dropped.</em></td></tr>
+<tr><td>G2 Candidate vs B1</td><td>Top-quintile Δ ≥ +0.1R, StepM-adjusted p &lt; 0.05</td></tr>
+<tr><td>G3 Probabilistic</td><td>RPSS &gt; 0 vs both the base rate and B1; ECE &lt; 0.03</td></tr>
+<tr><td>G4 Stability</td><td>Positive in ≥ 70% of years; no single year above 40% of total R; holds across size terciles and regimes</td></tr>
+<tr><td>G5 Portfolio</td><td>Beats the B1 ranking and the 95th percentile of random selection (B0); DSR &gt; 0.95; PBO &lt; 0.2</td></tr>
+<tr><td>G6 Capacity</td><td>Sharpe decays by &lt; 30% at 10×, 30× and 100× capital</td></tr>
+<tr><td>G7 Vault</td><td>G1, G2 and G5 keep the same sign, with at least 50% of the development effect</td></tr>
+</table></div>
+
+<h2>4. Phases and stop rules</h2>
+<ol class="phases">
+<li><b>E0 — Events and realistic labels (2–3 days).</b> Build the four detectors, fillable and gap-aware labels, costs, the delisting rule and the C1/C2 controls. Report event counts by type, year and market, and compare them with the power requirement. Report base rates, including the share of events reaching +2R before −1R, and the phantom share on NSE.</li>
+<li><b>E1 — Does any setup type have an edge? (1 day).</b> G1 against matched controls, on NASDAQ development data. <b>Stop rule:</b> if no setup type passes G1 net of costs, setups are not where the edge is. Record that and stop.</li>
+<li><b>E2 — Within-setup discrimination (2–3 days).</b> B1 vs M1, then A0/A1 analogues (neighbour IC vs a same-type, same-date-bucket null, CRPS/RPS, kNN vs the model head), then M2 MiniRocket. <b>Stop rule:</b> if nothing passes G2 for any setup type that survived E1, stop the chart-based track.</li>
+<li><b>E3 — Catalyst layer (3–4 days).</b> Add EDGAR 8-K earnings dates for NASDAQ, and test earnings setups against no-news setups (the Chan/Savor split). Add the NSE results dates after that.</li>
+<li><b>E4 — Portfolio simulation, capacity and vaults.</b> G5–G7 on NASDAQ, then NSE confirmation with circuit rules.</li>
+<li><b>E5 — Only if something passes:</b> a viewer showing, for a live setup, the predicted R-ladder, 10–20 outcome-aligned analogues (A0) with their charts and outcomes, and the caveats.</li>
+</ol>
+
+<div class="callout warn">
+<strong>Honest expectations</strong>
+<ul>
+<li>Every review points the same way: setup <em>shape</em> carries little. Event <em>context</em> carries some: gap size, volume, catalyst, same-day count and market state. So does <em>catalyst</em> information.</li>
+<li>The most likely positive result is a modest within-setup ranking (a few tenths of R per trade at the top quintile), concentrated in earnings setups and smaller liquid names.</li>
+<li>Analogues will most likely serve as explanation rather than as the ranking signal.</li>
+<li>The stop rules at E1 and E2 keep the cost of a negative answer to about a week.</li>
+</ul>
+</div>
+
+<h2>Key sources</h2>
+<ul class="small">
+<li>O'Neil Global Advisors: "Breakouts: Pump up the Volume" (2022); "Mind the Gap Size" (2021); "New Highs: Best Served Rare" (2020)</li>
+<li>Savor (2012) JFE; Chan (2003) JFE; Brandt, Kishore, Santa-Clara &amp; Venkatachalam (2008); Chan, Jegadeesh &amp; Lakonishok (1996) JF; Novy-Marx (2015); Martineau (2022) CFR; He &amp; Narayanamoorthy (2020) JAE</li>
+<li>Cooper, Gutierrez &amp; Hameed (2004) JF; Da, Gurun &amp; Warachka (2014) RFS; Bhootra &amp; Hur (2013) JBF; Gervais, Kaniel &amp; Mingelgrin (2001) JF; Seasholes &amp; Wu (2007) JEF; Lou, Polk &amp; Skouras (2019)</li>
+<li>Lo, Mamaysky &amp; Wang (2000) JF; Horton, Obled &amp; Jaboyedoff (2017) HESS; Delle Monache et al. (2013) MWR; Taillardat et al. (2019); Meinshausen (2006) QRF</li>
+<li>Dempster, Schmidt &amp; Webb (2021) MiniRocket; Middlehurst, Schäfer &amp; Bagnall (2024) "Bake off redux"; Guillaume et al. (2022) RDST; Jiang, Kelly &amp; Xiu (2023) JF</li>
+<li>Kolari &amp; Pynnönen (2010) RFS; Mitchell &amp; Stafford (2000); Petersen (2009); Politis &amp; Romano (1994); Romano &amp; Wolf (2005); Hansen (2005) SPA; Hansen, Lunde &amp; Nason (2011) MCS; Bailey &amp; López de Prado (2014) DSR; Bailey et al. (2017) PBO; Harvey, Liu &amp; Zhu (2016)</li>
+<li>Abdi &amp; Ranaldo (2017); Corwin &amp; Schultz (2012); Shumway (1997); Shumway &amp; Warther (1999)</li>
+<li>India: Raju (SSRN 4587697); Sehgal &amp; Bijoy (2015); Chaturvedula et al. (2015) EMR; Chari &amp; Inamdar (2024) on ASM; Nath (2003) price limits</li>
+<li>Data: SEC EDGAR submissions/8-K Item 2.02, XBRL companyfacts, Form 4; NSE/BSE corporate filings; NSE full bhavcopy (delivery); NSE bulk/block archives</li>
+</ul>
+</main>
+</body>
+</html>
