@@ -170,7 +170,12 @@ def main(argv=None) -> int:
     parser.add_argument("--config", default="config/datasets.example.yaml")
     parser.add_argument("--max-rows", type=int, default=1_000_000)
     parser.add_argument("--feature-set", choices=FEATURE_SETS, default="baseline")
+    parser.add_argument("--open-vault", action="store_true",
+                        help="one-time check: score only entries on or after the vault start "
+                             "with a single model trained on outcomes completed before it")
     args = parser.parse_args(argv)
+    if args.open_vault:
+        return open_vault(args)
     columns = feature_columns(args.feature_set)
     with_p1 = args.feature_set != "baseline"
     output = OUTPUT if not with_p1 else OUTPUT.with_name(f"gonogo_{args.feature_set}")
@@ -229,6 +234,53 @@ def main(argv=None) -> int:
     scored.to_parquet(output / "scored_entries.parquet")
     (output / "report.json").write_text(json.dumps(result, indent=2, default=str) + "\n")
     print(json.dumps(result, indent=2, default=str))
+    return 0
+
+
+def open_vault(args) -> int:
+    columns = feature_columns(args.feature_set)
+    with_p1 = args.feature_set != "baseline"
+    entries = load_entries()
+    feats = entry_features(entries, str(Path(args.config).resolve()), with_p1)
+    if with_p1:
+        breadth = pd.read_parquet(ROOT / "nse" / "breadth.parquet")
+        feats = feats.merge(breadth.rename(columns={"date": "signal_date"}), on="signal_date",
+                            how="left").set_index(feats.index)
+    entries = entries.join(feats, how="inner")
+    entries = entries.loc[entries["signal_date"] >= VAULT_START]
+    store = pd.read_parquet(ROOT / "nse" / "store.parquet")
+    store = clean_store(store.loc[(store["y20"] >= 0) & (store["completion"] < VAULT_START)])
+    if with_p1:
+        store = store.merge(pd.read_parquet(ROOT / "nse" / "p1_features.parquet"),
+                            on=["symbol", "date"], how="left")
+    train = store.iloc[np.sort(np.random.default_rng(7).choice(
+        len(store), min(args.max_rows, len(store)), replace=False))]
+    probs, er = fit_predict(train, entries, columns, "y20")
+    entries = entries.assign(er=er)
+    locked = entries["entry_bar_locked"].astype(bool)
+    fill = entries.loc[~locked].copy()
+    fill["kept"] = fill["er"].rank(pct=True) > SKIP_FRACTION
+    def stats(frame):
+        return {"n": int(len(frame)), "mean_ret_pct": float(100 * frame["ret"].mean()),
+                "median_ret_pct": float(100 * frame["ret"].median()),
+                "win_rate": float((frame["ret"] > 0).mean())}
+    result = {"feature_set": args.feature_set, "vault_start": str(VAULT_START.date()),
+              "signal_dates": [str(entries["signal_date"].min().date()),
+                               str(entries["signal_date"].max().date())],
+              "locked_excluded": int(locked.sum()),
+              "all_fillable": stats(fill), "kept": stats(fill.loc[fill["kept"]]),
+              "skipped": stats(fill.loc[~fill["kept"]]),
+              "ic_spearman": float(fill["er"].rank().corr(fill["ret"].rank())),
+              "by_strategy": {k: {"n": int(len(g)),
+                                  "kept_minus_all_pct": float(100 * (g.loc[g["kept"], "ret"].mean()
+                                                                     - g["ret"].mean()))}
+                              for k, g in fill.groupby("strategy")}}
+    result["kept_minus_all_pct"] = result["kept"]["mean_ret_pct"] - result["all_fillable"]["mean_ret_pct"]
+    out = ROOT / "nse" / f"vault_{args.feature_set}"
+    out.mkdir(parents=True, exist_ok=True)
+    fill.to_parquet(out / "scored_entries.parquet")
+    (out / "report.json").write_text(json.dumps(result, indent=2) + "\n")
+    print(json.dumps(result, indent=2))
     return 0
 
 
