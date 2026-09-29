@@ -202,3 +202,7 @@ pool 175. All 24 independent Gate 12 full-universe authorities and both market
 aggregates now pass, providing frozen exact reference rankings. Production recall
 against those references has not yet been measured, so the persisted exact-safe
 backend remains opt-in. This is completeness evidence, not outcome or profitability evidence.
+
+## License
+
+MIT; see [LICENSE](LICENSE). Nothing here is investment advice or a trading signal.
