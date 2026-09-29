@@ -21,6 +21,12 @@
   <nav><a href="#status">Current status</a><a href="#decisions">Decision register</a><a href="#entries">Chronology</a><a href="#reproduce">Reproduction</a></nav>
 </header>
 
+<section id="closure" class="entry">
+  <h2>Project closed — 29 September 2026</h2>
+  <p class="fail">Outcome: FAILED as a predictive trading tool. The status table below (11 September) describes engineering gates that passed; it does not describe predictive value, which never materialised. See L-326 for the full end-to-end account.</p>
+  <p>All derived data under <code>config/data/analogues</code> (about 38 GB) was deleted on 29 September 2026 at the owner's request. Every sealed receipt and digest in this log therefore refers to files that no longer exist. Code, plans and results write-ups remain in Git.</p>
+</section>
+
 <section id="status">
   <h2>Current status — 11 September 2026</h2>
   <table>
@@ -2636,6 +2642,118 @@
   <p class="pass"><b>Exact result:</b> all 3,270 queries and 6,540 views match, including the six sparse abstention panels. Twelve workers sealed 128 independent verification receipts in 432.83 wall seconds and 4,912.04 child CPU seconds. Parent peak RSS was 1,226,664 KiB; all twelve worker PIDs participated. Receipt <code>990f0540…f678</code>; file SHA-256 <code>40fcae2e…ed7c</code>.</p>
   <p><b>Meaning:</b> the system now reliably answers the structural part of the goal: for each current query, its fixed historical analogues can be separated into repeatable observed future-path families or explicitly shown as one family/insufficient evidence. It does not yet prove those families predict the live stock or yield profitable trades; M2 prospective evaluation remains the predictive gate.</p>
   <p class="warn"><b>Next:</b> R2-06 must render version-pinned JSON/HTML evidence panels from only this verified seal: every raw/primary/excluded/censored member, actual medoids, assignments, path envelopes and outcome summaries, stability/fit diagnostics, disagreement banners and the claim boundary. Parser, manifest and traceability tests must pass before R2 is called complete.</p>
+</section>
+<section class="entry" id="l-324">
+  <h2>L-324 — Decision checkpoint: chart similarity adds nothing over simple features</h2>
+  <p><b>Why:</b> before spending more time, ask whether the chart retriever is where any forecast skill comes from. The kill tests live in <code>experiments/decision/</code>; the local results are in <code>LOCAL_RUN_RESULTS.md</code>.</p>
+  <p class="warn"><b>Result:</b></p>
+  <ul>
+    <li>Versus the no-chart mixture, the chart parts added +0.84 Brier-skill points (90% CI +0.13 to +1.57).</li>
+    <li>Versus a 22-feature GBM, they added only +0.15 (CI −0.09 to +0.40). That fails the preset 0.5 bar, and the full retriever received 0% weight.</li>
+    <li>M2 would need about 99 months to confirm the effect.</li>
+    <li>Survivorship: 6.9% yearly attrition, so the files are not a survivor snapshot, but delisting returns are missing.</li>
+    <li>Fixed along the way: the survivorship audit took its snapshot end from the benchmark calendar.</li>
+  </ul>
+</section>
+<section class="entry" id="l-325">
+  <h2>L-325 — Pattern-encoding track P0–P2: stopped; momentum test bed is phantom under circuit realism</h2>
+  <p><b>Plan:</b> <code>docs/plans/2026-09-26-pattern-research-plan-v2.html</code>, with the review amendments. This track was exploratory research for personal trading, run with pass rules fixed before each result. It did not follow the sealed M-gate process.</p>
+  <p><b>P0:</b></p>
+  <ul>
+    <li>A stop-aware ordinal R-ladder label store: NASDAQ 3.58M rows, NSE 1.12M rows (NSE is survivors only).</li>
+    <li>A walk-forward cumulative-head evaluator.</li>
+    <li>A go/no-go that scores existing loser strategy entries.</li>
+  </ul>
+  <p>Bugs found and fixed:</p>
+  <ul>
+    <li>Flat (circuit) bars made features NaN, which silently dropped 58% of NSE entries, and the best ones.</li>
+    <li>Near-zero ATR rows produced realized R near −7e8.</li>
+  </ul>
+  <p>The baseline entry gate then failed narrowly (CI −0.15 to +1.48%).</p>
+  <p><b>P1:</b></p>
+  <ul>
+    <li>E1 anchored/event features plus E2 online ZigZag swing legs passed the preregistered trade-level gate: +1.11%, CI +0.32 to +1.97.</li>
+    <li>E1 drove the pass; E2 alone failed.</li>
+    <li>Paired against the baseline, the improvement was not significant (CI −0.27 to +1.33).</li>
+    <li>On NASDAQ, ΔRankIC was +0.006 (t 4–5), which is economically nil.</li>
+  </ul>
+  <p class="warn"><b>P2:</b></p>
+  <ul>
+    <li>Vault, opened once (112 fillable entries): E1+E2 −0.09%, baseline +0.70%.</li>
+    <li>Loser-engine portfolio backtests with circuit-lock realism on changed the picture. Momentum S-2 fell from 81.4% CAGR / 11% DD to −5.3% / 64%. BestV2 fell from 78.5% / 18.7% to −4.9% / 68%.</li>
+    <li>Causal score filters cannot rescue either strategy, and E1+E2 is worse than the baseline filter.</li>
+    <li>The trade-level P0/P1 results are superseded, because they used circuit-off trades.</li>
+  </ul>
+  <p class="warn"><b>Gen books (live) under the same realism:</b> they survive but roughly halve. CAGR drops from 64–75% to 30–42%, and Calmar from 1.8–2.8 to 0.67–1.31. gen498 is the weakest. See P2_RESULTS §4.</p>
+  <p><b>Decision:</b></p>
+  <ul>
+    <li>Stop the predictive pattern track. E3 (chart CNN) and S-track retrieval are not pursued.</li>
+    <li>The harness (<code>experiments/p0</code>) remains available to test any future signal.</li>
+    <li>R2 remains a descriptive viewer.</li>
+  </ul>
+  <p>Details: <code>experiments/p0/P0_RESULTS.md</code>, <code>experiments/p1/P1_RESULTS.md</code>, <code>experiments/p2/P2_RESULTS.md</code>.</p>
+</section>
+<section class="entry" id="l-326">
+  <h2>L-326 — Closure: what we tried end to end, and how it failed</h2>
+  <p><b>Goal (August 2026):</b> find historical stock episodes whose charts developed like today's, and use what happened next to them to make better swing-trading decisions on NASDAQ and NSE.</p>
+
+  <p><b>What was built (19 August – 11 September):</b></p>
+  <ul>
+    <li>A causal, multi-view 252-session chart representation.</li>
+    <li>Certified exact full-universe retrieval (Gate 12, M04R), with a composite and DTW distance.</li>
+    <li>Outcome stores, evidence cards, fixed-neighbour future modes (R2), and a prospective listener (M2).</li>
+    <li>About 1,800 tests and hundreds of sealed, independently verified receipts, across roughly 500 commits.</li>
+  </ul>
+  <p>The engineering was sound. The retrieval returned exactly what it was designed to return.</p>
+
+  <p class="fail"><b>How it failed</b></p>
+  <ol>
+    <li><b>The analogues did not predict.</b>
+      <ul>
+        <li>WF-04 walk-forward: composite Brier skill was −3.46% against a plain base rate on the untouched final block (L-247, 9 September).</li>
+        <li>Decision checkpoint (L-324): the chart retriever alone scored −2.4 skill points. A GBM on 22 simple price and volume features scored +3.4. Adding the retriever to the GBM gained +0.15, which is not significant, and the full retriever received 0% weight.</li>
+      </ul></li>
+    <li><b>Better encodings did not fix it</b> (L-325, <code>experiments/p0–p2</code>).
+      <ul>
+        <li>A stop-aware R-ladder target helped the framing but not the result.</li>
+        <li>Anchored/event features (E1) carried a small real ranking signal on NASDAQ (ΔRankIC +0.006), which is economically nil.</li>
+        <li>The swing-leg "VCP grammar" encoding (E2) added nothing.</li>
+        <li>A trade-level gate passed on existing strategy entries, but it was not significantly better than the simple baseline. The one-time vault (112 trades) did not confirm it.</li>
+      </ul></li>
+    <li><b>The test bed itself was phantom.</b>
+      <ul>
+        <li>With realistic NSE circuit-lock fills, every row of the loser leaderboard used for evaluation collapsed. Momentum strategies fell from about 80% CAGR to about −5% with 64–68% drawdowns.</li>
+        <li>A stricter lock rule gave the same answer.</li>
+        <li>Score filters could not rescue any of them.</li>
+        <li>The trade-level passes above had been measured on those phantom trades.</li>
+      </ul></li>
+    <li><b>Several intermediate "passes" were wrong</b> and were caught only on re-examination:
+      <ul>
+        <li>A NaN bug silently dropped 58% of NSE entries, and they were the best ones.</li>
+        <li>Near-zero-ATR rows produced realized R near −7e8.</li>
+        <li>A survivorship audit used the wrong snapshot end.</li>
+        <li>Momentum trades that entered on locked bars averaged +28% and were not fillable.</li>
+      </ul>
+      Each first result looked encouraging until it was checked. This is the main process failure.</li>
+  </ol>
+
+  <p><b>What was learned</b></p>
+  <ul>
+    <li><b>Similarity in chart shape does not mean similarity in outcome.</b> Unsupervised whole-chart matching is the approach the literature also finds fails (PIP+DTW failed on 18 of 18 indices). The usable information is local, anchored and event-driven, and it is small.</li>
+    <li><b>Simple features first.</b> Any new representation must beat a plain GBM before it is worth building infrastructure around it. Rigour spent on verifying retrieval did not substitute for an early test of predictive value.</li>
+    <li><b>On NSE, backtests must model circuit locks</b> (<code>skip_circuit_locked</code> and <code>defer_circuit_lock_exit</code>). Otherwise most apparent edge is phantom.</li>
+    <li><b>Distrust a first pass.</b> Check the dropped rows, extreme values, and fillability before believing a positive result.</li>
+  </ul>
+
+  <p><b>Not attempted:</b> the setup-conditioned analogue plan with earnings dates (<code>docs/plans/2026-09-27-setup-analogue-plan-v3.html</code>). It remains a written idea only; the research behind it suggests the gains would be modest.</p>
+
+  <p><b>Final state:</b></p>
+  <ul>
+    <li>Predictive and trading claims: none.</li>
+    <li>All derived artifacts were deleted on 29 September 2026 (about 38 GB). Sealed receipts are no longer verifiable, and the R2 viewer has no data.</li>
+    <li>Code, plans and results are in Git: GitHub <code>gokuui/market-analogues</code>, PR #1.</li>
+    <li><b>Project closed.</b></li>
+  </ul>
 </section>
 </main>
 

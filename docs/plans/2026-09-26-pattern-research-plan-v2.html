@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pattern Research Plan v2</title>
+<style>
+:root{--bg:#fbfaf7;--fg:#1d1d1b;--muted:#5c5a55;--line:#e3e0d8;--card:#ffffff;--accent:#2f5d8a;--good:#2e7d4f;--warn:#a86412;--bad:#a33a3a;--code:#f2efe8}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#171716;--fg:#e9e7e2;--muted:#a09d96;--line:#33322f;--card:#1f1f1d;--accent:#7fb0e0;--good:#6cc08f;--warn:#e0a458;--bad:#e07a7a;--code:#262624}}
+:root[data-theme="dark"]{--bg:#171716;--fg:#e9e7e2;--muted:#a09d96;--line:#33322f;--card:#1f1f1d;--accent:#7fb0e0;--good:#6cc08f;--warn:#e0a458;--bad:#e07a7a;--code:#262624}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:940px;margin:0 auto;padding:32px 16px 80px}
+h1{font-size:1.9rem;margin:0 0 4px;line-height:1.2}
+h2{font-size:1.3rem;margin:44px 0 10px;padding-top:12px;border-top:1px solid var(--line)}
+h3{font-size:1.05rem;margin:22px 0 6px}
+p,li{max-width:76ch}
+.sub{color:var(--muted);margin:0 0 20px}
+.callout{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--accent);padding:14px 16px;border-radius:6px;margin:16px 0}
+.callout.warn{border-left-color:var(--warn)}
+.table-wrap{overflow-x:auto;margin:12px 0}
+table{border-collapse:collapse;width:100%;font-size:.92rem;background:var(--card)}
+th,td{border:1px solid var(--line);padding:7px 9px;text-align:left;vertical-align:top}
+th{background:var(--code)}
+code{background:var(--code);padding:1px 5px;border-radius:4px;font-size:.88em}
+pre{background:var(--code);padding:12px;border-radius:6px;overflow-x:auto;font-size:.85rem;line-height:1.45}
+.tag{display:inline-block;font-size:.78rem;padding:1px 7px;border-radius:10px;border:1px solid currentColor;white-space:nowrap}
+.hi{color:var(--good)}.mid{color:var(--warn)}.lo{color:var(--bad)}
+ol.phases>li{margin-bottom:12px}
+.small{font-size:.88rem;color:var(--muted)}
+</style>
+</head>
+<body>
+<main>
+<h1>Pattern research plan v2: outputs, encodings, similarity and evaluation</h1>
+<p class="sub">market-analogues · 2026-09-26 · Supersedes <code>2026-09-26-pattern-encoding-research-plan.html</code> (kept for history). Based on six literature reviews (Paper Lantern, Exa, MarketMaker) and the Step 1–3 decision results in <code>experiments/decision/LOCAL_RUN_RESULTS.md</code>.</p>
+
+<div class="callout">
+<strong>Owner's principle:</strong> <em>"If two patterns are similar, their outcomes should be similar."</em> This plan applies it literally:
+<ol>
+<li>Define the outcome properly, as a trader-relevant ordered category.</li>
+<li>Learn representations and similarity that <em>predict</em> that category.</li>
+<li>Score every candidate on one fast, honest leaderboard.</li>
+</ol>
+</div>
+
+<div class="callout warn">
+<strong>Amendments from review (2026-09-26). These override the sections below.</strong>
+<ol>
+<li><strong>Vault.</strong> WF-04's final block already opened NASDAQ cutoffs 2024-01-31 → 2025-08-29 (verified from the query registry). M1 weight selection and the Step 1 run then used that block. So:
+  <ul>
+  <li>The vault is now <strong>cutoffs ≥ 2025-09-01</strong>: NASDAQ to about 2026-02 (data ends 2026-03-30), NSE to about 2026-01 (data ends 2026-02-11).</li>
+  <li>NASDAQ 2024-01 → 2025-08 is reported separately as <em>previously opened</em>. It is never treated as independent confirmation.</li>
+  <li>NSE was not used by WF-04, but the loser strategies were tuned on NSE data. That makes any NSE strategy-entry result optimistic.</li>
+  </ul></li>
+<li><strong>Delisting.</strong> The survivorship audit found that ended names had a <em>higher</em> median final 60-day return than survivors (+1.4% vs −7.3%): many exits are acquisitions. So:
+  <ul>
+  <li>The penalty applies only to <em>likely failures</em>: last close &lt; $1 (NSE: ₹5), or last close &lt; 50% of the 60-session high.</li>
+  <li>Other ended names are censored.</li>
+  <li>Every result is reported both with and without the penalty.</li>
+  </ul></li>
+<li><strong>First go/no-go on the trader's own setups, right after P0.</strong> Score the entries of the existing loser strategies (gen498, gen182/191, VCP+RS) with the baseline GBM, on liquid stocks, before any E1–E3 or S work. Those strategies were built on this data, so an improvement there is optimistic.</li>
+<li><strong>Similarity is off the critical path.</strong>
+  <ul>
+  <li>S1 and S2 run only as diagnostics or viewer explanations, after some forecaster passes.</li>
+  <li>S3 and S4 run only if P2 shows query-specific signal.</li>
+  <li>A GBM already implements "similar inputs → similar outcomes".</li>
+  </ul></li>
+<li><strong>Decision metric.</strong> After-cost expectancy (in R) of each day's top picks among <em>liquid</em> stocks. t-statistics are supporting evidence only.</li>
+<li><strong>Expectations.</strong>
+  <ul>
+  <li>The old label was already volatility-scaled (+2 ATR vs −1 ATR), so P(≥2R) will look like the old "favorable first", and the baseline should look similar.</li>
+  <li>Any real gain must come from new inputs (E1–E3) or from conditioning on the trader's setups.</li>
+  <li>Timeline: P0 plus the strategy-entry test is about 4–5 days. That is the only commitment now.</li>
+  </ul></li>
+</ol>
+</div>
+
+<h2>0. Why the first system failed</h2>
+<div class="table-wrap"><table>
+<tr><th>Design choice</th><th>Problem</th><th>v2 fix</th></tr>
+<tr><td>Similarity defined by how charts <em>look</em> (hand-designed multi-view + DTW)</td><td>Nothing tied "similar" to "similar outcome". The closest published system (PIP + DTW, Tsinaslanidis &amp; Kugiumtzis 2014) failed on 18 of 18 indices</td><td>Similarity <strong>learned from outcomes</strong> (§4)</td></tr>
+<tr><td>Whole 252-session window</td><td>Dominated by the overall trend, which simple features already capture</td><td>Local 5–60-bar windows aligned on the event, plus swing-leg sequences (§3)</td></tr>
+<tr><td>3-class barrier label (loss-first 63%)</td><td>Discarded how far winners ran and was not tied to a trader's stop size</td><td>Ordinal <strong>R-ladder</strong> label (§1)</td></tr>
+<tr><td>Brier score on about 1,700 queries</td><td>Low statistical power: 99 months to confirm live</td><td>All stocks × all sampled dates, paired against the baseline each day (§5)</td></tr>
+<tr><td>Raw average of top 20 neighbours</td><td>Noisy and uncalibrated. "Hub" episodes were reused everywhere</td><td>Shrinkage, hub control and a candidate-prior test (§4)</td></tr>
+</table></div>
+
+<h2>1. Output representation: what we predict</h2>
+<h3>Why not raw % buckets</h3>
+<p>The proposal to predict ranges like 0–5%, 5–10% and 10–20% within a time window has the right structure: ordered categories with a fixed horizon. Raw percentages mix very different stocks, though. +10% is about 1× daily range for an 8%-ADR biotech and about 7× for a 1.2%-ADR utility. A pooled model would mostly learn "volatile stocks land in big buckets", which is a volatility forecast, not a pattern. Volatility-normalised targets are standard for this reason:</p>
+<ul>
+<li>Lim, Zohren &amp; Roberts 2019.</li>
+<li>Barunik, Hronec &amp; Tobek 2024: predict standardised returns first, then map back.</li>
+</ul>
+<p>The buckets also need to respect the <strong>stop</strong>. A stock that drops 1.5R and then recovers to +10% is a loss for a trader with a stop. Close-to-close buckets would call it a win.</p>
+
+<h3>Primary target: Y20, the R-ladder (reach before the stop)</h3>
+<p>Entry is the next open. The unit of risk is <code>R = 1.25 × ADR20</code>, measured before entry. For detected setups (VCP or base breakout), R is the structural stop distance, capped at 1.5 × ADR. The path is scanned for up to 20 sessions.</p>
+<div class="table-wrap"><table>
+<tr><th>Class</th><th>Meaning</th><th>Expected base rate (to verify)</th></tr>
+<tr><td>C0</td><td>Stop hit before reaching +1R</td><td>~50–60%</td></tr>
+<tr><td>C1</td><td>Neither by day 20 (time exit)</td><td>~5–10%</td></tr>
+<tr><td>C2</td><td>Reached +1R, not +2R</td><td rowspan="3">remainder</td></tr>
+<tr><td>C3</td><td>Reached +2R, not +3R</td></tr>
+<tr><td>C4</td><td>Reached +3R, not +5R</td></tr>
+<tr><td>C5</td><td>Reached +5R or more (big winner)</td><td>~2–4%</td></tr>
+</table></div>
+<p class="small">Rules: if one bar touches both the stop and a target, the stop counts first (conservative). A gap through the stop records the actual loss. A bucket below about 2% frequency is merged into its neighbour. For display, R converts back to % as <code>R × stop%</code>, so "C4 on this stock = +18% to +30%".</p>
+
+<p><strong>Why this shape works:</strong></p>
+<ul>
+<li><strong>Cumulative form.</strong> P(≥C2), P(≥C3), P(≥C4) and P(C5) are the questions a stop-based trader asks: "chance of +1R, +2R, +3R, +5R before the stop."</li>
+<li><strong>Balanced heads.</strong> The cumulative heads split one rare "winner" class into nested events of roughly 40%, 20%, 10% and 3%. Each is learnable.</li>
+<li><strong>Retrieval compatible.</strong> The neighbours' outcomes form a histogram over the same buckets, so analogues and models are scored on the same scale.</li>
+<li><strong>Precise meaning of "similar outcome".</strong> Similarity between two outcome distributions is the distance between their cumulative curves (Earth-Mover distance), which is what the scoring rule (RPS) measures.</li>
+</ul>
+
+<h3>Secondary targets</h3>
+<ol>
+<li><strong>Realised R under the trading rule</strong> (meta-label): sell ⅓ at 2R, move the stop to breakeven, trail the rest on the 10/20-day MA. This gives expected R directly, and it is the number that decides whether to take a trade (López de Prado; Joubert 2022; Meyer et al. 2023).</li>
+<li><strong>Volatility-normalised, market-excess return over 5 and 20 days, ranked within each date.</strong> The most sensitive "is there any signal at all?" detector. Chart signals are strongest at 1–5 days (Jiang–Kelly–Xiu).</li>
+<li><strong>The (MFE<sub>R</sub>, MAE<sub>R</sub>) pair</strong> (maximum move up and down, in R): used to tune stop placement, because the MAE of eventual winners shows where the stop should sit.</li>
+<li><strong>Auxiliary horizons</strong> 5, 10 and 40 for Y (one model per horizon; check that they agree).</li>
+</ol>
+<p>The outcome code already computes MFE/MAE in % and ATR units and time-to-MFE/MAE for horizons 5–126 (<code>src/market_analogues/causal_outcomes.py</code>). The new label store extends it rather than replacing it.</p>
+
+<h2>2. System architecture</h2>
+<pre>
+ OHLCV (NASDAQ 12k, NSE 1.8k; causal, point-in-time; delisted names kept)
+   │
+   ├─► Label store  (Y20 R-ladder, realised-R, excess-return ranks, MFE/MAE; frozen, hashed)
+   │
+   ├─► Representations
+   │     E0  22 baseline features (existing)
+   │     E1  anchored and event features
+   │     E2  swing-leg "string" of the last base
+   │     E3  supervised 1D CNN on range-scaled 20/60-bar windows  (→ probabilities + 64-d embedding)
+   │
+   ├─► Forecaster: LightGBM cumulative-ordinal heads on [E0 + E1 + E2 + E3 outputs]
+   │
+   └─► Analogue retrieval (explanation + possible blend)
+         S1  learned weights on existing distance views (MLKR + RPS)
+         S2  GBM leaf-proximity neighbours
+         S3  learned reranker over the top-200 candidates
+         S4  outcome-aligned contrastive encoder (gated)
+         → neighbour outcome histogram (shrunk) → blend λ·kNN + (1−λ)·forecaster
+</pre>
+
+<h2>3. Representations</h2>
+<h3>E1: anchored and event features <span class="tag hi">strong evidence</span></h3>
+<p>Some are already in the 22 baseline features: <code>dist_high_252</code>, <code>close_location_20</code> and <code>range_contraction_10_63</code>. New ones:</p>
+<ul>
+<li><strong>Trend clarity:</strong> R² of the log-price fit over 63 and 252 days, and information discreteness <code>sign(R252)·(%down−%up)</code>. Momentum is 5.67% vs 2.53% in the clearest quintile (t = 8.1).</li>
+<li><strong>Close position in the range</strong> for 5 and 60 bars, in addition to the existing 20.</li>
+<li><strong>Last gap in σ units</strong> <code>ln(L<sub>t</sub>/H<sub>t−1</sub>)/σ<sub>252</sub></code>, plus days since the last gap above 2σ. O'Neil, 104k gaps: above 4σ gives +2.19% over 50 days.</li>
+<li><strong>Breakout-day volume</strong> <code>vol/SMA50−1</code> on a pivot break, days since the last 4% burst, and breakout ordinal (1st vs 4th base).</li>
+<li><strong>Context:</strong> market breadth (% of stocks above the 50-day MA), relative-strength rank of the sector, and Weinstein stage bucket.</li>
+</ul>
+<h3>E2: the "string" of the base, as swing legs <span class="tag mid">untested; cheap</span></h3>
+<p>Run a ZigZag at 1.5×ATR over the last 60–120 bars. Encode the last 3–5 legs as tuples:</p>
+<ul>
+<li>depth/ATR, duration, volume ratio versus the 50-day average, slope;</li>
+<li>contraction count and the T<sub>k+1</sub>/T<sub>k</sub> ratios;</li>
+<li>final contraction depth in ADR units;</li>
+<li>distance to the pivot (high of the last contraction).</li>
+</ul>
+<p>This is the practitioners' VCP grammar written as a sequence. Step 1: add the tuples as GBM columns. Step 2, only if step 1 adds signal: sequence distance over legs (DTW or edit distance) inside S1.</p>
+<h3>E3: supervised chart model <span class="tag hi">strongest academic evidence</span></h3>
+<ul>
+<li><strong>Architecture:</strong> a small 1D CNN, about 50k parameters, CPU PyTorch. PyTorch needs to be installed; there is no GPU.</li>
+<li><strong>Input:</strong> 20-bar and 60-bar windows of OHLC + 20-day MA, scaled to the window's own max-high/min-low, with volume scaled to the window maximum. The Jiang–Kelly–Xiu ablation shows this scaling is the key ingredient. Returns-scaled or z-scored inputs did worse.</li>
+<li><strong>Training:</strong> on the Y20 heads (CORN ordinal loss) and the 5-day excess-rank target, walk-forward.</li>
+<li><strong>Outputs:</strong> out-of-fold class probabilities go into the GBM, and the penultimate 64-d layer becomes the S4 embedding.</li>
+<li><strong>Variant E3r:</strong> the same model on the residual path (stock − β×benchmark), following Guijarro-Ordonez, Pelger &amp; Zanotti.</li>
+<li><strong>Markets:</strong> train NASDAQ and NSE separately. US→China transfer failed in a replication.</li>
+</ul>
+<h3>Not planned <span class="tag lo">no evidence</span></h3>
+<p>SAX/ABBA symbol strings, matrix-profile motifs, candlestick tokens, LLMs and whole-window 252-day DTW. Off-the-shelf foundation models (Kronos, Chronos, TimesFM) are optional at the end, marked leak-exposed. The independent evaluations of them are negative.</p>
+
+<h2>4. Outcome-aligned similarity: making analogues respect the principle</h2>
+<div class="callout warn">
+<strong>Two warnings from the research:</strong>
+<ol>
+<li>Choi &amp; Cho 2026 found that in financial data, a query-independent <em>candidate prior</em> (some episodes are useful for everyone) beat pattern similarity by about 2×. Training on <em>shuffled</em> futures worked as well as training on real ones. The "hubs" seen in R1 may be real structure, not a bug. So every similarity method is tested against a <strong>shuffled-future control</strong> and a <strong>candidate-prior baseline</strong>.</li>
+<li>Even learned retrieval trailed the best direct forecaster by 2–2.5% on S&amp;P 500. Plan for retrieval as <strong>explanation plus a possible blend</strong>, not as a replacement for the forecaster.</li>
+</ol>
+</div>
+<div class="table-wrap"><table>
+<tr><th>ID</th><th>Method</th><th>How it learns "similar = similar outcome"</th><th>Cost</th></tr>
+<tr><td>S1</td><td>Learned weights on existing views (MLKR/NCA style)</td><td><code>d = Σ w<sub>v</sub>·d<sub>v</sub></code>; neighbour weights <code>softmax(−d/τ)</code> over the current top-200; minimise the RPS of the neighbour histogram against the realised Y20. Views that get weight 0 are diagnostic in themselves</td><td>1–2 days</td></tr>
+<tr><td>S2</td><td>GBM leaf proximity</td><td>Neighbours = windows landing in the same leaves of the forecaster's trees (Breiman / RF-GAP). SVD of one-hot leaves → 64-d → FAISS</td><td>2–3 days</td></tr>
+<tr><td>S3</td><td>Learned reranker (Choi &amp; Cho)</td><td>MLP on [pattern score, z<sub>q</sub>, z<sub>c</sub>, z<sub>q</sub>−z<sub>c</sub>]; listwise softmax toward candidates with small outcome EMD</td><td>~1 week</td></tr>
+<tr><td>S4</td><td>Contrastive encoder (FASCL loss form)</td><td><code>KL(softmax(−EMD(y<sub>i</sub>,y<sub>j</sub>)/τ<sub>t</sub>) ‖ softmax(cos(z<sub>i</sub>,z<sub>j</sub>)/τ))</code>, batches sampled across dates, B ≥ 2048, τ ≈ 0.01–0.05. <strong>Gated:</strong> run only if S3's shuffled-future control shows query-specific signal</td><td>2–4 weeks on CPU</td></tr>
+</table></div>
+<p><strong>Label-noise rules</strong> (individual outcomes are about 95% noise):</p>
+<ul>
+<li>Never train on single pairs. Always use losses averaged over many neighbours.</li>
+<li>Optionally distil: use the GBM's out-of-fold predicted distribution as a denoised target.</li>
+</ul>
+<p><strong>Retrieval mechanics:</strong></p>
+<ul>
+<li>Windows every 5 sessions (about 10M vectors). 64-d vectors in FAISS: HNSW takes about 15 GB; IVF+SQ8 takes 1–3 GB.</li>
+<li>IDs are sorted by date, so "outcome known before the query date" is an <code>IDSelector</code> range.</li>
+<li>At most one neighbour per stock per 20-day block. The same stock is excluded, with an embargo.</li>
+<li>Hub control (CSLS or local scaling) is applied only <em>after</em> the candidate-prior test.</li>
+<li>The neighbour histogram is shrunk toward the date's base rate with a Dirichlet prior. Use fewer neighbours for tail buckets (the weather analog-ensemble practice: Delle Monache et al. 2013).</li>
+</ul>
+
+<h2>5. Evaluation: one leaderboard, fixed rules</h2>
+<h3>Protocol</h3>
+<ul>
+<li>Expanding walk-forward with yearly refits, test years 2006–2023. Purge and embargo of 25 sessions. Every learned component (encoder, weights, reranker) is trained only on data before each fold's cutoff.</li>
+<li><strong>Vault:</strong> 2024-01 to the end of the data (NASDAQ 2026-03-30, NSE 2026-02-11). Opened once, for the 3–5 finalists, after the leaderboard is frozen.</li>
+<li>Sample one date every 5 sessions, all eligible stocks on each date. Point-in-time price and liquidity floors. Missing delisting returns substituted (−30% NYSE/AMEX, −55% NASDAQ, −50% NSE). NSE upper-circuit-locked bars are not fillable.</li>
+<li>Develop on NASDAQ and confirm on NSE, with models trained separately.</li>
+</ul>
+<h3>Scores (each compares a candidate with the baseline on the same date, then tests the time series)</h3>
+<div class="table-wrap"><table>
+<tr><th>Role</th><th>Metric</th><th>Why</th></tr>
+<tr><td><strong>Primary (probabilistic)</strong></td><td>Daily ΔRPS skill on Y20 against the baseline GBM; Newey–West t-statistic</td><td>Proper ordinal score over all thresholds; more powerful than Brier on one class (Galdran 2023)</td></tr>
+<tr><td><strong>Primary (ranking)</strong></td><td>Daily ΔRankIC of the predicted expected R</td><td>Thousands of stocks per date: detects ΔIC ≈ 0.003</td></tr>
+<tr><td><strong>Decision</strong></td><td>Realised R expectancy of each day's top-k picks, after costs</td><td>The number a trader cares about</td></tr>
+<tr><td>Diagnostics</td><td>Per-head Brier skill and reliability; PIT/rank histograms; residual IC (spanning); % of positive years; NASDAQ/NSE sign agreement; liquidity-bucket breakdown</td><td>Show where the gain comes from and whether it is calibrated</td></tr>
+<tr><td>Retrieval only</td><td>Neighbour RPS against (random same-era neighbours, climatology, candidate prior, shuffled-future model); kNN versus the forecaster; optimal blend λ*; hubness skew; share of neighbours from the same stock or month</td><td>Shows whether similarity carries query-specific outcome information</td></tr>
+</table></div>
+<h3>Multiple testing and pass rules (fixed before results)</h3>
+<ul>
+<li>Every trial is logged. Holm correction across all candidates, Hansen SPA and the Model Confidence Set (<code>arch.bootstrap</code>), and a t ≥ 3 hurdle.</li>
+<li><strong>Pass:</strong> ΔRPS or ΔRankIC t ≥ 3 (Holm), in the 90% MCS, positive in ≥ 65% of years, same sign on NASDAQ and NSE, and a top-k expectancy gain after costs &gt; 0.</li>
+<li><strong>Promising:</strong> 2 ≤ t &lt; 3, or one market only.</li>
+<li><strong>Retrieval useful for trading:</strong> λ* &gt; 0 with a significant blend gain, and it beats the shuffled-future and candidate-prior controls. <strong>Retrieval useful as a viewer only:</strong> neighbour histograms calibrated (PIT roughly flat, slope 0.8–1.2) and better than random same-era neighbours.</li>
+<li><strong>Program stop:</strong> if nothing reaches Promising by the end of P3, chart shape adds no usable information beyond simple features in daily bars on this data. Archive with that finding.</li>
+</ul>
+
+<h2>6. Execution plan</h2>
+<ol class="phases">
+<li><strong>P0 — Labels, harness, baseline (3 days).</strong>
+  <ul>
+  <li>Build the label store: Y20/Y5/Y10/Y40, realised R, excess-return ranks, MFE/MAE in R.</li>
+  <li>Build the universe masks, the cost model and the leaderboard writer.</li>
+  <li>Train the baseline: LightGBM cumulative-ordinal heads on E0, then monotone repair and isotonic calibration.</li>
+  <li><strong>D0:</strong> rescore the old engine's neighbours on Y20 with and without shrinkage.</li>
+  <li><em>Gates:</em> label base rates match the spec; an injected future-peeking feature is caught; baseline versus itself gives Δ = 0; bit-exact rerun.</li>
+  </ul></li>
+<li><strong>P1 — E1 + E2 features (2–3 days).</strong> Answers directly whether VCP-grammar and anchored/event properties add anything beyond the 22 features.</li>
+<li><strong>P2 — Similarity S1 + S2 with controls (3–4 days).</strong> Includes the candidate-prior and shuffled-future tests and hubness diagnostics. Delivers the first outcome-aligned analogues.</li>
+<li><strong>P3 — E3 chart CNN + S3 reranker (1–1.5 weeks).</strong> Install CPU PyTorch. Pilot on 20% of stocks; promote to a full run only if the pilot t &gt; 1.5.</li>
+<li><strong>P4 — S4 contrastive encoder</strong>, only if P2/P3 show query-specific signal. Optionally Kronos embeddings, marked leak-exposed.</li>
+<li><strong>P5 — Freeze, open the vault, payoff test.</strong>
+  <ul>
+  <li>Use the finalists as a filter on existing loser strategy entries (gen498, gen182/191, VCP+RS, 2015–2026). Pass: Calmar (return ÷ maximum drawdown) improves after costs in at least 4 of 5 eras.</li>
+  <li>Run an event study of detected setups with the fixed exit rule, against matched random entries. Report the R-multiple distribution, expectancy and profit factor.</li>
+  </ul></li>
+<li><strong>P6 — If anything passes:</strong> build the viewer. For a query stock, show the predicted R-ladder, the 10–20 outcome-aligned analogues with their charts and outcomes, and the delisting and liquidity caveats.</li>
+</ol>
+
+<h2>7. Honest expectations</h2>
+<ul>
+<li>Published chart signals are largest at 1–5 days and in small or illiquid stocks. They are smaller at 20 days and after costs. India ranked among the weakest of 31 markets in one pattern study.</li>
+<li>Most likely outcome: E1/E3 add a small but real gain over the GBM. Analogues become calibrated and explainable, but seldom beat the forecaster.</li>
+<li>Most useful for trading: the R-ladder probabilities used as a <strong>filter and sizing input</strong> for breakouts the trader already takes.</li>
+</ul>
+
+<h2>Key sources</h2>
+<ul class="small">
+<li>Jiang, Kelly &amp; Xiu (2023) (Re-)Imag(in)ing Price Trends, J. Finance 78:3193</li>
+<li>Guijarro-Ordonez, Pelger &amp; Zanotti (2021) arXiv:2106.04028 · Murray, Xia &amp; Xiao (2024) Charting by Machines, JFE</li>
+<li>Rahimikia, Ni &amp; Wang (2025) arXiv:2511.18578 · Kronos arXiv:2508.02739</li>
+<li>Lee et al. (2026) FASCL arXiv:2602.10711 (github.com/HyeongminLEE/fascl) · Choi &amp; Cho (2026) arXiv:2608.23221 (github.com/dearyonghoon/which-histories-matter)</li>
+<li>Weinberger &amp; Tesauro (2007) MLKR · Goldberger et al. (2004) NCA · Rhodes et al. (2023) RF-GAP · Aumon et al. (2026) arXiv:2601.02735</li>
+<li>Zha et al. (2023) Rank-N-Contrast · Shi et al. (2021) CORN arXiv:2111.08851 · Galdran (2023) arXiv:2309.08701</li>
+<li>Delle Monache et al. (2013) Analog Ensemble, MWR 141:3498 · Radovanović et al. (2010) Hubs · Feldbauer et al. arXiv:1912.00706</li>
+<li>Lim, Zohren &amp; Roberts (2019) arXiv:1904.04912 · Barunik, Hronec &amp; Tobek arXiv:2408.07497</li>
+<li>López de Prado (2018) AFML · Joubert (2022) Meta-Labeling, JFDS · Meyer, Barziy &amp; Joubert (2023) JFDS</li>
+<li>Tsinaslanidis &amp; Kugiumtzis (2014) ESWA · Lo, Mamaysky &amp; Wang (2000) · Savin, Weller &amp; Zvingelis (2007)</li>
+<li>George &amp; Hwang (2004) · Da, Gurun &amp; Warachka (2014) · O'Neil Global Advisors breakout and gap studies · Han, Zhou &amp; Zhu (Taming Momentum Crashes)</li>
+<li>Gu, Kelly &amp; Xiu (2020) · Ding, Martin &amp; Yang (2022) · Harvey, Liu &amp; Zhu (2016) · Hansen (2005) SPA · Hansen, Lunde &amp; Nason (2011) MCS · Bailey &amp; López de Prado (2014) DSR</li>
+<li>Shumway (1997) · Shumway &amp; Warther (1999) · Novy-Marx &amp; Velikov (2016)</li>
+</ul>
+</main>
+</body>
+</html>

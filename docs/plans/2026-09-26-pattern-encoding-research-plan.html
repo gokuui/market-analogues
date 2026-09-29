@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pattern Encoding Plan</title>
+<style>
+:root{--bg:#fbfaf7;--fg:#1d1d1b;--muted:#5c5a55;--line:#e3e0d8;--card:#ffffff;--accent:#2f5d8a;--good:#2e7d4f;--warn:#a86412;--bad:#a33a3a;--code:#f2efe8}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#171716;--fg:#e9e7e2;--muted:#a09d96;--line:#33322f;--card:#1f1f1d;--accent:#7fb0e0;--good:#6cc08f;--warn:#e0a458;--bad:#e07a7a;--code:#262624}}
+:root[data-theme="dark"]{--bg:#171716;--fg:#e9e7e2;--muted:#a09d96;--line:#33322f;--card:#1f1f1d;--accent:#7fb0e0;--good:#6cc08f;--warn:#e0a458;--bad:#e07a7a;--code:#262624}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:920px;margin:0 auto;padding:32px 16px 80px}
+h1{font-size:1.9rem;margin:0 0 4px;line-height:1.2}
+h2{font-size:1.3rem;margin:44px 0 10px;padding-top:12px;border-top:1px solid var(--line)}
+h3{font-size:1.05rem;margin:24px 0 6px}
+p,li{max-width:74ch}
+.sub{color:var(--muted);margin:0 0 20px}
+.callout{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--accent);padding:14px 16px;border-radius:6px;margin:16px 0}
+.callout.warn{border-left-color:var(--warn)}
+.table-wrap{overflow-x:auto;margin:12px 0}
+table{border-collapse:collapse;width:100%;font-size:.92rem;background:var(--card)}
+th,td{border:1px solid var(--line);padding:7px 9px;text-align:left;vertical-align:top}
+th{background:var(--code)}
+code{background:var(--code);padding:1px 5px;border-radius:4px;font-size:.88em}
+.tag{display:inline-block;font-size:.78rem;padding:1px 7px;border-radius:10px;border:1px solid currentColor;white-space:nowrap}
+.hi{color:var(--good)}.mid{color:var(--warn)}.lo{color:var(--bad)}
+ol.phases>li{margin-bottom:10px}
+.small{font-size:.88rem;color:var(--muted)}
+</style>
+</head>
+<body>
+<main>
+<h1>Pattern encoding research plan</h1>
+<p class="sub"><strong>Superseded by <a href="2026-09-26-pattern-research-plan-v2.html">plan v2</a>.</strong> market-analogues · 2026-09-26 · Follows the Step 1–3 decision run (<code>experiments/decision/LOCAL_RUN_RESULTS.md</code>). Based on four parallel literature reviews using Paper Lantern, Exa and MarketMaker.</p>
+
+<div class="callout">
+<strong>Question.</strong> The owner believes chart patterns carry predictive information and that the analogue engine failed because of how it encodes charts, not because patterns are meaningless. This plan checks that belief against published research. It proposes better encodings and a fast, honest leaderboard for ranking them.
+</div>
+
+<h2>1. What the research says</h2>
+
+<h3>The belief is partly right</h3>
+<p>Chart shape does carry information beyond standard features. The strongest evidence is Jiang, Kelly &amp; Xiu, <em>(Re-)Imag(in)ing Price Trends</em> (J. Finance 2023):</p>
+<ul>
+<li><strong>Setup:</strong> a CNN trained on 5/20/60-day OHLC + volume + moving-average images of US stocks.</li>
+<li><strong>Result:</strong> it beat momentum and reversal. Known signals explain only about 10% of its forecasts.</li>
+<li><strong>Source of the gain:</strong> the authors' ablation shows it comes from the <em>representation</em>. The window is rescaled to its own high–low range, and the model is <em>trained on the forward outcome</em>. A 1D CNN on the same scaled series matches the 2D image model.</li>
+</ul>
+
+<h3>Why the current engine is the wrong encoding</h3>
+<div class="table-wrap"><table>
+<tr><th>Current engine</th><th>What the evidence favours</th></tr>
+<tr><td>Whole 252-session window</td><td>Local windows of 5–60 bars, aligned on the event (breakout or gap day)</td></tr>
+<tr><td>Hand-designed "looks similar" distance (unsupervised)</td><td>Similarity <em>learned</em> from forward outcomes (JKX; FASCL 2026; Choi &amp; Cho 2026)</td></tr>
+<tr><td>Average of 20 neighbours, no shrinkage</td><td>Supervised prediction head. Retrieval kept for explanation, with hub control and shrinkage</td></tr>
+<tr><td>Scores probability (3-class Brier) on 1,700 queries</td><td>Cross-sectional ranking on millions of stock-days, then payoff (R-multiples) with stops</td></tr>
+</table></div>
+<p>The closest published version of the current system is Tsinaslanidis &amp; Kugiumtzis (2014), which combined perceptually important points with DTW analogue matching. It <strong>did not beat the efficient-market baseline on any of 18 equity indices</strong>, the same outcome found here. Every positive result in this area is supervised, short-horizon (≤20 days), in-sample from the 1990s, or outside finance.</p>
+
+<h3>The "chart as a string" idea</h3>
+<ul>
+<li><span class="tag lo">No evidence</span> <strong>Generic symbolic strings</strong> (SAX, iSAX, ABBA, candlestick symbols, matrix-profile motifs): no predictive evidence for stock returns. They are compression and indexing tools.</li>
+<li><span class="tag mid">Untested</span> <strong>A string of swings</strong>: the base as a sequence of legs, each with depth in ATR units, duration, volume ratio and slope. This is the practitioner's VCP grammar, and nobody has tested it rigorously. It is cheap to test.</li>
+</ul>
+
+<h3>Chart properties with evidence (practitioner and academic)</h3>
+<div class="table-wrap"><table>
+<tr><th>Property</th><th>Definition for code</th><th>Evidence</th><th>Already in the 22 features?</th></tr>
+<tr><td>Nearness to 52-week high</td><td><code>close / max(high,252)</code></td><td>George &amp; Hwang 2004; NSE replication 2004–23</td><td>Partly</td></tr>
+<tr><td>Trend clarity</td><td>R² of log-price fit; information discreteness <code>sign(R12)·(%down−%up)</code></td><td>Momentum 5.67% vs 2.53% in the clearest quintile (t = 8.1)</td><td>No — path information</td></tr>
+<tr><td>Close position in range</td><td><code>(C−minL_n)/(maxH_n−minL_n)</code>, n = 5/20/60</td><td>JKX 2023 core ingredient</td><td>No</td></tr>
+<tr><td>Contraction ordering</td><td>ZigZag at 1.5×ATR; count 2–6; <code>T<sub>k+1</sub> ≤ 0.5–0.7·T<sub>k</sub></code>; final leg ≤ 1–2×ADR</td><td>Predicts move <em>size</em>, not direction; works as a conditioner</td><td>No — sequence information</td></tr>
+<tr><td>Breakout-day volume</td><td><code>vol/SMA50(vol)−1</code> on a pivot break</td><td>O'Neil, 197k breakouts: alpha 1.1% → 2.8% at &gt;150% volume. Hit rate flat at 57%: bigger payoff, not accuracy</td><td>Level only</td></tr>
+<tr><td>Gap size in σ units</td><td><code>ln(L<sub>t</sub>/H<sub>t−1</sub>)/σ<sub>252</sub></code></td><td>O'Neil, 104k gaps: &gt;4σ gives +2.19% over 50 days; &lt;2σ gives nothing</td><td>No</td></tr>
+<tr><td>Weinstein stage</td><td>SMA30w slope + price vs MA + Mansfield RS</td><td>No rigorous out-of-sample test; overlaps trend and RS</td><td>Mostly</td></tr>
+<tr><td>Volume dry-up</td><td><code>mean(vol,5–10)/mean(vol,50)</code></td><td>Weak (Lo, Mamaysky &amp; Wang 2000)</td><td>Partly</td></tr>
+</table></div>
+
+<div class="callout warn">
+<strong>Payoff, not accuracy.</strong> Pattern edges show up in the <em>size</em> of wins relative to losses under a stop:
+<ul>
+<li>O'Neil breakouts have a flat 57% hit rate, but filtering changes average gain versus loss.</li>
+<li>Han, Zhou &amp; Zhu: a 10% stop raised momentum's return from 0.99% to 1.69% a month.</li>
+</ul>
+An evaluation that scores only direction or probability will under-rate pattern information. The harness below therefore ends with a payoff test.
+</div>
+
+<h2>2. Candidate encodings, ranked by prior evidence and cost</h2>
+<div class="table-wrap"><table>
+<tr><th>ID</th><th>Encoding</th><th>Prior</th><th>Cost (12-core CPU)</th><th>How it is scored</th></tr>
+<tr><td>E0</td><td>Baseline: GBM on the existing 22 features</td><td>—</td><td>Done</td><td>Reference for every Δ</td></tr>
+<tr><td>E1</td><td><strong>Anchored and event features:</strong> 52-week-high distance, trend R², information discreteness, close position in the 5/20/60 range, gap σ, breakout-volume ratio, days since the last 4% burst, base ordinal</td><td><span class="tag hi">High</span></td><td>&lt;1 day</td><td>Extra GBM columns</td></tr>
+<tr><td>E2</td><td><strong>String of swings:</strong> the last 3–5 ATR-zigzag legs (depth/ATR, duration, volume ratio, slope), contraction count, T-ratio sequence, pivot distance</td><td><span class="tag mid">Untested</span></td><td>1 day</td><td>Extra GBM columns. Only if it helps: DTW or edit distance over legs</td></tr>
+<tr><td>E3</td><td><strong>Supervised 1D CNN</strong> on 20- and 60-bar windows. OHLC + MA scaled to the window's high–low range, volume scaled to the window's maximum</td><td><span class="tag hi">High</span></td><td>2–4 days</td><td>Out-of-fold probabilities stacked into the GBM</td></tr>
+<tr><td>E4</td><td>E3 on the <strong>residual path</strong> (stock minus β×benchmark)</td><td><span class="tag mid">Medium</span></td><td>+1 day</td><td>Stacked; compared against E3</td></tr>
+<tr><td>E5</td><td><strong>Retrieval rescue:</strong> kNN in the E3 embedding or a learned reranker over today's top-200 candidates. Includes hub control (CSLS or local scaling, reuse cap, one neighbour per stock per 20-day block) and shrinkage toward the base rate</td><td><span class="tag mid">Medium</span></td><td>2 days</td><td>kNN signal ΔIC, compared with a linear probe on the same embedding</td></tr>
+<tr><td>E6</td><td>Kronos (K-line foundation model) or TS2Vec embeddings, PCA to 16 dimensions</td><td><span class="tag lo">Low</span></td><td>1 day</td><td>Stacked. Kronos is <em>leak-exposed</em>: scored only on the period after its training data ends</td></tr>
+<tr><td>—</td><td>SAX/ABBA strings, matrix-profile motifs, candlestick tokens, LLM</td><td><span class="tag lo">Skip</span></td><td>—</td><td>Only if E1–E5 show signal</td></tr>
+</table></div>
+<p><strong>Also run first:</strong> a zero-cost diagnostic on the existing engine (D0 in phase P0 below).</p>
+<ul>
+<li>Measure its ranking skill (AUC and rank IC) before and after shrinking its probabilities toward the base rate.</li>
+<li>If ranking skill is above chance, the negative Brier came from poor calibration, not from zero information.</li>
+</ul>
+
+<h2>3. Evaluation harness: rank many encodings quickly and honestly</h2>
+<h3>Why the old test was too weak</h3>
+<p>The old test scored 1,700 hand-selected queries, and each query outcome carries full stock-level noise. It would need 99 months of live data to confirm a 1.9-point effect. The new harness scores <strong>every stock on every sampled date</strong>, then compares models date by date, so shared market noise cancels out. The agent's illustrative arithmetic: with σ<sub>ΔIC</sub> ≈ 0.03 over about 1,000 dates, it can detect a gain in rank IC of about <strong>0.003</strong> using historical data alone.</p>
+
+<h3>Specification</h3>
+<ul>
+<li><strong>Label store (frozen, hashed):</strong>
+  <ul>
+  <li>Entry at the next open.</li>
+  <li>Forward open-to-open return over 5, 10 and 20 days, as excess over the market, ranked within each date.</li>
+  <li>Binary "top quintile" label.</li>
+  <li>The old barrier label, kept for continuity.</li>
+  </ul></li>
+<li><strong>Universe:</strong> point-in-time price and liquidity floors, at least 250 days of history, and delisted stocks included.</li>
+<li><strong>Missing delisting returns:</strong> substitute −30% (Shumway) or −55% for NASDAQ (Shumway &amp; Warther); −50% for NSE.</li>
+<li><strong>NSE circuit-locked bars:</strong> not fillable, so excluded as entries.</li>
+<li><strong>Primary score:</strong> <code>ΔIC<sub>t</sub> = RankIC(GBM + X) − RankIC(GBM)</code> per date, with a Newey–West t-statistic on the mean. This is the Diebold–Mariano-style test from Gu, Kelly &amp; Xiu.</li>
+<li><strong>One common evaluator:</strong> every encoding becomes a per-(stock, date) vector. It is scored by Probe A (PCA-32 + ridge) and Probe B (a fixed-hyperparameter LightGBM on the 22 features + PCA-16 of X). Probe B's ΔIC is the leaderboard score. Baseline predictions are cached, so each candidate costs one embedding pass and two fits per fold.</li>
+<li><strong>Protocol:</strong>
+  <ul>
+  <li>Expanding walk-forward with yearly refits, test years 2006–2023.</li>
+  <li>Purge and embargo (h + 5 days).</li>
+  <li>Every learned encoder is trained only on data from before each fold's cutoff.</li>
+  </ul></li>
+<li><strong>Vault:</strong> 2024-01 onward (NASDAQ to 2026-03, NSE to 2026-02). Opened once, only for the 3–5 finalists, after the leaderboard is frozen.</li>
+<li><strong>Secondary metrics:</strong> residual IC (a spanning test), a Fama–MacBeth coefficient, top-decile net excess return (costs from Corwin–Schultz / Abdi–Ranaldo spreads, 15 bp per side minimum for NSE), percentage of positive years, US-versus-India sign agreement, and kNN neighbour consistency and calibration.</li>
+<li><strong>Multiple testing:</strong>
+  <ul>
+  <li>Every trial is logged: distance, window and seed each count.</li>
+  <li>Holm correction across the family, plus Hansen's SPA test and the Model Confidence Set, both from <code>arch.bootstrap</code>.</li>
+  <li>t ≥ 3 hurdle (Harvey–Liu–Zhu).</li>
+  <li>Deflated Sharpe ratio and PBO/CSCV for finalist portfolios.</li>
+  </ul></li>
+</ul>
+
+<h3>Pass rules (fixed before any result)</h3>
+<div class="table-wrap"><table>
+<tr><th>Verdict</th><th>Rule</th></tr>
+<tr><td class="hi">Pass</td><td>Probe-B ΔIC t ≥ 3, Holm p &lt; 0.05, in the 90% MCS, ΔIC &gt; 0 in ≥ 65% of test years, same sign in NASDAQ and NSE, residual-IC t ≥ 2, top-decile net excess &gt; 0</td></tr>
+<tr><td class="mid">Promising</td><td>2 ≤ t &lt; 3, or passes in one market only</td></tr>
+<tr><td class="lo">Fail</td><td>t &lt; 2, PBO &gt; 0.3, or the gain disappears after costs</td></tr>
+<tr><td>Viewer only</td><td>Fails ΔIC but kNN is well calibrated (slope 0.8–1.2) and informative. Useful as a visual aid, not as a filter</td></tr>
+</table></div>
+
+<h3>Stage 2 for finalists: payoff test</h3>
+<ul>
+<li>Use each finalist as a filter on the entries of existing strategies (loser gen498, gen182/191, VCP+RS, 2015–2026).</li>
+<li>Also run an event study with a fixed exit policy: structural stop at ≤ 1–1.5×ADR, partial profit at 2R, trailing exit on the 10/20-day MA.</li>
+<li>Report the R-multiple distribution, expectancy and profit factor, against a null of matched random entries.</li>
+<li>Pass: Calmar (return ÷ maximum drawdown) improves after costs in at least 4 of 5 eras.</li>
+</ul>
+
+<h2>4. Execution order</h2>
+<ol class="phases">
+<li><strong>P0 — Harness and baseline (1–2 days).</strong> Build the label store, universe masks and cost model. Cache walk-forward baseline predictions (E0). Build the leaderboard writer (schema below). Run the D0 diagnostic on the existing engine. <em>Gate:</em> synthetic-leak tests pass (a future-peeking feature must be caught), and baseline ΔIC against itself is 0.</li>
+<li><strong>P1 — Cheap encodings E1 and E2 (1–2 days).</strong> This answers directly whether the specific pattern properties add anything beyond the 22 features.</li>
+<li><strong>P2 — Supervised chart model E3/E4 (2–4 days).</strong> Pilot on 20% of stocks first; promote to a full run only if the pilot t &gt; 1.5.</li>
+<li><strong>P3 — Retrieval rescue E5 (2 days).</strong> Keeps the "what happened to similar charts" view if it is calibrated.</li>
+<li><strong>P4 — E6, only if budget allows.</strong></li>
+<li><strong>P5 — Freeze the leaderboard, open the vault, then run the payoff test on finalists.</strong></li>
+</ol>
+<p><strong>Stop rule for the whole program:</strong> if nothing reaches "Promising" by P3, chart shape adds no usable information beyond simple features on daily bars in this data. Record that and archive the project.</p>
+
+<h2>5. Leaderboard schema</h2>
+<p class="small"><code>run_id, encoding, family, params, encoder_train_cutoff, leak_exposed, n_trials_in_family, horizon, market, probe, standalone_rankIC, standalone_ICIR, delta_IC, delta_IC_t_NW, holm_p, in_MCS90, spa_p, residual_IC_t, fmb_t, pct_years_positive, worst_year_delta_IC, nasdaq_t, nse_t, top_decile_net_excess_bp, turnover, DSR, PBO, auc, logloss_delta, calib_slope, knn_consistency, corr_with_best, cpu_hours, label_store_hash, git_sha, verdict</code></p>
+
+<h2>6. Honest expectations</h2>
+<ul>
+<li>The published signal is largest at 1–5 days, in small and illiquid stocks, and in equal-weighted portfolios. It shrinks at 20 days and after costs.</li>
+<li>Transfer across markets is mixed: a US-trained model gave about zero in one China replication. Train and test on NSE separately.</li>
+<li>India ranked among the weakest of 31 markets in one pattern study (Lee et al. 2019).</li>
+<li>Realistic hope: a small gain over the GBM that is real and consistent, plus better entries through payoff filtering. A breakthrough is unlikely.</li>
+</ul>
+
+<h2>Sources</h2>
+<ul class="small">
+<li>Jiang, Kelly &amp; Xiu (2023) (Re-)Imag(in)ing Price Trends, J. Finance — doi.org/10.1111/jofi.13268</li>
+<li>Murray, Xia &amp; Xiao (2024) Charting by Machines, JFE</li>
+<li>Guijarro-Ordonez, Pelger &amp; Zanotti (2021) Deep Learning Statistical Arbitrage — arXiv:2106.04028</li>
+<li>Gu, Kelly &amp; Xiu (2020) Empirical Asset Pricing via Machine Learning, RFS</li>
+<li>Rahimikia, Ni &amp; Wang (2025) Re(Visiting) TSFMs in Finance — arXiv:2511.18578</li>
+<li>Shi et al. (2025) Kronos — arXiv:2508.02739; independent eval github.com/sumit-ai-ml/kronos-market-eval</li>
+<li>FASCL (2026) — arXiv:2602.10711; Choi &amp; Cho (2026) Which Histories Matter — arXiv:2608.23221</li>
+<li>Lo, Mamaysky &amp; Wang (2000) Foundations of Technical Analysis, J. Finance</li>
+<li>Savin, Weller &amp; Zvingelis (2007) Head-and-Shoulders, J. Fin. Econometrics</li>
+<li>Tsinaslanidis &amp; Kugiumtzis (2014) PIP + DTW prediction scheme, ESWA</li>
+<li>Radovanović et al. (2010) Hubs in space, JMLR; scikit-hubness — arXiv:1912.00706</li>
+<li>George &amp; Hwang (2004) 52-Week High and Momentum Investing, J. Finance</li>
+<li>Da, Gurun &amp; Warachka (2014) Frog in the Pan, RFS; Alpha Architect, Momentum and the Clarity of the Trend</li>
+<li>O'Neil Global Advisors — Breakouts study; Gap-Ups study</li>
+<li>Han, Zhou &amp; Zhu, Taming Momentum Crashes — SSRN 2407199</li>
+<li>Ding &amp; Martin (2017); Ding, Martin &amp; Yang (2022) — IC statistics</li>
+<li>Harvey, Liu &amp; Zhu (2016); Hansen (2005) SPA; Hansen, Lunde &amp; Nason (2011) MCS; Bailey &amp; López de Prado (2014) DSR; Bailey et al. (2017) PBO</li>
+<li>Shumway (1997); Shumway &amp; Warther (1999) — delisting bias</li>
+<li>Novy-Marx &amp; Velikov (2016) A Taxonomy of Anomalies and Their Trading Costs</li>
+<li>Meyer et al. (2025) TSFM leakage — arXiv:2510.13654; Gençay (2026) — arXiv:2608.27734</li>
+</ul>
+</main>
+</body>
+</html>
