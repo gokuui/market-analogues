@@ -1,5 +1,7 @@
 # Market Analogues
 
+> **Status: closed, 2026-09-29. Failed as a predictive trading tool.** The retrieval engine works as engineered, but historical chart analogues did not predict outcomes beyond simple features. Pattern-encoding follow-ups did not produce a tradable gain once fills were realistic. All derived data artifacts have been deleted. See the final entry (L-326) in [docs/development-log.html](docs/development-log.html) for the end-to-end account.
+
 A standalone, market-agnostic engine for finding structurally similar historical OHLCV episodes. It reads external datasets without modifying them, builds causal representations, verifies similarity with deterministic synthetic tests, and generates explainable HTML reports.
 
 ## Input contract
